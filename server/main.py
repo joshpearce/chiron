@@ -12,6 +12,7 @@ on the USB path.
 from __future__ import annotations
 
 import hmac
+import os
 import random
 import re
 import threading
@@ -37,11 +38,13 @@ CFG = yaml.safe_load((HERE / "config.yaml").read_text())
 app = FastAPI(title="chiron-server")
 chain = make_chain(CFG)
 
-# Optional shared-secret auth. Empty (the default) leaves the server open,
-# which is correct on the flight LAN where the only client is the iPad on a
-# Mac-hosted network. Set it before exposing the server on a public URL -
-# without it, anyone who finds the endpoint can spend the tutor's model budget.
-AUTH_TOKEN = (CFG.get("auth_token") or "").strip()
+# Shared-secret auth. Empty (the default) leaves the server open, which is
+# correct on the flight LAN where the only client is the iPad on a Mac-hosted
+# network. It is NOT optional on a public URL: without it, anyone who finds the
+# endpoint spends the tutor's model budget. CHIRON_AUTH_TOKEN is preferred over
+# the config key so the secret lives in the service environment rather than in
+# a file on disk.
+AUTH_TOKEN = (os.environ.get("CHIRON_AUTH_TOKEN") or CFG.get("auth_token") or "").strip()
 
 # Grade all free-text items of a check in one model call. Off by default: the
 # per-item path is the one verified end to end, and a check is the moment a

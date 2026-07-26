@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		22F0DE026E6BA746E20C90FF /* katex in Resources */ = {isa = PBXBuildFile; fileRef = 68F5F83F9E5D2EEB587385EF /* katex */; };
+		2BDCB839CEB3F03E8538AAB4 /* Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3091646F01947C00333241BA /* Credentials.swift */; };
 		3FC1C085C37DA34DC9042909 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA965B5A2EF9CB2D031CB1FE /* AppModel.swift */; };
 		49C25BFB2FE00A68F00BB1A9 /* book.css in Resources */ = {isa = PBXBuildFile; fileRef = 1F4412C6E6B26DC131C54235 /* book.css */; };
 		5C223EEF7AE0AF48A9942AE5 /* SelfTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AA842BA32080A6287EB9A6 /* SelfTest.swift */; };
@@ -28,6 +29,7 @@
 		1CB1CBACDDC9D2B6E47206C7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1F4412C6E6B26DC131C54235 /* book.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = book.css; sourceTree = "<group>"; };
 		2D6F3642FDD052AC3AE16540 /* Chiron.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chiron.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3091646F01947C00333241BA /* Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credentials.swift; sourceTree = "<group>"; };
 		4424A63E2C94C4589C4B5A8F /* default-book.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "default-book.json"; sourceTree = "<group>"; };
 		478BD8C483632C32A1A65736 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4E21F930C36788EA6466D67F /* CheckViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckViews.swift; sourceTree = "<group>"; };
@@ -63,6 +65,7 @@
 				BA965B5A2EF9CB2D031CB1FE /* AppModel.swift */,
 				478BD8C483632C32A1A65736 /* Assets.xcassets */,
 				4E21F930C36788EA6466D67F /* CheckViews.swift */,
+				3091646F01947C00333241BA /* Credentials.swift */,
 				1CB1CBACDDC9D2B6E47206C7 /* Info.plist */,
 				DF7A7AA69D4E3E6C07183050 /* MathText.swift */,
 				6CE4AEBB512C66BBEEE9B508 /* Models.swift */,
@@ -171,6 +174,7 @@
 				9A12A71D111DEE5FB1A1265C /* App.swift in Sources */,
 				3FC1C085C37DA34DC9042909 /* AppModel.swift in Sources */,
 				A67BB45B6191D6A590258527 /* CheckViews.swift in Sources */,
+				2BDCB839CEB3F03E8538AAB4 /* Credentials.swift in Sources */,
 				F2ECDC1E394FEBDB5B86B36F /* MathText.swift in Sources */,
 				AF29D4E2D309DDDCBC3C20E1 /* Models.swift in Sources */,
 				B512708502B49BDBA48396AE /* ReaderView.swift in Sources */,

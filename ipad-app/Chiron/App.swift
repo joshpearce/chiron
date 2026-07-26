@@ -177,6 +177,7 @@ struct ConnectionBadge: View {
 struct StartView: View {
     @EnvironmentObject var model: AppModel
     @State private var url: String = ""
+    @State private var token: String = ""
 
     var body: some View {
         VStack(spacing: 24) {
@@ -188,8 +189,18 @@ struct StartView: View {
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .frame(width: 280)
-                Button("Save") { model.sync.baseURL = url; Task { await model.sync.probe() } }
+                Button("Save") {
+                    model.sync.baseURL = url
+                    // Blank clears it, which is what the LAN case wants.
+                    Credentials.token = token
+                    Task { await model.sync.probe() }
+                }
             }
+            SecureField("shared key (blank on the local network)", text: $token)
+                .textFieldStyle(.roundedBorder)
+                .autocapitalization(.none)
+                .disableAutocorrection(true)
+                .frame(width: 360)
             Button {
                 Task { await model.start() }
             } label: {
@@ -207,7 +218,10 @@ struct StartView: View {
                 Text(err).foregroundStyle(.red).font(.callout)
             }
         }
-        .onAppear { url = model.sync.baseURL }
+        .onAppear {
+            url = model.sync.baseURL
+            token = Credentials.token ?? ""
+        }
     }
 }
 

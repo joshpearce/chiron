@@ -35,6 +35,7 @@ final class Sync: ObservableObject {
         if let url = URL(string: "\(baseURL)/health") {
             var req = URLRequest(url: url, timeoutInterval: 3)
             req.httpMethod = "GET"
+            Credentials.authorize(&req)
             if let (_, resp) = try? await URLSession.shared.data(for: req),
                (resp as? HTTPURLResponse)?.statusCode == 200 {
                 connected = true
@@ -59,6 +60,7 @@ final class Sync: ObservableObject {
             var req = URLRequest(url: url, timeoutInterval: 600)
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            Credentials.authorize(&req)
             req.httpBody = body
             if let (data, resp) = try? await URLSession.shared.data(for: req),
                (resp as? HTTPURLResponse)?.statusCode == 200 {

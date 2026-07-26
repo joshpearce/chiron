@@ -72,8 +72,13 @@ final class AppModel: ObservableObject {
     // MARK: - library
 
     func refreshSubjects() async {
-        if let url = URL(string: "\(sync.baseURL)/subjects"),
-           let (data, resp) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 3)),
+        var req: URLRequest?
+        if let url = URL(string: "\(sync.baseURL)/subjects") {
+            req = URLRequest(url: url, timeoutInterval: 3)
+            Credentials.authorize(&req!)
+        }
+        if let r = req,
+           let (data, resp) = try? await URLSession.shared.data(for: r),
            (resp as? HTTPURLResponse)?.statusCode == 200,
            let obj = try? JSONDecoder().decode([String: [SubjectInfo]].self, from: data) {
             subjects = obj["subjects"] ?? []
