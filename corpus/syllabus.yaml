@@ -113,6 +113,21 @@ units:
       - {id: c-moe-routing, name: "Router, top-k expert selection, load balancing"}
       - {id: c-moe-tradeoff, name: "Total vs active params; why A3B decodes fast (the teacher model IS one)"}
 
+  - id: u10
+    slug: hardware
+    title: "The iron: hardware and training at scale"
+    minutes: 30
+    prereqs: [u5, u6]
+    concepts:
+      - {id: c-memory-hierarchy, name: "GPU/accelerator anatomy: HBM vs SRAM, tensor cores, why matmul is the unit of currency"}
+      - {id: c-roofline, name: "Roofline model: arithmetic intensity, compute-bound vs bandwidth-bound (unifies the u6/u7 bandwidth math)"}
+      - {id: c-parallelism, name: "Data/tensor/pipeline/expert parallelism and the interconnects they stress"}
+      - {id: c-precision-scale, name: "Mixed precision (bf16/fp8), gradient accumulation/checkpointing, what a frontier training run physically is"}
+    notes: >
+      The reader's own M5 (153 GB/s, unified memory) and the 4-bit MoE serving
+      this book are the running examples on the inference side; contrast with
+      an H100 pod for the training side.
+
   - id: u8
     slug: harnesses
     title: "Harnesses and agents"
@@ -128,7 +143,7 @@ units:
     slug: synthesis
     title: "Synthesis: the full trace"
     minutes: 30
-    prereqs: [u1, u2, u3, u4, u5, u6, u7, u8]
+    prereqs: [u1, u2, u3, u4, u5, u6, u7, u10, u8]
     concepts:
       - {id: c-full-trace, name: "End-to-end trace: 'I hit enter in Claude Code' through every layer"}
     notes: "Closing cumulative check draws from ALL prior units, weighted to errors."

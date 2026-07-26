@@ -15,7 +15,7 @@ from render import render_chapter
 from roles import compose_check
 
 HERE = Path(__file__).parent
-OUT = HERE.parent / "ipad-app/DynamicBook/Resources/default-book.json"
+OUT = HERE.parent / "ipad-app/Chiron/Resources/default-book.json"
 
 
 class _NullState:

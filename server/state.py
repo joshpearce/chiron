@@ -180,11 +180,12 @@ class LearnerState:
         availability (agency) - the debt ledger carries the difference."""
         graph = self.corpus.prereq_graph()
         cleared = self.cleared_units()
+        loaded = set(self.corpus.units)
         out = []
         for uid in self.corpus.unit_order():
-            if uid in cleared:
-                continue
-            if all(p in cleared for p in graph.get(uid, [])):
+            if uid in cleared or uid not in loaded:
+                continue  # never offer a unit whose files are missing
+            if all(p in cleared for p in graph.get(uid, []) if p in loaded):
                 out.append(uid)
         return out
 

@@ -1,19 +1,22 @@
-"""book-server: the adaptive engine behind the iPad book.
+"""chiron-server: the adaptive engine behind the Chiron iPad app.
 
-One transport-agnostic exchange endpoint. The app reads fully detached; at a
-chapter boundary it POSTs everything that happened (beat responses, check
-answers, confidence ratings, timings, override/catch-up requests) and receives
-grades, gate result, the next chapter, and updated state - over Wi-Fi directly,
-or pushed through `iproxy` on the USB path.
+Chiron is a container of subjects; each subject has its own corpus and its own
+learner state. One transport-agnostic exchange endpoint per interaction: the
+app reads fully detached; at a chapter boundary it POSTs everything that
+happened (beat responses, check answers, confidence ratings, timings,
+override/catch-up requests) and receives grades, gate result, the next
+chapter, and updated state - over Wi-Fi directly, or pushed through `iproxy`
+on the USB path.
 """
 
 from __future__ import annotations
 
 import random
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 import checkers
@@ -26,12 +29,33 @@ from state import LearnerState
 HERE = Path(__file__).parent
 CFG = yaml.safe_load((HERE / "config.yaml").read_text())
 
-app = FastAPI(title="book-server")
-corpus = Corpus((HERE / CFG["corpus_dir"]).resolve())
-state = LearnerState((HERE / CFG["state_dir"]).resolve(), corpus)
+app = FastAPI(title="chiron-server")
 chain = LLMChain(CFG["upstreams"], CFG["llm"])
 SESSION = CFG["session"]
 rng = random.Random()
+
+
+@dataclass
+class Subject:
+    id: str
+    title: str
+    corpus: Corpus
+    state: LearnerState
+
+
+SUBJECTS: dict[str, Subject] = {}
+for spec in CFG["subjects"]:
+    corpus = Corpus((HERE / spec["corpus_dir"]).resolve())
+    SUBJECTS[spec["id"]] = Subject(
+        id=spec["id"], title=spec["title"], corpus=corpus,
+        state=LearnerState((HERE / spec["state_dir"]).resolve(), corpus))
+
+
+def _ctx(subject_id: str) -> Subject:
+    s = SUBJECTS.get(subject_id)
+    if s is None:
+        raise HTTPException(404, f"unknown subject: {subject_id}")
+    return s
 
 
 class BeatResponse(BaseModel):
@@ -49,6 +73,7 @@ class ItemResponse(BaseModel):
 
 
 class Exchange(BaseModel):
+    subject: str = "ai"
     phase: str = "boundary"              # boundary | pretest | start
     unit: str | None = None
     beat_responses: list[BeatResponse] = []
@@ -64,12 +89,12 @@ class Exchange(BaseModel):
 
 # ------------------------------------------------------------------ helpers
 
-def _grade_items(responses: list[ItemResponse], results: list) -> tuple[int, int]:
+def _grade_items(ctx: Subject, responses: list[ItemResponse], results: list) -> tuple[int, int]:
     """Grade item responses (mechanical first, LLM for free text). Appends
     result dicts; returns (passed, total)."""
     passed = 0
     for r in responses:
-        q, unit_id = corpus.find_question(r.item_id)
+        q, unit_id = ctx.corpus.find_question(r.item_id)
         if q is None:
             continue
         if q.get("kind") == "mcq":
@@ -80,10 +105,10 @@ def _grade_items(responses: list[ItemResponse], results: list) -> tuple[int, int
             g = {"verdict": "pass" if ok else "fail", "misconceptions": [],
                  "feedback_md": f"Reference: {q.get('answer', '')}"}
         else:
-            g = roles.grade_free_text(chain, q, r.response or "", corpus.misconceptions)
+            g = roles.grade_free_text(chain, q, r.response or "", ctx.corpus.misconceptions)
         ok = g["verdict"] in ("pass", "valid_alternative_path")
         passed += ok
-        state.apply("item_graded", {
+        ctx.state.apply("item_graded", {
             "item": r.item_id, "concept": q.get("concept"), "unit": unit_id,
             "verdict": g["verdict"], "confidence": r.confidence,
             "misconceptions": g.get("misconceptions", []),
@@ -93,21 +118,21 @@ def _grade_items(responses: list[ItemResponse], results: list) -> tuple[int, int
     return passed, len(responses)
 
 
-def _grade_beats(responses: list[BeatResponse], results: list):
+def _grade_beats(ctx: Subject, responses: list[BeatResponse], results: list):
     for r in responses:
-        beat, unit_id = corpus.find_beat(r.beat_id)
+        beat, unit_id = ctx.corpus.find_beat(r.beat_id)
         if beat is None:
             continue
         check = beat.get("check", "llm")
         if checkers.is_mechanical(check):
             ok = checkers.check_answer(check, beat.get("answer"), r.response)
-            verdict = "pass" if ok else "fail"
-            g = {"verdict": verdict, "misconceptions": [], "feedback_md": ""}
+            g = {"verdict": "pass" if ok else "fail", "misconceptions": [],
+                 "feedback_md": ""}
         else:
             g = roles.grade_free_text(
                 chain, {"prompt": beat["prompt"], "answer": beat.get("answer"),
-                        "rubric": beat.get("rubric")}, r.response, corpus.misconceptions)
-        state.apply("item_graded", {
+                        "rubric": beat.get("rubric")}, r.response, ctx.corpus.misconceptions)
+        ctx.state.apply("item_graded", {
             "item": r.beat_id, "concept": beat.get("concept"), "unit": unit_id,
             "verdict": g["verdict"], "confidence": None,
             "misconceptions": g.get("misconceptions", []),
@@ -117,8 +142,8 @@ def _grade_beats(responses: list[BeatResponse], results: list):
                         "self_verdict": r.self_verdict})
 
 
-def _next_unit(choice: str | None) -> str | None:
-    fringe = state.fringe()
+def _next_unit(ctx: Subject, choice: str | None) -> str | None:
+    fringe = ctx.state.fringe()
     if not fringe:
         return None
     if choice and choice in fringe:
@@ -126,31 +151,32 @@ def _next_unit(choice: str | None) -> str | None:
     return fringe[0]
 
 
-def _build_chapter(unit_id: str, check_summary: str) -> dict:
-    unit = corpus.units[unit_id]
-    directives = roles.plan_directives(chain, state, unit, check_summary)
-    assembled, _ = roles.author_chapter(chain, unit, directives, corpus)
+def _build_chapter(ctx: Subject, unit_id: str, check_summary: str) -> dict:
+    unit = ctx.corpus.units[unit_id]
+    directives = roles.plan_directives(chain, ctx.state, unit, check_summary)
+    assembled, _ = roles.author_chapter(chain, unit, directives, ctx.corpus)
     check_items = roles.compose_check(
-        unit, state, corpus, SESSION["check_items"], SESSION["callback_fraction"], rng)
+        unit, ctx.state, ctx.corpus, SESSION["check_items"],
+        SESSION["callback_fraction"], rng)
     pretest = list(unit.questions.get("pretest", []) or [])
-    state.apply("unit_started", {"unit": unit_id})
-    state.apply("exposed", {"unit": unit_id, "concepts": unit.concept_ids})
-    state.apply("summary", {"text": directives["summary"]})
+    ctx.state.apply("unit_started", {"unit": unit_id})
+    ctx.state.apply("exposed", {"unit": unit_id, "concepts": unit.concept_ids})
+    ctx.state.apply("summary", {"text": directives["summary"]})
     if unit.front.get("assumes"):
-        state.apply("assumed_known", {"concepts": unit.front["assumes"]})
+        ctx.state.apply("assumed_known", {"concepts": unit.front["assumes"]})
     return render_chapter(unit, assembled, directives, pretest, check_items)
 
 
-def _build_catchup() -> dict | None:
+def _build_catchup(ctx: Subject) -> dict | None:
     """Comprehensive backfill from the whole debt ledger: representation-
     switched sections for every debted concept, then a combined check that can
     retire the debt."""
-    debt = state.open_debt()
+    debt = ctx.state.open_debt()
     if not debt:
         return None
     sections, check_pool = [], []
     for d in debt:
-        unit = corpus.units.get(d["unit"])
+        unit = ctx.corpus.units.get(d["unit"])
         if not unit:
             continue
         variant = next((v for v in ("more-intuition", "se-analogies", "deeper-math")
@@ -161,7 +187,8 @@ def _build_catchup() -> dict | None:
             if not covers:
                 continue
             mdtext = (f"## {s.heading}\n\n" + unit.depths[variant][s.heading]) \
-                if variant and s.heading in unit.depths[variant] else s.markdown()
+                if variant and s.heading in unit.depths[variant] \
+                and len(unit.depths[variant][s.heading]) > 400 else s.markdown()
             sections.append({"heading": f"[{unit.id}] {s.heading}",
                              "markdown": mdtext, "beats": []})
         missed = set(d.get("items_missed", []))
@@ -178,49 +205,67 @@ def _build_catchup() -> dict | None:
         intro_md = ("This chapter consolidates everything skipped or missed so far, "
                     "explained differently than the first pass. The check at the end "
                     "retires the debt it covers.")
-        sections_list = sections
+        sections = []
 
     directives = {"opening_note_md": "", "next_action":
-                  "Work every section, then take the combined check.", "summary": state.data["summary"]}
+                  "Work every section, then take the combined check.",
+                  "summary": ctx.state.data["summary"]}
     rng.shuffle(check_pool)
-    fake_unit = _CatchupUnit()
-    fake_unit.sections = []
-    payload = render_chapter(fake_unit, sections, directives, [],
-                             check_pool[: max(8, len(check_pool) // 2)])
-    return payload
+    return render_chapter(_CatchupUnit(), sections, directives, [],
+                          check_pool[: max(8, len(check_pool) // 2)])
+
+
+def _state_payload(ctx: Subject) -> dict:
+    spine = []
+    for uid in ctx.corpus.unit_order():
+        u = ctx.corpus.units.get(uid)
+        spine.append({
+            "unit": uid, "title": u.title if u else uid,
+            "status": ctx.state.unit_status(uid),
+            "score": ctx.state.data["units"].get(uid, {}).get("check_score"),
+            "in_fringe": uid in ctx.state.fringe(),
+        })
+    return {
+        "spine": spine,
+        "fringe": ctx.state.fringe(),
+        "debt": ctx.state.open_debt(),
+        "active_misconceptions": ctx.state.active_misconceptions(),
+        "summary": ctx.state.data["summary"],
+        "session_minutes": ctx.state.session_minutes(),
+        "llm": chain.status(),
+    }
 
 
 # ------------------------------------------------------------------ endpoints
 
 @app.get("/health")
 def health():
-    return {"ok": True, "llm": chain.status(), "units_loaded": list(corpus.units)}
+    return {"ok": True, "llm": chain.status(),
+            "subjects": {s.id: list(s.corpus.units) for s in SUBJECTS.values()}}
+
+
+@app.get("/subjects")
+def subjects():
+    out = []
+    for s in SUBJECTS.values():
+        total = len(s.corpus.unit_order())
+        cleared = len(s.state.cleared_units())
+        out.append({"id": s.id, "title": s.title, "units_total": total,
+                    "units_cleared": cleared,
+                    "current_unit": s.state.data.get("current_unit"),
+                    "debt": len(s.state.open_debt())})
+    return {"subjects": out}
 
 
 @app.get("/state")
-def get_state():
-    spine = []
-    for uid in corpus.unit_order():
-        u = corpus.units.get(uid)
-        spine.append({
-            "unit": uid, "title": u.title if u else uid,
-            "status": state.unit_status(uid),
-            "score": state.data["units"].get(uid, {}).get("check_score"),
-            "in_fringe": uid in state.fringe(),
-        })
-    return {
-        "spine": spine,
-        "fringe": state.fringe(),
-        "debt": state.open_debt(),
-        "active_misconceptions": state.active_misconceptions(),
-        "summary": state.data["summary"],
-        "session_minutes": state.session_minutes(),
-        "llm": chain.status(),
-    }
+def get_state(subject: str = "ai"):
+    return _state_payload(_ctx(subject))
 
 
 @app.post("/exchange")
 def exchange(ex: Exchange):
+    ctx = _ctx(ex.subject)
+    state, corpus = ctx.state, ctx.corpus
     results: list = []
     gate = None
     chapter = None
@@ -232,15 +277,15 @@ def exchange(ex: Exchange):
     if ex.break_minutes:
         state.apply("break_taken", {"minutes": ex.break_minutes})
 
-    _grade_beats(ex.beat_responses, results)
+    _grade_beats(ctx, ex.beat_responses, results)
 
     check_summary = ""
     if ex.pretest_responses:
-        p, t = _grade_items(ex.pretest_responses, results)
+        p, t = _grade_items(ctx, ex.pretest_responses, results)
         check_summary += f"Pretest: {p}/{t}. "
 
     if ex.check_responses:
-        p, t = _grade_items(ex.check_responses, results)
+        p, t = _grade_items(ctx, ex.check_responses, results)
         score = p / t if t else 0.0
         passed = score >= SESSION["mastery_gate"]
         unit = corpus.units.get(ex.unit) if ex.unit else None
@@ -252,11 +297,6 @@ def exchange(ex: Exchange):
                 state.apply("debt_retired", {"unit": d["unit"]})
         missed = [r["item_id"] for r in results if r.get("verdict")
                   not in ("pass", "valid_alternative_path")]
-        # misconceptions answered correctly this round get cleared
-        for mid in list(state.active_misconceptions()):
-            hit = any(mid in r.get("misconceptions", []) for r in results)
-            if not hit and any(r.get("verdict") == "pass" for r in results):
-                pass  # cleared only via explicit refutation items; keep conservative
         gate = {"score": score, "passed": passed,
                 "gate": SESSION["mastery_gate"],
                 "extension_unlocked": score >= SESSION["extension_trigger"]}
@@ -286,20 +326,21 @@ def exchange(ex: Exchange):
     # what to read next
     advance_allowed = (gate is None) or gate["passed"] or ex.override or ex.skipped_check
     if ex.catch_me_up:
-        chapter = _build_catchup()
+        chapter = _build_catchup(ctx)
     if chapter is None and ex.phase in ("boundary", "start") and advance_allowed:
-        nxt = _next_unit(ex.choice)
+        nxt = _next_unit(ctx, ex.choice)
         if nxt:
-            chapter = _build_chapter(nxt, check_summary)
+            chapter = _build_chapter(ctx, nxt, check_summary)
     elif chapter is None and gate and not gate["passed"] and not ex.override:
         # remediation loop: rebuild the SAME unit; planner sees the failed
         # check in the summary and must switch representation
-        chapter = _build_chapter(ex.unit, check_summary + "REMEDIATE: switch representation, do not re-explain the same way.")
+        chapter = _build_chapter(ctx, ex.unit, check_summary +
+                                 "REMEDIATE: switch representation, do not re-explain the same way.")
 
     return {
         "results": results,
         "gate": gate,
         "chapter": chapter,
-        "state": get_state(),
+        "state": _state_payload(ctx),
         "break_suggestion": break_suggestion,
     }

@@ -208,8 +208,8 @@ struct BreakView: View {
         }
         .onAppear { remaining = suggestion.minutes * 60 }
         .task {
-            while remaining > 0 {
-                try? await Task.sleep(for: .seconds(1))
+            while remaining > 0 && !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
                 remaining -= 1
             }
         }
@@ -224,7 +224,7 @@ struct SpineView: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        NavigationStack {
+        NavigationView {
             List {
                 if let state = model.bookState {
                     Section("Progress") {
@@ -262,6 +262,7 @@ struct SpineView: View {
             }
             .navigationTitle("The spine")
         }
+        .navigationViewStyle(.stack)
     }
 
     private func icon(_ s: String) -> String {

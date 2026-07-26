@@ -48,7 +48,9 @@ struct ReaderView: UIViewRepresentable {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "bridge")
         let web = WKWebView(frame: .zero, configuration: config)
-        web.isInspectable = true
+        if #available(iOS 16.4, *) {
+            web.isInspectable = true
+        }
         web.scrollView.contentInsetAdjustmentBehavior = .never
         context.coordinator.web = web
         load(into: web, context: context)

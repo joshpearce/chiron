@@ -72,7 +72,32 @@ struct BeatResponse: Codable {
     }
 }
 
+struct SubjectInfo: Codable, Identifiable {
+    let id: String
+    let title: String
+    let unitsTotal: Int?
+    let unitsCleared: Int?
+    let currentUnit: String?
+    let debt: Int?
+
+    var progressLine: String {
+        var parts: [String] = []
+        if let c = unitsCleared, let t = unitsTotal { parts.append("\(c)/\(t) units") }
+        if let u = currentUnit { parts.append("reading \(u)") }
+        if let d = debt, d > 0 { parts.append("\(d) in debt") }
+        return parts.isEmpty ? "not started" : parts.joined(separator: " · ")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, debt
+        case unitsTotal = "units_total"
+        case unitsCleared = "units_cleared"
+        case currentUnit = "current_unit"
+    }
+}
+
 struct ExchangeRequest: Codable {
+    var subject: String = "ai"
     var phase: String = "boundary"
     var unit: String?
     var beatResponses: [BeatResponse] = []
@@ -86,7 +111,7 @@ struct ExchangeRequest: Codable {
     var breakMinutes: Double?
 
     enum CodingKeys: String, CodingKey {
-        case phase, unit, override, choice
+        case subject, phase, unit, override, choice
         case beatResponses = "beat_responses"
         case pretestResponses = "pretest_responses"
         case checkResponses = "check_responses"

@@ -1,6 +1,9 @@
-# book-server configuration
-corpus_dir: ../corpus
-state_dir: ../state
+# chiron-server configuration
+subjects:
+  - id: ai
+    title: "How AI Works"
+    corpus_dir: ../corpus
+    state_dir: ../state/ai
 static_dir: static
 
 upstreams:

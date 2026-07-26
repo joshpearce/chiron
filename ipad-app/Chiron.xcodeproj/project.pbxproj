@@ -1,0 +1,696 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		002912961520DFF3A4520EC2 /* KaTeX_Script-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3B6D5B05B22D52032CB2ADED /* KaTeX_Script-Regular.ttf */; };
+		0410B66E053DE24C1E022969 /* KaTeX_Fraktur-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 96619CD088FCA8DEFC252EB3 /* KaTeX_Fraktur-Regular.woff2 */; };
+		090BA385EC158EFE69870C5F /* KaTeX_Fraktur-Bold.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = A4611ABEA9C9C53D24016B6D /* KaTeX_Fraktur-Bold.woff2 */; };
+		0B3C9D9FDBE2787EEC5B179A /* KaTeX_SansSerif-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4933977314BDE64F2503840C /* KaTeX_SansSerif-Italic.ttf */; };
+		0C5C68259F3EA7D8ABC8096F /* KaTeX_Fraktur-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9A56D9CE221CD062F7A1D90F /* KaTeX_Fraktur-Regular.ttf */; };
+		0DAF5B8E0A1B3FDA6BD4C628 /* KaTeX_SansSerif-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3D43C99103FABFD1856E6C2F /* KaTeX_SansSerif-Bold.ttf */; };
+		0FFEDA922504F22FD6A72592 /* KaTeX_AMS-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DE7893BC4C88D83ECF339A4B /* KaTeX_AMS-Regular.ttf */; };
+		11E09DA53B7A6A8AC0241B94 /* KaTeX_Size1-Regular.woff in Resources */ = {isa = PBXBuildFile; fileRef = 06C582D23551FA911E28580F /* KaTeX_Size1-Regular.woff */; };
+		15628BB867885B4C204AAACC /* KaTeX_Math-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 91C28E82CCD947C477738161 /* KaTeX_Math-Italic.ttf */; };
+		19120ADE3B2273590EFB4E80 /* KaTeX_Fraktur-Bold.woff in Resources */ = {isa = PBXBuildFile; fileRef = 516CEC4E1B3E60BF55CB493B /* KaTeX_Fraktur-Bold.woff */; };
+		1B204B64FEE2DBB7366951DE /* KaTeX_Main-BoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 07F899D4A81CAC3F9BA11B4D /* KaTeX_Main-BoldItalic.ttf */; };
+		1F58C9583939DC1C0348EEF9 /* KaTeX_Size4-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9E9F9BD27D68C1A25608FDFA /* KaTeX_Size4-Regular.ttf */; };
+		23E7DF656294EE2791A7DA33 /* KaTeX_Main-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D531D4771F1A2F274A1C5128 /* KaTeX_Main-Regular.ttf */; };
+		2494D72013CC78DA767A8D55 /* KaTeX_Math-BoldItalic.woff in Resources */ = {isa = PBXBuildFile; fileRef = 7F47DE61BC59197917253535 /* KaTeX_Math-BoldItalic.woff */; };
+		256D17D59940752549DF00FC /* KaTeX_Math-Italic.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = F1EDBF687B785C0AB704251F /* KaTeX_Math-Italic.woff2 */; };
+		2D87BC9FBE5D4208BAEB6EB4 /* KaTeX_Size2-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 21D11D4F8ADB79ADFA17A6D2 /* KaTeX_Size2-Regular.woff2 */; };
+		2E7C89C5AB89D5413C05F53B /* KaTeX_Caligraphic-Bold.woff in Resources */ = {isa = PBXBuildFile; fileRef = 149F207864400C2D044F2304 /* KaTeX_Caligraphic-Bold.woff */; };
+		3CE785E3CA71891D3986E5D5 /* auto-render.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 63BCA5820450ECC865656A6B /* auto-render.min.js */; };
+		3E9AB035B55E41EAEF1D89CF /* KaTeX_Fraktur-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 804C6A20116C5A90D2133F04 /* KaTeX_Fraktur-Bold.ttf */; };
+		3FC1C085C37DA34DC9042909 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA965B5A2EF9CB2D031CB1FE /* AppModel.swift */; };
+		4013A910FE7AFD5A1AF64227 /* KaTeX_SansSerif-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 26422C5DCB6B0C9FF2028E2B /* KaTeX_SansSerif-Regular.woff2 */; };
+		41D359934CC2364DDA50FD75 /* KaTeX_Main-BoldItalic.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = E5B44C590F364DB8007652A8 /* KaTeX_Main-BoldItalic.woff2 */; };
+		45A97F6518EC1A37B760EDD0 /* KaTeX_SansSerif-Italic.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 26F76A784591A070A446D0CA /* KaTeX_SansSerif-Italic.woff2 */; };
+		463A2EADEEE58C757FF1C83C /* KaTeX_SansSerif-Bold.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 7B37B5EDF14D592DADD292F3 /* KaTeX_SansSerif-Bold.woff2 */; };
+		49C25BFB2FE00A68F00BB1A9 /* book.css in Resources */ = {isa = PBXBuildFile; fileRef = 1F4412C6E6B26DC131C54235 /* book.css */; };
+		4A797936738F009080D6FDF5 /* KaTeX_Size3-Regular.woff in Resources */ = {isa = PBXBuildFile; fileRef = A2B609F01FACBAFB5EECF50D /* KaTeX_Size3-Regular.woff */; };
+		4A9EA3993E2C1F4C424E35B1 /* auto-render.js in Resources */ = {isa = PBXBuildFile; fileRef = D44BE806EB80525E7499E51D /* auto-render.js */; };
+		4E6BB61CF52BD1699707ED40 /* KaTeX_Typewriter-Regular.woff in Resources */ = {isa = PBXBuildFile; fileRef = 338163F97AEDB85D636088C5 /* KaTeX_Typewriter-Regular.woff */; };
+		52B6227D20134C21A4E8B398 /* KaTeX_Caligraphic-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 87D0EF7FC18B5AC5036C24F1 /* KaTeX_Caligraphic-Regular.ttf */; };
+		57EC7E8D5BDD8229C2A7329F /* mathtex-script-type.mjs in Resources */ = {isa = PBXBuildFile; fileRef = 3C7B4E1DBA7B3F6DE66BCCDA /* mathtex-script-type.mjs */; };
+		57F0FBCD6BF1B028CC0E94C5 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 89C6D89AAB41D1F44AED752C /* README.md */; };
+		585A063296A2ECB601B59D11 /* KaTeX_Size4-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 14014A3E09F3085D310CAD81 /* KaTeX_Size4-Regular.woff2 */; };
+		5986C8B19A33A2F1E56ED67E /* KaTeX_SansSerif-Regular.woff in Resources */ = {isa = PBXBuildFile; fileRef = 7BFF35604982F6DB7DF83990 /* KaTeX_SansSerif-Regular.woff */; };
+		5AD1E82FF1EC44E3A487EB0F /* copy-tex.mjs in Resources */ = {isa = PBXBuildFile; fileRef = 0B0BB16C9FEAD8DF5BA50717 /* copy-tex.mjs */; };
+		5B0847E18307769F5A75723C /* KaTeX_Main-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 86A03626ABA86DE23531BF64 /* KaTeX_Main-Bold.ttf */; };
+		5B3CA61D77F702AF865DABF5 /* KaTeX_Math-BoldItalic.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = A0B54FB2561CEB6962020510 /* KaTeX_Math-BoldItalic.woff2 */; };
+		5D638E649FDDEC94A1FC0694 /* KaTeX_SansSerif-Italic.woff in Resources */ = {isa = PBXBuildFile; fileRef = 26C27720485460AF8450EFB5 /* KaTeX_SansSerif-Italic.woff */; };
+		5FBA2EC63BE2F113FFD665AF /* katex.js in Resources */ = {isa = PBXBuildFile; fileRef = 7C88980E704A78710A73FF10 /* katex.js */; };
+		602FC714B4AACD2281C7D13A /* KaTeX_Caligraphic-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5DB6BA9B3762CD1FEE248330 /* KaTeX_Caligraphic-Bold.ttf */; };
+		61C40BAAADB667EBE4856CDD /* KaTeX_Main-Regular.woff in Resources */ = {isa = PBXBuildFile; fileRef = 7542ED9CB05CF2B1B0780A5B /* KaTeX_Main-Regular.woff */; };
+		645AD3A862DFDEFFC057F9F8 /* katex.mjs in Resources */ = {isa = PBXBuildFile; fileRef = AE2C1BD8F7C3AC032909F78B /* katex.mjs */; };
+		64A647D27AA57B3B63AC04C6 /* KaTeX_Size2-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B31F64CCEAC925197380258 /* KaTeX_Size2-Regular.ttf */; };
+		657B0E5450B3BEAF599D95D4 /* mhchem.js in Resources */ = {isa = PBXBuildFile; fileRef = F89CA62122DFF35CBBAE4137 /* mhchem.js */; };
+		6620FC67E863E8B99BCF151A /* KaTeX_Main-BoldItalic.woff in Resources */ = {isa = PBXBuildFile; fileRef = 53CED93FDF3D813814532D3C /* KaTeX_Main-BoldItalic.woff */; };
+		711C1E8DB5CFA47414D22C0E /* render-a11y-string.js in Resources */ = {isa = PBXBuildFile; fileRef = E2FE61D5DEE733655FF1363B /* render-a11y-string.js */; };
+		716004376750CA0207B08F1F /* katex.min.css in Resources */ = {isa = PBXBuildFile; fileRef = 027A18681AA2223E2FFF8C54 /* katex.min.css */; };
+		77638129F5416082BCFF2FC4 /* KaTeX_SansSerif-Bold.woff in Resources */ = {isa = PBXBuildFile; fileRef = 03CBF7920658C22D25D5D3B0 /* KaTeX_SansSerif-Bold.woff */; };
+		799969B3C890EBB73AB74B0C /* KaTeX_AMS-Regular.woff in Resources */ = {isa = PBXBuildFile; fileRef = 95DC55844038C2D2C347C929 /* KaTeX_AMS-Regular.woff */; };
+		7C0D36F176AEC93FF426D24F /* KaTeX_Main-Italic.woff in Resources */ = {isa = PBXBuildFile; fileRef = 64CBF37F452C7829A232A4CC /* KaTeX_Main-Italic.woff */; };
+		8702BF692A179C9D9A170B42 /* KaTeX_AMS-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = D1F631EAF42EBA7E1E0735BE /* KaTeX_AMS-Regular.woff2 */; };
+		883CDB3EEE117485E9D2A5AE /* KaTeX_Size2-Regular.woff in Resources */ = {isa = PBXBuildFile; fileRef = 18C073BDA31AA35BB3E59D35 /* KaTeX_Size2-Regular.woff */; };
+		8B7415A0D57A05F203D74AE1 /* book.js in Resources */ = {isa = PBXBuildFile; fileRef = 756BF2C5D73A3EFF3BD5C55C /* book.js */; };
+		8C8562A01FFD05DE4D17DD2A /* default-book.json in Resources */ = {isa = PBXBuildFile; fileRef = 4424A63E2C94C4589C4B5A8F /* default-book.json */; };
+		935E13B205274070BFA0792F /* katex.css in Resources */ = {isa = PBXBuildFile; fileRef = 33C252D774DDFFCE2CB70D4B /* katex.css */; };
+		971307E637D32190E59CB558 /* copy-tex.js in Resources */ = {isa = PBXBuildFile; fileRef = 18815A004B28BA4DAAC4C4D4 /* copy-tex.js */; };
+		97F9F08E127B54F9E42D7BE7 /* mathtex-script-type.js in Resources */ = {isa = PBXBuildFile; fileRef = 4F6D514D2A21618ED133AA79 /* mathtex-script-type.js */; };
+		9A12A71D111DEE5FB1A1265C /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A19EB4693171E14B4F6BAD /* App.swift */; };
+		9A3752B8274804DC193E5101 /* KaTeX_Caligraphic-Regular.woff in Resources */ = {isa = PBXBuildFile; fileRef = 04C968C09EF16CB9C163DE27 /* KaTeX_Caligraphic-Regular.woff */; };
+		9A62819EA011C23EEE85DB76 /* katex.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 4EE0A84B6EA5A826DD1B2487 /* katex.min.js */; };
+		A0641BBC47F65EC186C3AA87 /* Sync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDBD0C79377E20146856D09 /* Sync.swift */; };
+		A67BB45B6191D6A590258527 /* CheckViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E21F930C36788EA6466D67F /* CheckViews.swift */; };
+		A7E8C7C80F4E9504F599558C /* KaTeX_Size4-Regular.woff in Resources */ = {isa = PBXBuildFile; fileRef = 79BD137168D282033E3D0C96 /* KaTeX_Size4-Regular.woff */; };
+		AA9463C3DA8907A6FC07B120 /* KaTeX_Typewriter-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = BED01CD6FCAEB295C0971695 /* KaTeX_Typewriter-Regular.woff2 */; };
+		AF29D4E2D309DDDCBC3C20E1 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE4AEBB512C66BBEEE9B508 /* Models.swift */; };
+		B3BC61CE4A0E039A106F89F5 /* copy-tex.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 3F9C2FAC6C79BD9F5DC97002 /* copy-tex.min.js */; };
+		B3D40829DB3ECD5C20A84B95 /* KaTeX_Main-Bold.woff in Resources */ = {isa = PBXBuildFile; fileRef = 1829387F556AAB7364753DE6 /* KaTeX_Main-Bold.woff */; };
+		B4F6C801DD64AC6E9A6914D5 /* KaTeX_Size3-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 437018421A510ECEEC559442 /* KaTeX_Size3-Regular.woff2 */; };
+		B512708502B49BDBA48396AE /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */; };
+		B92FE7DF8BC4A7F942BE233C /* KaTeX_Math-Italic.woff in Resources */ = {isa = PBXBuildFile; fileRef = 2F96392E1B67E20FA2BBEB37 /* KaTeX_Math-Italic.woff */; };
+		B9F89A21A417EA3B24928DB4 /* KaTeX_Main-Italic.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 845507567B0E0E8F67ABC885 /* KaTeX_Main-Italic.woff2 */; };
+		BDBFC7EB4E77F4B8285DE4B7 /* auto-render.mjs in Resources */ = {isa = PBXBuildFile; fileRef = 38FCE9699CCDC87A1D803A55 /* auto-render.mjs */; };
+		C5C2E748261F75E8C4E90AA2 /* KaTeX_Script-Regular.woff in Resources */ = {isa = PBXBuildFile; fileRef = EDD599ECC5D2961605D94463 /* KaTeX_Script-Regular.woff */; };
+		C5D999E8F2B303482493EC06 /* KaTeX_Main-Bold.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 79155CBB0E1F6F82C780E51D /* KaTeX_Main-Bold.woff2 */; };
+		C61DAED0EEB0B54A3BD249ED /* mathtex-script-type.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 5E8E973A7E194C007AC4A03B /* mathtex-script-type.min.js */; };
+		CB48493F9CE2D113FFF8CD9C /* KaTeX_Typewriter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 368AE5F0ADBFAEA08F64D24E /* KaTeX_Typewriter-Regular.ttf */; };
+		CE6674DA1CC0A0DF79589C12 /* mhchem.mjs in Resources */ = {isa = PBXBuildFile; fileRef = 6B4BB725B846435883392CB7 /* mhchem.mjs */; };
+		CEA8FF05840306B91B47693E /* KaTeX_Size1-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 6622B2BDD7B9423B4E34686F /* KaTeX_Size1-Regular.woff2 */; };
+		D0DDB272C99DE8513DDB68DA /* render-a11y-string.mjs in Resources */ = {isa = PBXBuildFile; fileRef = D9A34155C89A1E80EA5D9CA0 /* render-a11y-string.mjs */; };
+		D3FB77B82C381AB0B679B0BD /* KaTeX_Caligraphic-Bold.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 284321325264388299DFD470 /* KaTeX_Caligraphic-Bold.woff2 */; };
+		D683C51927E3D0B40CE4F1F9 /* KaTeX_Main-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 98AE23DC50BC1C1BD39722D4 /* KaTeX_Main-Regular.woff2 */; };
+		D6E317F6EE7D50AD7F1365DD /* KaTeX_Main-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B765460C2E2AED991ADAA30B /* KaTeX_Main-Italic.ttf */; };
+		D86752161E94A344B6A3488D /* KaTeX_Fraktur-Regular.woff in Resources */ = {isa = PBXBuildFile; fileRef = B51CF3E48224158CE1331960 /* KaTeX_Fraktur-Regular.woff */; };
+		DC567C087D3749AF5052329F /* KaTeX_Size3-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9DA0200635794726043CDACF /* KaTeX_Size3-Regular.ttf */; };
+		DDAA82BE453251EAAADC1583 /* KaTeX_Math-BoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D07BE659077FA88598463603 /* KaTeX_Math-BoldItalic.ttf */; };
+		E6A19B565BDE7A7F3BD40B4B /* mhchem.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 0CAAEFA9E1EC9A19EAFE8B7B /* mhchem.min.js */; };
+		F19B8A8656D732FCFDE24260 /* KaTeX_Caligraphic-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = FA45D2D12FCE598B344BDD4D /* KaTeX_Caligraphic-Regular.woff2 */; };
+		F1E1E1647EC9971FD9739E94 /* KaTeX_Size1-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CE6856D2C9001EC9AFD4D1F8 /* KaTeX_Size1-Regular.ttf */; };
+		F46447C3421936C299644C1C /* chapter.html in Resources */ = {isa = PBXBuildFile; fileRef = 6C775179B7AF96D0B1017B5E /* chapter.html */; };
+		F97FCF83941ED1688F76FC0E /* KaTeX_SansSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B187317C0C0C7B4618B5554 /* KaTeX_SansSerif-Regular.ttf */; };
+		FB205DE704466DA35AE087CB /* render-a11y-string.min.js in Resources */ = {isa = PBXBuildFile; fileRef = B1EBBD791176AEBB672CFA7A /* render-a11y-string.min.js */; };
+		FB9358B68780F07318372390 /* KaTeX_Script-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 1C314D7B62E15460CCDB0DF6 /* KaTeX_Script-Regular.woff2 */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		027A18681AA2223E2FFF8C54 /* katex.min.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = katex.min.css; sourceTree = "<group>"; };
+		03CBF7920658C22D25D5D3B0 /* KaTeX_SansSerif-Bold.woff */ = {isa = PBXFileReference; path = "KaTeX_SansSerif-Bold.woff"; sourceTree = "<group>"; };
+		04C968C09EF16CB9C163DE27 /* KaTeX_Caligraphic-Regular.woff */ = {isa = PBXFileReference; path = "KaTeX_Caligraphic-Regular.woff"; sourceTree = "<group>"; };
+		06C582D23551FA911E28580F /* KaTeX_Size1-Regular.woff */ = {isa = PBXFileReference; path = "KaTeX_Size1-Regular.woff"; sourceTree = "<group>"; };
+		07F899D4A81CAC3F9BA11B4D /* KaTeX_Main-BoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Main-BoldItalic.ttf"; sourceTree = "<group>"; };
+		0B0BB16C9FEAD8DF5BA50717 /* copy-tex.mjs */ = {isa = PBXFileReference; path = "copy-tex.mjs"; sourceTree = "<group>"; };
+		0CAAEFA9E1EC9A19EAFE8B7B /* mhchem.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = mhchem.min.js; sourceTree = "<group>"; };
+		14014A3E09F3085D310CAD81 /* KaTeX_Size4-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Size4-Regular.woff2"; sourceTree = "<group>"; };
+		149F207864400C2D044F2304 /* KaTeX_Caligraphic-Bold.woff */ = {isa = PBXFileReference; path = "KaTeX_Caligraphic-Bold.woff"; sourceTree = "<group>"; };
+		1829387F556AAB7364753DE6 /* KaTeX_Main-Bold.woff */ = {isa = PBXFileReference; path = "KaTeX_Main-Bold.woff"; sourceTree = "<group>"; };
+		18815A004B28BA4DAAC4C4D4 /* copy-tex.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "copy-tex.js"; sourceTree = "<group>"; };
+		18C073BDA31AA35BB3E59D35 /* KaTeX_Size2-Regular.woff */ = {isa = PBXFileReference; path = "KaTeX_Size2-Regular.woff"; sourceTree = "<group>"; };
+		1C314D7B62E15460CCDB0DF6 /* KaTeX_Script-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Script-Regular.woff2"; sourceTree = "<group>"; };
+		1CB1CBACDDC9D2B6E47206C7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		1F4412C6E6B26DC131C54235 /* book.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = book.css; sourceTree = "<group>"; };
+		21D11D4F8ADB79ADFA17A6D2 /* KaTeX_Size2-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Size2-Regular.woff2"; sourceTree = "<group>"; };
+		26422C5DCB6B0C9FF2028E2B /* KaTeX_SansSerif-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_SansSerif-Regular.woff2"; sourceTree = "<group>"; };
+		26C27720485460AF8450EFB5 /* KaTeX_SansSerif-Italic.woff */ = {isa = PBXFileReference; path = "KaTeX_SansSerif-Italic.woff"; sourceTree = "<group>"; };
+		26F76A784591A070A446D0CA /* KaTeX_SansSerif-Italic.woff2 */ = {isa = PBXFileReference; path = "KaTeX_SansSerif-Italic.woff2"; sourceTree = "<group>"; };
+		284321325264388299DFD470 /* KaTeX_Caligraphic-Bold.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Caligraphic-Bold.woff2"; sourceTree = "<group>"; };
+		2D6F3642FDD052AC3AE16540 /* Chiron.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chiron.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2F96392E1B67E20FA2BBEB37 /* KaTeX_Math-Italic.woff */ = {isa = PBXFileReference; path = "KaTeX_Math-Italic.woff"; sourceTree = "<group>"; };
+		338163F97AEDB85D636088C5 /* KaTeX_Typewriter-Regular.woff */ = {isa = PBXFileReference; path = "KaTeX_Typewriter-Regular.woff"; sourceTree = "<group>"; };
+		33C252D774DDFFCE2CB70D4B /* katex.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = katex.css; sourceTree = "<group>"; };
+		368AE5F0ADBFAEA08F64D24E /* KaTeX_Typewriter-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Typewriter-Regular.ttf"; sourceTree = "<group>"; };
+		38FCE9699CCDC87A1D803A55 /* auto-render.mjs */ = {isa = PBXFileReference; path = "auto-render.mjs"; sourceTree = "<group>"; };
+		3B6D5B05B22D52032CB2ADED /* KaTeX_Script-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Script-Regular.ttf"; sourceTree = "<group>"; };
+		3C7B4E1DBA7B3F6DE66BCCDA /* mathtex-script-type.mjs */ = {isa = PBXFileReference; path = "mathtex-script-type.mjs"; sourceTree = "<group>"; };
+		3D43C99103FABFD1856E6C2F /* KaTeX_SansSerif-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_SansSerif-Bold.ttf"; sourceTree = "<group>"; };
+		3F9C2FAC6C79BD9F5DC97002 /* copy-tex.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "copy-tex.min.js"; sourceTree = "<group>"; };
+		437018421A510ECEEC559442 /* KaTeX_Size3-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Size3-Regular.woff2"; sourceTree = "<group>"; };
+		4424A63E2C94C4589C4B5A8F /* default-book.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "default-book.json"; sourceTree = "<group>"; };
+		4933977314BDE64F2503840C /* KaTeX_SansSerif-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_SansSerif-Italic.ttf"; sourceTree = "<group>"; };
+		4E21F930C36788EA6466D67F /* CheckViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckViews.swift; sourceTree = "<group>"; };
+		4EE0A84B6EA5A826DD1B2487 /* katex.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = katex.min.js; sourceTree = "<group>"; };
+		4F6D514D2A21618ED133AA79 /* mathtex-script-type.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "mathtex-script-type.js"; sourceTree = "<group>"; };
+		4FDBD0C79377E20146856D09 /* Sync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sync.swift; sourceTree = "<group>"; };
+		50A19EB4693171E14B4F6BAD /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		516CEC4E1B3E60BF55CB493B /* KaTeX_Fraktur-Bold.woff */ = {isa = PBXFileReference; path = "KaTeX_Fraktur-Bold.woff"; sourceTree = "<group>"; };
+		53CED93FDF3D813814532D3C /* KaTeX_Main-BoldItalic.woff */ = {isa = PBXFileReference; path = "KaTeX_Main-BoldItalic.woff"; sourceTree = "<group>"; };
+		5DB6BA9B3762CD1FEE248330 /* KaTeX_Caligraphic-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Caligraphic-Bold.ttf"; sourceTree = "<group>"; };
+		5E8E973A7E194C007AC4A03B /* mathtex-script-type.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "mathtex-script-type.min.js"; sourceTree = "<group>"; };
+		63BCA5820450ECC865656A6B /* auto-render.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "auto-render.min.js"; sourceTree = "<group>"; };
+		64CBF37F452C7829A232A4CC /* KaTeX_Main-Italic.woff */ = {isa = PBXFileReference; path = "KaTeX_Main-Italic.woff"; sourceTree = "<group>"; };
+		6622B2BDD7B9423B4E34686F /* KaTeX_Size1-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Size1-Regular.woff2"; sourceTree = "<group>"; };
+		6B4BB725B846435883392CB7 /* mhchem.mjs */ = {isa = PBXFileReference; path = mhchem.mjs; sourceTree = "<group>"; };
+		6C775179B7AF96D0B1017B5E /* chapter.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = chapter.html; sourceTree = "<group>"; };
+		6CE4AEBB512C66BBEEE9B508 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		7542ED9CB05CF2B1B0780A5B /* KaTeX_Main-Regular.woff */ = {isa = PBXFileReference; path = "KaTeX_Main-Regular.woff"; sourceTree = "<group>"; };
+		756BF2C5D73A3EFF3BD5C55C /* book.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = book.js; sourceTree = "<group>"; };
+		79155CBB0E1F6F82C780E51D /* KaTeX_Main-Bold.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Main-Bold.woff2"; sourceTree = "<group>"; };
+		79BD137168D282033E3D0C96 /* KaTeX_Size4-Regular.woff */ = {isa = PBXFileReference; path = "KaTeX_Size4-Regular.woff"; sourceTree = "<group>"; };
+		7B187317C0C0C7B4618B5554 /* KaTeX_SansSerif-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_SansSerif-Regular.ttf"; sourceTree = "<group>"; };
+		7B31F64CCEAC925197380258 /* KaTeX_Size2-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Size2-Regular.ttf"; sourceTree = "<group>"; };
+		7B37B5EDF14D592DADD292F3 /* KaTeX_SansSerif-Bold.woff2 */ = {isa = PBXFileReference; path = "KaTeX_SansSerif-Bold.woff2"; sourceTree = "<group>"; };
+		7BFF35604982F6DB7DF83990 /* KaTeX_SansSerif-Regular.woff */ = {isa = PBXFileReference; path = "KaTeX_SansSerif-Regular.woff"; sourceTree = "<group>"; };
+		7C88980E704A78710A73FF10 /* katex.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = katex.js; sourceTree = "<group>"; };
+		7F47DE61BC59197917253535 /* KaTeX_Math-BoldItalic.woff */ = {isa = PBXFileReference; path = "KaTeX_Math-BoldItalic.woff"; sourceTree = "<group>"; };
+		804C6A20116C5A90D2133F04 /* KaTeX_Fraktur-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Fraktur-Bold.ttf"; sourceTree = "<group>"; };
+		845507567B0E0E8F67ABC885 /* KaTeX_Main-Italic.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Main-Italic.woff2"; sourceTree = "<group>"; };
+		86A03626ABA86DE23531BF64 /* KaTeX_Main-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Main-Bold.ttf"; sourceTree = "<group>"; };
+		87D0EF7FC18B5AC5036C24F1 /* KaTeX_Caligraphic-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Caligraphic-Regular.ttf"; sourceTree = "<group>"; };
+		89C6D89AAB41D1F44AED752C /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
+		91C28E82CCD947C477738161 /* KaTeX_Math-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Math-Italic.ttf"; sourceTree = "<group>"; };
+		95DC55844038C2D2C347C929 /* KaTeX_AMS-Regular.woff */ = {isa = PBXFileReference; path = "KaTeX_AMS-Regular.woff"; sourceTree = "<group>"; };
+		96619CD088FCA8DEFC252EB3 /* KaTeX_Fraktur-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Fraktur-Regular.woff2"; sourceTree = "<group>"; };
+		98AE23DC50BC1C1BD39722D4 /* KaTeX_Main-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Main-Regular.woff2"; sourceTree = "<group>"; };
+		9A56D9CE221CD062F7A1D90F /* KaTeX_Fraktur-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Fraktur-Regular.ttf"; sourceTree = "<group>"; };
+		9DA0200635794726043CDACF /* KaTeX_Size3-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Size3-Regular.ttf"; sourceTree = "<group>"; };
+		9E9F9BD27D68C1A25608FDFA /* KaTeX_Size4-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Size4-Regular.ttf"; sourceTree = "<group>"; };
+		A0B54FB2561CEB6962020510 /* KaTeX_Math-BoldItalic.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Math-BoldItalic.woff2"; sourceTree = "<group>"; };
+		A2B609F01FACBAFB5EECF50D /* KaTeX_Size3-Regular.woff */ = {isa = PBXFileReference; path = "KaTeX_Size3-Regular.woff"; sourceTree = "<group>"; };
+		A4611ABEA9C9C53D24016B6D /* KaTeX_Fraktur-Bold.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Fraktur-Bold.woff2"; sourceTree = "<group>"; };
+		AE2C1BD8F7C3AC032909F78B /* katex.mjs */ = {isa = PBXFileReference; path = katex.mjs; sourceTree = "<group>"; };
+		B1EBBD791176AEBB672CFA7A /* render-a11y-string.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "render-a11y-string.min.js"; sourceTree = "<group>"; };
+		B51CF3E48224158CE1331960 /* KaTeX_Fraktur-Regular.woff */ = {isa = PBXFileReference; path = "KaTeX_Fraktur-Regular.woff"; sourceTree = "<group>"; };
+		B765460C2E2AED991ADAA30B /* KaTeX_Main-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Main-Italic.ttf"; sourceTree = "<group>"; };
+		BA965B5A2EF9CB2D031CB1FE /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		BED01CD6FCAEB295C0971695 /* KaTeX_Typewriter-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Typewriter-Regular.woff2"; sourceTree = "<group>"; };
+		CE6856D2C9001EC9AFD4D1F8 /* KaTeX_Size1-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Size1-Regular.ttf"; sourceTree = "<group>"; };
+		D07BE659077FA88598463603 /* KaTeX_Math-BoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Math-BoldItalic.ttf"; sourceTree = "<group>"; };
+		D1F631EAF42EBA7E1E0735BE /* KaTeX_AMS-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_AMS-Regular.woff2"; sourceTree = "<group>"; };
+		D44BE806EB80525E7499E51D /* auto-render.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "auto-render.js"; sourceTree = "<group>"; };
+		D531D4771F1A2F274A1C5128 /* KaTeX_Main-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Main-Regular.ttf"; sourceTree = "<group>"; };
+		D9A34155C89A1E80EA5D9CA0 /* render-a11y-string.mjs */ = {isa = PBXFileReference; path = "render-a11y-string.mjs"; sourceTree = "<group>"; };
+		DE7893BC4C88D83ECF339A4B /* KaTeX_AMS-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_AMS-Regular.ttf"; sourceTree = "<group>"; };
+		E2FE61D5DEE733655FF1363B /* render-a11y-string.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "render-a11y-string.js"; sourceTree = "<group>"; };
+		E5B44C590F364DB8007652A8 /* KaTeX_Main-BoldItalic.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Main-BoldItalic.woff2"; sourceTree = "<group>"; };
+		EDD599ECC5D2961605D94463 /* KaTeX_Script-Regular.woff */ = {isa = PBXFileReference; path = "KaTeX_Script-Regular.woff"; sourceTree = "<group>"; };
+		F1EDBF687B785C0AB704251F /* KaTeX_Math-Italic.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Math-Italic.woff2"; sourceTree = "<group>"; };
+		F89CA62122DFF35CBBAE4137 /* mhchem.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = mhchem.js; sourceTree = "<group>"; };
+		FA45D2D12FCE598B344BDD4D /* KaTeX_Caligraphic-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Caligraphic-Regular.woff2"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		18688403B5A7406E79EB56D8 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				1F4412C6E6B26DC131C54235 /* book.css */,
+				756BF2C5D73A3EFF3BD5C55C /* book.js */,
+				6C775179B7AF96D0B1017B5E /* chapter.html */,
+				4424A63E2C94C4589C4B5A8F /* default-book.json */,
+				F84AC7A379EF46AFB152014F /* katex */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		239752A9BB87BA2A94EADF28 /* Chiron */ = {
+			isa = PBXGroup;
+			children = (
+				50A19EB4693171E14B4F6BAD /* App.swift */,
+				BA965B5A2EF9CB2D031CB1FE /* AppModel.swift */,
+				4E21F930C36788EA6466D67F /* CheckViews.swift */,
+				1CB1CBACDDC9D2B6E47206C7 /* Info.plist */,
+				6CE4AEBB512C66BBEEE9B508 /* Models.swift */,
+				8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */,
+				4FDBD0C79377E20146856D09 /* Sync.swift */,
+				18688403B5A7406E79EB56D8 /* Resources */,
+			);
+			path = Chiron;
+			sourceTree = "<group>";
+		};
+		28BF54E7863F73F42681BC1B /* fonts */ = {
+			isa = PBXGroup;
+			children = (
+				DE7893BC4C88D83ECF339A4B /* KaTeX_AMS-Regular.ttf */,
+				95DC55844038C2D2C347C929 /* KaTeX_AMS-Regular.woff */,
+				D1F631EAF42EBA7E1E0735BE /* KaTeX_AMS-Regular.woff2 */,
+				5DB6BA9B3762CD1FEE248330 /* KaTeX_Caligraphic-Bold.ttf */,
+				149F207864400C2D044F2304 /* KaTeX_Caligraphic-Bold.woff */,
+				284321325264388299DFD470 /* KaTeX_Caligraphic-Bold.woff2 */,
+				87D0EF7FC18B5AC5036C24F1 /* KaTeX_Caligraphic-Regular.ttf */,
+				04C968C09EF16CB9C163DE27 /* KaTeX_Caligraphic-Regular.woff */,
+				FA45D2D12FCE598B344BDD4D /* KaTeX_Caligraphic-Regular.woff2 */,
+				804C6A20116C5A90D2133F04 /* KaTeX_Fraktur-Bold.ttf */,
+				516CEC4E1B3E60BF55CB493B /* KaTeX_Fraktur-Bold.woff */,
+				A4611ABEA9C9C53D24016B6D /* KaTeX_Fraktur-Bold.woff2 */,
+				9A56D9CE221CD062F7A1D90F /* KaTeX_Fraktur-Regular.ttf */,
+				B51CF3E48224158CE1331960 /* KaTeX_Fraktur-Regular.woff */,
+				96619CD088FCA8DEFC252EB3 /* KaTeX_Fraktur-Regular.woff2 */,
+				86A03626ABA86DE23531BF64 /* KaTeX_Main-Bold.ttf */,
+				1829387F556AAB7364753DE6 /* KaTeX_Main-Bold.woff */,
+				79155CBB0E1F6F82C780E51D /* KaTeX_Main-Bold.woff2 */,
+				07F899D4A81CAC3F9BA11B4D /* KaTeX_Main-BoldItalic.ttf */,
+				53CED93FDF3D813814532D3C /* KaTeX_Main-BoldItalic.woff */,
+				E5B44C590F364DB8007652A8 /* KaTeX_Main-BoldItalic.woff2 */,
+				B765460C2E2AED991ADAA30B /* KaTeX_Main-Italic.ttf */,
+				64CBF37F452C7829A232A4CC /* KaTeX_Main-Italic.woff */,
+				845507567B0E0E8F67ABC885 /* KaTeX_Main-Italic.woff2 */,
+				D531D4771F1A2F274A1C5128 /* KaTeX_Main-Regular.ttf */,
+				7542ED9CB05CF2B1B0780A5B /* KaTeX_Main-Regular.woff */,
+				98AE23DC50BC1C1BD39722D4 /* KaTeX_Main-Regular.woff2 */,
+				D07BE659077FA88598463603 /* KaTeX_Math-BoldItalic.ttf */,
+				7F47DE61BC59197917253535 /* KaTeX_Math-BoldItalic.woff */,
+				A0B54FB2561CEB6962020510 /* KaTeX_Math-BoldItalic.woff2 */,
+				91C28E82CCD947C477738161 /* KaTeX_Math-Italic.ttf */,
+				2F96392E1B67E20FA2BBEB37 /* KaTeX_Math-Italic.woff */,
+				F1EDBF687B785C0AB704251F /* KaTeX_Math-Italic.woff2 */,
+				3D43C99103FABFD1856E6C2F /* KaTeX_SansSerif-Bold.ttf */,
+				03CBF7920658C22D25D5D3B0 /* KaTeX_SansSerif-Bold.woff */,
+				7B37B5EDF14D592DADD292F3 /* KaTeX_SansSerif-Bold.woff2 */,
+				4933977314BDE64F2503840C /* KaTeX_SansSerif-Italic.ttf */,
+				26C27720485460AF8450EFB5 /* KaTeX_SansSerif-Italic.woff */,
+				26F76A784591A070A446D0CA /* KaTeX_SansSerif-Italic.woff2 */,
+				7B187317C0C0C7B4618B5554 /* KaTeX_SansSerif-Regular.ttf */,
+				7BFF35604982F6DB7DF83990 /* KaTeX_SansSerif-Regular.woff */,
+				26422C5DCB6B0C9FF2028E2B /* KaTeX_SansSerif-Regular.woff2 */,
+				3B6D5B05B22D52032CB2ADED /* KaTeX_Script-Regular.ttf */,
+				EDD599ECC5D2961605D94463 /* KaTeX_Script-Regular.woff */,
+				1C314D7B62E15460CCDB0DF6 /* KaTeX_Script-Regular.woff2 */,
+				CE6856D2C9001EC9AFD4D1F8 /* KaTeX_Size1-Regular.ttf */,
+				06C582D23551FA911E28580F /* KaTeX_Size1-Regular.woff */,
+				6622B2BDD7B9423B4E34686F /* KaTeX_Size1-Regular.woff2 */,
+				7B31F64CCEAC925197380258 /* KaTeX_Size2-Regular.ttf */,
+				18C073BDA31AA35BB3E59D35 /* KaTeX_Size2-Regular.woff */,
+				21D11D4F8ADB79ADFA17A6D2 /* KaTeX_Size2-Regular.woff2 */,
+				9DA0200635794726043CDACF /* KaTeX_Size3-Regular.ttf */,
+				A2B609F01FACBAFB5EECF50D /* KaTeX_Size3-Regular.woff */,
+				437018421A510ECEEC559442 /* KaTeX_Size3-Regular.woff2 */,
+				9E9F9BD27D68C1A25608FDFA /* KaTeX_Size4-Regular.ttf */,
+				79BD137168D282033E3D0C96 /* KaTeX_Size4-Regular.woff */,
+				14014A3E09F3085D310CAD81 /* KaTeX_Size4-Regular.woff2 */,
+				368AE5F0ADBFAEA08F64D24E /* KaTeX_Typewriter-Regular.ttf */,
+				338163F97AEDB85D636088C5 /* KaTeX_Typewriter-Regular.woff */,
+				BED01CD6FCAEB295C0971695 /* KaTeX_Typewriter-Regular.woff2 */,
+			);
+			path = fonts;
+			sourceTree = "<group>";
+		};
+		4810D2B0E90D2CDCD6AA570D = {
+			isa = PBXGroup;
+			children = (
+				239752A9BB87BA2A94EADF28 /* Chiron */,
+				927FE4EDAA74BD3F9BCB9D38 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		927FE4EDAA74BD3F9BCB9D38 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2D6F3642FDD052AC3AE16540 /* Chiron.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DA8526225E2A5CF1AD333702 /* contrib */ = {
+			isa = PBXGroup;
+			children = (
+				D44BE806EB80525E7499E51D /* auto-render.js */,
+				63BCA5820450ECC865656A6B /* auto-render.min.js */,
+				38FCE9699CCDC87A1D803A55 /* auto-render.mjs */,
+				18815A004B28BA4DAAC4C4D4 /* copy-tex.js */,
+				3F9C2FAC6C79BD9F5DC97002 /* copy-tex.min.js */,
+				0B0BB16C9FEAD8DF5BA50717 /* copy-tex.mjs */,
+				4F6D514D2A21618ED133AA79 /* mathtex-script-type.js */,
+				5E8E973A7E194C007AC4A03B /* mathtex-script-type.min.js */,
+				3C7B4E1DBA7B3F6DE66BCCDA /* mathtex-script-type.mjs */,
+				F89CA62122DFF35CBBAE4137 /* mhchem.js */,
+				0CAAEFA9E1EC9A19EAFE8B7B /* mhchem.min.js */,
+				6B4BB725B846435883392CB7 /* mhchem.mjs */,
+				E2FE61D5DEE733655FF1363B /* render-a11y-string.js */,
+				B1EBBD791176AEBB672CFA7A /* render-a11y-string.min.js */,
+				D9A34155C89A1E80EA5D9CA0 /* render-a11y-string.mjs */,
+			);
+			path = contrib;
+			sourceTree = "<group>";
+		};
+		F84AC7A379EF46AFB152014F /* katex */ = {
+			isa = PBXGroup;
+			children = (
+				33C252D774DDFFCE2CB70D4B /* katex.css */,
+				7C88980E704A78710A73FF10 /* katex.js */,
+				027A18681AA2223E2FFF8C54 /* katex.min.css */,
+				4EE0A84B6EA5A826DD1B2487 /* katex.min.js */,
+				AE2C1BD8F7C3AC032909F78B /* katex.mjs */,
+				89C6D89AAB41D1F44AED752C /* README.md */,
+				DA8526225E2A5CF1AD333702 /* contrib */,
+				28BF54E7863F73F42681BC1B /* fonts */,
+			);
+			path = katex;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D2AE88B4FBD262E09816A6CA /* Chiron */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F6A9856ADE9185E6A42C79C5 /* Build configuration list for PBXNativeTarget "Chiron" */;
+			buildPhases = (
+				073C707B38913B93631E77AA /* Sources */,
+				B7549C662ED4B59B24639996 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Chiron;
+			packageProductDependencies = (
+			);
+			productName = Chiron;
+			productReference = 2D6F3642FDD052AC3AE16540 /* Chiron.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		88AF112FA0F27BB17F7933AB /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					D2AE88B4FBD262E09816A6CA = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = E26C8EA783A0643D4C901473 /* Build configuration list for PBXProject "Chiron" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 4810D2B0E90D2CDCD6AA570D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 927FE4EDAA74BD3F9BCB9D38 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D2AE88B4FBD262E09816A6CA /* Chiron */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B7549C662ED4B59B24639996 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0FFEDA922504F22FD6A72592 /* KaTeX_AMS-Regular.ttf in Resources */,
+				799969B3C890EBB73AB74B0C /* KaTeX_AMS-Regular.woff in Resources */,
+				8702BF692A179C9D9A170B42 /* KaTeX_AMS-Regular.woff2 in Resources */,
+				602FC714B4AACD2281C7D13A /* KaTeX_Caligraphic-Bold.ttf in Resources */,
+				2E7C89C5AB89D5413C05F53B /* KaTeX_Caligraphic-Bold.woff in Resources */,
+				D3FB77B82C381AB0B679B0BD /* KaTeX_Caligraphic-Bold.woff2 in Resources */,
+				52B6227D20134C21A4E8B398 /* KaTeX_Caligraphic-Regular.ttf in Resources */,
+				9A3752B8274804DC193E5101 /* KaTeX_Caligraphic-Regular.woff in Resources */,
+				F19B8A8656D732FCFDE24260 /* KaTeX_Caligraphic-Regular.woff2 in Resources */,
+				3E9AB035B55E41EAEF1D89CF /* KaTeX_Fraktur-Bold.ttf in Resources */,
+				19120ADE3B2273590EFB4E80 /* KaTeX_Fraktur-Bold.woff in Resources */,
+				090BA385EC158EFE69870C5F /* KaTeX_Fraktur-Bold.woff2 in Resources */,
+				0C5C68259F3EA7D8ABC8096F /* KaTeX_Fraktur-Regular.ttf in Resources */,
+				D86752161E94A344B6A3488D /* KaTeX_Fraktur-Regular.woff in Resources */,
+				0410B66E053DE24C1E022969 /* KaTeX_Fraktur-Regular.woff2 in Resources */,
+				5B0847E18307769F5A75723C /* KaTeX_Main-Bold.ttf in Resources */,
+				B3D40829DB3ECD5C20A84B95 /* KaTeX_Main-Bold.woff in Resources */,
+				C5D999E8F2B303482493EC06 /* KaTeX_Main-Bold.woff2 in Resources */,
+				1B204B64FEE2DBB7366951DE /* KaTeX_Main-BoldItalic.ttf in Resources */,
+				6620FC67E863E8B99BCF151A /* KaTeX_Main-BoldItalic.woff in Resources */,
+				41D359934CC2364DDA50FD75 /* KaTeX_Main-BoldItalic.woff2 in Resources */,
+				D6E317F6EE7D50AD7F1365DD /* KaTeX_Main-Italic.ttf in Resources */,
+				7C0D36F176AEC93FF426D24F /* KaTeX_Main-Italic.woff in Resources */,
+				B9F89A21A417EA3B24928DB4 /* KaTeX_Main-Italic.woff2 in Resources */,
+				23E7DF656294EE2791A7DA33 /* KaTeX_Main-Regular.ttf in Resources */,
+				61C40BAAADB667EBE4856CDD /* KaTeX_Main-Regular.woff in Resources */,
+				D683C51927E3D0B40CE4F1F9 /* KaTeX_Main-Regular.woff2 in Resources */,
+				DDAA82BE453251EAAADC1583 /* KaTeX_Math-BoldItalic.ttf in Resources */,
+				2494D72013CC78DA767A8D55 /* KaTeX_Math-BoldItalic.woff in Resources */,
+				5B3CA61D77F702AF865DABF5 /* KaTeX_Math-BoldItalic.woff2 in Resources */,
+				15628BB867885B4C204AAACC /* KaTeX_Math-Italic.ttf in Resources */,
+				B92FE7DF8BC4A7F942BE233C /* KaTeX_Math-Italic.woff in Resources */,
+				256D17D59940752549DF00FC /* KaTeX_Math-Italic.woff2 in Resources */,
+				0DAF5B8E0A1B3FDA6BD4C628 /* KaTeX_SansSerif-Bold.ttf in Resources */,
+				77638129F5416082BCFF2FC4 /* KaTeX_SansSerif-Bold.woff in Resources */,
+				463A2EADEEE58C757FF1C83C /* KaTeX_SansSerif-Bold.woff2 in Resources */,
+				0B3C9D9FDBE2787EEC5B179A /* KaTeX_SansSerif-Italic.ttf in Resources */,
+				5D638E649FDDEC94A1FC0694 /* KaTeX_SansSerif-Italic.woff in Resources */,
+				45A97F6518EC1A37B760EDD0 /* KaTeX_SansSerif-Italic.woff2 in Resources */,
+				F97FCF83941ED1688F76FC0E /* KaTeX_SansSerif-Regular.ttf in Resources */,
+				5986C8B19A33A2F1E56ED67E /* KaTeX_SansSerif-Regular.woff in Resources */,
+				4013A910FE7AFD5A1AF64227 /* KaTeX_SansSerif-Regular.woff2 in Resources */,
+				002912961520DFF3A4520EC2 /* KaTeX_Script-Regular.ttf in Resources */,
+				C5C2E748261F75E8C4E90AA2 /* KaTeX_Script-Regular.woff in Resources */,
+				FB9358B68780F07318372390 /* KaTeX_Script-Regular.woff2 in Resources */,
+				F1E1E1647EC9971FD9739E94 /* KaTeX_Size1-Regular.ttf in Resources */,
+				11E09DA53B7A6A8AC0241B94 /* KaTeX_Size1-Regular.woff in Resources */,
+				CEA8FF05840306B91B47693E /* KaTeX_Size1-Regular.woff2 in Resources */,
+				64A647D27AA57B3B63AC04C6 /* KaTeX_Size2-Regular.ttf in Resources */,
+				883CDB3EEE117485E9D2A5AE /* KaTeX_Size2-Regular.woff in Resources */,
+				2D87BC9FBE5D4208BAEB6EB4 /* KaTeX_Size2-Regular.woff2 in Resources */,
+				DC567C087D3749AF5052329F /* KaTeX_Size3-Regular.ttf in Resources */,
+				4A797936738F009080D6FDF5 /* KaTeX_Size3-Regular.woff in Resources */,
+				B4F6C801DD64AC6E9A6914D5 /* KaTeX_Size3-Regular.woff2 in Resources */,
+				1F58C9583939DC1C0348EEF9 /* KaTeX_Size4-Regular.ttf in Resources */,
+				A7E8C7C80F4E9504F599558C /* KaTeX_Size4-Regular.woff in Resources */,
+				585A063296A2ECB601B59D11 /* KaTeX_Size4-Regular.woff2 in Resources */,
+				CB48493F9CE2D113FFF8CD9C /* KaTeX_Typewriter-Regular.ttf in Resources */,
+				4E6BB61CF52BD1699707ED40 /* KaTeX_Typewriter-Regular.woff in Resources */,
+				AA9463C3DA8907A6FC07B120 /* KaTeX_Typewriter-Regular.woff2 in Resources */,
+				57F0FBCD6BF1B028CC0E94C5 /* README.md in Resources */,
+				4A9EA3993E2C1F4C424E35B1 /* auto-render.js in Resources */,
+				3CE785E3CA71891D3986E5D5 /* auto-render.min.js in Resources */,
+				BDBFC7EB4E77F4B8285DE4B7 /* auto-render.mjs in Resources */,
+				49C25BFB2FE00A68F00BB1A9 /* book.css in Resources */,
+				8B7415A0D57A05F203D74AE1 /* book.js in Resources */,
+				F46447C3421936C299644C1C /* chapter.html in Resources */,
+				971307E637D32190E59CB558 /* copy-tex.js in Resources */,
+				B3BC61CE4A0E039A106F89F5 /* copy-tex.min.js in Resources */,
+				5AD1E82FF1EC44E3A487EB0F /* copy-tex.mjs in Resources */,
+				8C8562A01FFD05DE4D17DD2A /* default-book.json in Resources */,
+				935E13B205274070BFA0792F /* katex.css in Resources */,
+				5FBA2EC63BE2F113FFD665AF /* katex.js in Resources */,
+				716004376750CA0207B08F1F /* katex.min.css in Resources */,
+				9A62819EA011C23EEE85DB76 /* katex.min.js in Resources */,
+				645AD3A862DFDEFFC057F9F8 /* katex.mjs in Resources */,
+				97F9F08E127B54F9E42D7BE7 /* mathtex-script-type.js in Resources */,
+				C61DAED0EEB0B54A3BD249ED /* mathtex-script-type.min.js in Resources */,
+				57EC7E8D5BDD8229C2A7329F /* mathtex-script-type.mjs in Resources */,
+				657B0E5450B3BEAF599D95D4 /* mhchem.js in Resources */,
+				E6A19B565BDE7A7F3BD40B4B /* mhchem.min.js in Resources */,
+				CE6674DA1CC0A0DF79589C12 /* mhchem.mjs in Resources */,
+				711C1E8DB5CFA47414D22C0E /* render-a11y-string.js in Resources */,
+				FB205DE704466DA35AE087CB /* render-a11y-string.min.js in Resources */,
+				D0DDB272C99DE8513DDB68DA /* render-a11y-string.mjs in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		073C707B38913B93631E77AA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9A12A71D111DEE5FB1A1265C /* App.swift in Sources */,
+				3FC1C085C37DA34DC9042909 /* AppModel.swift in Sources */,
+				A67BB45B6191D6A590258527 /* CheckViews.swift in Sources */,
+				AF29D4E2D309DDDCBC3C20E1 /* Models.swift in Sources */,
+				B512708502B49BDBA48396AE /* ReaderView.swift in Sources */,
+				A0641BBC47F65EC186C3AA87 /* Sync.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		17F5E588D0DC107374061A3A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		2A9E31F90FB30FD54E28675E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		2C16569547EA9C5C6D113C20 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Chiron/Info.plist;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mjbraun.chiron;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
+		};
+		E06D0C73D86D789F5AA89F08 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Chiron/Info.plist;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mjbraun.chiron;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		E26C8EA783A0643D4C901473 /* Build configuration list for PBXProject "Chiron" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2A9E31F90FB30FD54E28675E /* Debug */,
+				17F5E588D0DC107374061A3A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F6A9856ADE9185E6A42C79C5 /* Build configuration list for PBXNativeTarget "Chiron" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E06D0C73D86D789F5AA89F08 /* Debug */,
+				2C16569547EA9C5C6D113C20 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 88AF112FA0F27BB17F7933AB /* Project object */;
+}

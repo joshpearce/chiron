@@ -1,0 +1,50 @@
+# Unit-local misconceptions for u10 (hardware and training at scale).
+# Same schema as corpus/misconception-bank.yaml. IDs are unit-scoped (U10-Mn)
+# so they never collide with global bank IDs.
+#
+# All four are systems mis-transfers rather than ML errors, which is the point:
+# this learner's expertise is on the systems axis, so the wrong models here are
+# confident, specific, and mostly correct in the regime where they were learned.
+# The global entries this unit reinforces are M10 (attention-parallel-so-linear)
+# and M16 (quantization-lossy-compression-of-facts).
+
+misconceptions:
+  - id: U10-M1
+    name: more-flops-faster-inference
+    wrong_model: "A faster accelerator generates tokens faster. Comparing two chips for inference means comparing their TFLOPs."
+    why_appealing: "FLOP/s is the headline number on every spec sheet, it correlates with price, and it is the genuinely correct number for the workloads that made accelerators famous - dense training, graphics, large-batch serving. The belief also survives because the same person is right about training on the same chip."
+    failing_prediction: "If FLOP/s set inference speed, a chip with 2x the FLOPs and identical memory bandwidth would decode about 2x as fast at batch 1. Benchmark it: single-stream decode throughput between two such chips is within measurement noise. Meanwhile a chip with the same FLOPs and 1.5x the bandwidth decodes 1.5x faster, to two significant figures. Concretely: 320 TFLOP/s at 1.6 TB/s loses to 160 TFLOP/s at 2.4 TB/s, by exactly the bandwidth ratio 1.5x, because the FLOPs term is not in the cost model at all."
+    correction: "Which hardware number binds is set by the workload's arithmetic intensity I = FLOPs/bytes, compared against the machine balance B = peak FLOP/s / bandwidth. Below B the ceiling is I x bandwidth and extra FLOP/s buy nothing; above B the ceiling is peak FLOP/s and extra bandwidth buys nothing. Batch-1 decode with bf16 weights sits at I = 1 against an H100's B = 295, running at 0.34% of peak. 'Fast hardware' is a property of a (hardware, workload) pair, not of hardware."
+    units: [u10, u6, u7]
+
+  - id: U10-M2
+    name: gpus-fast-because-many-cores
+    wrong_model: "GPUs are fast because they have thousands of cores; a CPU has 16 lanes and an H100 has 16,896, and that ratio is roughly the speedup."
+    why_appealing: "Core count is the number on the box and the most visible difference from a CPU. It is also half true - the parallelism is real and necessary, so the belief gets confirmed constantly without ever being tested against the case that would falsify it."
+    failing_prediction: "If core count were the mechanism, a kernel at 100% occupancy across all 132 SMs would be at or near peak FLOPs. Profile a fused elementwise kernel - GELU, residual add, RMSNorm: it saturates every core on the chip and runs at under 2% of peak FLOPs, because it reads a value, does one or two operations, writes it back, and waits. A 4096x4096 matmul on the same cores at the same occupancy hits 70-80% of peak. Identical hardware, identical occupancy, a 40x gap that core count explains none of."
+    correction: "The advantage is bandwidth first (3.35 TB/s against a server CPU's ~0.4 TB/s) and arithmetic density second (tensor cores extract ~15x more FLOPs per issued instruction than general vector units). The thousands of cores exist to hide ~500-cycle HBM latency by having other warps ready to issue - they are a latency-hiding mechanism, not the throughput mechanism. Energy tells the same story: an off-chip DRAM fetch costs roughly 170x the floating-point add that consumes it, so every architectural feature exists to raise operations-per-byte-moved."
+    units: [u10]
+
+  - id: U10-M3
+    name: same-iron-for-training-and-inference
+    wrong_model: "Training hardware and inference hardware are the same problem. It is all the same matmuls on the same weights, so the ranking of chips should be roughly the same for both."
+    why_appealing: "The operations genuinely are identical - a training forward pass is bit-for-bit the same computation as a prefill, on the same tensors. Nothing in the mathematics distinguishes them, so the difference has to come from somewhere the mathematics does not mention."
+    failing_prediction: "If the workloads had the same shape, the training winner would win at single-user inference and the market would sell one kind of part. Instead it has split: Groq and Cerebras sell inference parts built around enormous SRAM and almost no HBM, which beat H100s badly at low-batch decode and cannot train at all; a laptop with 1.5% of an H100's FLOPs serves a 35B MoE at conversational speed; and the H100 idles 99.7% of its arithmetic decoding one stream. Three optimal points for one apparently identical set of matmuls."
+    correction: "Batch size moves the workload across the ridge point, and it is the only thing that has to change. Training runs at thousands of positions per pass (I = 4096 FLOP/byte at microbatch 4096 in bf16, fourteen times past an H100's balance of 295, compute-bound); single-user decode runs at one position (I = 1, 295x short, bandwidth-bound). Memory differs by the same kind of factor: mixed-precision AdamW training costs 16 bytes/param (weights + gradients + fp32 master + two fp32 moments) against 2 bytes/param for bf16 inference or 0.54 at 4 bits - 1.12 TB for a 70B model, which is fourteen H100s before a single activation is stored."
+    units: [u10, u5, u6]
+
+  - id: U10-M4
+    name: low-precision-halves-accuracy
+    wrong_model: "Training or serving in 16 bits instead of 32 halves the model's accuracy, or costs quality in proportion to the bits given up. Precision is a dial trading quality for speed."
+    why_appealing: "Bit-counting is sound in the domains engineers meet it first - image and audio compression, fixed-point DSP - and it is the same intuition M16 attacks for quantization. It is reinforced by the fact that reduced precision genuinely does break training runs, just not for the reason the intuition gives."
+    failing_prediction: "If bit width set quality, bf16 training would produce measurably worse models than fp32. Matched-hyperparameter runs land within noise of each other, and every frontier model of the last five years was trained at 16 bits or below. The sharper failure: fp16 and bf16 have the SAME bit count and behave completely differently - fp16 diverges on runs where bf16 is stable, and fp16 requires a dynamic loss-scaling control loop that bf16 does not need at all. One number cannot explain a difference between two formats that share it."
+    correction: "A float spends its bits on range (exponent) and resolution (mantissa), and training cares almost entirely about range. bf16 is fp32 with 16 mantissa bits deleted: same 8-bit exponent, same 1.2e-38 floor, 0.4% relative resolution. fp16 trades three exponent bits for mantissa: finer resolution but a floor at 6.0e-8, below which a gradient of 1e-8 rounds to exactly zero - absent, not imprecise. That is what loss scaling exists to fix. Resolution does bite in exactly one place, the accumulation of tiny updates into large weights, and the fix is fp32 master weights rather than a wider forward pass. Networks absorb proportional error and cannot survive values going missing."
+    units: [u10, u6]
+
+  - id: U10-M5
+    name: parallelism-is-just-sharding
+    wrong_model: "Splitting a model across N devices gives you N times the memory and roughly N times the throughput. Which axis you split along is an implementation detail, and placement of the shards is a deployment concern rather than a design one."
+    why_appealing: "Engineers shard databases and stateless services routinely, where scaling is close to linear and the choice of shard key mostly affects hot spots rather than throughput. The word 'parallelism' also promises linear speedup by construction."
+    failing_prediction: "If the axis were a detail, tensor parallelism at degree 8 would cost the same inside one node and across eight nodes. It does not. With d_model = 8192, a microbatch of 8,192 positions and bf16 activations, tensor parallelism's two all-reduces per layer over 80 layers move 40 GiB per forward pass: 48 ms over NVLink at 900 GB/s, 859 ms over InfiniBand at 50 GB/s. An 18x slowdown from a placement change with no code change. And flat data parallelism at 8,192-way spends 5.6 s per step on the gradient all-reduce against 0.54 s of compute - a 10x loss with no sharding bug anywhere."
+    correction: "Each axis carries a distinct collective at a distinct frequency, and the arrangement is chosen so the most frequent collective lands on the fastest link. Tensor parallelism all-reduces activations twice per layer, so it stays inside an NVLink node. Pipeline parallelism sends activations point-to-point once per stage boundary and pays in idleness instead: a bubble fraction of (p-1)/(m+p-1), which is 47% at p=8, m=8 and 9.9% at m=64. Data parallelism all-reduces gradients once per optimizer step, so it can tolerate the slowest link in the building. Expert parallelism all-to-alls tokens twice per MoE layer, the least forgiving pattern of the four. The hierarchy of parallelism strategies is the hierarchy of interconnect bandwidths, matched term for term."
+    units: [u10, u7]

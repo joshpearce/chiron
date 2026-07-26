@@ -1,14 +1,13 @@
 import SwiftUI
 
 @main
-struct DynamicBookApp: App {
+struct ChironApp: App {
     @StateObject private var model = AppModel()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(model)
-                .persistentSystemOverlays(.hidden)
         }
     }
 }
@@ -20,6 +19,8 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             switch model.screen {
+            case .menu:
+                LibraryView()
             case .start:
                 StartView()
             case .reading:
@@ -62,15 +63,64 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSpine) { SpineView() }
         .overlay(alignment: .topTrailing) {
-            HStack(spacing: 12) {
-                ConnectionBadge()
-                Button { showSpine = true } label: {
-                    Image(systemName: "list.bullet.rectangle")
+            if !model.isMenu {
+                HStack(spacing: 12) {
+                    ConnectionBadge()
+                    Button { showSpine = true } label: {
+                        Image(systemName: "list.bullet.rectangle")
+                    }
+                    Button { model.backToLibrary() } label: {
+                        Image(systemName: "books.vertical")
+                    }
+                }
+                .padding(10)
+            }
+        }
+    }
+}
+
+struct LibraryView: View {
+    @EnvironmentObject var model: AppModel
+
+    var body: some View {
+        VStack(spacing: 28) {
+            VStack(spacing: 6) {
+                Text("Chiron").font(.system(size: 52, weight: .semibold, design: .serif))
+                Text("Choose a subject. The book adapts as you read.")
+                    .foregroundStyle(.secondary)
+            }
+            VStack(spacing: 12) {
+                ForEach(model.subjects) { s in
+                    Button {
+                        Task { await model.openSubject(s.id) }
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(s.title).font(.title3.weight(.semibold))
+                                Text(s.progressLine)
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                        }
+                        .padding(16)
+                        .frame(maxWidth: 480)
+                        .background(Color.gray.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(10)
+            HStack {
+                ConnectionBadge()
+                Button {
+                    Task { await model.refreshSubjects() }
+                } label: { Image(systemName: "arrow.clockwise") }
+            }
+            if let err = model.errorMessage {
+                Text(err).foregroundStyle(.red).font(.callout)
+            }
         }
-        .statusBarHidden()
+        .task { await model.refreshSubjects() }
     }
 }
 
@@ -85,9 +135,9 @@ struct ConnectionBadge: View {
             .background(.thinMaterial, in: Capsule())
             .foregroundStyle(t == "offline" ? .orange : .green)
             .task {
-                while true {
+                while !Task.isCancelled {
                     await model.sync.probe()
-                    try? await Task.sleep(for: .seconds(15))
+                    try? await Task.sleep(nanoseconds: 15_000_000_000)
                 }
             }
     }
@@ -99,10 +149,8 @@ struct StartView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            Text("The Book").font(.system(size: 44, weight: .semibold, design: .serif))
-            Text("An adaptive course on how AI actually works,\ntuned to you as you read.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
+            Text(model.currentSubjectTitle)
+                .font(.system(size: 40, weight: .semibold, design: .serif))
             HStack {
                 TextField("server", text: $url)
                     .textFieldStyle(.roundedBorder)
@@ -122,6 +170,8 @@ struct StartView: View {
                 model.startStatic()
             }
             .buttonStyle(.bordered)
+            Button("Back to library") { model.backToLibrary() }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
             if let err = model.errorMessage {
                 Text(err).foregroundStyle(.red).font(.callout)
             }

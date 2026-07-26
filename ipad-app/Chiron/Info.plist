@@ -24,7 +24,7 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Connects to the book server running on your Mac to grade answers and generate chapters.</string>
+	<string>Chiron connects to the tutor server running on your Mac to grade answers and generate chapters.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

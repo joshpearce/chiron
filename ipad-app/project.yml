@@ -1,14 +1,14 @@
-name: DynamicBook
+name: Chiron
 options:
   bundleIdPrefix: com.mjbraun
   deploymentTarget:
-    iOS: "17.0"
+    iOS: "15.0"          # iPad mini 4 (iPad5,1) tops out at iPadOS 15.8
 targets:
-  DynamicBook:
+  Chiron:
     type: application
     platform: iOS
     sources:
-      - DynamicBook
+      - Chiron
     settings:
       base:
         TARGETED_DEVICE_FAMILY: "2"          # iPad only
@@ -17,13 +17,13 @@ targets:
         # DEVELOPMENT_TEAM set by Xcode after Apple ID sign-in (free personal team)
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        PRODUCT_BUNDLE_IDENTIFIER: com.mjbraun.dynamicbook
+        PRODUCT_BUNDLE_IDENTIFIER: com.mjbraun.chiron
     info:
-      path: DynamicBook/Info.plist
+      path: Chiron/Info.plist
       properties:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-        NSLocalNetworkUsageDescription: "Connects to the book server running on your Mac to grade answers and generate chapters."
+        NSLocalNetworkUsageDescription: "Chiron connects to the tutor server running on your Mac to grade answers and generate chapters."
         UIRequiresFullScreen: false
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false

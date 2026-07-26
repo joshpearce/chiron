@@ -1,12 +1,14 @@
 import Foundation
 import SwiftUI
 
-/// App state machine: reading -> check -> gate -> next chapter.
+/// App state machine: library -> subject -> reading -> check -> gate -> next chapter.
 /// Everything needed to survive an app relaunch mid-flight persists to
-/// Documents: current chapter payload, collected beat responses, book state.
+/// Documents, keyed by subject: current chapter payload, collected beat
+/// responses, book state.
 @MainActor
 final class AppModel: ObservableObject {
     enum Screen {
+        case menu
         case start
         case reading
         case pretest
@@ -15,7 +17,8 @@ final class AppModel: ObservableObject {
         case takingBreak(BreakSuggestion)
     }
 
-    @Published var screen: Screen = .start
+    @Published var screen: Screen = .menu
+    @Published var subjects: [SubjectInfo] = []
     @Published var chapter: ChapterPayload?
     @Published var bookState: BookState?
     @Published var lastResults: [GradeResult] = []
@@ -23,13 +26,19 @@ final class AppModel: ObservableObject {
 
     let sync = Sync()
 
-    // Static fallback: the bundled default-path book, used when no server is
-    // reachable. Reading + JS-graded beats + reveal-based self-checks survive;
-    // adaptivity and free-text grading do not.
+    private(set) var subjectID = "ai"
+    var currentSubjectTitle: String {
+        subjects.first(where: { $0.id == subjectID })?.title ?? "How AI Works"
+    }
+    var isMenu: Bool { if case .menu = screen { return true }; return false }
+
+    // Static fallback: the bundled default-path book (subject "ai"), used when
+    // no server is reachable. Reading + JS-graded beats + reveal-based
+    // self-checks survive; adaptivity and free-text grading do not.
     @Published var staticMode = false
     private var staticIndex: Int {
-        get { UserDefaults.standard.integer(forKey: "staticIndex") }
-        set { UserDefaults.standard.set(newValue, forKey: "staticIndex") }
+        get { UserDefaults.standard.integer(forKey: "staticIndex-\(subjectID)") }
+        set { UserDefaults.standard.set(newValue, forKey: "staticIndex-\(subjectID)") }
     }
     private lazy var staticBook: [ChapterPayload] = {
         guard let url = Bundle.main.url(forResource: "default-book", withExtension: "json"),
@@ -43,23 +52,62 @@ final class AppModel: ObservableObject {
     private var chapterOpenedAt: Date?
     private let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
-    init() {
-        restore()
+    // MARK: - library
+
+    func refreshSubjects() async {
+        if let url = URL(string: "\(sync.baseURL)/subjects"),
+           let (data, resp) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 3)),
+           (resp as? HTTPURLResponse)?.statusCode == 200,
+           let obj = try? JSONDecoder().decode([String: [SubjectInfo]].self, from: data) {
+            subjects = obj["subjects"] ?? []
+        } else if subjects.isEmpty {
+            // offline: the built-in subject is always available
+            subjects = [SubjectInfo(id: "ai", title: "How AI Works",
+                                    unitsTotal: 11, unitsCleared: nil,
+                                    currentUnit: nil, debt: nil)]
+        }
     }
 
-    // MARK: - persistence
+    func openSubject(_ id: String) async {
+        subjectID = id
+        staticMode = false
+        restore()
+        if chapter != nil {
+            screen = .reading
+        } else {
+            screen = .start
+        }
+    }
+
+    func backToLibrary() {
+        persist()
+        chapter = nil
+        bookState = nil
+        errorMessage = nil
+        staticMode = false
+        screen = .menu
+        Task { await refreshSubjects() }
+    }
+
+    // MARK: - persistence (per subject)
+
+    private func file(_ name: String) -> URL {
+        dir.appendingPathComponent("\(name)-\(subjectID).json")
+    }
 
     private func restore() {
-        if let d = try? Data(contentsOf: dir.appendingPathComponent("chapter.json")),
+        chapter = nil
+        bookState = nil
+        beatResponses = []
+        if let d = try? Data(contentsOf: file("chapter")),
            let ch = try? JSONDecoder().decode(ChapterPayload.self, from: d) {
             chapter = ch
-            screen = .reading
         }
-        if let d = try? Data(contentsOf: dir.appendingPathComponent("state.json")),
+        if let d = try? Data(contentsOf: file("state")),
            let st = try? JSONDecoder().decode(BookState.self, from: d) {
             bookState = st
         }
-        if let d = try? Data(contentsOf: dir.appendingPathComponent("beats.json")),
+        if let d = try? Data(contentsOf: file("beats")),
            let br = try? JSONDecoder().decode([BeatResponse].self, from: d) {
             beatResponses = br
         }
@@ -67,13 +115,13 @@ final class AppModel: ObservableObject {
 
     private func persist() {
         if let ch = chapter, let d = try? JSONEncoder().encode(ch) {
-            try? d.write(to: dir.appendingPathComponent("chapter.json"))
+            try? d.write(to: file("chapter"))
         }
         if let st = bookState, let d = try? JSONEncoder().encode(st) {
-            try? d.write(to: dir.appendingPathComponent("state.json"))
+            try? d.write(to: file("state"))
         }
         if let d = try? JSONEncoder().encode(beatResponses) {
-            try? d.write(to: dir.appendingPathComponent("beats.json"))
+            try? d.write(to: file("beats"))
         }
     }
 
@@ -88,7 +136,7 @@ final class AppModel: ObservableObject {
     // MARK: - flow
 
     func start(choice: String? = nil) async {
-        await run(ExchangeRequest(phase: "start", choice: choice))
+        await run(ExchangeRequest(subject: subjectID, phase: "start", choice: choice))
     }
 
     func startStatic() {
@@ -125,7 +173,7 @@ final class AppModel: ObservableObject {
         // Pretest grades fold into the boundary exchange offline; if connected,
         // send now so the planner can compress the CURRENT chapter.
         guard sync.connected else { screen = .reading; return }
-        var req = ExchangeRequest(phase: "pretest", unit: chapter?.unit)
+        var req = ExchangeRequest(subject: subjectID, phase: "pretest", unit: chapter?.unit)
         req.pretestResponses = responses
         await run(req, keepReadingOnNil: true)
     }
@@ -134,7 +182,7 @@ final class AppModel: ObservableObject {
 
     func submitCheck(_ responses: [ItemResponse], override: Bool = false) async {
         if staticMode { advanceStatic(); return }
-        var req = ExchangeRequest(unit: chapter?.unit)
+        var req = ExchangeRequest(subject: subjectID, unit: chapter?.unit)
         req.checkResponses = responses
         req.beatResponses = beatResponses
         req.override = override
@@ -144,7 +192,7 @@ final class AppModel: ObservableObject {
 
     func skipCheck() async {
         if staticMode { advanceStatic(); return }
-        var req = ExchangeRequest(unit: chapter?.unit)
+        var req = ExchangeRequest(subject: subjectID, unit: chapter?.unit)
         req.skippedCheck = true
         req.beatResponses = beatResponses
         req.chunkMinutes = chunkMinutes()
@@ -152,7 +200,7 @@ final class AppModel: ObservableObject {
     }
 
     func catchMeUp() async {
-        var req = ExchangeRequest(unit: chapter?.unit)
+        var req = ExchangeRequest(subject: subjectID, unit: chapter?.unit)
         req.catchMeUp = true
         req.beatResponses = beatResponses
         await run(req)
@@ -161,7 +209,7 @@ final class AppModel: ObservableObject {
     func continueAfterGate(override: Bool) async {
         guard case .gate = screen else { return }
         if override {
-            var req = ExchangeRequest(unit: chapter?.unit)
+            var req = ExchangeRequest(subject: subjectID, unit: chapter?.unit)
             req.override = true
             await run(req)
         } else {
@@ -171,7 +219,7 @@ final class AppModel: ObservableObject {
     }
 
     func breakFinished(minutes: Double) async {
-        var req = ExchangeRequest(unit: chapter?.unit)
+        var req = ExchangeRequest(subject: subjectID, unit: chapter?.unit)
         req.breakMinutes = minutes
         await run(req, keepReadingOnNil: true)
     }

@@ -1,0 +1,717 @@
+# u10 - The iron: hardware and training at scale. Item bank.
+# Concepts: c-memory-hierarchy, c-roofline, c-parallelism, c-precision-scale.
+# Refutation targets: U10-M1..U10-M5 (unit-local), reinforcing M10 and M16.
+# 14 check items: 9 constructed/congruent (64%), 5 mcq. 3 callback_eligible,
+# 2 stretch. q1 is the fade-sequence solo item for `roofline`.
+
+pretest:
+  - id: u10-p1
+    concept: c-roofline
+    prompt: |
+      Two accelerators are for sale at the same price. Card A does 320 TFLOP/s
+      of bf16 with 1.6 TB/s of memory bandwidth. Card B does 160 TFLOP/s with
+      2.4 TB/s.
+
+      You will use it to serve one interactive user at a time from a dense 13B
+      model in bf16. Which card generates tokens faster, and by how much? If
+      you are not sure, say what you would need to know to decide.
+    answer: |
+      Card B, by exactly 1.5x. Batch-1 decode reads all 13B weights from memory
+      once per token - 26 GB - so the ceiling is bandwidth divided by bytes:
+      1.6/0.026 = 61.5 tok/s for Card A, 2.4/0.026 = 92.3 tok/s for Card B.
+      The ratio is the bandwidth ratio, 2.4/1.6, because the FLOPs term does
+      not appear in the cost model. Card A would be running its arithmetic
+      units at about 0.5% of peak.
+    check: llm
+    rubric: |
+      Expected to fail or be partial - calibration, not assessment.
+      Full credit: picks B, names memory bandwidth as the binding resource, and
+      gets the 1.5x ratio by dividing bandwidth by weight bytes.
+      Partial: picks B on intuition ("decode is memory-bound") without the
+      arithmetic, or gets the mechanism but not the ratio.
+      Fail: picks A (U10-M1, the spec-sheet comparison), or says "it depends on
+      the software", or answers in terms of core counts (U10-M2).
+      Record which. A learner who nails this has already internalized the u6/u7
+      bandwidth argument and the planner should compress the motivation half of
+      the roofline section, spending the time on the compute-bound side and on
+      parallelism instead - that is where the genuinely new material is.
+
+  - id: u10-p2
+    concept: c-memory-hierarchy
+    prompt: |
+      A GPU kernel that applies a GELU activation elementwise to a large tensor
+      runs at 100% occupancy across every streaming multiprocessor on an H100,
+      and delivers under 2% of the chip's peak FLOP/s. A large matrix multiply
+      on the same chip, at the same occupancy, delivers 75%.
+
+      What is different about the two kernels? Answer from whatever model you
+      hold now.
+    answer: |
+      Arithmetic intensity - FLOPs performed per byte moved across the HBM
+      boundary. GELU reads a value, does one or two operations, and writes it
+      back: roughly 0.5 FLOP/byte, against a machine that needs 295 FLOP/byte
+      to keep its arithmetic units fed. It is bandwidth-bound and no amount of
+      parallelism changes that, because the ratio has no free parameter in it.
+      A large matmul does 2n^3 FLOPs against 3n^2 elements, so its intensity
+      grows linearly with n and crosses the machine balance. Matmul is the only
+      primitive in the network that gets more efficient as it gets bigger.
+    check: llm
+    rubric: |
+      Expected to be partial. This is the systems axis, so a strong answer is
+      plausible and the planner should use it to calibrate.
+      Full credit: names the FLOPs-per-byte ratio (by any name) and states that
+      the elementwise kernel is limited by data movement.
+      Partial: says "GELU is memory-bound" without the ratio, or explains it as
+      "GELU is a simple operation so there is less work" - true but it does not
+      explain why the *percentage of peak* is low.
+      Fail: attributes it to core count, occupancy, thread divergence, or
+      "GELU does not use tensor cores" as the primary cause (U10-M2), or says
+      the matmul does more total FLOPs so the percentage is not comparable
+      (M10 - conflating total work with rate).
+
+  - id: u10-p3
+    concept: c-precision-scale
+    prompt: |
+      fp16 and bf16 are both 16-bit floating-point formats. Training runs in
+      fp16 historically required a "loss scaling" step - multiplying the loss by
+      a large constant before the backward pass and dividing it out afterwards.
+      Training runs in bf16 do not.
+
+      Why? And separately: what does mixed-precision training keep in fp32, and
+      why that specifically?
+    answer: |
+      The exponent field. fp16 spends 5 bits on the exponent, giving a smallest
+      normal value of 6.1e-5 and a smallest subnormal of 6.0e-8; real gradients
+      of 1e-8 fall below that and round to exactly zero. Loss scaling shifts
+      them up into representable range. bf16 spends 8 bits on the exponent -
+      the same as fp32 - so its floor is 1.2e-38 and nothing underflows. It
+      pays for that with 8x coarser resolution, which does not matter for
+      gradients.
+      Mixed precision keeps master weights and the optimizer moments in fp32,
+      because those accumulate. bf16's relative resolution is 0.4%, so a weight
+      update of relative size 1e-4 rounds straight back to the original weight
+      and vanishes. Storage of a value tolerates coarse resolution;
+      accumulation of small increments into it does not.
+    check: llm
+    rubric: |
+      Expected to fail, and the specific failure is diagnostic. The second half
+      is genuinely hard and failure there is the default.
+      Fail patterns and what each means:
+      (a) "bf16 is more accurate / packs more into 16 bits" = U10-M4, the
+          bit-counting model, and the target of the precision section.
+      (b) "bf16 is newer and designed for ML" = no mechanism at all; run the
+          full format table.
+      (c) Correct on loss scaling but blank or wrong on fp32 master weights =
+          the common expert-adjacent partial. Teach the accumulation argument
+          and skip the range argument.
+      Pass requires naming the exponent/dynamic range for the first half AND
+      accumulation (not "accuracy") for the second.
+
+check:
+  - id: u10-q1
+    concept: c-roofline
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    difficulty: core
+    prompt: |
+      Run the roofline procedure end to end on hardware you have not seen.
+
+        Hardware:  peak 600 TFLOP/s bf16,  HBM bandwidth 1.5 TB/s
+        Workload:  one forward pass over a dense 50B-parameter model,
+                   bf16 weights (2 bytes each), 128 token positions in the pass
+
+      Give all five steps explicitly:
+      (a) FLOPs required by the pass,
+      (b) bytes that must cross the HBM boundary,
+      (c) arithmetic intensity,
+      (d) machine balance, and which regime the workload is in,
+      (e) the attainable throughput and the resulting tokens per second.
+
+      Then answer: (f) how many token positions per pass would this workload
+      need in order to sit exactly at the ridge point, and (g) what would
+      happen to the tokens-per-second figure from (e) if the vendor doubled the
+      peak FLOP/s and left bandwidth alone?
+    answer: |
+      (a) 2 * 50e9 * 128 = 1.28e13 FLOPs.
+      (b) 50e9 * 2 = 1.0e11 bytes. The weights are read once per pass and
+          reused across all 128 positions, so this does not scale with
+          positions.
+      (c) I = 1.28e13 / 1.0e11 = 128 FLOP/byte. (Equivalently 2 * 128 / 2 =
+          128: with bf16 weights the intensity in FLOP/byte equals the number
+          of positions.)
+      (d) B = 600e12 / 1.5e12 = 400 FLOP/byte. I = 128 < 400, so the workload
+          is bandwidth-bound, short of the ridge by a factor of 3.1.
+      (e) attainable = I * bandwidth = 128 * 1.5e12 = 1.92e14 = 192 TFLOP/s,
+          which is 32% of peak. FLOPs per token = 2 * 50e9 = 1e11, so
+          1.92e14 / 1e11 = 1,920 tok/s aggregate across the 128 positions,
+          or 15 tok/s per sequence.
+      (f) 400 positions, since I = positions for bf16 weights and the ridge is
+          at I = B = 400.
+      (g) Unchanged at 1,920 tok/s. The workload sits on the bandwidth roof;
+          doubling peak FLOP/s raises the compute roof and pushes the ridge out
+          to 800 FLOP/byte, which makes the situation worse, not better. Only
+          more bandwidth or higher intensity moves this number.
+    check: llm
+    rubric: |
+      Fade-sequence solo item for `roofline`. Tolerances: (a) 1.28e13,
+      (b) 1.0e11, (c) 128, (d) 400, (e) 192 TFLOP/s (+/- 2) and 1,920 tok/s
+      (+/- 20), (f) 400.
+      Pass = (c), (d), (g) all correct AND at least three of (a), (b), (e), (f).
+      (d) must include the comparison and the named regime, not just the number.
+      (g) is the discriminating part. Answering "twice as fast" or "3,840 tok/s"
+      is U10-M1 and fails the item regardless of everything else, because the
+      procedure exists precisely to prevent that inference. Noticing in (g) that
+      the ridge moves further away - the machine becomes harder to feed - is a
+      strong signal for the extension gate.
+      Common slips to name rather than simply mark wrong: scaling (b) with the
+      128 positions gives I = 1 and is the single most instructive error, since
+      weight reuse across the batch is the entire mechanism; using 4 bytes per
+      weight gives I = 64 and B unchanged, same regime, wrong ceiling.
+
+  - id: u10-q2
+    concept: c-roofline
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    difficulty: core
+    prompt: |
+      A colleague benchmarks your serving stack and reports: "prefill runs at
+      about 70% of the GPU's rated FLOPs, decode runs at 0.3%. Decode is 200x
+      less efficient - there must be a bug in the decode path."
+
+      There is no bug. Explain what the two numbers actually measure, why the
+      gap is expected, and give the batch size at which decode would stop being
+      the outlier. Assume bf16 weights and an H100 (989 TFLOP/s, 3.35 TB/s).
+    answer: |
+      Both numbers are percentages of the compute roof, and only one of the two
+      workloads is anywhere near it. Weight bytes are read once per forward
+      pass and reused across every token position in that pass, so arithmetic
+      intensity is 2 x positions / bytes-per-weight, which for bf16 is just the
+      number of positions. Prefill over a long prompt runs thousands of
+      positions per pass, so its intensity is in the thousands, far past the
+      H100's balance of 989/3.35 = 295 FLOP/byte; it is compute-bound and 70%
+      of peak is a good result. Decode at batch 1 runs one position, intensity
+      1 FLOP/byte, 295x short of the ridge, so its ceiling is
+      1 x 3.35e12 = 3.35 TFLOP/s, which is 0.34% of 989. The measured 0.3% is
+      not a bug - it is within a whisker of the theoretical maximum for that
+      workload on that chip.
+      Decode stops being the outlier at 295 positions per forward pass, the
+      ridge point. Batching 295+ concurrent sequences into one decode step, or
+      speculative decoding, or a longer prompt, all raise the position count and
+      move the workload toward the compute roof.
+    check: llm
+    rubric: |
+      Pass requires: (1) intensity is 2 x positions / b, so the weight read is
+      amortized across positions in a pass and NOT across tokens generated over
+      time; (2) the two workloads sit on opposite sides of the ridge point;
+      (3) the crossover at 295 positions, or any correct derivation of it from
+      the machine balance.
+      Partial: (1) and (2) without the numeric crossover.
+      Fail patterns:
+      - "decode is serial so it cannot use the parallel hardware" - a
+        restatement, not a cost model, and it is U10-M2 in disguise. Probe for
+        what the hardware is waiting on.
+      - "the GPU is too slow for decode, use a bigger card" - U10-M1.
+      - "the KV cache grows so decode gets slower" - M17 flavored; the cache
+        does cost traffic but it does not explain a constant 0.3%, which holds
+        from token 1.
+      - claiming prompt processing is sequential - M9, flag as a regression to
+        u3/u6 material.
+
+  - id: u10-q3
+    concept: c-memory-hierarchy
+    kind: constructed
+    congruent: true
+    difficulty: core
+    prompt: |
+      A textbook attention kernel for one head at sequence length n = 4096,
+      head width d = 128, fp16, materializes the n x n score matrix in HBM.
+      FlashAttention does not.
+
+      (a) Size the score matrix in bytes and compare it to the roughly 33 MB of
+          SRAM on an H100.
+      (b) State what FlashAttention changes and what it does not change, in
+          terms of FLOPs, HBM traffic, and output values.
+      (c) FlashAttention has to compute a softmax over a row while holding only
+          a tile of that row. Name the mechanism that makes this exact rather
+          than approximate.
+    answer: |
+      (a) 4096 * 4096 * 2 = 33,554,432 bytes, or 32 MiB - for one head of one
+          layer. That is roughly the entire on-chip SRAM budget of the chip, so
+          it cannot stay resident; it is written to HBM and read back, and the
+          softmax output is written and read again. Total attention traffic is
+          ~4x the score matrix plus the Q/K/V/O tensors, against 4 MiB of
+          genuinely necessary traffic.
+      (b) FLOPs are identical: 4 n^2 d, the same multiply-accumulates for QK^T
+          and PV. Output values are identical, bit-comparable. What changes is
+          HBM traffic, which drops by more than an order of magnitude because
+          the n x n intermediate is produced a tile at a time in SRAM and never
+          written out. That raises arithmetic intensity from tens of FLOP/byte
+          to order n/b, crossing the H100's balance of 295 and moving attention
+          from the bandwidth roof to the compute roof.
+      (c) The online (streaming) softmax. Carry a running row maximum m and a
+          running sum l; when a tile arrives with a larger maximum m', rescale
+          the accumulated output and the running sum by exp(m - m') before
+          adding the new tile's contribution. The rescaling exactly compensates
+          for having normalized earlier tiles against a smaller maximum, so the
+          streaming result equals the batch result.
+    check: llm
+    rubric: |
+      Pass requires: (a) 33,554,432 bytes / 32 MiB with the comparison to
+      on-chip SRAM made; (b) FLOPs unchanged AND output unchanged AND traffic
+      reduced, with the regime change named; (c) the running-max rescaling, by
+      any wording that conveys correcting earlier partial normalizations.
+      Partial: (a) and (b) correct, (c) named as "online softmax" with no
+      mechanism.
+      Fail patterns to correct explicitly:
+      - "FlashAttention approximates the softmax" or "it drops small attention
+        weights" - the single most common wrong belief about it. It is exact.
+      - "it reduces attention from O(n^2) to O(n)" - M10 wearing new clothes.
+        Compute is still O(n^2 d); HBM traffic drops to O(nd).
+      - "it is faster because it uses shared memory better / more cores" -
+        U10-M2. Shared memory is the venue, not the mechanism; the mechanism is
+        that the n x n intermediate never crosses the HBM boundary.
+
+  - id: u10-q4
+    concept: c-memory-hierarchy
+    kind: constructed
+    congruent: true
+    difficulty: core
+    prompt: |
+      Explain why a transformer's normalization, activation, and residual-add
+      kernels can never be made compute-bound on any accelerator, no matter how
+      large the model or the batch, while matrix multiplication can.
+
+      Then say what optimization the field applies to those kernels instead,
+      and what it actually accomplishes in roofline terms.
+    answer: |
+      Elementwise operations do a fixed, small number of FLOPs per element and
+      move a fixed number of bytes per element: read one value, do one or two
+      operations, write one value. In bf16 that is about 2 FLOPs per 4 bytes,
+      so I ~ 0.5 FLOP/byte. Crucially the ratio contains no free parameter -
+      making the tensor larger multiplies both numerator and denominator
+      equally, and so does making the batch larger. Against a machine balance
+      of 295 FLOP/byte that is a factor of ~600 short, permanently.
+      Matmul is different because the work and the data scale differently:
+      2n^3 FLOPs against 3n^2 elements, so I = n/3 for a square bf16 matmul and
+      grows linearly with size. Setting n/3 = 295 gives n ~ 886 - square bf16
+      matmuls smaller than about 886 on a side are bandwidth-bound on an H100
+      even though they are matmuls, which is why small models run poorly on big
+      chips.
+      The optimization is kernel fusion: rather than trying to raise the
+      intensity of the elementwise op, stop paying for it at all by folding it
+      into the kernel that produced its input, so the value goes matmul ->
+      registers/SRAM -> activation -> next stage without ever crossing the HBM
+      boundary. In roofline terms fusion does not move the workload along the
+      x-axis so much as delete a point from the graph: the fused kernel's bytes
+      are the matmul's bytes, and the elementwise FLOPs ride along free.
+    check: llm
+    rubric: |
+      Pass requires: (1) elementwise intensity is a constant with no free
+      parameter, so no size or batch fixes it; (2) matmul's work/data ratio
+      grows with size, which is the structural difference; (3) fusion, framed
+      as removing HBM round-trips rather than as "making the kernel faster".
+      Partial: (1) and (3) without articulating why matmul is different -
+      that contrast is the point of the item.
+      Bonus signal: computing the ~886 crossover, or noting that this is why
+      the entire architecture is expressed as matmuls in the first place.
+      Fail: "you can make them compute-bound with a large enough batch" -
+      the batch multiplies both sides. "Use more cores / better occupancy" -
+      U10-M2. "Fusion reduces the number of kernel launches" - true and
+      irrelevant at these sizes; the launch overhead is nanoseconds and the
+      traffic is milliseconds.
+
+  - id: u10-q5
+    concept: c-parallelism
+    kind: constructed
+    congruent: true
+    difficulty: core
+    prompt: |
+      You have 8,192 accelerators. Inside each node, 8 GPUs are connected by
+      NVLink at 900 GB/s. Between nodes, each GPU has one 400 Gb/s (50 GB/s)
+      InfiniBand link.
+
+      For each of data, tensor, and pipeline parallelism, state (i) what is
+      split, (ii) which collective operation it requires, (iii) how often that
+      collective fires, and (iv) whether you would place that axis inside a
+      node or across nodes, with the reason.
+
+      Then give a concrete 3D arrangement of the 8,192 devices.
+    answer: |
+      Data parallelism: splits the batch, replicating the weights. Collective:
+      all-reduce of the gradient buffer. Frequency: once per optimizer step -
+      the least frequent of the three. Placement: across nodes, because it can
+      tolerate the slow link. It is also the axis whose cost is independent of
+      the number of participants for a ring implementation (each device pushes
+      about 2S bytes regardless of P), which is why it scales outward.
+
+      Tensor parallelism: splits individual weight matrices - columns of the up
+      projection, rows of the down projection, heads of attention. Collective:
+      all-reduce of the activation tensor. Frequency: twice per transformer
+      layer, so 160 times per forward pass in an 80-layer model. Placement:
+      inside a node, mandatory. At d_model 8192 and 8,192 positions per
+      microbatch those all-reduces move ~40 GiB per pass: 48 ms over NVLink,
+      859 ms over InfiniBand. An 18x penalty from placement alone.
+
+      Pipeline parallelism: splits by layer, giving each stage a contiguous
+      block. Collective: none - point-to-point sends of one activation tensor
+      per stage boundary, the cheapest pattern of the three. Frequency: once per
+      microbatch per boundary. Placement: across nodes is fine; the cost is not
+      bandwidth but the bubble, (p-1)/(m+p-1) of idle time, which is fixed by
+      using many microbatches rather than by faster links.
+
+      Arrangement: tensor parallel 8 (inside a node) x pipeline parallel 8 x
+      data parallel 128 = 8,192. Read outward by frequency: the most frequent
+      collective gets the fastest link.
+    check: llm
+    rubric: |
+      Pass requires all three axes with the correct collective (DP: all-reduce
+      of gradients; TP: all-reduce of activations; PP: point-to-point sends),
+      the correct relative frequencies (TP per layer >> PP per microbatch >>
+      DP per step), and TP placed inside the node with the frequency-based
+      reason. The specific 3D factorization can be any product equal to 8,192
+      with TP <= 8.
+      Partial: correct collectives and placement, frequencies vague.
+      Fail patterns:
+      - placing TP across nodes, or saying placement does not matter, is
+        U10-M5 and is the target of this item.
+      - justifying TP's placement by "tensors are big" rather than by
+        communication frequency - the DP gradient buffer is much bigger, and it
+        goes on the slow link. Volume is not the criterion; frequency is.
+      - describing pipeline parallelism's cost as bandwidth. It is idleness.
+      Bonus: noting that a ring all-reduce's per-device cost is independent of
+      P, which is why DP is the axis you scale outward.
+
+  - id: u10-q6
+    concept: c-parallelism
+    kind: constructed
+    congruent: true
+    difficulty: stretch
+    prompt: |
+      A training run uses 8-stage pipeline parallelism. The bubble fraction -
+      the share of time each device spends idle waiting for the pipeline to
+      fill and drain - is (p - 1) / (m + p - 1), where p is the number of
+      stages and m the number of microbatches per optimizer step.
+
+      (a) Compute the bubble at m = 8 and at m = 64.
+      (b) What is the smallest m that keeps the bubble under 10%?
+      (c) The team proposes cutting the global batch size in half to improve
+          convergence per token. What does that do to the bubble, and what is
+          the cheapest way to protect against it?
+      (d) The bubble is idleness, not communication. Explain why that
+          distinction changes which hardware upgrade would help.
+    answer: |
+      (a) m = 8: 7 / 15 = 46.7%. m = 64: 7 / 71 = 9.9%. Nearly half the cluster
+          wasted in the first case.
+      (b) 7 / (m + 7) < 0.10 requires m + 7 > 70, so m > 63: the smallest
+          integer is m = 64, giving 9.86%.
+      (c) Halving the global batch halves the microbatch count if microbatch
+          size is held fixed, so m goes 64 -> 32 and the bubble goes 9.9% ->
+          17.9%, nearly doubling. The cheapest protection is to halve the
+          microbatch size too, holding m at 64 - this costs some per-device
+          arithmetic intensity (smaller matmuls, closer to the ridge from
+          below) but preserves the pipeline schedule. Reducing p, or moving to
+          an interleaved / zero-bubble schedule, are the structural fixes.
+      (d) Because idleness is not fixed by a faster link. A pipeline bubble is
+          time when a device has no work available, not time when it is waiting
+          on a transfer - the transfers here are point-to-point sends of a
+          single activation tensor, the cheapest pattern in the run. Upgrading
+          the interconnect changes the bubble by approximately nothing.
+          The levers are scheduling ones: more microbatches, fewer stages, or a
+          schedule that interleaves stage assignments so devices have other work
+          during the fill and drain.
+    check: llm
+    rubric: |
+      Stretch item; the >90% path uses this.
+      (a) 46.7% and 9.9% (+/- 0.5 point each). (b) exactly 64 - answering 63 is
+      a strict-inequality slip worth naming but not failing.
+      (c) must identify that m falls and the bubble roughly doubles, and give
+      any coherent protection that holds m constant.
+      (d) is the discriminating part and must be correct to pass: the bubble is
+      absence of available work, so interconnect upgrades do not help and the
+      fix is a scheduling one.
+      Fail: answering (d) with "faster links reduce the bubble" is U10-M5 -
+      it treats every distributed cost as a bandwidth cost. Also fail any
+      answer that trades the bubble away by simply raising p, which moves it in
+      the wrong direction.
+      Pass = (a), (b), (d) correct. (c) is a bonus.
+
+  - id: u10-q7
+    concept: c-precision-scale
+    kind: constructed
+    congruent: true
+    difficulty: core
+    prompt: |
+      Mixed-precision training with AdamW stores five tensors per parameter:
+      bf16 weights, bf16 gradients, fp32 master weights, and two fp32 optimizer
+      moments.
+
+      (a) Give the bytes per parameter and the total state for a 70B model.
+      (b) fp32 master weights double the largest single line item. Justify them
+          with a concrete numeric example - do not assert that fp32 is "more
+          accurate".
+      (c) The forward pass runs in bf16 with 0.4% relative resolution and this
+          costs essentially nothing in final model quality. Reconcile that with
+          (b), which says 0.4% resolution destroys training.
+    answer: |
+      (a) 2 + 2 + 4 + 4 + 4 = 16 bytes per parameter. For 70e9 parameters that
+          is 1.12 TB of state, before any activations - fourteen 80 GB H100s
+          just to hold it, which is why a 70B model cannot be trained on any
+          single accelerator that exists.
+      (b) Take a weight w = 1.0 and a step that should apply dw = -1e-4, an
+          entirely ordinary relative update size. bf16 has 8 significant bits,
+          so the spacing of representable values just below 1.0 is 2^-8 =
+          0.00390625. The nearest bf16 values to 0.9999 are 1.0 (distance
+          0.0001) and 0.99609375 (distance 0.0038), so w + dw rounds back to
+          exactly 1.0. The update is not imprecise; it is discarded, and it
+          will be discarded every step forever. In fp32 the spacing at 1.0 is
+          6e-8 and 0.9999 is represented to seven digits. The master copy
+          exists so the accumulation of small increments happens where the
+          increments are representable.
+      (c) The two roles are different. The forward pass *reads* weights and
+          computes with them once; a 0.4% perturbation of each weight is
+          proportional noise spread over thousands of dimensions, and trained
+          networks absorb that - exactly M16's argument for why 4-bit
+          quantization costs a couple of points rather than destroying the
+          model. The optimizer *accumulates* into weights, and accumulation of
+          increments smaller than the representable step is not noisy, it is a
+          no-op: the running total never moves. Coarse resolution is survivable
+          when you read and fatal when you add.
+    check: llm
+    rubric: |
+      Pass requires: (a) 16 bytes/param and 1.12 TB; (b) a worked rounding
+      example showing an update landing below half a representable step and
+      being discarded entirely; (c) the read-versus-accumulate distinction,
+      with the connection to M16's quantization argument.
+      (b) must be numeric. An answer that says "fp32 is more precise so the
+      update survives" without showing the update vanishing is U10-M4 with
+      better vocabulary - partial credit at most.
+      (c) is the discriminating part. A learner who says "quantization is
+      different because it is inference" has the right instinct but not the
+      mechanism; probe for accumulate-versus-read.
+      Fail: any framing of the form "16-bit halves the accuracy" (U10-M4), or
+      claiming bf16 forward passes do measurably degrade quality (they do not,
+      at matched hyperparameters), or reporting 8 bytes/param by forgetting the
+      master copy or one of the two Adam moments.
+
+  - id: u10-q8
+    concept: c-roofline
+    kind: constructed
+    congruent: true
+    difficulty: warmup
+    prompt: |
+      An accelerator does 500 TFLOP/s of bf16 and has 2.5 TB/s of HBM
+      bandwidth. You run batch-1 decode on a dense 40B-parameter model with
+      bf16 weights (2 bytes per parameter).
+
+      Give the bandwidth-bound decode ceiling in tokens per second. Bare
+      number, two decimal places.
+    answer: 31.25
+    check: numeric(0.1)
+    rubric: |
+      Bytes read per token = 40e9 * 2 = 80 GB. Ceiling = 2.5e12 / 80e9 =
+      31.25 tok/s. Confirm the regime first: I = 2/b = 1 FLOP/byte against a
+      balance of 500/2.5 = 200, so bandwidth-bound by a factor of 200.
+      Graded numerically.
+      Diagnostic values: 6250 means the learner computed from FLOPs
+      (500e12 / 8e10), which is U10-M1 and is the error the item is built to
+      catch - it is off by a factor of 200, exactly the ratio by which the
+      workload misses the ridge. 62.5 means they used 1 byte per parameter.
+      15.63 means they used 4 bytes. 0.03 means they inverted the division.
+
+  - id: u10-q9
+    concept: c-precision-scale
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    difficulty: stretch
+    prompt: |
+      Plan a pretraining run and then stress the plan.
+
+        Model:    40e9 parameters
+        Data:     8e12 tokens
+        Cluster:  4,096 accelerators at 800e12 FLOP/s peak bf16 each
+        MFU:      35%
+
+      (a) Total training FLOPs, using C = 6ND, and the wall-clock in days
+          (1 day = 86,400 s).
+      (b) Define MFU precisely enough that someone could compute it from a log,
+          and name three distinct places the missing 65% goes.
+      (c) The team enables full activation checkpointing to fit the model. What
+          happens to the wall-clock, and what happens to the reported MFU?
+      (d) The cluster loses one accelerator every three hours on average, and
+          the run is synchronous. Sketch what the run must do about that, and
+          state the tradeoff that sets checkpoint frequency.
+    answer: |
+      (a) C = 6 * 40e9 * 8e12 = 1.92e24 FLOPs. Aggregate effective throughput =
+          4096 * 800e12 * 0.35 = 1.1469e18 FLOP/s. Time = 1.92e24 / 1.1469e18 =
+          1.674e6 s = 19.4 days.
+      (b) MFU = (6ND / wall-clock seconds) / (aggregate peak FLOP/s). The
+          numerator counts only the FLOPs the model mathematics requires, not
+          the FLOPs the hardware executed - recomputation is deliberately
+          excluded. Three places the rest goes: communication that failed to
+          overlap with compute (gradient all-reduce, tensor-parallel
+          activation all-reduces); pipeline bubbles; and the bandwidth-bound
+          elementwise and normalization kernels between the matmuls. Load
+          imbalance across stages and time lost to failure and restart are two
+          more.
+      (c) Wall-clock rises by about 33%, because full recomputation adds one
+          extra forward pass and takes total work from 6ND to 8ND: 19.4 -> 25.8
+          days. Reported MFU *falls* by the same factor, to about 26%, because
+          the numerator is fixed at 6ND by definition while the denominator
+          (wall-clock x peak) grew. This is the exact case where MFU and HFU
+          diverge: HFU counts the recomputation and would stay near 35%. A team
+          reporting a lower MFU after enabling checkpointing has not regressed.
+      (d) The run must checkpoint weights and full optimizer state periodically,
+          detect and evict failed nodes automatically, pull replacements from a
+          hot spare pool, reload, and resume - with no human in the loop,
+          because at one failure per three hours over 19 days that is roughly
+          155 restarts. It must also watch for silent data corruption, which
+          produces wrong numbers without an error. The tradeoff: a longer
+          checkpoint interval spends less time writing but loses more work per
+          failure - on average half an interval. At one failure per three hours
+          a 20-minute interval loses about 10 minutes per failure, roughly 5.5%
+          of throughput, and you trade that against the cost of writing state
+          that often - fp32 master weights plus the two moments is 12 bytes per
+          parameter, so 480 GB per checkpoint for this 40B model.
+    check: llm
+    rubric: |
+      Stretch item, four parts; the >90% path uses this.
+      (a) 1.92e24 FLOPs and 19.4 days (+/- 0.5). Answering 6.8 days means MFU
+      was ignored; 6.5 days means C = 2ND.
+      (b) MUST state that the numerator is the model's required FLOPs (6ND),
+      not executed FLOPs, and give three genuinely distinct sinks.
+      (c) is the discriminating part and must be correct to pass: wall-clock up
+      ~33% (6ND -> 8ND) AND reported MFU down, with the reason being that the
+      6ND numerator is definitionally fixed. A learner who says MFU stays the
+      same has not internalized the definition; a learner who says MFU rises has
+      it backwards and is probably computing HFU.
+      (d) any coherent answer covering automated checkpoint/restore and the
+      half-an-interval expected loss.
+      Pass = (a) and (c) correct, plus one of (b) or (d).
+      Fail: treating hardware failure as an exceptional case to be handled by
+      alerting a human, or planning the run without any checkpointing at all.
+
+  - id: u10-q10
+    concept: c-roofline
+    kind: mcq
+    congruent: false
+    callback_eligible: true
+    difficulty: warmup
+    check: choice
+    prompt: |
+      Your vendor offers two upgrades at the same price: (A) double the peak
+      FLOP/s with the same memory bandwidth, or (B) double the memory bandwidth
+      with the same peak FLOP/s. You serve one interactive user at a time from
+      a 4-bit MoE model on a laptop-class part. Which do you take?
+    options:
+      - text: "B. Batch-1 decode sits far below the machine's balance point, so the ceiling is (intensity x bandwidth) and doubling bandwidth roughly doubles tokens per second. Doubling FLOP/s moves a roof the workload is nowhere near."
+        correct: true
+        explain: "Correct, and the factor is close to exactly 2 because the bandwidth-bound ceiling is linear in bandwidth. At 4.35 bits per weight the workload offers 3.7 FLOP/byte against a machine balance of 65 - it misses the ridge by 18x, so the compute roof is irrelevant."
+      - text: "A. More arithmetic throughput is the general-purpose upgrade; it helps every workload at least somewhat, while bandwidth only helps memory-heavy ones."
+        misconception: U10-M1
+        explain: "This is the spec-sheet comparison. Below the ridge point the compute roof does not participate in the answer at all - not 'somewhat', not at the margin. The workload runs at 5.6% of the FLOPs it already has, and doubling them takes it to 2.8%."
+      - text: "A. The model is a mixture of experts, so it already reads few bytes per token; bandwidth has stopped being the constraint and compute is what remains."
+        misconception: U7-M4
+        explain: "MoE cuts bytes read per token by the total/active ratio, which raises the ceiling but does not change the regime. The intensity is still 2/b - a property of matrix-vector products, unchanged by which matrices you skip - so at batch 1 the workload is exactly as bandwidth-bound after the architecture change as before it. It is faster while remaining on the same roof."
+      - text: "Neither meaningfully. Single-user latency is dominated by the KV cache growing as the conversation lengthens, so both upgrades are swamped."
+        misconception: M17
+        explain: "The cache does grow and does cost traffic, but weight traffic per token is constant from token 1 onward and dominates until roughly 8,500 tokens of context (u6's crossover). The cache is also read from the same memory system, so doubling bandwidth helps that term too. Nothing here is swamped."
+
+  - id: u10-q11
+    concept: c-memory-hierarchy
+    kind: mcq
+    congruent: false
+    difficulty: warmup
+    check: choice
+    prompt: |
+      A fused elementwise kernel (GELU, residual add, RMSNorm) runs at 100%
+      occupancy across all 132 SMs of an H100 and delivers under 2% of the
+      chip's peak FLOP/s. What is the explanation?
+    options:
+      - text: "Its arithmetic intensity is around 0.5 FLOP/byte - it reads a value, does one or two operations, and writes it back - against a machine that needs 295 FLOP/byte to keep its arithmetic units fed."
+        correct: true
+        explain: "Correct. The kernel is short of bytes, not of cores, and the ratio has no free parameter: larger tensors and larger batches multiply the FLOPs and the bytes equally. The only available move is fusion, which stops the value from crossing the HBM boundary between operations at all."
+      - text: "Occupancy is high but per-core utilization is not; issuing more threads per block, or using a grid-stride loop, would let the cores do more work per launch."
+        misconception: U10-M2
+        explain: "This is the core-count model. The cores are already fully occupied and already have nothing to do - they are stalled on memory, and adding more of them or scheduling them differently adds more things to stall. Occupancy is a latency-hiding metric, and it is doing its job here; there is simply no arithmetic to hide behind."
+      - text: "GELU uses transcendental functions, which issue on the special function units at a fraction of the throughput of the main pipelines, so the kernel is compute-bound on those units."
+        misconception: U10-M1
+        explain: "Plausible-sounding and testable: replace GELU with a plain residual add, which has no transcendentals at all, and the kernel still runs at a similar fraction of peak. The constraint is the load and the store, not the operation between them. Attributing the limit to an arithmetic unit is U10-M1 pointed at a smaller target."
+      - text: "The comparison is not meaningful. An elementwise op is O(n) work while a matmul is O(n^3), so of course the elementwise kernel accounts for a smaller share of the chip's FLOPs."
+        misconception: M10
+        explain: "This conflates total work with rate. Percentage of peak is a rate - FLOPs delivered per second while the kernel is running - and it is entirely comparable between kernels of different total sizes. The same conflation of asymptotic cost with wall-clock behaviour is what makes attention look cheap at short context."
+
+  - id: u10-q12
+    concept: c-parallelism
+    kind: mcq
+    congruent: false
+    difficulty: core
+    check: choice
+    prompt: |
+      A team configures tensor parallelism at degree 8 by placing the 8 shards
+      on 8 separate nodes connected by InfiniBand, rather than on 8 GPUs inside
+      one NVLink node. The total bytes communicated are identical either way.
+      What happens?
+    options:
+      - text: "Throughput collapses. Tensor parallelism all-reduces the activation tensor twice per layer, so an 80-layer forward pass moves tens of GiB; at 900 GB/s that is about 48 ms and at 50 GB/s it is about 859 ms, an 18x penalty from placement alone."
+        correct: true
+        explain: "Correct, and the criterion is frequency, not volume. Tensor parallelism is the most frequent collective in the run - 160 all-reduces per forward pass - so it gets the fastest link and stays inside a node. This is why TP degree in practice equals the number of GPUs sharing an NVLink domain."
+      - text: "Nothing significant. The same number of bytes crosses the same number of links; the only difference is a slightly higher per-message latency, which is amortized away by the message sizes involved."
+        misconception: U10-M5
+        explain: "Bytes are not the cost - bytes divided by bandwidth is. The two links differ by 18x in bandwidth, and the operation happens 160 times per forward pass, so the penalty compounds rather than amortizing. This is the belief that parallelism is 'just sharding' and the axis is an implementation detail."
+      - text: "It is fine, and in fact preferable: spreading the shards across nodes means each shard gets its own full memory bandwidth instead of contending with seven peers for one node's HBM."
+        misconception: U10-M5
+        explain: "The premise is wrong - GPUs in a node do not share HBM; each has its own 80 GB at 3.35 TB/s, so there is nothing to contend for. The reasoning also inverts the actual constraint, which is the link between the shards, not the memory behind them."
+      - text: "Throughput is unaffected, but memory usage rises, because cross-node tensor parallelism cannot overlap the all-reduce with compute and must buffer activations."
+        misconception: U10-M5
+        explain: "Overlap is genuinely harder across nodes, and buffering is real, but naming memory as the consequence gets the magnitude backwards: the cost here is an 18x slowdown on the critical path of every layer. Any answer that keeps throughput 'unaffected' has not priced the collective."
+
+  - id: u10-q13
+    concept: c-precision-scale
+    kind: mcq
+    congruent: false
+    difficulty: core
+    check: choice
+    prompt: |
+      fp16 training required dynamic loss scaling - multiplying the loss by a
+      large constant before the backward pass and dividing it out before the
+      optimizer step. bf16 training does not. Both are 16-bit formats. Why?
+    options:
+      - text: "bf16 has 8 exponent bits, the same as fp32, so its smallest normal value is 1.2e-38. fp16 has 5, floors out at 6.0e-8 for subnormals, and gradients below that round to exactly zero."
+        correct: true
+        explain: "Correct. Loss scaling exists to shift gradients up into a five-bit exponent's representable range, nothing more. bf16 buys the range by spending mantissa bits, ending up with 0.4% relative resolution - coarser than fp16 - and that trade is the right one because gradients need range far more than resolution."
+      - text: "bf16 packs more information into its 16 bits than fp16 does, so it is simply the more accurate 16-bit format and needs less protection."
+        misconception: U10-M4
+        explain: "Both formats have exactly 16 bits and neither carries more information than the other; they allocate it differently. bf16 is in fact *less* precise than fp16 - 8 significant bits against 11. It is more robust, which is a different property, and the word 'accurate' is what conceals the difference."
+      - text: "bf16 runs are stable because mixed precision keeps fp32 master weights, which fp16 training did not do."
+        misconception: U10-M4
+        explain: "fp16 mixed-precision training also kept fp32 master weights - they were introduced together. Master weights solve a different failure: the accumulation of updates smaller than the representable step into a weight. Loss scaling solves gradient underflow during the backward pass. Two mechanisms, two failures, and conflating them means neither is understood."
+      - text: "Because 4-bit and 8-bit quantization show that networks tolerate large weight perturbations, so 16-bit gradients never needed protection in the first place - loss scaling was cargo cult."
+        misconception: M16
+        explain: "The quantization robustness result is about proportional perturbation of stored weights at inference time, and it is genuinely correct there. It says nothing about a gradient becoming exactly zero during training, which is not perturbation but absence. Remove loss scaling from a real fp16 run and it diverges - this is measurable, not folklore."
+
+  - id: u10-q14
+    concept: c-roofline
+    kind: mcq
+    congruent: false
+    difficulty: core
+    check: choice
+    prompt: |
+      You are decoding at 85 tok/s from a 4-bit model on a 153 GB/s machine,
+      one user, and the workload is bandwidth-bound by a factor of 18. Which
+      change raises the ceiling?
+    options:
+      - text: "Anything that cuts bytes read per token: a more aggressive quantization, or an architecture that activates fewer parameters per token."
+        correct: true
+        explain: "Correct. Below the ridge the ceiling is (bytes moved) divided into (bandwidth), so the only two levers are more bandwidth or fewer bytes. This is the single move that u6's quantization, u7's mixture of experts, and grouped-query attention all make - three different techniques, one denominator."
+      - text: "A chip with three times the peak FLOP/s and the same 153 GB/s of memory bandwidth."
+        misconception: U10-M1
+        explain: "The workload uses 5.6% of the FLOPs it already has. Tripling the compute roof takes that to 1.9% and leaves the ceiling exactly where it was, because the workload is on the bandwidth roof and only the compute roof moved."
+      - text: "Enabling FlashAttention, which removes the n x n score matrix from HBM and dramatically cuts attention traffic."
+        misconception: U10-M3
+        explain: "FlashAttention targets the regime where the n x n score matrix exists - prefill and training, where n queries attend over n keys. During single-token decode there is one query, so the score 'matrix' is a 1 x n vector that was never a problem. Applying a compute-bound-regime optimization to a bandwidth-bound decode loop is the regime confusion this unit is built around."
+      - text: "Storing the KV cache in fp32 rather than fp16, so attention arithmetic over the cache is more accurate and the model needs fewer tokens to reach the answer."
+        misconception: U10-M4
+        explain: "This moves the ceiling in the wrong direction twice. Doubling cache precision doubles cache traffic on a machine where traffic is the binding constraint, and it halves attention's arithmetic intensity (which is 2 x H_q / (H_kv x b), inversely proportional to bytes per scalar). The premise is also the bit-counting model - fp16 caches cost close to nothing in quality."
