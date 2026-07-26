@@ -57,6 +57,13 @@ unlock):
 
 Your learner state has been **reset**, so you start the flight clean.
 
+**Measured at the real 32K context** the flight uses (not the 16K I developed
+against): the model loads at 20.4 GB, chapter delivery is effectively instant,
+and a full 9-item check grades in **31 seconds** (~8s per free-text item; MCQ
+and numeric items are graded in code and cost nothing). Worst case, an all-
+constructed check runs a little over a minute. Against 20-25 minutes of
+reading per chunk, the boundary wait is not the bottleneck.
+
 ### Two app-breaking bugs the simulator found in ten minutes
 
 Running the app in the iOS Simulator (no cable, no unlock dance) immediately
