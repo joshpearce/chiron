@@ -5,3 +5,5 @@ state/
 build/
 DynamicBook.xcodeproj/
 build-sim/
+server-go/chiron-server
+server-go/dist/
