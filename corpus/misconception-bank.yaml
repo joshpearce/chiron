@@ -1,0 +1,154 @@
+# Misconception bank for LLM internals.
+# Every MCQ distractor in the corpus MUST cite one of these IDs, so a wrong
+# answer is a diagnosis, not just a miss. Each entry follows the refutation
+# template: wrong model / why it is appealing / a specific prediction it makes
+# that fails / the correction.
+#
+# Target learner is an expert engineer: expect confident, partially-correct
+# models (the high-confidence-wrong quadrant), especially the ones that
+# pattern-match to software concepts (M4, M13, M14, M16).
+
+misconceptions:
+  - id: M1
+    name: agentive-attention
+    wrong_model: "Attention 'looks at' or 'decides' what's important, like a spotlight with intent."
+    why_appealing: "The name says 'attention'; every popular explainer anthropomorphizes it."
+    failing_prediction: "If attention 'decided', identical Q/K inputs couldn't produce useful mixing - but attention is a fixed similarity-weighted average; swap in random value vectors and it still 'attends' identically."
+    correction: "Attention computes a similarity-weighted average of value vectors. The weights are dot products, softmaxed. No selection, no intent - a differentiable soft lookup."
+    units: [u3, u4]
+
+  - id: M2
+    name: softmax-truth-probability
+    wrong_model: "Softmax outputs are probabilities that each option is 'true' or 'correct'."
+    why_appealing: "They sum to 1 and get called probabilities everywhere."
+    failing_prediction: "If they were correctness probabilities, temperature couldn't change them without new evidence - but temperature rescales logits and reshapes the whole distribution."
+    correction: "Softmax is a normalized exponential weighting of scores - a differentiable argmax-softener. In the output layer it parameterizes a sampling distribution, calibrated only to training-data frequencies, not truth."
+    units: [u2, u6]
+
+  - id: M3
+    name: embeddings-contain-meaning
+    wrong_model: "Embeddings store the meaning of a word, like a rich struct of semantic fields."
+    why_appealing: "'king - man + woman = queen' demos; 'semantic vector' language."
+    failing_prediction: "If meaning lived in the vector, the same vector would mean the same thing in a different model - but embeddings are meaningless outside their model; only relative geometry induced by the training objective matters."
+    correction: "An embedding is a learned position whose geometry (distances/directions to other embeddings) is shaped by the objective. Meaning is relational and model-internal."
+    units: [u1]
+
+  - id: M4
+    name: params-as-lookup-table
+    wrong_model: "Parameters are a compressed key-value store of facts; bigger model = more rows."
+    why_appealing: "Engineers reach for the database analogy; retrieval failures look like missing rows."
+    failing_prediction: "A lookup table can't answer queries about items it never stored - but models interpolate: they answer novel questions by composing features, and confidently 'retrieve' facts that were never anywhere in the data (hallucination)."
+    correction: "Parameters define a function that transforms token streams. Facts are distributed across weights as soft statistical regularities; generalization and hallucination are the same mechanism."
+    units: [u1, u4, u5]
+
+  - id: M5
+    name: gd-finds-the-minimum
+    wrong_model: "Gradient descent finds THE minimum of the loss."
+    why_appealing: "Optimization framing; convex intuition from school math."
+    failing_prediction: "If training found the global minimum, two runs from different seeds would converge to the same weights - they never do, yet both work."
+    correction: "SGD finds one of astronomically many good-enough low-loss regions. In high dimensions, local minima are rare (saddle points dominate) and wide basins generalize. 'The minimum' doesn't exist in any useful sense."
+    units: [u2, u5]
+
+  - id: M6
+    name: temperature-changes-knowledge
+    wrong_model: "Raising temperature makes the model 'more creative'/know different things; T=0 shows what it 'really knows'."
+    why_appealing: "Observable behavior change; 'creativity' language in API docs."
+    failing_prediction: "If temperature changed knowledge, the logits would differ - they are identical; only the sampling from them changes."
+    correction: "Temperature rescales fixed logits before sampling. T=0 is argmax over the same distribution. All 'knowledge' is upstream of sampling."
+    units: [u6]
+
+  - id: M7
+    name: layernorm-numerical-stability
+    wrong_model: "LayerNorm is for numerical stability (avoiding overflow/NaNs)."
+    why_appealing: "Engineers know normalization from numerics; float problems are familiar."
+    failing_prediction: "If it were about float range, you could remove it at inference in fp32 - remove it and the network's outputs are garbage regardless of precision."
+    correction: "Normalization conditions the optimization landscape and controls activation scale so residual-stream contributions stay comparable across depth - it's about trainability and gradient flow, not float safety."
+    units: [u4]
+
+  - id: M8
+    name: residual-gradient-highway-only
+    wrong_model: "Residual connections exist only so gradients can flow backward (skip connections for training)."
+    why_appealing: "That IS the textbook motivation from ResNets, and it's half right."
+    failing_prediction: "If residuals were only a training trick, ablating a middle block at inference would destroy everything downstream - but transformer computation is largely additive refinements to a persistent stream; many blocks can be skipped with graceful degradation."
+    correction: "The residual stream is the model's shared workspace: each block reads from it and writes an additive update. The gradient-highway story is true but secondary to the read/write-channel view."
+    units: [u4]
+
+  - id: M9
+    name: transformers-read-in-order
+    wrong_model: "Transformers process the sequence token-by-token, left to right, like an RNN."
+    why_appealing: "Text generation LOOKS sequential; chat streams token by token."
+    failing_prediction: "If processing were sequential, prompt processing would take one step per token - but the whole prompt is processed in parallel in one forward pass; only *generation* is sequential."
+    correction: "Within a forward pass, all positions are computed simultaneously; order lives entirely in positional information and the causal mask. Generation is sequential only because each new token needs a new forward pass."
+    units: [u3, u6]
+
+  - id: M10
+    name: attention-parallel-so-linear
+    wrong_model: "Self-attention is O(n) because it's parallelized."
+    why_appealing: "Conflating wall-clock speed with asymptotic complexity - a classic systems trap."
+    failing_prediction: "If attention were O(n), doubling context would double cost - it quadruples compute and the KV cache grows linearly while attention compute per new token grows with n."
+    correction: "Attention is O(n^2) in sequence length (every query dots every key). Parallel hardware hides it at small n; at long context it's the dominant cost. This is WHY long context is expensive."
+    units: [u3, u6]
+
+  - id: M11
+    name: more-params-more-memorization
+    wrong_model: "More parameters = more memorized training data."
+    why_appealing: "Storage intuition: bigger disk, more files."
+    failing_prediction: "If scale just added memorization, big models would generalize worse (overfit) - instead scaling laws show smooth improvement on held-out data, and emergent capabilities appear that no training example demonstrates."
+    correction: "Capacity buys richer feature composition, not rows. Loss on unseen data improves predictably with scale (scaling laws); memorization exists but is the exception regime."
+    units: [u5]
+
+  - id: M12
+    name: moe-experts-are-specialists
+    wrong_model: "MoE experts are domain specialists - a 'code expert', a 'French expert' - and the router classifies the topic."
+    why_appealing: "The name 'expert'; mixture-of-specialists is a familiar systems pattern."
+    failing_prediction: "If experts were domain specialists, routing would correlate strongly with topic - measured routing is largely token-level and syntactic; the same 'expert' fires across unrelated domains."
+    correction: "Experts are parallel MLP blocks selected per token by a learned router optimizing load-balanced loss reduction. Specialization is emergent, token-granular, and mostly not human-interpretable."
+    units: [u7]
+
+  - id: M13
+    name: model-sees-the-chat
+    wrong_model: "The model 'knows' it's in a chat with roles, tools, and memory - the API structure exists inside the model."
+    why_appealing: "The API presents messages/roles/tools as first-class objects."
+    failing_prediction: "If roles were model-native, you couldn't jailbreak by writing 'assistant:' text in user content - but everything is one token stream with delimiter tokens; the structure is a serialization convention."
+    correction: "Harness assembles system prompt + history + tool results into one flat token sequence. Roles are learned formatting. All 'memory' is literally tokens in the context window (or external storage the harness re-injects)."
+    units: [u8]
+
+  - id: M14
+    name: tools-run-inside-model
+    wrong_model: "The model executes tools / browses / runs code itself."
+    why_appealing: "Product UX presents it that way; 'the AI did X'."
+    failing_prediction: "If the model executed tools, tool output could arrive mid-token - instead the model emits a structured CALL, generation stops, the harness executes and appends the result, and a NEW forward pass continues."
+    correction: "Tool use is a text protocol: model emits a call, harness executes, result becomes more context tokens. The 'agent' is the loop, not the model."
+    units: [u8]
+
+  - id: M15
+    name: rlhf-teaches-facts
+    wrong_model: "RLHF/fine-tuning is where the model learns most of its knowledge and skills."
+    why_appealing: "The dramatic behavior difference between base and chat models."
+    failing_prediction: "If post-training added knowledge, benchmark knowledge scores would jump after RLHF - they barely move (and often dip); post-training compute is a rounding error vs pretraining."
+    correction: "Capabilities come from pretraining. Post-training shapes behavior: format, refusals, helpfulness - selecting among things the base model could already do."
+    units: [u5]
+
+  - id: M16
+    name: quantization-lossy-compression-of-facts
+    wrong_model: "Quantizing to 4-bit deletes 7/8 of the model's knowledge, like lossy-compressing a database."
+    why_appealing: "Bit-counting intuition: fewer bits, less information."
+    failing_prediction: "If knowledge scaled with bits, a 4-bit 35B model would perform like an 8-bit ~17B - but 4-bit quantization typically costs only a few percent on benchmarks because weights are redundant and precision matters less than direction."
+    correction: "Weights carry heavy redundancy; what matters is preserving the geometry of the computation, not per-weight precision. Quantization error behaves like noise the network is robust to - up to a cliff."
+    units: [u6]
+
+  - id: M17
+    name: kv-cache-is-conversation-memory
+    wrong_model: "The KV cache is the model's memory of the conversation (its 'session state')."
+    why_appealing: "It IS a cache that persists across tokens, and chat feels stateful."
+    failing_prediction: "If the KV cache were semantic memory, dropping and recomputing it from the same tokens would lose information - it reproduces bit-identical results; it's pure recomputation avoidance."
+    correction: "KV cache stores already-computed key/value projections so old tokens aren't re-processed per new token. State lives in the token sequence; the cache is a performance optimization over it."
+    units: [u6, u8]
+
+  - id: M18
+    name: loss-zero-is-goal
+    wrong_model: "Training aims for zero loss; remaining loss is a deficiency."
+    why_appealing: "Every engineer's test suite goes green at zero failures."
+    failing_prediction: "If zero loss were achievable-and-good, the model would assign probability 1 to one continuation - but language is genuinely stochastic; irreducible entropy means optimal loss is far above zero, and hitting near-zero on training data means memorization."
+    correction: "Cross-entropy has an irreducible floor (the entropy of language). Scaling laws model loss as approaching this floor asymptotically. The gap that matters is to the floor, not to zero."
+    units: [u2, u5]

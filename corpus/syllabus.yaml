@@ -1,0 +1,152 @@
+# Syllabus: "What AI is, end to end" - fixed spine, dynamic depth.
+# The spine is completable in ~4h at target pace (mastery gating stalls an
+# overstuffed syllabus). Extensions unlock only above 90% unit mastery.
+# Heavy math sits in the first half of the session (fatigue rule).
+
+learner:
+  name: Matt
+  profile: >
+    Experienced pragmatic software engineer (systems, infra, Elixir/Python/Go/Rust,
+    Fly.io). Uses LLM tooling daily (Claude Code, MCP, agents). Expert on the
+    code/systems axis; rusty-but-recoverable on linear algebra; novice on matrix
+    calculus and ML notation conventions. High-confidence partial mental models
+    expected - refutation structure is the primary rhetorical tool.
+  session: single ~8h flight, offline, 20-25 min chunks, breaks scheduled.
+
+defaults:
+  mastery_gate: 0.80
+  extension_trigger: 0.90
+  check_min_items: 8
+  check_constructed_fraction: 0.6
+  check_callback_fraction: 0.4   # of items drawn from prior units
+  chunk_minutes: [20, 25]
+
+units:
+  - id: u0
+    slug: calibration
+    title: "Calibration: where you actually are"
+    minutes: 20
+    prereqs: []
+    concepts:
+      - {id: c-notation, name: "ML notation conventions (indices, dims, gradient layout)"}
+      - {id: c-matmul, name: "Matrix multiply as composition of linear maps"}
+      - {id: c-dotprod, name: "Dot product as similarity / projection"}
+    notes: >
+      Baseline quiz across all axes + notation pre-training section that the
+      planner SKIPS if the pretest shows fluency (pre-training does not help
+      high-prior-knowledge learners). Seeds the two-axis expertise profile.
+
+  - id: u1
+    slug: core-bet
+    title: "The core bet: next-token prediction"
+    minutes: 25
+    prereqs: [u0]
+    concepts:
+      - {id: c-lm-objective, name: "Language modeling objective; why next-token prediction forces world modeling"}
+      - {id: c-tokens, name: "Tokenization (BPE), tokens vs words vs characters"}
+      - {id: c-embeddings, name: "Embeddings as learned geometry, not stored meaning"}
+      - {id: c-logits, name: "Logits -> distribution over vocabulary"}
+
+  - id: u2
+    slug: math-floor
+    title: "The math floor"
+    minutes: 35
+    prereqs: [u0]
+    concepts:
+      - {id: c-matrix-transform, name: "Matrices as transformations of vector spaces"}
+      - {id: c-softmax, name: "Softmax: definition, temperature, why exp"}
+      - {id: c-gradient, name: "Gradients and the chain rule (scalar -> vector intuition)"}
+      - {id: c-loss-surface, name: "Loss surfaces, local minima, why SGD works anyway"}
+
+  - id: u3
+    slug: attention
+    title: "Attention from first principles"
+    minutes: 40
+    prereqs: [u1, u2]
+    concepts:
+      - {id: c-qkv, name: "Queries, keys, values: the retrieval framing and its limits"}
+      - {id: c-sdpa, name: "Scaled dot-product attention equation, incl. why sqrt(d_k)"}
+      - {id: c-attn-numeric, name: "Full numeric hand-computation of attention on tiny matrices"}
+      - {id: c-causal-mask, name: "Causal masking; why 'transformers read in order' is wrong"}
+
+  - id: u4
+    slug: transformer-block
+    title: "The transformer block"
+    minutes: 35
+    prereqs: [u3]
+    concepts:
+      - {id: c-mha, name: "Multi-head attention; MQA/GQA variants (confusable siblings - interleave)"}
+      - {id: c-mlp-block, name: "The MLP block; where 'knowledge' lives"}
+      - {id: c-residual, name: "Residual stream as additive read/write channel (not just gradient highway)"}
+      - {id: c-layernorm, name: "LayerNorm/RMSNorm and placement (pre/post-LN - interleave)"}
+      - {id: c-depth, name: "Why stacking blocks works; feature composition"}
+
+  - id: u5
+    slug: training
+    title: "Training: loss to aligned model"
+    minutes: 45
+    prereqs: [u2, u4]
+    concepts:
+      - {id: c-xent, name: "Cross-entropy loss; perplexity"}
+      - {id: c-backprop, name: "Backprop as chain rule bookkeeping (fade-sequence derivation)"}
+      - {id: c-optimizers, name: "SGD -> momentum -> Adam -> AdamW (confusable siblings - interleave)"}
+      - {id: c-scaling, name: "Pretraining data and scaling laws"}
+      - {id: c-posttrain, name: "SFT, RLHF/RLAIF, DPO; where helpfulness comes from"}
+
+  - id: u6
+    slug: inference
+    title: "Inference: making it run"
+    minutes: 30
+    prereqs: [u3, u4]
+    concepts:
+      - {id: c-sampling, name: "Temperature, top-p, top-k; temperature changes sampling not knowledge"}
+      - {id: c-kv-cache, name: "KV cache; why context length costs what it costs"}
+      - {id: c-quant, name: "Quantization (live example: the 4-bit model teaching this book)"}
+      - {id: c-specdec, name: "Speculative decoding"}
+
+  - id: u7
+    slug: moe
+    title: "Mixture of Experts"
+    minutes: 25
+    prereqs: [u4, u6]
+    concepts:
+      - {id: c-moe-routing, name: "Router, top-k expert selection, load balancing"}
+      - {id: c-moe-tradeoff, name: "Total vs active params; why A3B decodes fast (the teacher model IS one)"}
+
+  - id: u8
+    slug: harnesses
+    title: "Harnesses and agents"
+    minutes: 20
+    prereqs: [u6]
+    concepts:
+      - {id: c-sysprompt, name: "System prompts and conversation assembly; it is all one token stream"}
+      - {id: c-toolloop, name: "Tool-use loop mechanics; MCP"}
+      - {id: c-context-mgmt, name: "Context management, compaction, agentic patterns"}
+    notes: "Matt's home turf - planner should compress hard on pretest evidence."
+
+  - id: u9
+    slug: synthesis
+    title: "Synthesis: the full trace"
+    minutes: 30
+    prereqs: [u1, u2, u3, u4, u5, u6, u7, u8]
+    concepts:
+      - {id: c-full-trace, name: "End-to-end trace: 'I hit enter in Claude Code' through every layer"}
+    notes: "Closing cumulative check draws from ALL prior units, weighted to errors."
+
+extensions:
+  - id: x1
+    slug: attention-gradients
+    title: "Backprop through attention; softmax Jacobian"
+    unlocks_after: {unit: u5, mastery: 0.90}
+  - id: x2
+    slug: interpretability
+    title: "Interpretability: induction heads, superposition"
+    unlocks_after: {unit: u4, mastery: 0.90}
+  - id: x3
+    slug: rlhf-math
+    title: "RLHF math: policy gradients, PPO/DPO derivations"
+    unlocks_after: {unit: u5, mastery: 0.90}
+  - id: x4
+    slug: positional
+    title: "Positional encodings and long context: RoPE internals"
+    unlocks_after: {unit: u3, mastery: 0.90}
