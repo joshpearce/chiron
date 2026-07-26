@@ -13,6 +13,15 @@ import os
 enum SelfTest {
     static let log = Logger(subsystem: "com.mjbraun.chiron", category: "chiron-selftest")
 
+    /// os.Logger output does not reach `idevicesyslog`, which reads the legacy
+    /// syslog stream - so a run over USB looked like it had produced nothing at
+    /// all. Everything goes to stdout as well, where ios-deploy relays it.
+    static func say(_ line: String) {
+        print("chiron-selftest \(line)")
+        fflush(stdout)
+        log.notice("\(line)")
+    }
+
     static var requested: Bool {
         CommandLine.arguments.contains("selftest") || weakRequested
     }
@@ -65,7 +74,7 @@ enum SelfTest {
         model.startStatic()
         let chapters = model.staticChapters
         guard !chapters.isEmpty else {
-            log.error("INSPECT no bundled chapters: \(model.errorMessage ?? "?", privacy: .public)")
+            log.error("INSPECT no bundled chapters: \(model.errorMessage ?? "?")")
             return
         }
         // An explicit unit wins; otherwise pick the most math-dense chapter,
@@ -83,19 +92,19 @@ enum SelfTest {
         case "showbreak":   model.showBreakForInspection()
         default:            model.showReadingForInspection()
         }
-        log.notice("INSPECT \(screen, privacy: .public) unit=\(chapter.unit, privacy: .public) beats=\(chapter.beats.count, privacy: .public) check=\(chapter.check.count, privacy: .public)")
+        say("INSPECT \(screen) unit=\(chapter.unit) beats=\(chapter.beats.count) check=\(chapter.check.count)")
     }
 
     static func run(_ model: AppModel) async {
-        log.notice("START transport=\(model.sync.transport, privacy: .public) base=\(model.sync.baseURL, privacy: .public)")
+        say("START transport=\(model.sync.transport) base=\(model.sync.baseURL)")
 
         await model.sync.probe()
-        log.notice("PROBE connected=\(model.sync.connected, privacy: .public) transport=\(model.sync.transport, privacy: .public)")
+        say("PROBE connected=\(model.sync.connected) transport=\(model.sync.transport)")
 
         await model.refreshSubjects()
-        log.notice("SUBJECTS n=\(model.subjects.count, privacy: .public)")
+        say("SUBJECTS n=\(model.subjects.count)")
         guard let subject = model.subjects.first else {
-            log.error("FAIL no subjects available")
+            say("FAIL no subjects available")
             return
         }
 
@@ -103,10 +112,10 @@ enum SelfTest {
         await model.start()
 
         guard let chapter = model.chapter else {
-            log.error("FAIL no chapter after start: \(model.errorMessage ?? "no error reported", privacy: .public)")
+            log.error("FAIL no chapter after start: \(model.errorMessage ?? "no error reported")")
             return
         }
-        log.notice("CHAPTER unit=\(chapter.unit, privacy: .public) html=\(chapter.html.count, privacy: .public) beats=\(chapter.beats.count, privacy: .public) pretest=\(chapter.pretest.count, privacy: .public) check=\(chapter.check.count, privacy: .public)")
+        say("CHAPTER unit=\(chapter.unit) html=\(chapter.html.count) beats=\(chapter.beats.count) pretest=\(chapter.pretest.count) check=\(chapter.check.count)")
 
         // Strong path answers from the shipped reference answers; weak path
         // answers with a confident, plausible-sounding misconception, which is
@@ -127,18 +136,18 @@ enum SelfTest {
             return ItemResponse(itemId: item.id, response: answer,
                                 selectedIndex: nil, confidence: 4)
         }
-        log.notice("MODE \(weak ? "weak" : "strong", privacy: .public)")
-        log.notice("CHECK submitting n=\(responses.count, privacy: .public)")
+        log.notice("MODE \(weak ? "weak" : "strong")")
+        say("CHECK submitting n=\(responses.count)")
         await model.submitCheck(responses)
 
         if case .gate(let gate, let results) = model.screen {
             let pct = Int((gate.score ?? 0) * 100)
             let passed = results.filter { $0.passed }.count
-            log.notice("GATE score=\(pct, privacy: .public)% passed=\(gate.passed, privacy: .public) items=\(passed, privacy: .public)/\(results.count, privacy: .public)")
-            log.notice("NEXT unit=\(model.chapter?.unit ?? "none", privacy: .public)")
-            log.notice("PASS self-test completed the full loop")
+            say("GATE score=\(pct)% passed=\(gate.passed) items=\(passed)/\(results.count)")
+            log.notice("NEXT unit=\(model.chapter?.unit ?? "none")")
+            say("PASS self-test completed the full loop")
         } else {
-            log.error("FAIL no gate after check: \(model.errorMessage ?? "no error reported", privacy: .public)")
+            log.error("FAIL no gate after check: \(model.errorMessage ?? "no error reported")")
         }
     }
 }

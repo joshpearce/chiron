@@ -1,8 +1,33 @@
 # Flight-day runbook
 
-## MORNING STATUS (overnight of 2026-07-25 -> 26)
+## STATUS
 
-**Everything server-side is green. One thing needs your hands: unlock the iPad.**
+**The iPad has now completed a real exchange end to end.** Against the sprite:
+a 9-item cumulative check (u1 items plus four callbacks from the cleared u0),
+every item graded by Claude, gate passed at 100%, next chapter delivered.
+Confirmed from the server's event log rather than from client-side logging,
+which matters - see the logging note below.
+
+**The service is Go** on both the sprite and the Mac. `start-flight.sh` runs
+`bin/chiron-server`; `scripts/sprite-deploy.sh` ships it to the sprite.
+
+**Still to do before flying: the Wi-Fi soft AP has never carried traffic.**
+macOS will not share a connection from Wi-Fi to Wi-Fi, so the option is absent
+while Wi-Fi is the uplink. `scripts/setup-adhoc.sh` creates the loopback service
+that frees Wi-Fi to be the share target; the Internet Sharing toggle itself is
+GUI-only and will drop your Wi-Fi while it is on. Preflight now fails if Wi-Fi
+sharing is off - it used to report GO in exactly that state, which is how the
+iPad ended up with no route to the Mac while every check passed.
+
+### Device logging does not work the way you would expect
+
+`os.Logger` output does not reach `idevicesyslog` (it reads the legacy syslog
+stream), and `ios-deploy --noninteractive` does not relay app stdout either. A
+self-test run therefore looks like it produced nothing at all. Judge device
+behaviour by what the server recorded - `/subjects`, `/state`, or the event log
+- not by client logs.
+
+## MORNING STATUS (overnight of 2026-07-25 -> 26)
 
 Do this first:
 
