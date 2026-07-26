@@ -19,8 +19,9 @@ every symbol defined.
 
 A document is a sequence of $T$ discrete symbols $x_1, x_2, \ldots, x_T$. Each
 $x_t$ is an integer in $\{1, \ldots, V\}$, where $V$ is the vocabulary size (the
-number of distinct symbols the model can emit). Section 3 explains what those
-symbols actually are; for now, think "roughly a word fragment."
+number of distinct symbols the model can emit). The tokenization section below
+explains what those symbols actually are; for now, think "roughly a word
+fragment."
 
 The probability of the whole document factors exactly, with no approximation, by
 the chain rule of probability:
@@ -249,10 +250,11 @@ w i d e s t _    (3)
 **Merge step.** Count every adjacent pair across the corpus, weighted by word
 count. Merge the most frequent pair into a single symbol. Repeat.
 
-*Round 1.* Pair counts: `(l,o)`=7, `(o,w)`=7, `(w,_)`=5, `(w,e)`=2+6=8,
-`(e,r)`=2, `(r,_)`=2, `(n,e)`=6, `(e,s)`=6+3=9, `(s,t)`=6+3=9, `(t,_)`=6+3=9,
-`(w,i)`=3, `(i,d)`=3, `(d,e)`=3. Three pairs tie at 9; break ties by first
-occurrence and take `(e,s)`.
+*Round 1.* Pair counts, every adjacent pair in the corpus: `(l,o)`=7,
+`(o,w)`=7, `(w,_)`=5, `(w,e)`=2+6=8, `(e,r)`=2, `(r,_)`=2, `(n,e)`=6,
+`(e,w)`=6, `(e,s)`=6+3=9, `(s,t)`=6+3=9, `(t,_)`=6+3=9, `(w,i)`=3, `(i,d)`=3,
+`(d,e)`=3. Three pairs tie at 9; break ties by first occurrence and take
+`(e,s)`.
 
 Merge 1: **`es`**
 
@@ -453,16 +455,23 @@ vector" means.
 
 **Here is the specific prediction that model makes, and it fails.** If meaning
 lived in the coordinates, the coordinates would have to be stable. Take a trained
-model, pick any permutation $\pi$ of the $d_{model}$ coordinate indices, and apply
-it to the columns of $E$. Then apply the same $\pi$ to the input rows of every
-weight matrix that reads from the residual stream, and to the gain and bias
-vectors of every normalization layer. The resulting model produces
-bit-for-bit identical outputs on every input. Nothing measurable changed. There
-are $4096!$ such relabelings, all equally valid, so "dimension 412 means
-formality" cannot be a fact about the model - it is a fact about an arbitrary
-labeling that the training run happened to land on. (For a model without
-elementwise normalization gains, the same argument runs with any orthogonal
-matrix $Q$ in place of a permutation, so not even the axes are privileged. u4
+model, pick any permutation $\pi$ of the $d_{model}$ coordinate indices, and
+relabel the residual stream by it. That means four consistent edits: permute the
+columns of $E$; permute the input side of every weight matrix that *reads* from
+the stream; permute the output side of every matrix that *writes* into it; and
+permute the gain and bias vectors of every normalization layer. Now every
+activation in the network is the old activation with its coordinates shuffled by
+$\pi$, and every read undoes the shuffle before acting on it, so the logits come
+out identical on every input. Nothing measurable changed. There are $4096!$ such
+relabelings, all equally valid, so "dimension 412 means formality" cannot be a
+fact about the model - it is a fact about an arbitrary labeling that the training
+run happened to land on. (Strip the learned gains and use RMSNorm, which divides
+by $\lVert x \rVert / \sqrt{d_{model}}$ and is therefore invariant under any
+rotation, and the argument runs with an arbitrary orthogonal matrix $Q$ in place
+of a permutation - not even the axes are privileged. Real models keep a learned
+elementwise gain, which breaks the full rotational symmetry down to the
+permutations; that is why interpretability work can find axis-aligned features at
+all, and why what it reports are still directions rather than coordinates. u4
 covers the normalization detail.)
 
 Second failing prediction, cruder and easier to check: if the vector held the
@@ -524,10 +533,11 @@ answer: |
   and intrinsically. It does not. Three distinguishing experiments, any one
   is enough:
 
-  1. Permute all d_model coordinates of E consistently, and permute the input
-     rows of every matrix that reads the stream. Outputs are bit-identical.
-     A store whose fields can be arbitrarily relabeled with no effect is not
-     storing anything in those fields.
+  1. Permute all d_model coordinates of E consistently, permute the input side
+     of every matrix that reads the stream and the output side of every matrix
+     that writes into it, and permute the normalization gains and biases.
+     Outputs are identical. A store whose fields can be arbitrarily relabeled
+     with no effect is not storing anything in those fields.
   2. Transplant one model's embedding row into another model. If meaning were
      in the vector it would transfer. It produces noise.
   3. Feed `bank` in two disambiguating contexts. The input vector is the same
@@ -566,8 +576,9 @@ $$|E| = 32{,}000 \times 4096 = 131{,}072{,}000$$
 
 That is 131 million parameters whose entire job is to assign each of 32,000
 tokens a starting position. Llama-2 does not tie its input and output matrices
-(section 6 explains tying), so there is a second matrix of the same size at the
-output end, for 262 million total, against a full model of about 6.74 billion.
+(the output-layer section below explains tying), so there is a second matrix of
+the same size at the output end, for 262 million total, against a full model of
+about 6.74 billion.
 The embedding end is roughly 4% of the model. The other 96% is transformation.
 
 Hold onto that ratio, because it sets up a trap.
@@ -640,11 +651,20 @@ hidden state. For generating the next token, only the hidden state at the *last*
 position matters.
 
 That vector has to become a distribution over all $V$ tokens. One matrix does it.
-The unembedding matrix is $W_U \in \mathbb{R}^{V \times d_{model}}$, and:
+The unembedding matrix is $W_U \in \mathbb{R}^{V \times d_{model}}$ - one row per
+vocabulary entry, the same layout as $E$, which is what makes weight tying
+possible at the end of this section. With $h$ a row vector of shape
+$(1, d_{model})$ in this book's convention:
 
-$$z = W_U h, \qquad z \in \mathbb{R}^{V}$$
+$$z = h\,W_U^T, \qquad z \in \mathbb{R}^{V}$$
 
-where $z$ is the vector of **logits**, one real number per vocabulary entry. Read
+The transpose is load-bearing, not tidying. $h$ carries $d_{model}$ on its second
+axis and $W_U$ carries $d_{model}$ on its second axis too, so nothing contracts
+until one of them is flipped; $W_U^T$ is $(d_{model}, V)$ and the join works.
+This is literally what the code does - a PyTorch `nn.Linear` stores its weight as
+(out, in) and computes `h @ W.T`.
+
+Here $z$ is the vector of **logits**, one real number per vocabulary entry. Read
 componentwise, this is the part that matters:
 
 $$z_j = \langle W_U[j,:],\ h \rangle = \sum_{k=1}^{d_{model}} W_U[j,k] \, h_k$$
@@ -665,7 +685,7 @@ tokens. Same shape, different operands.
 $[\ \texttt{" the"},\ \texttt{" a"},\ \texttt{" mat"},\ \texttt{" quantum"}\ ]$
 at indices 0-3. Suppose the stack, having processed `The cat sat on`, emitted
 
-$$h = \begin{bmatrix} 2 \\ -1 \\ 0.5 \end{bmatrix}$$
+$$h = \begin{bmatrix} 2 & -1 & 0.5 \end{bmatrix}$$
 
 and the model's unembedding matrix is
 
@@ -724,7 +744,7 @@ prompt: |
   vocabulary $[\texttt{" the"}, \texttt{" a"}, \texttt{" mat"}, \texttt{" quantum"}]$,
   but a new hidden state from a different context:
 
-  $$h = \begin{bmatrix} 0 \\ 1 \\ 1 \end{bmatrix}$$
+  $$h = \begin{bmatrix} 0 & 1 & 1 \end{bmatrix}$$
 
   $z_0 = (1)(0) + (0)(1) + (0)(1) =$ ____
   $z_1 = (0.5)(0) + (1)(1) + (2)(1) =$ ____

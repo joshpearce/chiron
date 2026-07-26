@@ -18,8 +18,9 @@ pretest:
       writer chose. A perfect model reproduces the true conditional
       distribution, which still assigns less than probability 1 to whatever
       actually occurred, so -log P of the observed token stays positive.
-      Empirically the floor for English is somewhere near 0.7-1.0 nats per
-      token; frontier models sit modestly above it.
+      Scaling-law fits estimate the floor directly: Chinchilla's fitted
+      irreducible term is about 1.7 nats per token on its corpus, and frontier
+      models sit modestly above that.
     check: llm
     rubric: |
       Pass requires the answer to be non-zero AND to attribute the floor to
@@ -235,6 +236,7 @@ check:
     prompt: |
       A model's tokenizer has a vocabulary of 32,000 entries. Which statement is
       correct?
+    check: choice
     options:
       - text: "The model can represent any string, including words that appear nowhere in the vocabulary, by composing subword pieces down to individual bytes."
         correct: true
@@ -264,12 +266,12 @@ check:
       Procedure (any one of three):
 
       (a) Coordinate permutation. Pick a permutation of the d_model coordinates.
-      Apply it to the columns of E, to the input rows of every matrix that reads
-      the residual stream, and to every normalization gain and bias. Run the
-      model.
+      Apply it to the columns of E, to the input side of every matrix that reads
+      the residual stream, to the output side of every matrix that writes into
+      it, and to every normalization gain and bias. Run the model.
       Claim predicts: the meaning-bearing fields are scrambled, so outputs
       degrade.
-      Actual result: bit-identical outputs on every input. d_model! parameter
+      Actual result: identical outputs on every input. d_model! parameter
       settings implement the same function, so no coordinate can carry a fixed
       semantic field.
 
@@ -313,6 +315,7 @@ check:
       You measure a trained model's embedding matrix and find that coordinate
       412 correlates strongly with word formality across 500 sampled tokens.
       What does this establish?
+    check: choice
     options:
       - text: "That in this particular training run, a formality-related direction happens to have substantial overlap with coordinate 412. Retraining with a different seed would place it elsewhere."
         correct: true
@@ -414,6 +417,7 @@ check:
     prompt: |
       For prompt A, the model's top token has logit 18.4. For prompt B, the top
       token has logit 6.2. What can you conclude?
+    check: choice
     options:
       - text: "Nothing. Logits are defined only up to an additive constant, so absolute values are not comparable across forward passes; only gaps within one distribution carry information."
         correct: true

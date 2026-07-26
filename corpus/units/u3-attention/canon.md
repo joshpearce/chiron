@@ -261,9 +261,9 @@ $n \times d_{model}$:
 2. **Score.** $S = QK^T$, shape $n \times n$. Entry $S_{ij} = q_i \cdot k_j$,
    a sum of $d_k$ products.
 3. **Scale.** $S' = S / \sqrt{d_k}$. Divide every entry by the same scalar
-   constant. Section 4 is entirely about why.
+   constant. The next section is entirely about why.
 4. **Mask** (causal models only). Set $S'_{ij} = -\infty$ for every $j > i$.
-   Section 6. Skip it for now.
+   The causal-masking section below covers it. Skip it for now.
 5. **Normalize.** $A = \text{softmax}(S')$, row-wise:
    $A_{ij} = e^{S'_{ij}} / \sum_{m} e^{S'_{im}}$, where the sum runs over all
    $n$ columns of row $i$. Each row is now non-negative and sums to 1.
@@ -505,8 +505,8 @@ are still equal.
 
 ### Step 4: mask
 
-Skipped. This section computes the unmasked (bidirectional) case. Section 6
-redoes the same numbers with the causal mask applied.
+Skipped. This section computes the unmasked (bidirectional) case. The
+causal-masking section below redoes the same numbers with the mask applied.
 
 ### Step 5: normalize
 
@@ -563,13 +563,16 @@ prompt: |
 
   $$e^{1.414214} = 4.113250, \qquad e^{2.121320} = 8.342145$$
 
-  Compute $A_{23}$ - how much token 2 weights token 3's value.
+  Compute $A_{23}$ - how much token 2 weights token 3's value. Give it to
+  three decimal places.
 
   Mechanical check before answering: two of the three scores are equal and
   smaller than the third, so $A_{23}$ must be greater than $1/3$ and less
-  than $1$.
+  than $1$. Note that the bound does not hand you the answer - "the two equal
+  ones split half and the big one takes half" gives $0.5$, and that is wrong.
+  Exponentiate and normalize.
 answer: 0.503490
-check: numeric(0.01)
+check: numeric(0.002)
 ```
 
 ### Step 6: aggregate
@@ -632,7 +635,7 @@ prompt: |
   answer must lie between 0 and 2, and because most of the weight sits on
   $v_3$ (whose first component is 2), it should land well above 1.
 answer: 1.645732
-check: numeric(0.01)
+check: numeric(0.005)
 ```
 
 That is the whole mechanism. Six matrix operations, no branches, no loops
@@ -797,9 +800,11 @@ prompt: |
 
   what is $A_{21}$, the causal attention weight from token 2 onto token 1?
 
-  You should not need to exponentiate anything to answer this.
+  You should not need to exponentiate anything to answer this, and the answer
+  is exact rather than a rounded decimal. If you find yourself reporting a
+  number the unmasked computation produced, you have skipped the mask.
 answer: 0.5
-check: numeric(0.01)
+check: numeric(0.001)
 ```
 
 Two consequences worth holding onto.

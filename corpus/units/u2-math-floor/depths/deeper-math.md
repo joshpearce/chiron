@@ -359,8 +359,10 @@ The composite $L = f_k \circ \cdots \circ f_1$ has Jacobian $J_k J_{k-1} \cdots 
 Matrix product is associative, so you may bracket it either way, and the cost
 differs enormously.
 
-Forward mode computes $J_k(\cdots(J_2 J_1))$, propagating an $n \times n$ object
-where $n$ is the parameter count. Reverse mode computes $((J_k J_{k-1})\cdots)J_1$,
+Forward mode computes $J_k(\cdots(J_2 J_1))$, so the object it carries forward
+has one column per input, that is $n$ columns where $n$ is the parameter count,
+and as many rows as the current layer is wide. Reverse mode computes
+$((J_k J_{k-1})\cdots)J_1$,
 and since $L$ is scalar, $J_k$ is $1 \times m$ - a row vector. Every intermediate
 stays a vector. One backward sweep yields the gradient with respect to all $n$
 parameters at a cost of roughly 2 to 3 forward passes, independent of $n$.

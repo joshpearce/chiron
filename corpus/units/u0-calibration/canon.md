@@ -69,8 +69,8 @@ cosmetic, and because broadcasting hides orientation errors until they surface
 three layers downstream as a wrong-but-plausible shape.
 
 What is actually true: this book, like the papers, uses the **row-vector
-convention** throughout. Data on the left, weights on the right, dimensions
-contract at the join:
+convention** for every equation that carries data through a model. Data on the
+left, weights on the right, dimensions contract at the join:
 
 $$X W = Y, \quad X: (n, d_{\text{in}}), \quad W: (d_{\text{in}}, d_{\text{out}}), \quad Y: (n, d_{\text{out}})$$
 
@@ -79,6 +79,16 @@ $Y$ holds one output vector per row. The inner dimensions - the $d_{\text{in}}$
 on both sides of the join - must match, and then they vanish. The outer
 dimensions survive. That is the only shape rule you need for the rest of the
 book.
+
+One deliberate exception, flagged now so it does not read as a contradiction
+later. Unit u2 works its two-dimensional geometric examples - rotations,
+scalings, projections - in the textbook column form $Wx$, because that is the
+form every linear algebra text and every picture of a rotation uses, and it
+says so at the point of use. Those are the same maps with the same weights
+stored transposed: $(Wx)^T = x^T W^T$. Outside that one section, data is on the
+left. When you meet an unfamiliar equation, do not look at the letter order -
+look at which index the two factors share, because that is the one that
+contracts.
 
 ```beat
 id: u0-b1
@@ -139,6 +149,35 @@ is why attention scores need a $1/\sqrt{d_k}$ correction (u3), and why a single
 high-magnitude key can dominate an attention distribution regardless of
 direction.
 
+```beat
+id: u0-b2
+type: predict
+concept: c-dotprod
+prompt: |
+  Same three vectors: $q = [3, 0]$, $k_1 = [0.6, 0.8]$, $k_2 = [6, 8]$, with
+  $k_1$ and $k_2$ pointing in identical directions.
+
+  Before reading on, predict: which of $k_1$, $k_2$ is physically *closer* to
+  $q$ in the plane, and does the ranking by distance agree with the ranking by
+  dot product? Commit to an answer before you compute anything.
+answer: |
+  $k_1$ is much closer - $\lVert q - k_1 \rVert \approx 2.53$ against
+  $\lVert q - k_2 \rVert \approx 8.54$ - and the two rankings disagree
+  completely. $k_1$ is the nearer vector and scores $1.8$; $k_2$ is over three
+  times farther away and scores $18$. The dot product is not a distance and is
+  not even a decreasing function of distance.
+rubric: |
+  Pass requires both: (1) $k_1$ identified as the closer vector (exact
+  distances not required - "the short one, obviously" is fine); (2) an explicit
+  statement that the distance ranking and the dot-product ranking disagree.
+  Partial = (1) with no statement about the disagreement, or a hedge that they
+  "usually" agree.
+  Fail and what it diagnoses: predicting that $k_2$ is closer because it scores
+  higher, or that the rankings must agree = U0-M6, and it means the next
+  paragraph must be delivered rather than skipped.
+check: llm
+```
+
 <!-- refutes: U0-M6 -->
 The neighboring instinct, that a bigger dot product means "closer", fails on the
 same example and harder. Proximity would mean the score shrinks as vectors move
@@ -150,7 +189,7 @@ which agrees on ranking only when all norms are equal - the unit-sphere case
 your vector database quietly enforces and a transformer does not.
 
 ```beat
-id: u0-b2
+id: u0-b3
 type: completion
 concept: c-dotprod
 # variants: blank lines 1 and 3 instead of 2 and 3; or blank all three products
@@ -220,7 +259,7 @@ different object of a different size. Same two matrices, different composition,
 different function.
 
 ```beat
-id: u0-b3
+id: u0-b4
 type: completion
 concept: c-matmul
 # variants: blank (AB)_11 and (AB)_21 instead, which tests column-of-B
@@ -271,6 +310,23 @@ the gap is exactly why batch size affects training stability (u5). A related
 trap - $\mathbb{E}$ is a probability-weighted mean, not the typical value. The
 expected roll of a fair die is 3.5.
 
+```beat
+id: u0-b5
+type: compute
+concept: c-notation
+prompt: |
+  A batch of three examples produces per-example losses $0.1$, $0.2$, and
+  $9.0$. Training uses the batch mean as its estimate of
+  $\mathbb{E}_{x \sim \mathcal{D}}[\ell(x)]$.
+
+  Compute that estimate, to two decimal places. Then notice that it is larger
+  than two of the three numbers it averages: this is what "probability-weighted
+  mean, not typical value" looks like on real data, and it is why a handful of
+  pathological examples can dominate a training objective.
+answer: 3.10
+check: numeric(0.01)
+```
+
 **Gradients.** For a scalar loss $L$ and a weight matrix $W$, the symbol
 $\partial L / \partial W$ - also written $\nabla_W L$ - denotes the collection
 of partial derivatives of $L$ with respect to each entry of $W$.
@@ -307,7 +363,7 @@ applied layer by layer with matrix multiplies in place of the scalar product,
 which is why it is bookkeeping rather than new mathematics.
 
 ```beat
-id: u0-b4
+id: u0-b6
 type: self-explain
 concept: c-notation
 prompt: |

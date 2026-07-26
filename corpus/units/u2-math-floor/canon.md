@@ -33,7 +33,18 @@ $m$ tall and $n$ wide. That object is a linear function
 
 $$W : \mathbb{R}^{n} \rightarrow \mathbb{R}^{m}$$
 
-Read it exactly the way you would read `func W(x [n]float32) [m]float32`. It
+**Orientation note, because it will bite you otherwise.** This unit writes the
+map on the left of its argument, $Wx$, with $x$ a column vector. That is the
+form every linear algebra text uses and the form every picture of a rotation is
+drawn in, and the hand-worked 2D examples below are much easier to read that
+way. It is the opposite of the row-vector form $XW$ that u0 established and that
+u3 onward uses for data flowing through a model. They are the same maps with the
+weights stored transposed: $(Wx)^T = x^T W^T$, so a $W$ of shape $(m, n)$ here
+is a $W$ of shape $(n, m)$ there. Read the shape, not the letter order. The rule
+that survives both conventions is the only one that matters: the index the two
+factors share is the one that contracts, and the outer two survive.
+
+Read the type exactly the way you would read `func W(x [n]float32) [m]float32`. It
 consumes a vector with $n$ components and produces a vector with $m$ components.
 The columns tell you what it eats; the rows tell you what it emits. When a
 framework yells about a shape mismatch, it is a type error, and it is the single
@@ -132,13 +143,28 @@ rule.
 
 The entry-level formula falls out of that requirement:
 
-$$(AB)_{ij} = \sum_{k} A_{ik} B_{kj}$$
+$$(AB)_{ij} = \sum_{t=1}^{k} A_{it} B_{tj}$$
 
-where the sum runs over the shared inner dimension. Row $i$ of $A$ dotted with
-column $j$ of $B$.
+where $t$ runs over the shared inner dimension of size $k$. Row $i$ of $A$
+dotted with column $j$ of $B$.
 
 ### Order matters, and it matters visibly
 
+<!-- refutes: U2-M3 -->
+
+You probably think the order of matrix factors is a convention or an
+optimization detail - matrix multiplication is associative, so ordering is
+flexible. Here is the prediction that fails: under that belief, swapping two
+same-shaped weight matrices in a forward pass would leave the outputs unchanged,
+because nothing crashed and the same numbers went in. Watch it not happen.
+
+The belief is appealing because associativity is real, is genuinely used for
+large optimizations, and gets glossed as "order is flexible" in casual speech.
+Shapes also often still line up after a swap, so nothing raises an error and "it
+runs" gets read as "it is equivalent".
+
+What is actually true: associativity lets you regroup parentheses,
+$(AB)C = A(BC)$. Commutativity, which would let you swap factors, does not hold.
 Function composition does not commute, and neither does matrix multiplication.
 Take $R$, the 90-degree rotation, and $B = \begin{bmatrix} 2 & 0 \\ 0 & 1\end{bmatrix}$,
 a stretch along the first axis only.
@@ -437,9 +463,9 @@ $$e^{1} = 2.718 \quad e^{0.5} = 1.649 \quad e^{0} = 1.000
 $$p = (0.506,\ 0.307,\ 0.186)$$
 
 Read the middle option across the three rows: 0.117, 0.245, 0.307. Its
-probability nearly tripled. The gap between it and the winner went from a factor
-of 7.4 down to a factor of 1.6. And the model's logits were byte-identical in all
-three cases.
+probability more than doubled, a factor of 2.6 from end to end. The gap between
+it and the winner went from a factor of 7.4 down to a factor of 1.6. And the
+model's logits were byte-identical in all three cases.
 
 Two limits are worth holding. As $T \rightarrow 0$, the scaled gaps blow up and
 all the mass collapses onto the top logit: softmax becomes hard $\arg\max$. As
@@ -555,11 +581,26 @@ $$x \leftarrow x - \eta \, \nabla f(x)$$
 where $\eta$ (eta) is the learning rate, a small positive scalar controlling step
 size.
 
-Be precise about "steepest local increase". The gradient does not point at the
-minimum. It points the way the surface tilts *right here*, and one step later it
-will point somewhere else. On a long narrow valley, the gradient points mostly
-across the valley walls rather than along the floor toward the bottom, which is
-why plain gradient descent zigzags and why unit u5 needs momentum and Adam.
+<!-- refutes: U2-M2 -->
+
+Be precise about "steepest local increase", because the natural reading is
+wrong. You probably think the gradient points toward the minimum, so the
+negative gradient is the direction to travel to get there. Here is the
+prediction that fails: if it pointed at the minimum, one appropriately sized
+step would arrive, and descent trajectories would be straight lines. They are
+not - descent visibly zigzags, and the zigzag gets worse the more elongated the
+surface is.
+
+The belief is appealing because it is true on a simple bowl, which is the
+picture school calculus leaves you with, and because "steepest descent" sounds
+like it means "toward the bottom".
+
+What is actually true: the gradient is computed entirely from the surface at the
+current point and carries no information about where any minimum is. It points
+the way the surface tilts *right here*, and one step later it will point
+somewhere else. On a long narrow valley, the gradient points mostly across the
+valley walls rather than along the floor toward the bottom, which is why plain
+gradient descent zigzags and why unit u5 needs momentum and Adam.
 
 ### Worked example
 

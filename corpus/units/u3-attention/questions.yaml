@@ -120,6 +120,7 @@ check:
     prompt: |
       In a self-attention layer processing a sequence of $n$ tokens, where do
       the key vectors come from?
+    check: choice
     options:
       - text: "Each of the $n$ tokens produces its own key by the projection $k_j = x_j W^K$, so $K$ has exactly $n$ rows."
         correct: true
@@ -244,6 +245,7 @@ check:
       You remove the $\sqrt{d_k}$ division from a transformer with $d_k = 128$
       and train it from scratch in float32. Everything else is unchanged. What
       is the most likely outcome?
+    check: choice
     options:
       - text: "Training stalls: attention rows are near one-hot from initialization, so $p(1-p)$ is tiny and almost no gradient flows through the attention layers."
         correct: true
@@ -277,7 +279,7 @@ check:
       (Row 1 needs no exponentials once you have computed its scores. If you
       find yourself reaching for $e^x$, look at the two scores again.)
     answer: 2
-    check: numeric(0.01)
+    check: numeric(0.001)
     difficulty: core
 
   - id: u3-q7
@@ -296,7 +298,7 @@ check:
       $d_k = 2$ and no mask. You may use $e^{0.707107} = 2.028115$ and
       $e^{0} = 1$.
     answer: 0.669762
-    check: numeric(0.01)
+    check: numeric(0.005)
     difficulty: core
 
   - id: u3-q8
@@ -416,6 +418,7 @@ check:
       You send a 4,000-token prompt to a model and it begins streaming a
       response. Which statement about what happened inside the model is
       correct?
+    check: choice
     options:
       - text: "All 4,000 prompt positions were computed in a single parallel forward pass; only the generated tokens required one forward pass each."
         correct: true
@@ -491,6 +494,7 @@ check:
       A model's context window is doubled from 8k to 16k tokens. Holding
       everything else fixed, what happens to the arithmetic performed by one
       self-attention head on a full-length input?
+    check: choice
     options:
       - text: "It roughly quadruples, because the score matrix has $n^2$ entries and both $QK^T$ and $AV$ scale with it."
         correct: true

@@ -166,15 +166,24 @@ the original was $x$, and:
   coordinatewise $\sigma$.
 - Unembedding: $W_U' = W_U \Pi^\top$, so $W_U'(\Pi h) = W_U h$. Unchanged.
 
-So logits are bit-identical for every input, and $d!$ distinct parameter settings
+So logits are identical for every input, and $d!$ distinct parameter settings
 implement the identical function. Any claim of the form "coordinate $k$ encodes
 property $p$" is a claim about the arbitrary representative that SGD landed on.
 
-For a network with no elementwise gain (no LayerNorm/RMSNorm affine parameters),
-replace $\Pi$ by any orthogonal $Q$ with $Q^\top Q = I$; every step above holds
-except the elementwise ones, so the invariance group is the full orthogonal group
-$O(d)$ and not even the coordinate axes are distinguished. Real models sit
-between: the norm's elementwise gain breaks full rotational symmetry, which is
+Widening the group takes more care than it is usually given. Replace $\Pi$ by an
+orthogonal $Q$ with $Q^\top Q = I$ and the linear reads and writes still cancel,
+but the elementwise steps do not: a coordinatewise $\sigma$ does not commute with
+a general rotation, and neither does LayerNorm, whose mean $\frac{1}{d}\sum_i x_i$
+is the projection onto the all-ones direction and is preserved only by rotations
+that fix that direction. RMSNorm is the exception - it divides by
+$\lVert x \rVert / \sqrt{d}$, which is a function of the norm alone and is
+therefore invariant under every orthogonal $Q$. So the clean statement is: strip
+a network of all coordinatewise operations - gain-free RMSNorm, no pointwise
+activation - and its invariance group is the full orthogonal group $O(d)$, in
+which not even the coordinate axes are distinguished. Every coordinatewise
+operation you add back collapses the group toward the permutations. Real
+transformers sit at the collapsed end, since they have both an elementwise
+normalization gain and a pointwise activation in every MLP. That collapse is
 why interpretability work (x2) can sometimes find axis-aligned features at all,
 but the useful features it finds are generally *directions*, not coordinates, and
 are typically non-orthogonal and outnumber $d$ (superposition).
