@@ -126,7 +126,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					D2AE88B4FBD262E09816A6CA = {
-						DevelopmentTeam = TLA7HBNWRW;
+						DevelopmentTeam = ${CHIRON_TEAM_ID};
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -312,7 +312,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = TLA7HBNWRW;
+				DEVELOPMENT_TEAM = ${CHIRON_TEAM_ID};
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Chiron/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -321,7 +321,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.mjbraun.chiron;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.mjbraun.chiron;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
@@ -333,7 +333,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = TLA7HBNWRW;
+				DEVELOPMENT_TEAM = ${CHIRON_TEAM_ID};
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Chiron/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -342,7 +342,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.mjbraun.chiron;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.mjbraun.chiron;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 2;
 			};

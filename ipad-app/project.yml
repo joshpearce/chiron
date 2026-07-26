@@ -21,11 +21,19 @@ targets:
         TARGETED_DEVICE_FAMILY: "2"          # iPad only
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: TLA7HBNWRW   # Matthew Braun (Personal Team)
+        # Fly.io, Inc - a paid team, so provisioning profiles last a year
+        # rather than the seven days a personal team gets. The free-team profile
+        # expiring is not a nuisance but a failure: when it lapses the app stops
+        # launching at all, including the bundled offline book.
+        DEVELOPMENT_TEAM: ${CHIRON_TEAM_ID}
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        PRODUCT_BUNDLE_IDENTIFIER: com.mjbraun.chiron
+        # com.mjbraun.chiron is registered to the personal team and an App ID
+        # can only belong to one team, so moving to Fly.io needs a new one.
+        # Deliberately not com.fly.* - this is Matt's project living on the
+        # company account, not a Fly product.
+        PRODUCT_BUNDLE_IDENTIFIER: dev.mjbraun.chiron
     info:
       path: Chiron/Info.plist
       properties:
