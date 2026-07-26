@@ -38,15 +38,21 @@ type Section struct {
 	Segments []Segment
 }
 
+// Markdown re-emits one segment exactly as it was authored. A beat round-trips
+// through its original YAML rather than through the struct, so re-emitting is
+// byte-faithful and a beat a depth swap re-appends is the same beat.
+func (s Segment) Markdown() string {
+	if s.Type == "prose" {
+		return s.MD
+	}
+	return "```beat\n" + s.raw + "```"
+}
+
 // Markdown re-emits the section, beats included, for the author role to rewrite.
 func (s Section) Markdown() string {
 	parts := []string{"## " + s.Heading}
 	for _, seg := range s.Segments {
-		if seg.Type == "prose" {
-			parts = append(parts, seg.MD)
-		} else {
-			parts = append(parts, "```beat\n"+seg.raw+"```")
-		}
+		parts = append(parts, seg.Markdown())
 	}
 	return strings.Join(parts, "\n\n")
 }
