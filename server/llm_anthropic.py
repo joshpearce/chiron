@@ -41,13 +41,20 @@ def _strictify(schema: dict) -> dict:
 
 class AnthropicChain:
     def __init__(self, model: str = MODEL):
+        import glob
         import os
 
         self.model = model
         self.client = None
         self._client_error = None
-        if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
-            self._client_error = "no ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN in environment"
+        has_env = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+        # `ant auth login` OAuth profiles are a first-class SDK credential
+        # source; detect them so health reporting is honest.
+        cfg_dir = os.environ.get("ANTHROPIC_CONFIG_DIR", os.path.expanduser("~/.config/anthropic"))
+        has_profile = bool(glob.glob(os.path.join(cfg_dir, "credentials", "*.json")))
+        if not (has_env or has_profile):
+            self._client_error = ("no credentials: set ANTHROPIC_API_KEY, or run "
+                                  "`ant auth login --no-browser` for an OAuth profile")
             return
         try:
             import anthropic  # deferred so the Mac offline path never needs it
