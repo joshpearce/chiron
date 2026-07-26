@@ -1,0 +1,595 @@
+pretest:
+  - id: u0-p1
+    concept: c-cia-triad
+    prompt: |
+      A payments API encrypts each request body with AES-CTR under a shared key
+      and a fresh nonce per request. No MAC, no signature, no AEAD. An attacker
+      on the network cannot read a single byte of any request. Can they change
+      the amount field in a request that is already in flight? Answer yes or no,
+      say what they would do, and say what the receiving server observes.
+    answer: |
+      Yes. CTR is a keystream XOR: C = M XOR K. The attacker knows the request
+      format (formats are public), so they know the byte offset of the amount
+      digit. To turn the plaintext byte from ASCII '1' (0x31) into '9' (0x39)
+      they compute the mask 0x31 XOR 0x39 = 0x08 offline and XOR 0x08 into that
+      ciphertext byte. On decryption (C XOR 0x08) XOR K = M XOR 0x08, so exactly
+      that plaintext byte changes and nothing else does. The server observes a
+      successful decryption producing well-formed plaintext with the attacker's
+      amount in it. No error, no corruption elsewhere, and the attacker never
+      learned the key or the keystream.
+    check: llm
+    rubric: |
+      Pass requires: (1) yes, the attack works without the key, (2) the mechanism
+      is XORing a chosen mask into the ciphertext at a known offset, (3) the
+      server sees no error. Any 2 of 3 = pass. "No, they would need the key" or
+      "decryption would fail / produce garbage" = M1, fail. "It would corrupt the
+      rest of the message" = fail; keystream XOR modes have no error propagation.
+      This item is expected to fail before the unit; the point is calibration.
+  - id: u0-p2
+    concept: c-key-entropy
+    prompt: |
+      Exhaustive key search against a 128-bit key and against a 256-bit key,
+      same attacker, same hardware. By what factor does the 256-bit key multiply
+      the attacker's work? Express the factor as a power of two and answer with
+      only the exponent, as a single number.
+    answer: 128
+    check: numeric(0.5)
+    rubric: |
+      Work factor is 2^n trials, so the ratio is 2^256 / 2^128 = 2^128, exponent
+      128. Answering 1 (a factor of 2) or 2 is M2 exactly: treating key length as
+      a linear security scale instead of as the exponent in the attacker's cost.
+      Answering 256 or 8 (256/128 = 2, log 2 = 1, etc.) indicates the exponent
+      arithmetic was not done at all.
+  - id: u0-p3
+    concept: c-xor-properties
+    prompt: |
+      You capture two ciphertexts, c1 and c2, that you know were produced by
+      XORing two different plaintexts against the same one-time pad key k. You
+      have no key material and no plaintext. State exactly what you can compute
+      from c1 and c2 alone, and say whether this is a partial leak or a total
+      break.
+    answer: |
+      c1 XOR c2 = (m1 XOR k) XOR (m2 XOR k) = m1 XOR m2, because k XOR k = 0.
+      The key cancels and never appears. That is a total break, not a partial
+      leak: any guessed or known fragment of either plaintext (a fixed header, a
+      JSON key name, a common English word) immediately yields the other
+      plaintext at those offsets, and you extend the guess along the message
+      (crib-dragging) until both are recovered. The key is never learned because
+      it is never needed.
+    check: llm
+    rubric: |
+      Pass requires: (1) the computation c1 XOR c2 = m1 XOR m2 with the reason
+      that k XOR k = 0, and (2) the verdict "total break". Answering "nothing,
+      because I do not have k" = fail. Answering "it leaks a little / degrades
+      security somewhat" = M5, fail. Naming crib-dragging or known-plaintext
+      exploitation is full credit but not required to pass.
+
+check:
+  - id: u0-q1
+    concept: c-xor-properties
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      Compute 0x3C XOR 0x5A. Give the result as a decimal integer.
+    answer: 102
+    check: numeric(0.5)
+    rubric: |
+      0x3C = 0011 1100, 0x5A = 0101 1010, XOR = 0110 0110 = 0x66 = 102 decimal.
+      Answering 126 means OR was computed instead of XOR; answering 24 means AND;
+      answering 150 means the two bytes were added.
+    difficulty: warmup
+  - id: u0-q2
+    concept: c-xor-properties
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Two one-byte messages were encrypted under the same one-byte one-time pad
+      key k. You capture c1 = 0x62 and c2 = 0x43. From context you learn that
+      m1 = 0x48 (ASCII 'H'). Recover m2 and give it as a decimal integer.
+    answer: 105
+    check: numeric(0.5)
+    rubric: |
+      c1 XOR c2 = 0x62 XOR 0x43 = 0x21 = m1 XOR m2, the key having cancelled.
+      Then m2 = 0x21 XOR m1 = 0x21 XOR 0x48 = 0x69 = 105 decimal (ASCII 'i').
+      Answering 33 (0x21) means the reader stopped at m1 XOR m2 and did not
+      finish. Answering 98 (0x62) or 72 (0x48) means the key was never cancelled.
+      Recovering k first (k = m1 XOR c1 = 0x2A, then m2 = c2 XOR k) is an equally
+      correct route to 105.
+    difficulty: core
+  - id: u0-q3
+    concept: c-cia-triad
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A ciphertext byte from a keystream-XOR cipher currently decrypts to ASCII
+      '5' (0x35). An active attacker wants the receiver to decrypt that byte as
+      ASCII '0' (0x30) instead, without the key. What single byte value must they
+      XOR into that ciphertext byte? Give it as a decimal integer.
+    answer: 5
+    check: numeric(0.5)
+    rubric: |
+      The mask is the XOR of current and desired plaintext bytes: 0x35 XOR 0x30 =
+      0x05 = 5. It works because (C XOR d) XOR K = M XOR d, the keystream
+      cancelling regardless of d. Answering 48 (0x30) means the reader substituted
+      the desired byte rather than the delta - that would require knowing K.
+      Answering 53 (0x35) is the same error on the other operand. Any answer
+      claiming this is impossible without the key is M1.
+    difficulty: core
+  - id: u0-q4
+    concept: c-cia-triad
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A reviewer rejects your proposal to add HMAC to an internal message queue
+      whose payloads are already encrypted with AES-CTR: "the payload is
+      encrypted, an attacker cannot even read it, so they certainly cannot forge
+      a useful message - the MAC is redundant bytes on every record." Refute this
+      with one concrete attack, then state which of confidentiality, integrity,
+      and authenticity the current design actually provides, and which mechanism
+      supplies each.
+    answer: |
+      The attack: CTR ciphertext is M XOR K, so an attacker who knows the record
+      layout XORs a chosen mask d into a chosen ciphertext offset and the
+      decrypted plaintext becomes M XOR d at exactly that offset. Flipping a
+      known field (an amount, a boolean, a user id digit) is deterministic, needs
+      no key, and produces no decryption error - the consumer accepts a
+      well-formed record it believes came from the producer. Confidentiality is
+      genuinely provided by the cipher and is untouched by this attack. Integrity
+      and authenticity are provided by nothing at all in the current design. They
+      need a keyed primitive: a MAC (HMAC over the ciphertext) or an AEAD mode
+      that carries the tag internally. An unkeyed checksum inside the plaintext
+      does not help - the attacker recomputes it, and for a CRC over an XOR
+      cipher they can even patch it through the ciphertext without decrypting.
+    check: llm
+    rubric: |
+      Pass requires: (1) a concrete tampering attack that does not need the key
+      (bit or byte flipping propagating one-for-one into plaintext), and (2) the
+      explicit statement that integrity/authenticity are absent and need a keyed
+      mechanism (MAC or AEAD). Full credit adds that confidentiality is
+      unaffected by the attack, and that an unkeyed checksum is not a fix.
+      "The attacker cannot target a field they cannot read" or "the receiver
+      would notice garbage" = M1, fail. Proposing a longer key or a stronger
+      cipher as the fix = fail, and specifically M2 if framed as more key bits
+      buying integrity. Proposing MAC-then-encrypt instead of encrypt-then-MAC is
+      still a pass at this depth; ordering is unit 3 (M9).
+    difficulty: core
+  - id: u0-q5
+    concept: c-threat-model
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A service exposes POST /session/resume, which decrypts a client-supplied
+      encrypted token and returns HTTP 400 when the padding is malformed and HTTP
+      200 otherwise. Answer three things: (a) does exercising this endpoint
+      require a passive or an active attacker, (b) is the capability CPA, CCA, or
+      both, and (c) if the team makes both responses take an identical 2 ms, what
+      has that fixed and what has it not?
+    answer: |
+      (a) Active. The attacker must submit chosen bytes to the service, not just
+      observe traffic. (b) CCA at minimum: the attacker chooses ciphertexts and
+      learns something about the decryption result. If any other endpoint
+      encrypts attacker-influenced data under the same key, they also hold a CPA
+      oracle, so both. (c) Equalising timing removes the timing side channel
+      only. The status code itself is still a decryption oracle - a single bit of
+      "was this ciphertext valid under the key" per query is exactly what a
+      padding-oracle attack consumes. The fix is not to make failures
+      indistinguishable in latency but to authenticate the ciphertext (MAC or
+      AEAD verified before any decryption or padding inspection), so that
+      attacker-supplied bytes are rejected without a decryption-dependent
+      response at all.
+    check: llm
+    rubric: |
+      Pass requires: (a) active, (b) CCA (naming CPA as well is correct and
+      earns full credit; naming only CPA fails), and (c) the recognition that a
+      distinguishable success/failure response is itself the oracle, so constant
+      time is insufficient. Any 2 of 3, with (c) among them, = pass. Answering
+      (c) with "constant time makes it secure" = fail. Calling the attacker
+      passive = fail; observing responses to bytes you injected is active by
+      definition.
+    difficulty: core
+  - id: u0-q6
+    concept: c-threat-model
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      The IND-CPA game requires the adversary's two challenge plaintexts to
+      satisfy |m0| = |m1|. Explain what would go wrong with the definition
+      without that restriction, and name one real attack that exploits the leak
+      the restriction concedes.
+    answer: |
+      Ciphertext length is a simple function of plaintext length in every standard
+      scheme, so without the restriction the adversary submits a 1-byte m0 and a
+      1000-byte m1, reads len(c*), and wins with advantage 1/2 against every
+      scheme that exists - including the one-time pad, which has perfect secrecy.
+      A definition no scheme can satisfy distinguishes nothing and is vacuous, so
+      the definition concedes length explicitly and demands secrecy of everything
+      else. Real consequences: compression-then-encryption side channels (CRIME,
+      BREACH) recover secrets from ciphertext lengths alone, and traffic analysis
+      fingerprints visited pages from response sizes. Hiding length needs a
+      separate mechanism, which is why TLS 1.3 provides record padding.
+    check: llm
+    rubric: |
+      Pass requires: (1) ciphertext length reveals plaintext length, giving a
+      trivial 1/2-advantage win, and (2) the point that this makes the definition
+      unsatisfiable/vacuous rather than merely unfair. Full credit adds a real
+      consequence (CRIME/BREACH, traffic analysis, or the need for explicit
+      padding). Claiming encryption does hide plaintext length = fail. Claiming
+      the restriction is there "to be fair to the scheme" with no vacuity
+      argument = partial credit only.
+    difficulty: core
+  - id: u0-q7
+    concept: c-modular-arithmetic
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Compute 4^7 mod 23 by repeated squaring. Give the result as an integer in
+      [0, 23).
+    answer: 8
+    check: numeric(0.4)
+    rubric: |
+      4^2 = 16. 4^4 = 16^2 = 256 = 11*23 + 3 = 3. 7 = 4 + 2 + 1, so
+      4^7 = 4^4 * 4^2 * 4^1 = 3 * 16 * 4 = 192 = 8*23 + 8 = 8. Answering 3 or 16
+      means the reader reported an intermediate square. Answering 12 (= 3*4)
+      means a term of the exponent decomposition was dropped - the binary
+      decomposition of 7, not the squaring, is the usual failure point.
+    difficulty: core
+  - id: u0-q8
+    concept: c-modular-arithmetic
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      Compute -23 mod 9 using the mathematical convention (result in [0, 9)).
+      Give the result as an integer.
+    answer: 4
+    check: numeric(0.4)
+    rubric: |
+      -23 + 27 = 4, and 4 is in [0,9), so -23 mod 9 = 4. Answering -5 is the C /
+      Java / Go `%` result, which is not the mathematical residue; the portable
+      fix is ((a % n) + n) % n. Answering 5 means the sign was dropped before
+      reducing.
+    difficulty: warmup
+  - id: u0-q9
+    concept: c-key-entropy
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A scheme offers 80 bits of security. An attacker farm performs 2^45 key
+      trials per second. Using 2^25 seconds per year, how many years does
+      exhaustive search take? Express the answer as a power of two and give only
+      the exponent, as a single number.
+    answer: 10
+    check: numeric(0.5)
+    rubric: |
+      2^80 trials / 2^45 per second = 2^35 seconds; 2^35 / 2^25 = 2^10 years,
+      about a thousand years - which is why 80-bit security is retired, not
+      because it is trivially breakable today but because the margin is a factor
+      of 2^48 short of the 128-bit floor. Answering 35 means the year conversion
+      was skipped. Answering 55 or 105 means exponents were added instead of
+      subtracted.
+    difficulty: core
+  - id: u0-q10
+    concept: c-key-entropy
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A passphrase is generated by drawing 4 words uniformly at random, with
+      replacement, from a 2048-word list. How many bits of entropy does it have?
+      Give a single number.
+    answer: 44
+    check: numeric(0.5)
+    rubric: |
+      H = log2(|K|) = log2(2048^4) = 4 * log2(2048) = 4 * 11 = 44 bits.
+      Answering 8192 (4*2048) means multiplying by alphabet size rather than its
+      log. Answering 11 or 2048 means a parameter was reported instead of the
+      entropy. Answering 128 because "it feeds a 128-bit AES key" confuses key
+      width with keyspace size: the searchable space is 2^44 no matter how wide
+      the derived key is, and a KDF raises per-guess cost, it does not create
+      entropy.
+    difficulty: core
+  - id: u0-q11
+    concept: c-modular-arithmetic
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Work in Z_11^* = {1,...,10} under multiplication mod 11. Show whether 2 is
+      a generator by listing its successive powers, state the group order and the
+      period you observe, and say what Fermat's little theorem predicts about the
+      power at which the sequence returns to 1. Then state, in one sentence, why
+      an attacker cannot use this calculation to break Diffie-Hellman on a
+      3072-bit prime.
+    answer: |
+      Powers of 2 mod 11: 2^1=2, 2^2=4, 2^3=8, 2^4=16=5, 2^5=10, 2^6=20=9,
+      2^7=18=7, 2^8=14=3, 2^9=6, 2^10=12=1. All ten elements 1..10 appear exactly
+      once before the sequence returns to 1, so 2 is a generator (a primitive
+      root) of Z_11^*. The group order is |Z_11^*| = p - 1 = 10, and the observed
+      period is also 10. Fermat's little theorem says a^(p-1) = 1 mod p for any a
+      not divisible by p, so the return to 1 at exponent 10 is forced, not
+      accidental; it also means exponents are reduced mod p-1 = 10 while bases are
+      reduced mod p = 11. It breaks nothing at scale because recovering x from
+      2^x mod 11 here took ten trial multiplications: the hardness of discrete
+      log is entirely a function of group size, and for a 3072-bit prime the best
+      known algorithms (index calculus, number field sieve) are subexponential but
+      still infeasible, while enumeration is hopeless.
+    check: llm
+    rubric: |
+      Pass requires: (1) a correct orbit of 2 covering all 10 elements (one
+      arithmetic slip in the list is tolerable if the conclusion follows), (2) the
+      conclusion that 2 is a generator with order and period both 10, and (3) the
+      Fermat statement a^(p-1) = 1 mod p as the reason the cycle closes at 10.
+      Full credit adds the size argument for why toy discrete log is easy.
+      Claiming 2 is not a generator despite a full orbit = fail. Saying the
+      exponent lives mod p rather than mod p-1 = partial credit, and flag it: two
+      moduli in one formula is a standard implementation bug. An answer implying
+      that because discrete log is easy mod 11 it is easy in general, or that EC
+      and finite-field groups need the same parameter sizes, is M11 territory and
+      should be marked down.
+    difficulty: stretch
+  - id: u0-q12
+    concept: c-threat-model
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A vendor's datasheet states: "our proprietary cipher has never been
+      published, so attackers have no way to analyse it - this is a security
+      advantage over AES." Assess the claim. Name the principle it violates,
+      state what happens to the claimed security when a firmware image is
+      extracted, and identify what part of the vendor's system is a real secret
+      and what part is not.
+    answer: |
+      It violates Kerckhoffs's principle: everything about the system except the
+      key must be assumed public - algorithm, mode, padding, protocol state
+      machine, source. Secrecy of the design is not a security parameter, it is a
+      delay. Once anyone dumps or decaps the firmware, or leaks the spec, or
+      reverse-engineers the binary, every bit of the claimed advantage evaporates
+      at once and whatever residual strength the cipher has is whatever public
+      cryptanalysis would have established up front. AES's security claim survives
+      full disclosure by construction, and has been attacked by everyone for two
+      decades without being broken - that is evidence, whereas "unanalysed" is
+      only absence of evidence. In the vendor's system the per-device key is the
+      real secret; the algorithm is not, and any design property they are relying
+      on remaining unknown is a liability disguised as a feature.
+    check: llm
+    rubric: |
+      Pass requires: (1) naming Kerckhoffs's principle or clearly stating that
+      only the key may be assumed secret, and (2) the consequence that extraction
+      or disclosure removes the entire claimed benefit at once, leaving whatever
+      the cipher is actually worth unanalysed. Full credit adds that public
+      scrutiny is positive evidence while obscurity is merely absence of evidence,
+      and identifies the key as the only legitimate secret. Accepting the vendor's
+      claim as a genuine advantage = fail. "Obscurity adds a layer of defence on
+      top of a strong cipher" = partial credit only, and note that it is not a
+      security property you can quantify in bits.
+    difficulty: core
+  - id: u0-q13
+    concept: c-cia-triad
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    check: choice
+    prompt: |
+      A log shipper encrypts each record with AES-CTR using a unique nonce per
+      record and ships the nonce alongside the ciphertext. There is no MAC and no
+      AEAD. Which statement about an active network attacker is correct?
+    options:
+      - text: |
+          They cannot read any record, but they can XOR a chosen mask into a
+          chosen ciphertext offset and cause exactly the corresponding plaintext
+          bits to flip on decryption, with no error raised.
+        correct: true
+        explain: |
+          Correct. C = M XOR K, so (C XOR d) XOR K = M XOR d. The keystream
+          cancels, the attacker needs neither the key nor K, and the change is
+          deterministic and local to the bytes they touched. Confidentiality holds;
+          integrity was never provided by anything in this design.
+      - text: |
+          They cannot tamper usefully, because any modification they make will
+          decrypt to unpredictable garbage that the consumer will reject as
+          malformed.
+        misconception: M1
+        explain: |
+          Attractive because encryption feels like a sealed container, so
+          unreadable implies untouchable. Wrong: keystream XOR modes have no error
+          propagation and no integrity check, so a flipped ciphertext bit is a
+          flipped plaintext bit and nothing else. "Malformed" is only detected if
+          the plaintext format happens to catch it, and an attacker who knows the
+          layout aims for fields where it does not.
+      - text: |
+          The tampering is only possible because the nonce is shipped in the
+          clear; keeping the nonce secret would restore integrity.
+        misconception: M4
+        explain: |
+          Attractive because the nonce feeds the cipher's internal state just as
+          the key does, so it seems to inherit the key's secrecy requirement.
+          Wrong on both halves: nonces need uniqueness, not secrecy (every
+          deployed CTR/CBC implementation transmits them), and a secret nonce
+          would not help anyway - the attack never uses the nonce, only the
+          linearity of XOR.
+      - text: |
+          AES is an unbroken block cipher, so any scheme built directly on AES
+          inherits its security, including resistance to modification.
+        misconception: M3
+        explain: |
+          Attractive because it looks like using the strong primitive directly
+          with no extra moving parts. Wrong: a secure block cipher guarantees only
+          that its block permutation is indistinguishable from random. What the
+          surrounding mode does - and does not - provide is a separate question,
+          which is the same reasoning error that makes ECB leak structure in
+          unit 1.
+    difficulty: warmup
+  - id: u0-q14
+    concept: c-xor-properties
+    kind: mcq
+    congruent: false
+    callback_eligible: true
+    check: choice
+    prompt: |
+      A deployment reuses one one-time pad key k for two different messages, m1
+      and m2. What is the consequence?
+    options:
+      - text: |
+          Total break: c1 XOR c2 = m1 XOR m2 with k cancelled out, so any known or
+          guessable fragment of either message exposes the other at those offsets
+          and the rest follows by crib-dragging.
+        correct: true
+        explain: |
+          Correct. (m1 XOR k) XOR (m2 XOR k) = m1 XOR m2 because k XOR k = 0. The
+          attacker holds a relation between the two plaintexts containing no key
+          material at all, and structure in real messages (fixed headers, JSON key
+          names, English text) turns that relation into both plaintexts. This is
+          the same failure as CTR nonce reuse in unit 1.
+      - text: |
+          Security degrades gradually: reusing the key twice leaks a modest amount
+          of statistical information, and the leak grows with each additional
+          reuse.
+        misconception: M5
+        explain: |
+          Attractive because most misuse feels like it should degrade
+          proportionally - a small mistake, a small leak. Wrong: the first reuse
+          is already a cliff, not a slope. One reuse hands over m1 XOR m2 exactly,
+          which is enough to recover both messages given any crib. There is no
+          regime in which two-time pad is "somewhat" secure.
+      - text: |
+          The key is still uniformly random, so the one-time pad's perfect secrecy
+          carries over to both messages individually.
+        misconception: M3
+        explain: |
+          Attractive because uniformity of k is the stated hypothesis of the
+          perfect-secrecy proof. Wrong: the proof also requires the key to be used
+          once, and it bounds what an attacker learns from one ciphertext. Given
+          two ciphertexts under one key the joint distribution is no longer
+          independent of the plaintexts - the property of the primitive does not
+          survive the way it was composed.
+      - text: |
+          It is only a problem if k itself leaks; while k remains secret both
+          messages stay confidential, since k never appears in c1 XOR c2.
+        misconception: M4
+        explain: |
+          Attractive, and it even notices the right fact - k does vanish from
+          c1 XOR c2 - then draws the opposite conclusion. That vanishing is the
+          attack, not the defence: the attacker does not need k because the
+          relation between plaintexts is key-free. Secrecy and uniqueness are
+          separate requirements, and this violates uniqueness while satisfying
+          secrecy.
+    difficulty: core
+  - id: u0-q15
+    concept: c-threat-model
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    check: choice
+    prompt: |
+      Enc is deterministic: the same plaintext under the same key always yields
+      the same ciphertext, with no nonce or randomness. What does the IND-CPA game
+      say about it?
+    options:
+      - text: |
+          It cannot be IND-CPA secure at all. Query the oracle on m0, record c0,
+          submit (m0, m1) as the challenge, and answer 0 if c* equals c0 -
+          always correct, advantage 1/2.
+        correct: true
+        explain: |
+          Correct, and note what the argument does not depend on: nothing about
+          the internals of Enc. Determinism alone hands the adversary the maximum
+          advantage, which is why randomisation or a nonce is a requirement of the
+          definition rather than an implementation nicety.
+      - text: |
+          It is secure provided the underlying primitive is a strong block cipher
+          such as AES, since the adversary cannot invert AES to compare
+          ciphertexts meaningfully.
+        misconception: M3
+        explain: |
+          Attractive because the primitive really is strong, and inverting it
+          really is infeasible. Wrong because the attack never inverts anything -
+          it compares two ciphertexts for equality, which costs one memcmp. The
+          strength of the block cipher does not transfer to a mode that leaks
+          plaintext equality, which is exactly ECB's problem in unit 1.
+      - text: |
+          It is secure if the key is made long enough; a 256-bit key pushes the
+          adversary's advantage down to a negligible value.
+        misconception: M2
+        explain: |
+          Attractive because key length is the one security dial most people know,
+          and more bits normally means more work for the attacker. Wrong: the
+          adversary's advantage here is 1/2 regardless of key length, since the
+          winning strategy never guesses a key. Key bits raise brute-force cost;
+          they do not repair a structural break in the scheme.
+      - text: |
+          It is secure as long as the ciphertexts are not stored or transmitted in
+          a way that lets an attacker collect two of them for comparison.
+        misconception: M4
+        explain: |
+          Attractive because it correctly identifies comparison as the mechanism,
+          then tries to fix it by hiding data rather than by fixing the scheme.
+          Wrong on the threat model: IND-CPA grants the adversary an encryption
+          oracle by assumption, and in reality any attacker who can observe or
+          replay traffic collects ciphertexts freely. Relying on data staying
+          uncollectable is the same confusion as demanding a secret IV instead of
+          a unique one.
+    difficulty: core
+  - id: u0-q16
+    concept: c-key-entropy
+    kind: mcq
+    congruent: false
+    callback_eligible: true
+    check: choice
+    prompt: |
+      A team must hit roughly 128 bits of security across a symmetric cipher, an
+      RSA key, and an elliptic-curve key. Which set of parameters is right?
+    options:
+      - text: |
+          AES-128, a 3072-bit RSA modulus, and a 256-bit elliptic-curve key.
+        correct: true
+        explain: |
+          Correct. Bits of security is the cost of the best known attack, and that
+          cost has a different shape for each problem: exhaustive search is
+          exponential for a symmetric key, factoring and finite-field discrete log
+          fall to subexponential algorithms (GNFS, index calculus) so the modulus
+          must be far larger, and elliptic-curve discrete log has no better than
+          fully exponential attacks so 2 * 128 = 256 bits suffices.
+      - text: |
+          AES-128, a 128-bit RSA modulus, and a 128-bit elliptic-curve key - one
+          security level means one key size.
+        misconception: M11
+        explain: |
+          Attractive because "128-bit security" sounds like a single number that
+          should transfer across algorithms. Wrong and catastrophically so: a
+          128-bit RSA modulus factors on a laptop in well under a second. Key size
+          is a parameter of a specific hard problem, not a portable security
+          level.
+      - text: |
+          AES-128, a 3072-bit RSA modulus, and a 3072-bit elliptic-curve key,
+          since both public-key problems are discrete-log-flavoured and need
+          comparable sizes.
+        misconception: M11
+        explain: |
+          Attractive because RSA and DH/EC are taught side by side and both are
+          described as "easy forward, hard backward", inviting the assumption of
+          one hardness in different packaging. Wrong: finite-field discrete log
+          and elliptic-curve discrete log have different best-known attack
+          complexity classes - subexponential versus fully exponential - so a
+          3072-bit curve is roughly 750 bits of security and about two orders of
+          magnitude of wasted work per operation.
+      - text: |
+          AES-256 rather than AES-128, because 128 bits is only half the strength
+          of 256 and 128 is therefore borderline.
+        misconception: M2
+        explain: |
+          Attractive because doubling a resource usually buys proportional
+          benefit. Wrong: AES-256 is 2^128 times more work to brute force, not
+          twice, and AES-128 already costs about 2^43 years against a farm running
+          2^60 trials per second. Real reasons to choose 256 bits exist -
+          multi-target attacks, Grover's algorithm halving the exponent, margin
+          against cryptanalysis - but "twice as strong" is not one of them.
+    difficulty: stretch
