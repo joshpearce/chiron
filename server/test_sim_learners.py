@@ -41,8 +41,12 @@ WRONG_BY_CONCEPT = {
 def reset_state():
     subprocess.run(["pkill", "-f", "uvicorn main:app"], capture_output=True)
     shutil.rmtree(HERE.parent / "state", ignore_errors=True)
+    # Bind all interfaces: a localhost-only rebind leaves the iPad unable to
+    # reach the server, which looks like an app hang rather than a server
+    # misconfiguration. Anything that restarts the server must match
+    # start-flight.sh.
     subprocess.Popen(
-        [str(HERE / ".venv/bin/uvicorn"), "main:app", "--port", "8080"],
+        [str(HERE / ".venv/bin/uvicorn"), "main:app", "--host", "0.0.0.0", "--port", "8080"],
         cwd=HERE, stdout=open("/tmp/book-server.log", "a"), stderr=subprocess.STDOUT)
     for _ in range(30):
         time.sleep(1)

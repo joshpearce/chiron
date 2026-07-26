@@ -8,6 +8,11 @@ struct ChironApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(model)
+                .task {
+                    if SelfTest.requested {
+                        await SelfTest.run(model)
+                    }
+                }
         }
     }
 }

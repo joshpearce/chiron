@@ -43,6 +43,7 @@
 		5AD1E82FF1EC44E3A487EB0F /* copy-tex.mjs in Resources */ = {isa = PBXBuildFile; fileRef = 0B0BB16C9FEAD8DF5BA50717 /* copy-tex.mjs */; };
 		5B0847E18307769F5A75723C /* KaTeX_Main-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 86A03626ABA86DE23531BF64 /* KaTeX_Main-Bold.ttf */; };
 		5B3CA61D77F702AF865DABF5 /* KaTeX_Math-BoldItalic.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = A0B54FB2561CEB6962020510 /* KaTeX_Math-BoldItalic.woff2 */; };
+		5C223EEF7AE0AF48A9942AE5 /* SelfTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AA842BA32080A6287EB9A6 /* SelfTest.swift */; };
 		5D638E649FDDEC94A1FC0694 /* KaTeX_SansSerif-Italic.woff in Resources */ = {isa = PBXBuildFile; fileRef = 26C27720485460AF8450EFB5 /* KaTeX_SansSerif-Italic.woff */; };
 		5FBA2EC63BE2F113FFD665AF /* katex.js in Resources */ = {isa = PBXBuildFile; fileRef = 7C88980E704A78710A73FF10 /* katex.js */; };
 		602FC714B4AACD2281C7D13A /* KaTeX_Caligraphic-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5DB6BA9B3762CD1FEE248330 /* KaTeX_Caligraphic-Bold.ttf */; };
@@ -164,6 +165,7 @@
 		804C6A20116C5A90D2133F04 /* KaTeX_Fraktur-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Fraktur-Bold.ttf"; sourceTree = "<group>"; };
 		845507567B0E0E8F67ABC885 /* KaTeX_Main-Italic.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Main-Italic.woff2"; sourceTree = "<group>"; };
 		86A03626ABA86DE23531BF64 /* KaTeX_Main-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Main-Bold.ttf"; sourceTree = "<group>"; };
+		87AA842BA32080A6287EB9A6 /* SelfTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTest.swift; sourceTree = "<group>"; };
 		87D0EF7FC18B5AC5036C24F1 /* KaTeX_Caligraphic-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Caligraphic-Regular.ttf"; sourceTree = "<group>"; };
 		89C6D89AAB41D1F44AED752C /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
@@ -221,6 +223,7 @@
 				1CB1CBACDDC9D2B6E47206C7 /* Info.plist */,
 				6CE4AEBB512C66BBEEE9B508 /* Models.swift */,
 				8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */,
+				87AA842BA32080A6287EB9A6 /* SelfTest.swift */,
 				4FDBD0C79377E20146856D09 /* Sync.swift */,
 				18688403B5A7406E79EB56D8 /* Resources */,
 			);
@@ -508,6 +511,7 @@
 				A67BB45B6191D6A590258527 /* CheckViews.swift in Sources */,
 				AF29D4E2D309DDDCBC3C20E1 /* Models.swift in Sources */,
 				B512708502B49BDBA48396AE /* ReaderView.swift in Sources */,
+				5C223EEF7AE0AF48A9942AE5 /* SelfTest.swift in Sources */,
 				A0641BBC47F65EC186C3AA87 /* Sync.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

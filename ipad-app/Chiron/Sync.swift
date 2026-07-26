@@ -16,6 +16,11 @@ final class Sync: ObservableObject {
     @Published var transport = "offline"   // wifi | usb | offline
     @Published var busy = false
 
+    /// How long to wait for the Mac-side USB bridge before giving up. Chapter
+    /// generation on a local model can take a while, so this is generous - but
+    /// finite, so a bridge that never runs is reported instead of hanging.
+    let usbTimeout: TimeInterval = 150
+
     private var outbox: Data?              // pending exchange request (USB path)
     private var delivered: ((Data) -> Void)?
     private var listener: NWListener?
@@ -64,6 +69,9 @@ final class Sync: ObservableObject {
         }
 
         // USB fallback: park in outbox, wait for the bridge to deliver.
+        // Bounded so a dead bridge surfaces as a visible error rather than an
+        // indefinite spinner - the learner can then switch transport or read
+        // the built-in book.
         transport = "usb"
         let data: Data = try await withCheckedThrowingContinuation { cont in
             outbox = body
@@ -73,11 +81,12 @@ final class Sync: ObservableObject {
                 done = true
                 cont.resume(returning: d)
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 900) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + usbTimeout) { [weak self] in
                 guard !done else { return }
                 done = true
                 self?.outbox = nil
                 self?.delivered = nil
+                self?.transport = "offline"
                 cont.resume(throwing: URLError(.timedOut))
             }
         }

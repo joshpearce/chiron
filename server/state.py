@@ -57,6 +57,10 @@ class LearnerState:
 
     def apply(self, kind: str, payload: dict) -> dict:
         event = {"n": self.data["version"] + 1, "ts": _now(), "kind": kind, **payload}
+        # The directory can disappear between boot and write (cleanup script,
+        # redeploy, wiped volume). Losing a learner's progress mid-flight to a
+        # missing mkdir is not an acceptable failure, so re-create on demand.
+        self.dir.mkdir(parents=True, exist_ok=True)
         with self.log_path.open("a") as f:
             f.write(json.dumps(event) + "\n")
         self.data["version"] = event["n"]
@@ -67,6 +71,7 @@ class LearnerState:
         return event
 
     def _save(self):
+        self.dir.mkdir(parents=True, exist_ok=True)
         self.snapshot_path.write_text(json.dumps(self.data, indent=1))
 
     # ---------- event handlers ----------
