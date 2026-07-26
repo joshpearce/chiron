@@ -157,44 +157,70 @@ item worthless.
 option carries an `explain`. A wrong answer must be a diagnosis, not a miss."""
 
 
+def _file_schema(key: str, description: str) -> dict:
+    return {"type": "object", "properties": {key: {"type": "string", "description": description}},
+            "required": [key]}
+
+
+# One file per call. Asking for all six in a single JSON object produced a
+# ~30k-token response that took over ten minutes and failed as a unit - one
+# malformed character anywhere lost the whole unit. Staged calls are each
+# bounded, each retryable, and each written to disk the moment it succeeds, so
+# a later failure costs one file instead of a chapter. Depth files also need
+# canon's actual headings, which a single shot has to coordinate with itself.
+DEPTHS = [
+    ("deeper-math.md", "the same sections, with the derivations worked in full"),
+    ("more-intuition.md", "the same sections, leading with physical/geometric intuition before any symbol"),
+    ("se-analogies.md", "the same sections, explained through analogies to software systems, each with its breakdown point stated"),
+]
+
+
 def author_unit(slug: str, unit: dict, syllabus: dict, bank: str) -> tuple[str, bool, str]:
-    """Author one unit. Returns (unit_id, ok, message)."""
+    """Author one unit, file by file. Returns (unit_id, ok, message).
+
+    Files already on disk are kept, so re-running after a failure resumes
+    instead of re-paying for what worked.
+    """
     chain = make_chain(CFG)
     out_dir = _plan_path(slug) / "units" / f"{unit['id']}-{unit['slug']}"
-    schema = {
-        "type": "object",
-        "properties": {
-            "canon_md": {"type": "string", "description": "full canon.md including front matter and ```beat blocks"},
-            "questions_yaml": {"type": "string", "description": "full questions.yaml content"},
-            "misconceptions_yaml": {"type": "string", "description": "unit-local misconceptions.yaml content"},
-            "depth_deeper_math": {"type": "string"},
-            "depth_more_intuition": {"type": "string"},
-            "depth_se_analogies": {"type": "string"},
-        },
-        "required": ["canon_md", "questions_yaml", "misconceptions_yaml",
-                     "depth_deeper_math", "depth_more_intuition", "depth_se_analogies"],
-    }
-    user = (f"AUTHORING CONTRACT:\n{SPEC.read_text()}\n\n"
-            f"LEARNER:\n{syllabus['learner']['profile']}\n\n"
-            f"MISCONCEPTION BANK (cite these ids):\n{bank}\n\n"
-            f"UNIT TO AUTHOR:\n{yaml.safe_dump(unit, sort_keys=False)}\n\n"
-            f"Author every file for this unit. Depth files must use the exact same "
-            f"`## ` headings as canon.md.")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "depths").mkdir(exist_ok=True)
+    context = (f"AUTHORING CONTRACT:\n{SPEC.read_text()}\n\n"
+               f"LEARNER:\n{syllabus['learner']['profile']}\n\n"
+               f"MISCONCEPTION BANK (cite these ids):\n{bank}\n\n"
+               f"UNIT TO AUTHOR:\n{yaml.safe_dump(unit, sort_keys=False)}")
+
+    def write(path: Path, key: str, description: str, extra: str) -> str:
+        if path.exists() and path.stat().st_size > 0:
+            return path.read_text()
+        result = chain.structured("author", UNIT_SYSTEM,
+                                  f"{context}\n\n{extra}", _file_schema(key, description), key)
+        path.write_text(result[key])
+        return result[key]
+
     try:
-        result = chain.structured("author", UNIT_SYSTEM, user, schema, "unit")
+        canon = write(out_dir / "canon.md", "canon_md",
+                      "full canon.md: front matter, prose, and ```beat blocks",
+                      "Write canon.md for this unit, and nothing else.")
+        headings = "\n".join(ln for ln in canon.splitlines() if ln.startswith("## "))
+        write(out_dir / "questions.yaml", "questions_yaml",
+              "full questions.yaml content",
+              f"Here is the canon.md you just wrote:\n\n{canon}\n\n"
+              f"Now write questions.yaml for it, and nothing else.")
+        write(out_dir / "misconceptions.yaml", "misconceptions_yaml",
+              "unit-local misconceptions.yaml content",
+              f"Here are this unit's headings:\n{headings}\n\n"
+              f"Write the unit-local misconceptions.yaml, and nothing else.")
+        for name, what in DEPTHS:
+            write(out_dir / "depths" / name, "content", what,
+                  f"Here is canon.md:\n\n{canon}\n\n"
+                  f"Write the {name} depth variant: {what}. It must use these "
+                  f"exact `## ` headings, in this order - the server swaps "
+                  f"sections by heading, so a drifted heading silently does "
+                  f"nothing:\n{headings}")
     except Exception as e:                      # noqa: BLE001 - report, don't abort the batch
         return unit["id"], False, str(e)[:200]
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "canon.md").write_text(result["canon_md"])
-    (out_dir / "questions.yaml").write_text(result["questions_yaml"])
-    (out_dir / "misconceptions.yaml").write_text(result["misconceptions_yaml"])
-    depths = out_dir / "depths"
-    depths.mkdir(exist_ok=True)
-    (depths / "deeper-math.md").write_text(result["depth_deeper_math"])
-    (depths / "more-intuition.md").write_text(result["depth_more_intuition"])
-    (depths / "se-analogies.md").write_text(result["depth_se_analogies"])
-    return unit["id"], True, f"{len(result['canon_md'])} chars"
+    return unit["id"], True, f"{len(canon)} chars"
 
 
 def units(slug: str, only: list[str]) -> int:

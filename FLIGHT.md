@@ -149,7 +149,6 @@ stray LaTeX. The bundle was regenerated and the corrected build is on the iPad.
 
 ### Known, not fixed (deliberate)
 
-- **One unexplained 404** in an early bridge log. (see below)
 - **One unexplained 404** in an early bridge log. The shape is reproducible
   (an unknown `subject` returns 404) but the actual trigger was not confirmed,
   and the stale-app theory was disproven (only `com.mjbraun.chiron` is
