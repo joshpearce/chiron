@@ -1,0 +1,29 @@
+name: DynamicBook
+options:
+  bundleIdPrefix: com.mjbraun
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  DynamicBook:
+    type: application
+    platform: iOS
+    sources:
+      - DynamicBook
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "2"          # iPad only
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        CODE_SIGN_STYLE: Automatic
+        # DEVELOPMENT_TEAM set by Xcode after Apple ID sign-in (free personal team)
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.mjbraun.dynamicbook
+    info:
+      path: DynamicBook/Info.plist
+      properties:
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: "Connects to the book server running on your Mac to grade answers and generate chapters."
+        UIRequiresFullScreen: false
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false

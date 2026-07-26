@@ -1,0 +1,39 @@
+# Unit-local misconceptions for u7 (Mixture of Experts).
+# Same schema as corpus/misconception-bank.yaml. IDs are unit-scoped (U7-Mn)
+# so they never collide with global bank IDs. The global entry this unit is
+# built to refute is M12 (moe-experts-are-specialists); these four are the
+# errors that survive after M12 is dislodged, and every one of them is a
+# systems mis-transfer rather than an ML mistake.
+
+misconceptions:
+  - id: U7-M1
+    name: moe-saves-memory
+    wrong_model: "A 35B-A3B only needs the RAM of a 3B model, since only 3B parameters are active per token."
+    why_appealing: "The A3B naming foregrounds the active count; 'active' sounds like 'loaded'. And the analogy to resident-set-versus-virtual-size is genuinely close - engineers know that a process mapping 19 GB may only touch a fraction of it."
+    failing_prediction: "If only the active slice needed to be resident, a 35B-A3B would load and run in ~2 GB of RAM. It does not: it OOMs below ~19 GB. Nor can you page experts from SSD on demand - the selected set changes every token at every layer, so you would stream 1.8 GB per token over a ~5 GB/s link, about 2.8 tok/s, worse than the dense 35B ceiling of 8 tok/s you were trying to beat."
+    correction: "Total parameters set the memory-capacity requirement; active parameters set the memory-bandwidth cost per token. MoE trades capacity (which you have) for bandwidth (which you lack). All experts must be resident because the next token may select any of them."
+    units: [u7]
+
+  - id: U7-M2
+    name: router-is-a-separate-classifier
+    wrong_model: "The router is a separate small model - a classifier trained on its own objective, or a hand-written heuristic - that inspects the token and dispatches it."
+    why_appealing: "Every dispatcher an engineer has built was a distinct component with its own logic and its own tests. 'Router' is a loaded word."
+    failing_prediction: "If the router were separately trained, you could swap in a better router for a trained MoE and get better outputs. You cannot: the experts co-adapted to this router's exact partition during training, and replacing it destroys the model. There is also no separate objective anywhere in an MoE training script for it to have been trained against."
+    correction: "The router is one linear layer (roughly N x d, about 262k params for N=128, d=2048) inside the block, trained jointly by the same next-token loss via the gate weights, plus an auxiliary balance term. It has no independent existence, no labels, and no separate training stage."
+    units: [u7]
+
+  - id: U7-M3
+    name: experts-are-an-ensemble
+    wrong_model: "MoE is an ensemble: several complete models run and their outputs are combined, like bagging or a model committee."
+    why_appealing: "'Mixture' plus a weighted sum of outputs is literally the form of an ensemble average, and ensembling is a familiar, respectable technique."
+    failing_prediction: "If experts were models, you could serve one alone and get a weaker but working model. You cannot - an expert is one MLP block in one layer of forty-eight, with no attention, no embeddings, and no output head. Extracted, it maps a residual-stream vector to a residual-stream update and nothing else. An ensemble also costs k times more compute than one member; MoE costs a fraction of the dense equivalent, which is the opposite of the ensemble economics."
+    correction: "Experts are parallel MLP sublayers inside a single model, selected per token per layer. The weighted sum happens inside the block, before the result rejoins the residual stream. There is one model, one forward pass, one output distribution."
+    units: [u7]
+
+  - id: U7-M4
+    name: moe-speedup-is-unconditional
+    wrong_model: "A 35B-A3B is roughly 10x faster than a dense 35B, full stop - in prefill, in decode, at any batch size, on any hardware."
+    why_appealing: "The total/active ratio is a single memorable number, and it is genuinely correct in the case people first meet (one user, one laptop, generating)."
+    failing_prediction: "If the speedup were unconditional, MoE serving nodes would show a 10x throughput advantage at production batch sizes. They do not. With N=128 and top-k=8, a batch of 64 tokens touches an expected 126 of the 128 experts - the union of independent top-8 draws covers nearly the whole pool - so the batched pass reads essentially all 35B of weights and the bandwidth advantage falls to about 1.02x."
+    correction: "The MoE bandwidth win is a small-batch, memory-bound-regime win, and it decays as N(1 - e^{-kB/N}). It is around 10.6x at batch 1, 2.4x at batch 8, 1.5x at batch 16, and 1.02x by batch 64. In the compute-bound regime (prefill, or large-batch serving) MoE still cuts FLOPs by the same ratio, but that is a throughput benefit partly offset by gather/scatter and all-to-all overhead, not the latency cliff you get locally."
+    units: [u7]

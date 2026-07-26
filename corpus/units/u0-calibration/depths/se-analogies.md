@@ -48,8 +48,7 @@ magic number, and pipeline syntax is enforced by a parser. The vector convention
 is announced nowhere, checked by nothing, and frequently switches between a
 paper's equations and that same paper's reference implementation. There is no
 byte-order mark. You infer the convention from the shapes in the equations, and
-if you infer wrong, everything still runs - it just computes a different
-function.
+if you infer wrong, everything still runs - it computes a different function.
 
 ## Dot products: alignment, not distance
 
@@ -77,8 +76,8 @@ exactly when magnitudes are held at one, and diverge as soon as they are not.
 **Where this breaks:** in a metrics pipeline you can always recover the rate
 from the count and the denominator, so the two views are interconvertible per
 data point. Inside a model, the magnitude carries load-bearing signal that you
-cannot simply divide out and still have the same network - some components
-encode confidence or salience in norm. Normalizing everything to unit length
+cannot divide out and still have the same network - some components encode
+confidence or salience in norm. Normalizing everything to unit length
 would not be "cleaning up the metric", it would be deleting a channel the model
 trained itself to use.
 

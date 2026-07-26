@@ -124,7 +124,8 @@ $$\frac{T_{\text{naive}}}{T_{\text{cached}}}
 
 As $k \to \infty$ this behaves like $\frac{d k^2/2}{dk} = k/2$: the waste factor
 grows linearly in step count without bound. At $k = 40$ with the unit's
-constants it is 22.9. There is no session length at which skipping cache reuse
+constants ($n_0 = 4000$, $d = 600$) it is $656{,}000 / 28{,}000 = 23.4$, running
+ahead of the $k/2 = 20$ asymptote because the $n_0$ term has not yet washed out. There is no session length at which skipping cache reuse
 stops mattering; it gets monotonically worse.
 
 ## Context is the scarce resource

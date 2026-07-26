@@ -1,0 +1,46 @@
+# Unit-local misconception additions for u8 (harnesses and agents).
+# Same schema as corpus/misconception-bank.yaml. These are the u8-specific
+# refinements of M13/M14/M17 that a daily agent-tooling user is most likely to
+# hold: each one is compatible with correct day-to-day behavior, which is
+# exactly why it survives.
+
+misconceptions:
+  - id: U8-M1
+    name: context-window-is-retained-memory
+    wrong_model: "The context window is memory the model holds onto between turns; the harness sends only the new message and the model still has the rest."
+    why_appealing: "Chat UIs show a persistent thread, the API bills a 'conversation', and 'the model has a 200k context window' sounds like a buffer the model owns."
+    failing_prediction: "If history were retained server-side, deleting a middle message client-side could not change the model's behavior, and an identical conversation replayed from a different client would need a session handle - but you can hand-edit any prior turn, replay from any client, and the model behaves exactly as if that edited history were the original."
+    correction: "The inference API is stateless. The harness re-serializes and re-sends the entire history as tokens on every turn. The context window is a limit on how long that re-sent array may be, not a store the model owns. The only thing persisting server-side is the KV cache, which is a memoization keyed on the token prefix, not a session."
+    units: [u8]
+
+  - id: U8-M2
+    name: model-speaks-mcp
+    wrong_model: "MCP is a model capability - the model connects to MCP servers, discovers tools, and calls them."
+    why_appealing: "MCP is marketed alongside models, configured per-assistant, and the product surface says 'Claude can now connect to X'."
+    failing_prediction: "If the model spoke MCP, you could not swap the transport (stdio vs HTTP) or the entire protocol without retraining - but harnesses expose the identical tool to the model over MCP, a bespoke JSON format, or a plain function-calling API, and the model's behavior is unchanged, because all it ever saw was a schema rendered as text in the prompt."
+    correction: "MCP is a protocol between the harness and a tool server. The harness discovers schemas over MCP, renders them into the prompt as text, parses the model's emitted text back into a call, and dispatches it over MCP. The model never opens a connection and never sees the protocol."
+    units: [u8]
+
+  - id: U8-M3
+    name: prompt-cache-caches-responses
+    wrong_model: "Prompt caching caches answers - ask a similar question and you get the cached response back, so it can serve stale or wrong output."
+    why_appealing: "Every other cache an engineer meets (HTTP, CDN, memoized RPC) caches results keyed on a semantic notion of 'the same request'."
+    failing_prediction: "If it cached responses, a cache hit would return identical output and would be sensitive to semantic similarity - instead a hit changes only latency and price, output is sampled fresh every time, and a single differing token anywhere in the prefix produces a total miss no matter how similar the meaning."
+    correction: "Prompt caching stores computed key/value tensors for an exact token prefix. It is a memoization of the prefill computation, not of the response. Match is byte-exact and prefix-only; on a hit the model still runs a fresh forward pass over the remainder and samples fresh tokens."
+    units: [u8]
+
+  - id: U8-M4
+    name: subagents-add-capacity
+    wrong_model: "Sub-agents give you more total model capacity - parallel brains, or a way to exceed the context limit by pooling several windows."
+    why_appealing: "'Spawn 5 agents' reads like horizontal scaling, and horizontal scaling really does add capacity in every other system an engineer has built."
+    failing_prediction: "If sub-agents pooled context, a parent could reason over the union of its children's windows - it cannot: the parent only ever receives each child's final report as ordinary tokens in its own stream, and anything the child saw but did not write into that report is unrecoverable."
+    correction: "A sub-agent is a separate context window over the same weights. It buys the parent context budget - the child's exploration tokens never enter the parent's stream and so are never re-paid on later turns - at the cost of a lossy natural-language interface in both directions. It is a budget optimization, not a capability or capacity one."
+    units: [u8]
+
+  - id: U8-M5
+    name: system-prompt-is-privileged-execution
+    wrong_model: "The system prompt is processed differently from other text - higher priority, checked against later content, or enforced as a constraint on generation."
+    why_appealing: "It is a distinct API field, it is documented as setting rules, and empirically it does dominate behavior most of the time."
+    failing_prediction: "If it were an enforced constraint there would be a mechanism that could reject a violating continuation - there is none: the same weights process every token, and a long enough context or sufficiently authoritative later text measurably erodes system-prompt adherence, which an enforced constraint could not do."
+    correction: "The system prompt is tokens at the front of the same stream, marked by reserved delimiter tokens. Its influence is a learned prior - post-training taught the model that text after those delimiters is usually obeyed. Because attention weights are a softmax over all keys, that influence is diluted as context grows. Strong tendency, not enforcement."
+    units: [u8]

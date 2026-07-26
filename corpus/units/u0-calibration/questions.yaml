@@ -121,7 +121,7 @@ pretest:
       inner dimensions do not match.
       Partial: (a) correct, (b) wrong or unjustified.
       Fail and what it diagnoses: answering (b) "yes, matrix multiplication is
-      commutative" or "yes, you would just loop differently" = U0-M1.
+      commutative" or "yes, you would loop in the other order" = U0-M1.
       Answering (b) "yes, transpose it and it works" without noticing that this
       computes a different function = U0-M4.
 
@@ -178,6 +178,7 @@ check:
       $q = [3, 0]$, $k_1 = [0.6, 0.8]$, $k_2 = [6, 8]$. Note that $k_1$ and
       $k_2$ point in exactly the same direction. Which key gets the larger raw
       attention score $q \cdot k$, and what does that tell you?
+    check: choice
     options:
       - text: "$k_2$, by a factor of 10, even though the two keys point in identical directions - the dot product scales with magnitude as well as alignment."
         correct: true
@@ -190,7 +191,7 @@ check:
         explain: "Attractive because 'similar' and 'nearby' are the same word in everyday use. Check it: $\\lVert q - k_1 \\rVert \\approx 2.53$ while $\\lVert q - k_2 \\rVert \\approx 8.54$, so $k_1$ really is much closer - and it scores ten times lower. The dot product is not a distance and is not even a decreasing function of distance."
       - text: "$k_2$, because a longer vector is a more confident match and the score is $\\lVert k \\rVert$ times the cosine of the angle, so length is the deciding factor."
         misconception: U0-M2
-        explain: "The arithmetic here is right - the formula given is correct and $k_2$ does score higher - but the reading is wrong on both sides. The score is $\\lVert q \\rVert \\lVert k \\rVert \\cos\\theta$, scaled by BOTH magnitudes, not just the key's. And length is not the deciding factor in general: a long vector at 90 degrees still scores zero. Magnitude and alignment both matter, multiplicatively."
+        explain: "The arithmetic here is right - the formula given is correct and $k_2$ does score higher - but the reading is wrong on both sides. The score is $\\lVert q \\rVert \\lVert k \\rVert \\cos\\theta$, scaled by BOTH magnitudes, not the key's alone. And length is not the deciding factor in general: a long vector at 90 degrees still scores zero. Magnitude and alignment both matter, multiplicatively."
     difficulty: warmup
 
   - id: u0-q4
@@ -243,6 +244,7 @@ check:
     prompt: |
       $A$ has shape $(2,3)$ and $B$ has shape $(3,2)$, so both $AB$ and $BA$
       are defined. What is the relationship between them?
+    check: choice
     options:
       - text: "They are different objects - $AB$ is $2 \\times 2$ and $BA$ is $3 \\times 3$ - because each is a different composition of the two maps."
         correct: true
@@ -250,7 +252,7 @@ check:
       - text: "They are equal, because matrix multiplication is built out of multiplying and adding ordinary numbers, and both of those commute."
         misconception: U0-M1
         explain: "Attractive because it is true of the individual arithmetic operations inside the loop. But the loop pairs row $i$ of the left operand with column $j$ of the right one, and swapping the operands re-pairs everything. Commutativity of the scalar multiplications says nothing about the pairing. Here the two products are not even the same size."
-      - text: "$BA = (AB)^T$ - swapping the order just transposes the result."
+      - text: "$BA = (AB)^T$ - swapping the order transposes the result."
         misconception: U0-M4
         explain: "Attractive because $(AB)^T = B^T A^T$ is a real identity and this looks like it. It is not: the true identity transposes both factors as well as reordering them. Shapes alone refute the claim here, since $(AB)^T$ is $2 \\times 2$ and $BA$ is $3 \\times 3$. Treating a transpose as a cosmetic fix-up is the orientation error."
       - text: "They contain the same numbers in a different arrangement, since no information is created or destroyed by reordering a product."
@@ -310,6 +312,7 @@ check:
       A paper writes the training objective as
       $L(\theta) = \mathbb{E}_{x \sim \mathcal{D}}[\ell(x; \theta)]$.
       What does the $\mathbb{E}$ notation mean here?
+    check: choice
     options:
       - text: "The average of the per-example loss over the distribution $\\mathcal{D}$, weighted by how likely each $x$ is - approximated in practice by the mean over a batch."
         correct: true

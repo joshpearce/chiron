@@ -10,34 +10,28 @@ assumes: []
 
 ## How this unit works
 
-This unit does two things and then gets out of the way.
+This unit measures, front-loads notation, and gets out of the way.
 
-First, it measures. The pretest that opens this unit spans the entire math floor
-of the book - dot products, matrix shapes, softmax, the chain rule, gradient
-notation. You are expected to miss some of it. Missing items here is the point:
-a failed attempt before instruction makes the instruction stick harder, and the
-pattern of what you miss is what sets the depth of every later unit. Answer
-fast, answer wrong, move on.
+The pretest spans the whole math floor of the book - dot products, matrix
+shapes, softmax, the chain rule, gradient notation. You are expected to miss
+some of it. That is the point: a failed attempt before instruction makes the
+instruction stick, and the pattern of what you miss sets the depth of every
+later unit. Answer fast, answer wrong, move on.
 
-Second, it front-loads notation. Everything after this unit is written in
-symbols, and the symbols are the actual barrier for a working engineer reading
-ML papers. Not the concepts - the concepts are ordinary. The barrier is that
-$\partial L / \partial W$, $\mathbb{E}_{x \sim \mathcal{D}}[\cdot]$, and
-$d_k$ are never defined in the papers that use them.
-
-The four sections below are that notation pre-training. They are self-contained:
-nothing later in this unit depends on them, and nothing in them depends on the
-rest of the book. If your pretest shows you already read this dialect fluently,
-they get skipped, because pre-training notation for someone who already has it
-costs time and buys nothing.
+Then notation. Everything after this unit is written in symbols, and the symbols
+are the real barrier for an engineer reading ML papers - not the concepts, which
+are ordinary. Nobody defines $\partial L / \partial W$,
+$\mathbb{E}_{x \sim \mathcal{D}}[\cdot]$, or $d_k$ in the papers that use them.
+The four sections below do. They are self-contained, and if your pretest shows
+you already read this dialect they get skipped.
 
 <!-- skippable: notation-pretraining begins -->
 
 ## The shape contract
 
 Every quantity in this book is a block of numbers, and the only thing you need
-to track about it is its shape. Get the shapes right and the equations follow
-almost mechanically. Get them wrong and nothing type-checks.
+to track is its shape. Get the shapes right and the equations follow almost
+mechanically.
 
 The index letters are near-universal across papers. Memorize these five:
 
@@ -49,12 +43,10 @@ The index letters are near-universal across papers. Memorize these five:
 | $d_k$ | width of one attention head's query/key vectors | 64 to 128 |
 | $V$ | vocabulary size - how many distinct tokens exist | ~32,000 to ~200,000 |
 
-So a batch of token embeddings has shape $(b, n, d_{\text{model}})$: $b$
-sequences, each $n$ tokens long, each token represented by a
-$d_{\text{model}}$-dimensional vector. That is the single most common shape in
-this book. In most equations the batch dimension is dropped and left implicit,
-so you will see $X$ with shape $(n, d_{\text{model}})$ and be expected to
-understand that everything applies per-sequence, in parallel, across the batch.
+A batch of token embeddings therefore has shape $(b, n, d_{\text{model}})$, the
+single most common shape in this book. Most equations drop the batch dimension,
+so you will see $X$ with shape $(n, d_{\text{model}})$ and are expected to know
+that everything applies per-sequence, in parallel, across the batch.
 
 Now the part that trips engineers, because it is a convention choice that nobody
 announces.
@@ -63,31 +55,30 @@ announces.
 You probably think the row-vs-column orientation of a vector is cosmetic - a
 transpose here or there, the kind of thing you fix when the code throws. Here is
 the prediction that fails: under that belief, a paper writing $xW$ and a
-textbook writing $Wx$ should be describing the same operation with the same
-matrix, so you could carry a shape from one to the other. Try it.
-In $Wx$, the linear-algebra-textbook form, $x$ is a column vector of shape
-$(d_{\text{in}}, 1)$ and $W$ has shape $(d_{\text{out}}, d_{\text{in}})$ -
-input dimension **last**. In $xW$, the form nearly all ML papers and every
-tensor library use, $x$ is a row vector of shape $(1, d_{\text{in}})$ and $W$
-has shape $(d_{\text{in}}, d_{\text{out}})$ - input dimension **first**. The
-same weight matrix is stored transposed between the two worlds. Read a paper in
-the wrong convention and every shape you derive is backwards.
+textbook writing $Wx$ describe the same operation with the same matrix, so a
+shape derived in one carries to the other. It does not. In $Wx$, the
+linear-algebra-textbook form, $x$ is a column vector of shape
+$(d_{\text{in}}, 1)$ and $W$ has shape $(d_{\text{out}}, d_{\text{in}})$ - input
+dimension **last**. In $xW$, the form nearly all ML papers and every tensor
+library use, $x$ is a row vector of shape $(1, d_{\text{in}})$ and $W$ has shape
+$(d_{\text{in}}, d_{\text{out}})$ - input dimension **first**. The same weight
+matrix is stored transposed between the two worlds.
 
 The belief is appealing because in scalar-land orientation genuinely is
-cosmetic, and because Python broadcasting hides orientation errors until they
-surface three layers downstream as a wrong-but-plausible shape.
+cosmetic, and because broadcasting hides orientation errors until they surface
+three layers downstream as a wrong-but-plausible shape.
 
 What is actually true: this book, like the papers, uses the **row-vector
-convention** throughout. Data comes first, weights come second, dimensions
+convention** throughout. Data on the left, weights on the right, dimensions
 contract at the join:
 
 $$X W = Y, \quad X: (n, d_{\text{in}}), \quad W: (d_{\text{in}}, d_{\text{out}}), \quad Y: (n, d_{\text{out}})$$
 
 where $X$ holds one token vector per row, $W$ is a learned weight matrix, and
 $Y$ holds one output vector per row. The inner dimensions - the $d_{\text{in}}$
-appearing on both sides of the join - must match and then vanish. The outer
-dimensions survive. That is the whole rule, and it is the only shape rule you
-will need for the rest of the book.
+on both sides of the join - must match, and then they vanish. The outer
+dimensions survive. That is the only shape rule you need for the rest of the
+book.
 
 ```beat
 id: u0-b1
@@ -127,14 +118,13 @@ vectors point the same general way, zero means perpendicular, negative means
 opposed.
 
 <!-- refutes: U0-M2 -->
-You probably think this makes the dot product a similarity score - that a bigger
-dot product means "more similar", the way cosine similarity does in every vector
-database you have used. Here is the prediction that fails: under that belief,
-scaling a vector without rotating it should not change how similar it is to
-anything, since its direction is unchanged. Take $q = [3, 0]$ and two keys
-pointing in the identical direction, $k_1 = [0.6, 0.8]$ and $k_2 = [6, 8]$.
-Cosine similarity is $0.6$ for both - same direction, same angle. But
-$q \cdot k_1 = 1.8$ and $q \cdot k_2 = 18$. Ten times the score for zero change
+You probably read that as a similarity score - a bigger dot product means "more
+similar", the way cosine similarity does in every vector database you have used.
+Here is the prediction that fails: under that belief, scaling a vector without
+rotating it cannot change how similar it is to anything, since its direction is
+unchanged. Take $q = [3, 0]$ and two keys pointing in identical directions,
+$k_1 = [0.6, 0.8]$ and $k_2 = [6, 8]$. Cosine similarity is $0.6$ for both. But
+$q \cdot k_1 = 1.8$ and $q \cdot k_2 = 18$ - ten times the score for zero change
 in direction.
 
 The belief is appealing because your tooling normalizes for you: embedding
@@ -143,21 +133,20 @@ cosine are literally the same number. That is a property of the normalization,
 not of the dot product.
 
 What is actually true: the dot product is cosine similarity multiplied by both
-magnitudes, so it conflates "points the same way" with "is large". Inside a
-transformer nothing is normalized before the dot product, and this matters
-twice: it is why attention scores need a $1/\sqrt{d_k}$ correction (u3), and it
-is why a single high-magnitude key can dominate an attention distribution
-regardless of direction.
+magnitudes, so it conflates "points the same way" with "is large". Nothing
+inside a transformer normalizes before the dot product, which matters twice - it
+is why attention scores need a $1/\sqrt{d_k}$ correction (u3), and why a single
+high-magnitude key can dominate an attention distribution regardless of
+direction.
 
 <!-- refutes: U0-M6 -->
-The neighboring instinct - that a bigger dot product means "closer" - fails on
-the same example, and harder. If the dot product tracked proximity it would
-shrink as vectors move apart. Measure: $\lVert q - k_1 \rVert \approx 2.53$ and
-$\lVert q - k_2 \rVert \approx 8.54$, so $k_2$ is more than three times farther
-from $q$, and it scores ten times higher. The dot product is not a distance and
-is not even monotone in distance. The two are related by
+The neighboring instinct, that a bigger dot product means "closer", fails on the
+same example and harder. Proximity would mean the score shrinks as vectors move
+apart. Measure it: $\lVert q - k_1 \rVert \approx 2.53$ while
+$\lVert q - k_2 \rVert \approx 8.54$, so $k_2$ is over three times farther away
+and scores ten times higher. The two quantities are related by
 $\lVert u - v \rVert^2 = \lVert u \rVert^2 - 2(u \cdot v) + \lVert v \rVert^2$,
-which agrees on ranking only when all the norms are equal - the unit-sphere case
+which agrees on ranking only when all norms are equal - the unit-sphere case
 your vector database quietly enforces and a transformer does not.
 
 ```beat
@@ -186,31 +175,29 @@ check: exact
 You probably think matrix multiplication is a triple-nested loop whose
 inner-dimensions-must-match rule is bookkeeping - an implementation detail of
 how the numbers happen to be stored. Here is the prediction that fails: under
-that belief, the rule should be arbitrary enough that some other pairing (say,
-multiplying aligned entries, or matching outer dimensions) would be an equally
-valid definition, just a different convention. It is not. Matrices are
-functions. $A$ of shape $(p, q)$ is a function from $q$-dimensional space to
-$p$-dimensional space in column convention, or from $p$ to $q$ in row
-convention. $AB$ is the **composition** of those two functions, and the shape
-rule is nothing but the requirement that the output type of one function matches
-the input type of the next. It is a type check, not a storage detail. That is
-also why $AB \neq BA$: composing in the other order is a different function, and
-usually not even a well-typed one.
+that belief the rule is arbitrary enough that another pairing (multiplying
+aligned entries, say, or matching outer dimensions) would be an equally valid
+definition. It would not. Matrices are functions. $A$ of shape $(p, q)$ is a
+function from $p$-dimensional space to $q$-dimensional space in row convention,
+and $AB$ is the **composition** of two such functions. The shape rule is nothing
+but the requirement that one function's output type matches the next one's input
+type. It is a type check, not a storage detail - which is also why
+$AB \neq BA$: composing in the other order is a different function, and often
+not a well-typed one.
 
-The belief is appealing because the loop is what the hardware does, and as a
-systems engineer you correctly reason about the memory-layout level for
-performance. That level is real. It is just not where the meaning is.
+The belief is appealing because the loop is what the hardware runs, and
+reasoning at the memory-layout level is usually the productive instinct. That
+level is real. It is not where the meaning is.
 
-What is actually true: every entry of the product is a dot product, and the
-whole product is a change of representation. Entry $(i, j)$ of $AB$ is row $i$
-of $A$ dotted with column $j$ of $B$:
+What is actually true: every entry of the product is a dot product. Entry
+$(i, j)$ of $AB$ is row $i$ of $A$ dotted with column $j$ of $B$:
 
 $$(AB)_{ij} = \sum_{t} A_{it} B_{tj}$$
 
 where $t$ runs over the shared inner dimension, $A_{it}$ is the entry of $A$ in
 row $i$ and column $t$, and $B_{tj}$ is the entry of $B$ in row $t$ and column
-$j$. So a matrix multiply is a grid of dot products - one per (row of $A$,
-column of $B$) pair.
+$j$. A matrix multiply is a grid of dot products, one per (row of $A$, column of
+$B$) pair.
 
 <!-- fade: matrix-multiply -->
 Worked, with $A$ of shape $(2, 3)$ and $B$ of shape $(3, 2)$:
@@ -228,9 +215,9 @@ $$(AB)_{22} = (3)(1) + (1)(2) + (-1)(5) = 3 + 2 - 5 = 0$$
 
 $$AB = \begin{bmatrix} 2 & 11 \\ 13 & 0 \end{bmatrix}$$
 
-Note that $BA$ is also defined here - $(3,2)$ times $(2,3)$ gives $(3,3)$ - and
-is a completely different object, a $3 \times 3$ matrix. Same two matrices,
-different composition, different function.
+$BA$ is also defined here - $(3,2)$ times $(2,3)$ gives $(3,3)$ - and is a
+different object of a different size. Same two matrices, different composition,
+different function.
 
 ```beat
 id: u0-b3
@@ -255,36 +242,34 @@ check: exact
 
 ## Gradients and expectations
 
-Two more pieces of notation and the pre-training is done. Both are the kind of
-symbol that papers use hundreds of times without ever defining.
+Two symbols left, both used hundreds of times per paper and defined in none of
+them.
 
 **Expectation.** $\mathbb{E}_{x \sim \mathcal{D}}[f(x)]$ reads "the expected
 value of $f(x)$ when $x$ is drawn from the distribution $\mathcal{D}$" - the
 average of $f(x)$ over all possible $x$, weighted by how likely each $x$ is
-under $\mathcal{D}$. The subscript names the distribution; the brackets hold
-whatever you are averaging.
-
-You cannot compute that average - $\mathcal{D}$ is "the distribution of all
-text that could exist", and you have a hard drive, not a distribution. So every
-expectation in this book is estimated by a sample mean over a batch:
+under $\mathcal{D}$. The subscript names the distribution, the brackets hold
+what you are averaging. You cannot compute that average, because $\mathcal{D}$
+is "the distribution of all text that could exist" and you have a hard drive.
+So every expectation in this book is estimated by a sample mean over a batch:
 
 $$\mathbb{E}_{x \sim \mathcal{D}}[f(x)] \approx \frac{1}{b} \sum_{i=1}^{b} f(x_i)$$
 
 where $b$ is the batch size and $x_1, \dots, x_b$ are the examples in the batch.
 
 <!-- refutes: U0-M5 -->
-You probably read that approximation as an equality with extra ceremony - that
-$\mathbb{E}$ is just notation for "average of the numbers I have". Here is the
-prediction that fails: if the objective were defined over your dataset, then a
-model that memorized the dataset would have optimally solved the stated problem,
-and generalization error would not exist as a concept. Every number anyone
-reports is held-out loss. The belief is appealing because the batch mean is what
-the code literally computes, and the dataset is the only concrete object in
-sight. What is true is that the thing you want is the expectation over a
-distribution nobody can enumerate, the thing you compute is an unbiased but
-noisy estimate of it, and the gap between them is exactly why batch size affects
-training stability (u5). One related trap: $\mathbb{E}$ is a probability-
-weighted mean, not the typical value. The expected roll of a fair die is 3.5.
+You probably read that approximation as an equality with extra ceremony, with
+$\mathbb{E}$ meaning "average of the numbers I have". Here is the prediction
+that fails: if the objective were defined over your dataset, a model that
+memorized the dataset would have optimally solved the stated problem, and
+generalization error would not exist as a concept. Every number anyone reports
+is held-out loss. The belief is appealing because the batch mean is what the
+code computes and the dataset is the only concrete object in sight. What is
+true: the thing you want is an expectation over a distribution nobody can
+enumerate, the thing you compute is an unbiased but noisy estimate of it, and
+the gap is exactly why batch size affects training stability (u5). A related
+trap - $\mathbb{E}$ is a probability-weighted mean, not the typical value. The
+expected roll of a fair die is 3.5.
 
 **Gradients.** For a scalar loss $L$ and a weight matrix $W$, the symbol
 $\partial L / \partial W$ - also written $\nabla_W L$ - denotes the collection
@@ -292,36 +277,34 @@ of partial derivatives of $L$ with respect to each entry of $W$.
 
 <!-- refutes: U0-M3 -->
 You probably think of that symbol as a slope: one number saying which way the
-loss is heading. Here is the prediction that fails: under that belief the update
-rule $W \leftarrow W - \eta \, \partial L / \partial W$, where $\eta$ is the
-learning rate, would be subtracting a scalar from a matrix - it would move every
-weight by the identical amount, in the identical direction, forever. Training
-would be a single global dial. It obviously is not.
+loss is heading. Here is the prediction that fails: the update rule
+$W \leftarrow W - \eta \, \partial L / \partial W$, where $\eta$ is the learning
+rate, would then be subtracting a scalar from a matrix, moving every weight by
+the identical amount in the identical direction forever. Training would be a
+single global dial.
 
 The belief is appealing because that is what a derivative is in one-variable
 calculus, which is the last place most engineers used one.
 
-What is actually true, and it is the single most useful fact in this section:
-**the gradient has the same shape as the thing you differentiate with respect
-to.** If $W$ has shape $(768, 3072)$, then $\partial L / \partial W$ has shape
-$(768, 3072)$. Entry $(i,j)$ of the gradient answers one narrow question: if I
-nudge $W_{ij}$ up by a hair and change nothing else, how much does $L$ go up?
-The update subtracts the whole gradient matrix from the whole weight matrix,
-entrywise, so every weight gets its own individually-computed step. That shape
-correspondence is called denominator layout, and it is the convention every ML
-framework uses because it makes the update rule shape-correct by construction.
-(Some math texts use numerator layout, where the gradient comes out transposed.
-When a paper's shapes look transposed from what the code does, this is usually
-why.)
+What is actually true, and it is the most useful fact in this section: **the
+gradient has the same shape as the thing you differentiate with respect to.** If
+$W$ has shape $(768, 3072)$, so does $\partial L / \partial W$. Entry $(i,j)$
+answers one narrow question - nudge $W_{ij}$ up by a hair, change nothing else,
+how much does $L$ go up? The update subtracts the whole gradient matrix from the
+whole weight matrix entrywise, so every weight gets its own step. That shape
+correspondence is called denominator layout, and every ML framework uses it
+because it makes the update rule shape-correct by construction. (Some math texts
+use numerator layout, where the gradient comes out transposed. When a paper's
+shapes look transposed from what the code does, this is usually why.)
 
-The chain rule is what makes this computable through a deep stack. In scalar
-form: if $L$ depends on $y$ and $y$ depends on $x$, then
+The chain rule makes this computable through a deep stack: if $L$ depends on $y$
+and $y$ depends on $x$, then
 
 $$\frac{\partial L}{\partial x} = \frac{\partial L}{\partial y} \cdot \frac{\partial y}{\partial x}$$
 
-Local derivatives multiply along the path. Backpropagation (u5) is that
-identity applied layer by layer, with matrix multiplies in place of the scalar
-product - which is why it is bookkeeping rather than new mathematics.
+Local derivatives multiply along the path. Backpropagation (u5) is that identity
+applied layer by layer with matrix multiplies in place of the scalar product,
+which is why it is bookkeeping rather than new mathematics.
 
 ```beat
 id: u0-b4
@@ -340,8 +323,8 @@ answer: |
 rubric: |
   Must contain both: (1) the gradient has the SAME shape as $W$,
   $(d_{\text{model}}, d_{\text{ff}})$ - stating the shape correctly is required,
-  not just "same shape"; (2) one entry is the sensitivity of the scalar loss to
-  one individual weight (partial derivative w.r.t. $W_{ij}$).
+  not merely "same shape"; (2) one entry is the sensitivity of the scalar loss
+  to one individual weight (partial derivative w.r.t. $W_{ij}$).
   Pass = both. Partial = (1) only, or (2) phrased as "how much that weight
   matters" without the derivative/sensitivity idea.
   Fail conditions and what they diagnose: calling the gradient a scalar or a
@@ -356,6 +339,6 @@ check: llm
 
 That is the whole notation surface. Shapes contract at the join, dot products
 return scalars that mix direction with magnitude, matrix multiply composes
-functions, gradients wear the shape of their weights, and $\mathbb{E}$ means an
+functions, gradients wear the shape of their weights, and $\mathbb{E}$ is an
 average you can only estimate. Every equation in the next nine units is built
 from those five facts.

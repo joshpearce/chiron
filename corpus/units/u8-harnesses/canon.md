@@ -317,7 +317,7 @@ for 33,000. The ratio is $33{,}000 / 7{,}000 \approx 4.7$.
 Note the $k(k+1)/2$: without caching, prefill cost is **quadratic in the number
 of agent steps**. A 40-step session with these constants prefills $41 \times
 4000 + 600 \times 820 = 164{,}000 + 492{,}000 = 656{,}000$ tokens to produce a
-28,600-token final context - a factor of 23. This is the arithmetic behind "long
+28,000-token final context - a factor of 23. This is the arithmetic behind "long
 agentic sessions get expensive", and it is not the same quadratic as attention's
 $O(n^2)$. It is a re-prefill quadratic, layered on top of the attention one.
 They compound.
