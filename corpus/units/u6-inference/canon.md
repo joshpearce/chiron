@@ -58,7 +58,7 @@ table. Its config:
 | vocabulary $V$ | 151,936 |
 | weight format | 4-bit, group size 64 |
 | file on disk | 19.1 GB |
-| host | M4 Max, 128 GB unified memory, 546 GB/s |
+| host | Apple M5, 32 GB unified memory, 153 GB/s |
 
 The mixture-of-experts part (128 experts, top-8) is u7's job. For this unit the
 only thing that matters about it is the number 3.33B: that is how many weights
@@ -603,13 +603,13 @@ used exactly once. It is memory-bandwidth-bound, and the arithmetic units idle
 while waiting on RAM.
 
 Put the numbers on your machine. Decode reads the active weights per token:
-3.33B parameters at 4.3125 bits each is 1.80 GB moved per token. At 546 GB/s:
+3.33B parameters at 4.3125 bits each is 1.80 GB moved per token. At 153 GB/s:
 
-$$546 / 1.80 = 304 \text{ tokens/sec ceiling}$$
+$$153 / 1.80 = 85 \text{ tokens/sec ceiling}$$
 
 That is a hard ceiling from bandwidth alone, before any compute. Had this been a
 dense 35B model reading all 19.1 GB per token, the same ceiling would be
-$546 / 19.1 = 29$ tokens/sec. That gap - 304 against 29 - is the entire reason
+$153 / 19.1 = 8$ tokens/sec. That gap - 85 against 8 - is the entire reason
 the book is served by an MoE, and u7 will unpack why the router makes it
 possible.
 

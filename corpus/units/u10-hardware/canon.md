@@ -84,8 +84,9 @@ at about **640 pJ**. Process nodes have shrunk since and the absolute numbers
 have all come down, but the *ratios* have gotten worse, not better, because
 arithmetic scales with transistor density and off-chip wires do not.
 
-Sit with the ratio. Fetching one operand from DRAM costs roughly **170 times**
-the energy of the addition that consumes it. On-chip SRAM is about 130x cheaper
+Sit with the ratio. Fetching one operand from DRAM costs roughly **700 times**
+the energy of the addition that consumes it, and about **170 times** the energy
+of the multiply. On-chip SRAM is about 130x cheaper
 than DRAM for the same fetch. A chip designer looking at those numbers concludes
 immediately that the only way to go fast is to fetch a value once and then use
 it many times, and every architectural feature of a modern accelerator - the
@@ -130,8 +131,9 @@ work that actually costs time.
 
 A tensor core is a hardware block that performs a small matrix multiply and
 accumulate as a single instruction - on an H100, a tile-level operation like
-$D = A B + C$ where the tiles are 16x8x16 or similar, issued per warp per
-cycle. It is not a wider SIMD lane. It is a different shape of instruction:
+$D = A B + C$ where the tiles are 16x8x16 or similar, issued once per warp
+rather than once per element. It is not a wider SIMD lane. It is a different
+shape of instruction:
 one issue, one set of operand fetches, many multiply-accumulates.
 
 The delivered difference on an H100:
@@ -384,10 +386,10 @@ rubric: |
   Attainable = I * bandwidth = 32 * 3.35e12 = 1.072e14 = 107.2 TFLOP/s.
   Diagnostic wrong answers: 989 means the learner took peak and never computed
   the intensity (U10-M1, the spec-sheet answer); 53.6 means they dropped the
-  factor of 2 for multiply-and-add; 3.35 means they used batch 1; 3164 means
+  factor of 2 for multiply-and-add; 3.35 means they used batch 1; 31,648 means
   they multiplied intensity by peak FLOP/s instead of by bandwidth (a units
-  slip - the product I * bandwidth has units FLOP/s, check it).
-check: numeric(0.5)
+  slip - only I * bandwidth has units of FLOP/s, check it).
+check: numeric(0.001)
 ```
 
 ```beat
@@ -459,7 +461,7 @@ Two corollaries worth carrying out of this section.
 
 **Elementwise operations are always bandwidth-bound.** A GELU reads a value and
 writes a value: 4 bytes of bf16 traffic for one or two FLOPs, so $I \approx
-0.5$. Against a balance of 295 that is a factor of 600 short. There is no batch
+0.5$. Against a balance of 295 that is a factor of 590 short. There is no batch
 size, no chip, and no compiler that fixes this, because the ratio has no free
 parameter in it. The only available move is to stop crossing the HBM boundary
 between operations - fuse the GELU into the matmul kernel that produced its
@@ -647,8 +649,8 @@ $d_{head}$ cancels, $L$ cancels, $n$ cancels. What survives is the **grouped-que
 ratio** $H_q / H_{kv}$ and the cache precision.
 
 For plain multi-head attention, $H_q = H_{kv}$ and $I = 2/b = 1$ FLOP/byte in
-fp16 - the worst intensity in the entire network, an order of magnitude below
-even the weight matvecs. Under u6's grouped-query configuration,
+fp16 - the worst intensity in the entire network, below even the 4-bit weight
+matvecs at $2/0.544 = 3.7$. Under u6's grouped-query configuration,
 $H_q/H_{kv} = 32/4 = 8$, so $I = 8$ FLOP/byte: eight query heads share one set
 of cached keys, and each cached byte gets used eight times instead of once.
 
@@ -685,7 +687,7 @@ rubric: |
   Note for feedback: d_head and the layer count cancel, so a learner who
   carried them through and still got 8.0 has done more arithmetic than
   necessary but understands the structure.
-check: numeric(0.05)
+check: numeric(0.005)
 ```
 
 ## Why training and inference want different iron
@@ -702,7 +704,7 @@ a chip designed for one would be a reasonable buy for the other. Instead, the
 market has split in half. Groq and Cerebras sell inference parts whose selling
 point is enormous **SRAM** capacity and almost no HBM, and they beat H100s badly
 at low-batch decode while being useless for training. Apple silicon serves 35B
-models on a laptop at conversational speed with 1.5% of an H100's FLOPs. And
+models on a laptop at conversational speed with 1% of an H100's FLOPs. And
 the H100 itself, the training part, spends 99.7% of its arithmetic idle when
 asked to decode one stream. Three products, three different optimal points, one
 apparently identical set of matmuls.
@@ -739,12 +741,12 @@ mixed-precision AdamW:
 | **total** | | **16** |
 
 For a 70B model that is $16 \times 70 \times 10^{9} = 1.12$ TB of state, before
-a single activation is saved. On 80 GB H100s, the optimizer state alone
-requires **fourteen GPUs** - which is to say, a 70B model cannot be trained on
+a single activation is saved. On 80 GB H100s, that state alone requires
+**fourteen GPUs** - which is to say, a 70B model cannot be trained on
 any single accelerator that exists, at any price, and the parallelism section
 below is not an optimization but a precondition. The same model serves
-inference in 140 GB at bf16, or 19 GB at 4 bits: **8x to 60x less memory** for
-the same weights.
+inference in 140 GB at bf16, or 38 GB at 4.35 bits: **8x to 29x less memory**
+for the same weights.
 
 Put the two machines side by side on the workloads they are each built for:
 
@@ -754,7 +756,7 @@ Put the two machines side by side on the workloads they are each built for:
 | peak bf16 | ~10 TFLOP/s | 989 TFLOP/s (99x) |
 | balance | 65 FLOP/byte | 295 FLOP/byte |
 | memory | unified, CPU+GPU shared | 80 GB HBM, device-only |
-| batch-1 decode ceiling, 4-bit 35B-A3B | 85 tok/s | ~1,870 tok/s |
+| batch-1 decode ceiling, 4-bit 35B-A3B | 85 tok/s | ~1,860 tok/s |
 | useful for a 70B training run | no | only in groups of thousands |
 
 Look at the second and third rows together. The H100 has 22x the bandwidth and
@@ -771,6 +773,21 @@ device, so it is a distributed system. Everything you know about distributed
 systems applies, and the vocabulary maps cleanly: this is sharding, the
 collective operations are the primitives, the interconnect is the network you
 are always fighting, and stragglers are your problem.
+
+<!-- refutes: U10-M5 -->
+
+One thing does not map, and it is worth flagging before the details. You
+probably expect that splitting a model across $N$ devices gives you $N$ times
+the memory and roughly $N$ times the throughput, and that *which* axis you split
+along is an implementation detail - the way a shard key mostly affects hot spots
+rather than throughput. The prediction that fails: tensor parallelism at degree
+8 would then cost the same inside one node and across eight nodes, since the
+bytes communicated are identical. It does not. The same configuration runs 18x
+slower purely from placement, and flat data parallelism at 8,192-way spends ten
+times as long communicating as computing with no bug anywhere. Each axis carries
+a *different collective at a different frequency*, and the arrangement is a
+design problem with one rule: the most frequent collective gets the fastest
+link. The rest of this section is that rule, derived.
 
 There are four axes you can split along. Real runs use all of them at once.
 
@@ -811,13 +828,16 @@ rubric: |
   the full buffer; 0.31 means they used NVLink bandwidth (900 GB/s), which is
   the right number for an intra-node reduce and the wrong one for a
   cluster-wide one - the distinction is the entire point of this section;
-  22,937 or similar means they converted 400 Gb/s to bytes incorrectly (divide
-  by 8, not multiply); 45,875 means they used 2S in gigabits.
+  0.7 means they read 400 Gb/s as 400 GB/s and skipped the divide-by-8;
+  45,875 means they multiplied the per-device volume by P = 8,192, which is
+  exactly the property ring all-reduce does not have - per-device bytes are
+  independent of P; 22,937 is that same error with the factor of 2 also
+  dropped.
   Context for feedback: the compute in that same step is roughly 0.54 seconds
   per device, so this configuration spends ten times as long communicating as
   computing. It is a demonstration that flat data parallelism at this scale
   does not work, not a recommendation.
-check: numeric(0.05)
+check: numeric(0.005)
 ```
 
 That 5.6 seconds is the punchline. Compute per device per step, at a 4M-token
@@ -835,8 +855,8 @@ Three things fix it, and all three are in every real training stack:
   few tens of MB.
 - **Fewer replicas.** Combine with the axes below so that the data-parallel
   degree is 128 rather than 8,192, and each replica owns 1/64 of the parameters.
-  The buffer per device drops to 140/64 = 2.19 GB, the all-reduce moves 4.3 GB,
-  and the time falls to 0.087 seconds. This is the real reason 3D parallelism
+  The buffer per device drops to 140/64 = 2.19 GB, the all-reduce moves 4.4 GB,
+  and the time falls to 0.088 seconds. This is the real reason 3D parallelism
   exists.
 - **Gradient accumulation.** Run several microbatches and sum their gradients
   locally before communicating, which amortizes one all-reduce over $k$ times
@@ -964,7 +984,8 @@ separate things, and training cares almost exclusively about one of them.
 | fp16 | 1 | **5** | 10 | $65{,}504$ | $6.1 \times 10^{-5}$ | $2^{-11} = 0.05\%$ |
 
 bf16 is fp32 with sixteen mantissa bits deleted: identical exponent field,
-identical range, eight times coarser resolution. fp16 spends three of its
+identical range, and resolution coarser by a factor of $2^{16} = 65{,}536$
+($2^{-8}$ against fp32's $2^{-24}$). fp16 spends three of its
 exponent bits on mantissa instead: eight times *finer* resolution than bf16,
 and a dynamic range that tops out at 65,504 and bottoms out at $6.1 \times
 10^{-5}$ for normal values.
@@ -1157,7 +1178,7 @@ rubric: |
            Dense bf16 is the honest peak for this workload.
   Any answer in hours or seconds without converting is a units failure, not a
   model failure - grade the model, correct the units.
-check: numeric(0.3)
+check: numeric(0.002)
 ```
 
 Twenty-two and a half days at 100% availability. Which brings us to the last

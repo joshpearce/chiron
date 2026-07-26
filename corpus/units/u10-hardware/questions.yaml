@@ -1,7 +1,7 @@
 # u10 - The iron: hardware and training at scale. Item bank.
 # Concepts: c-memory-hierarchy, c-roofline, c-parallelism, c-precision-scale.
 # Refutation targets: U10-M1..U10-M5 (unit-local), reinforcing M10 and M16.
-# 14 check items: 9 constructed/congruent (64%), 5 mcq. 3 callback_eligible,
+# 14 check items: 9 constructed/congruent (64%), 5 mcq. 4 callback_eligible,
 # 2 stretch. q1 is the fade-sequence solo item for `roofline`.
 
 pretest:
@@ -292,7 +292,7 @@ check:
       so I ~ 0.5 FLOP/byte. Crucially the ratio contains no free parameter -
       making the tensor larger multiplies both numerator and denominator
       equally, and so does making the batch larger. Against a machine balance
-      of 295 FLOP/byte that is a factor of ~600 short, permanently.
+      of 295 FLOP/byte that is a factor of ~590 short, permanently.
       Matmul is different because the work and the data scale differently:
       2n^3 FLOPs against 3n^2 elements, so I = n/3 for a square bf16 matmul and
       grows linearly with size. Setting n/3 = 295 gives n ~ 886 - square bf16
@@ -508,7 +508,7 @@ check:
       Give the bandwidth-bound decode ceiling in tokens per second. Bare
       number, two decimal places.
     answer: 31.25
-    check: numeric(0.1)
+    check: numeric(0.001)
     rubric: |
       Bytes read per token = 40e9 * 2 = 80 GB. Ceiling = 2.5e12 / 80e9 =
       31.25 tok/s. Confirm the regime first: I = 2/b = 1 FLOP/byte against a
@@ -617,7 +617,7 @@ check:
         explain: "MoE cuts bytes read per token by the total/active ratio, which raises the ceiling but does not change the regime. The intensity is still 2/b - a property of matrix-vector products, unchanged by which matrices you skip - so at batch 1 the workload is exactly as bandwidth-bound after the architecture change as before it. It is faster while remaining on the same roof."
       - text: "Neither meaningfully. Single-user latency is dominated by the KV cache growing as the conversation lengthens, so both upgrades are swamped."
         misconception: M17
-        explain: "The cache does grow and does cost traffic, but weight traffic per token is constant from token 1 onward and dominates until roughly 8,500 tokens of context (u6's crossover). The cache is also read from the same memory system, so doubling bandwidth helps that term too. Nothing here is swamped."
+        explain: "The cache does grow and does cost traffic, but weight traffic per token is constant from token 1 onward and far larger: 1.8 GB of weights against u6's 96 KiB of cache per token of context, so cache traffic does not match weight traffic until roughly 18,000 tokens. (u6's 8,469-token crossover is the arithmetic one - attention FLOPs against weight FLOPs - which is a different comparison and irrelevant here, since the workload is bandwidth-bound either way.) The cache is also read from the same memory system, so doubling bandwidth helps that term too. Nothing here is swamped."
 
   - id: u10-q11
     concept: c-memory-hierarchy

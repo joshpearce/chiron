@@ -141,10 +141,12 @@ scalar multiplication by $e^{a' - a}$, applied to the whole accumulator. Nothing
 is approximated. After the final block, $o^{(T)} / \ell^{(T)}$ is exactly the
 attention output for that row.
 
-The cost is one extra multiply per accumulator element per block, which is
-$O(nd)$ extra FLOPs total against $O(n^2 d)$ of real work - under 0.1% at
-$n = 8192$. You pay a fraction of a percent in arithmetic to remove 98% of the
-memory traffic. That is the trade the roofline says to make, quantified.
+The cost is one extra multiply per accumulator element per $K$/$V$ block. With
+block width $B_c$ there are $n/B_c$ blocks per row and $d$ accumulator elements
+per row, so the total is $n^2 d / B_c$ extra FLOPs against $4 n^2 d$ of real
+work - a ratio of $1/(4B_c)$, which at a typical $B_c = 64$ is 0.4%. You pay a
+fraction of a percent in arithmetic to remove 98% of the memory traffic. That
+is the trade the roofline says to make, quantified.
 
 **The backward pass.** FlashAttention's backward is where the memory saving
 becomes structural rather than merely large. A conventional backward through
@@ -288,7 +290,8 @@ $$\text{dynamic range} = \frac{x_{\max}}{x_{\min,\text{normal}}} \approx 2^{2^{e
 For fp16 ($e=5$, $s=10$): range $2^{30} \approx 10^{9}$, roundoff
 $2^{-11} = 4.9 \times 10^{-4}$. For bf16 ($e=8$, $s=7$): range
 $2^{254} \approx 10^{76}$, roundoff $2^{-8} = 3.9 \times 10^{-3}$. bf16 has
-$10^{67}$ times the dynamic range and 8 times the roundoff error. Since
+$2^{224} \approx 2.7 \times 10^{67}$ times the dynamic range and 8 times the
+roundoff error. Since
 gradient magnitudes across a deep network routinely span 8 to 10 orders of
 magnitude within a single step, and every value is used in a product where a
 4x10^-3 relative error is one part of a much larger stochastic-gradient noise

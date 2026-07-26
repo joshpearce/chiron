@@ -241,9 +241,9 @@ For $B$ small the weight term dominates and $I \approx 2B / b_w$: arithmetic
 intensity is *linear in batch size* and inversely proportional to weight
 precision.
 
-On the M4 Max: 546 GB/s and roughly 34 TFLOP/s fp16 on the GPU, so
-$I^* \approx 62$ FLOPs/byte. With $b_w = 0.54$ bytes (4.3125 bits), decode at
-$B = 1$ gives $I \approx 2/0.54 \approx 3.7$ FLOPs/byte - a factor of 17 below
+On the M5: 153 GB/s and roughly 10 TFLOP/s fp16 on the GPU, so
+$I^* \approx 65$ FLOPs/byte. With $b_w = 0.54$ bytes (4.3125 bits), decode at
+$B = 1$ gives $I \approx 2/0.54 \approx 3.7$ FLOPs/byte - a factor of 18 below
 the ridge, deep in the bandwidth-bound region. Prefill with $B = 2000$ gives
 $I \approx 7400$, far above the ridge, compute-bound.
 
