@@ -168,6 +168,15 @@ def check_depth_headings(unit, report: Report) -> None:
             report.error(f"{unit.id}/depths/{name}",
                          f"headings not in canon (swap silently does nothing): "
                          f"{sorted(drifted)[:3]}")
+        # The same silent no-op from the other direction: the planner can ask
+        # for a section at this depth and get the canon text back, with nothing
+        # anywhere saying the variant was never written.
+        missing = canon - set(sections)
+        if missing:
+            report.warn(f"{unit.id}/depths/{name}",
+                        f"{len(missing)} canon section(s) have no variant here, so "
+                        f"requesting this depth silently returns canon: "
+                        f"{sorted(missing)[:3]}")
 
 
 def check_refutation_ids(unit, corpus, report: Report) -> None:

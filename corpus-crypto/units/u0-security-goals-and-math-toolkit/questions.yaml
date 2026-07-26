@@ -1,0 +1,559 @@
+# u0 - Security Goals and the Math Toolkit
+# Pretest items are expected to fail; they calibrate and prime the refutations
+# in canon.md (M1 in section 1, M2 in section 5).
+
+pretest:
+  - id: u0-p1
+    concept: c-cia-triad
+    prompt: |
+      A payment daemon sends `PAY 0100 USD` encrypted with a strong stream cipher
+      (ciphertext = plaintext XOR keystream, key never reused). An attacker on the
+      wire knows the message format but not the key, and cannot read a single byte
+      of plaintext. Can they cause the receiver to act on `PAY 0900 USD`? Answer
+      yes or no and justify with the specific mechanism.
+    answer: |
+      Yes. ASCII '1' is 0x31 and '9' is 0x39, so the attacker XORs the mask
+      0x31 XOR 0x39 = 0x08 into the ciphertext byte holding that digit. On
+      decryption the keystream byte cancels as usual:
+      (M XOR K XOR 0x08) XOR K = M XOR 0x08 = 0x39. The receiver sees a
+      well-formed message and no error. Confidentiality was never broken; the
+      attacker never learned the keystream and never needed to.
+    check: llm
+    rubric: |
+      Pass requires "yes" plus the mechanism: an XOR mask applied to the ciphertext
+      propagates one-for-one into the plaintext, with no error raised. "No, they
+      would need the key" or "no, the receiver would see garbage" is M1 and fails.
+      "Yes, but only by corrupting the message randomly" is partial - it misses that
+      the change is chosen and precise. Expected failure rate is high; that is the
+      point of the item.
+
+  - id: u0-p2
+    concept: c-key-entropy
+    prompt: |
+      Exhaustively searching a 128-bit keyspace takes some amount of work W.
+      Exhaustively searching a 256-bit keyspace takes 2^k times as much work as W.
+      Give k as an integer.
+    answer: 128
+    check: numeric(0.5)
+    rubric: |
+      2^256 / 2^128 = 2^128, so k = 128. Answering 1 ("twice as much work") is M2
+      exactly: treating the key length as the quantity being compared instead of as
+      the exponent. Answering 2 means reporting the ratio 256/128 rather than a
+      power of two.
+
+  - id: u0-p3
+    concept: c-threat-model
+    prompt: |
+      An adversary has unlimited computing power and unlimited time. Which of these
+      can they break: (a) AES-128 in a correctly used mode, (b) a correctly used
+      one-time pad? Answer for both and explain what distinguishes the two cases.
+    answer: |
+      (a) Yes. AES-128 is only computationally secure: an unbounded adversary
+      enumerates all 2^128 keys and identifies the right one, because for a typical
+      message only one key yields sensible plaintext. (b) No. The one-time pad has
+      information-theoretic (perfect) secrecy: for any ciphertext c and any candidate
+      plaintext m of the same length, exactly one key k = m XOR c explains the
+      observation, and every key is equally likely. The ciphertext therefore leaves
+      the posterior over plaintexts unchanged, Pr[M=m | C=c] = Pr[M=m]. Unlimited
+      compute buys nothing because the information is absent, not merely hidden.
+    check: llm
+    rubric: |
+      Pass requires both verdicts (AES breakable by brute force, OTP not) plus the
+      distinction between computational and information-theoretic security, however
+      phrased ("every plaintext is equally consistent with the ciphertext" counts).
+      Claiming the OTP falls to brute force fails - it misses that all keys give all
+      plaintexts. Claiming AES-128 is unbreakable by an unbounded adversary also
+      fails.
+
+check:
+  - id: u0-q1
+    concept: c-xor-properties
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A one-time pad ciphertext byte is $c = \texttt{0xB7}$ and the key byte is
+      $k = \texttt{0x4E}$. Recover the plaintext byte and give it as a decimal
+      integer.
+    answer: 249
+    check: numeric(0.5)
+    rubric: |
+      m = c XOR k: 1011 0111 XOR 0100 1110 = 1111 1001 = 0xF9 = 249. Answering 183
+      (0xB7) or 78 (0x4E) means the reader reported an input instead of the XOR.
+      Answering 105 (0xB7 - 0x4E) means arithmetic subtraction was substituted for
+      XOR.
+    difficulty: warmup
+
+  - id: u0-q2
+    concept: c-cia-triad
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A stream-cipher ciphertext (ciphertext = plaintext XOR keystream) carries a
+      plaintext byte that is currently the ASCII digit `'3'` ($\texttt{0x33}$). An
+      active attacker wants the receiver to decrypt that byte as `'8'`
+      ($\texttt{0x38}$), without knowing the key or the keystream. Give the mask
+      byte they must XOR into the corresponding ciphertext byte, as a decimal
+      integer.
+    answer: 11
+    check: numeric(0.5)
+    rubric: |
+      delta = 0x33 XOR 0x38 = 0011 0011 XOR 0011 1000 = 0000 1011 = 0x0B = 11.
+      Answering 5 means the reader computed the arithmetic difference 0x38 - 0x33
+      rather than the XOR - these coincide for many ASCII digit pairs and diverge
+      here, which is why this pair was chosen. Answering 56 (0x38) means they
+      supplied the target byte, forgetting that the existing plaintext bits are
+      still present under the mask.
+    difficulty: core
+
+  - id: u0-q3
+    concept: c-cia-triad
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      For each of the three mechanisms below, state which of confidentiality,
+      integrity, and authenticity it provides and which it does not, and give the
+      concrete attack that demonstrates each failure:
+
+      (a) AES-CTR with a correct, never-repeated nonce and no MAC.
+      (b) A CRC32 of the plaintext appended to the plaintext, with the whole thing
+          then encrypted under a stream cipher.
+      (c) A detached Ed25519 signature over a public, unencrypted git tag.
+    answer: |
+      (a) Confidentiality: yes. Integrity: no. Authenticity: no. Attack: an active
+      attacker XORs a chosen mask into any ciphertext byte; the keystream cancels and
+      the flip appears verbatim in the decrypted plaintext with no error. They can
+      also fabricate a ciphertext wholesale - the receiver has no way to tell who
+      produced it.
+      (b) Confidentiality: yes. Integrity: no. Authenticity: no. Attack: CRC32 is
+      unkeyed, so it certifies nothing an attacker cannot compute, and it is linear
+      over XOR - CRC(M XOR d) = CRC(M) XOR CRC(d). The attacker XORs d into the data
+      region of the ciphertext and CRC(d) into the checksum region, and the decrypted
+      message carries the edit with a valid checksum. This is the WEP break.
+      (c) Confidentiality: no - the tag is in the clear, and the signature does not
+      hide anything. Integrity: yes. Authenticity: yes - verification succeeds only
+      if the holder of the private key signed exactly these bytes.
+    check: llm
+    rubric: |
+      Correct answer must get all three verdicts right for at least two of the three
+      mechanisms, with a concrete attack for each claimed failure. Required content:
+      (a) chosen bit flips propagate with no error; (b) unkeyed and/or linear
+      checksum can be patched through the ciphertext; (c) signatures give
+      integrity+authenticity and zero confidentiality.
+      Partial credit: correct verdicts with vague attacks ("an attacker could modify
+      it") - accept 2 of 3 mechanisms at this level, not 1.
+      Characteristic errors: claiming (a) or (b) provides integrity because the
+      attacker cannot read the data is M1, fail. Claiming (c) provides
+      confidentiality because it is cryptographic is a fail. Claiming (b) is fine
+      because CRC32 is "too short" but would work at CRC64 misses the point - length
+      is irrelevant when the function is unkeyed - mark partial at best.
+    difficulty: core
+
+  - id: u0-q4
+    concept: c-threat-model
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A scheme encrypts deterministically: $\mathrm{Enc}(k, m)$ returns the same
+      ciphertext every time for a given $(k, m)$, with no nonce and no randomness.
+      Construct an explicit IND-CPA adversary against it, compute the adversary's
+      advantage, and state the general rule this establishes.
+    answer: |
+      Adversary: choose any two distinct equal-length plaintexts m0 and m1. Query the
+      chosen-plaintext oracle on m0, record the reply c0. Submit (m0, m1) as the
+      challenge pair, receive c* = Enc(k, m_b). Output b' = 0 if c* == c0, else
+      b' = 1. Determinism makes the comparison exact, so Pr[b' = b] = 1 and
+      Adv = |1 - 1/2| = 1/2, the maximum possible. The adversary runs in the time of
+      two encryptions, so it is efficient.
+      General rule: no deterministic encryption scheme can be IND-CPA secure,
+      regardless of the strength of the underlying primitive. Encryption must be
+      randomized or nonced; freshness is a requirement of the security definition,
+      not an implementation nicety.
+    check: llm
+    rubric: |
+      Must contain: (1) an oracle query on one of the two challenge plaintexts before
+      or after the challenge, (2) an equality comparison against the challenge
+      ciphertext to decide b', (3) advantage 1/2 (equivalently: wins with probability
+      1, total break). Any 2 of 3 = pass; all 3 plus the general rule = full credit.
+      Characteristic errors: claiming a sufficiently strong block cipher rescues
+      determinism is M3 (primitive strength does not transfer to the mode), fail.
+      Stating only "identical plaintexts produce identical ciphertexts, so repeats
+      leak" without using the oracle to win the game = partial. Reporting the
+      advantage as 1 rather than 1/2 = minor error, still pass if the strategy is
+      right, but note that advantage is measured against the 1/2 coin-flip baseline.
+    difficulty: core
+
+  - id: u0-q5
+    concept: c-threat-model
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      The IND-CPA game hands the adversary an encryption oracle but never a
+      decryption oracle. Describe a deployed system in which the adversary
+      effectively has the decryption-oracle capability, explain precisely what an
+      IND-CPA proof does and does not promise for that system, and say what has to be
+      added to close the gap.
+    answer: |
+      Any server that accepts attacker-supplied ciphertext, decrypts it, and behaves
+      observably differently depending on the result is a decryption oracle. The
+      observable need not be the plaintext: a distinct error for "bad padding" versus
+      "bad MAC", a different HTTP status, a measurable timing difference, or even a
+      connection reset is enough. Concretely: a TLS terminator or a session-cookie
+      decryptor that returns 400 on malformed padding and 403 on a failed inner
+      check.
+      An IND-CPA proof promises only that an adversary who can obtain encryptions
+      learns nothing from ciphertexts it passively observes. It promises nothing once
+      the adversary can submit ciphertexts of its own and observe the outcome - that
+      is the CCA setting, and IND-CPA-secure schemes can be, and routinely are,
+      totally broken there. A padding oracle recovers plaintext byte by byte from a
+      scheme whose confidentiality proof is perfectly valid, because the proof's
+      threat model never granted that query.
+      Closing the gap requires integrity on the ciphertext: authenticated encryption
+      (encrypt-then-MAC or an AEAD mode), so that any attacker-modified ciphertext is
+      rejected on the tag check before any decryption-dependent behaviour can be
+      observed. Constant-time, indistinguishable error handling is the supporting
+      implementation requirement.
+    check: llm
+    rubric: |
+      Pass requires: (1) a concrete CCA oracle where the leak is the observable
+      *outcome* of decryption (error type, timing, status) rather than returned
+      plaintext, and (2) the statement that IND-CPA security says nothing about
+      attacker-submitted ciphertexts, so an IND-CPA-secure scheme can be fully broken
+      under CCA. Full credit adds (3) authenticated encryption / integrity on the
+      ciphertext as the fix.
+      Characteristic errors: answering that the server would have to leak the
+      plaintext for this to matter shows the oracle concept was not absorbed - fail.
+      Answering that a stronger cipher or longer key closes the gap is M3-flavoured
+      (the gap is in the composition and the threat model, not the primitive), fail.
+      Answering that the fix is to hide error messages only = partial; suppressing
+      messages does not remove timing or state-based oracles.
+    difficulty: stretch
+
+  - id: u0-q6
+    concept: c-modular-arithmetic
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Compute $3^{7} \bmod 23$ by repeated squaring. Give the result as an integer in
+      $[0, 23)$.
+    answer: 2
+    check: numeric(0.4)
+    rubric: |
+      3^1 = 3. 3^2 = 9. 3^4 = 81 = 3*23 + 12 = 12. 7 = 4 + 2 + 1, so
+      3^7 = 12 * 9 * 3: 12*9 = 108 = 4*23 + 16 = 16, then 16*3 = 48 = 2*23 + 2 = 2.
+      Answering 16 means the reader stopped after multiplying 3^4 * 3^2 and dropped
+      the 3^1 factor - the exponent's binary decomposition is the step readers skip.
+      Answering 12 or 9 means an intermediate square was reported. Answering 2187
+      means no reduction was applied at all.
+    difficulty: core
+
+  - id: u0-q7
+    concept: c-cia-triad
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      A device fetches a firmware image protected with AES-256-CTR under a fresh,
+      never-reused nonce. There is no MAC and no signature. An active network
+      attacker sits between the device and the server. Which statement is accurate?
+    options:
+      - text: |
+          The attacker cannot read any of the firmware, but can flip chosen bits of
+          the image the device installs, and the device detects nothing.
+        correct: true
+        explain: |
+          Correct, and both halves matter. CTR confidentiality is sound with a unique
+          nonce, so the plaintext stays hidden. But ciphertext = plaintext XOR
+          keystream, so XORing a mask into a ciphertext byte XORs that same mask into
+          the decrypted byte: the keystream cancels. With a known firmware layout the
+          attacker patches a specific instruction. Nothing in CTR checks anything, so
+          no error is raised.
+      - text: |
+          The attacker cannot meaningfully modify the image: without the key, any
+          change produces unpredictable garbage that the device's parser rejects.
+        misconception: M1
+        explain: |
+          This is the encryption-implies-integrity model. It is appealing because
+          "cannot read" and "cannot change" compress to the same feeling. The failing
+          prediction is exactly this one: XOR-stream modes have no error propagation
+          and no verification step, so a chosen mask yields a chosen, predictable
+          plaintext change - not garbage. Integrity needs its own keyed mechanism.
+      - text: |
+          AES-256 is unbroken, so mounting this attack would require breaking AES
+          itself.
+        misconception: M3
+        explain: |
+          This assumes the primitive's strength carries through to whatever is built
+          on it. It does not. The attack never touches AES: the keystream is never
+          computed, guessed, or needed, because it cancels in
+          (C XOR delta) XOR K = M XOR delta. A secure cipher constrains what the
+          cipher does, not what the surrounding construction fails to check.
+      - text: |
+          Flipping a ciphertext bit corrupts that block and every block after it, so a
+          length or checksum test at the end of the image catches the tampering.
+        misconception: M1
+        explain: |
+          Two errors. First, CTR has no chaining at all - each byte decrypts
+          independently, so damage is confined to exactly the bytes touched; the
+          error-propagation intuition comes from CBC and is wrong here. Second, and
+          more fundamental, an unkeyed length or checksum test is not an integrity
+          mechanism: the attacker computes it too. Believing a self-consistent
+          decryption implies an untampered one is M1.
+    difficulty: warmup
+
+  - id: u0-q8
+    concept: c-key-entropy
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      A vault derives a 256-bit AES key as $\mathrm{SHA\text{-}256}(\text{PIN})$,
+      where the PIN is 6 uniformly random decimal digits. An attacker holds the
+      ciphertext and one known plaintext block, and attacks offline. How many bits of
+      security does the encrypted data have?
+    options:
+      - text: |
+          About 20 bits, because the attacker searches PINs, not keys.
+        correct: true
+        explain: |
+          Correct. Bits of security is $\log_2$ of the best known attack cost, and the
+          cheapest attack enumerates the 10^6 PINs, hashing each and trialling the
+          resulting key: $\log_2(10^6) = 19.9$ bits, roughly a second of work. A key
+          derivation function cannot create entropy that the input did not contain -
+          SHA-256 spreads 20 bits of entropy across 256 bits of output, it does not
+          manufacture the missing 236.
+      - text: |
+          256 bits, since the AES key is 256 bits wide and SHA-256's output is
+          uniformly distributed.
+        misconception: M2
+        explain: |
+          This treats the key length parameter as if it were the security level. Key
+          length is only an upper bound on bits of security; the actual level is set
+          by the cheapest attack, which here is a 10^6-item PIN search. The output of
+          SHA-256 is uniform over its range only when its input is - a deterministic
+          function of 10^6 inputs has at most 10^6 outputs.
+      - text: |
+          128 bits, because SHA-256 provides 128 bits of collision resistance and the
+          derived key inherits that bound.
+        misconception: M7
+        explain: |
+          Collision resistance is the wrong property and the wrong bound. The
+          birthday bound of 2^128 describes the cost of finding two colliding inputs
+          to SHA-256; it says nothing about the difficulty of recovering a key derived
+          from a low-entropy secret. The attacker is not looking for a collision, they
+          are enumerating a 10^6-element input space.
+      - text: |
+          Somewhere between 20 and 256, because hashing spreads the PIN's entropy over
+          the full 256-bit space and the attacker must still work in that space.
+        misconception: M2
+        explain: |
+          The "somewhere between" instinct is the linear-scaling intuition again:
+          treating security as something that can be partially topped up by a wider
+          parameter. It cannot. The attacker chooses the search space, and they will
+          choose the 10^6 PINs over the 2^256 keys. A KDF such as Argon2 raises the
+          per-guess cost - buying perhaps 20 bits of work factor - but the entropy
+          stays at 19.9 bits.
+    difficulty: warmup
+
+  - id: u0-q9
+    concept: c-xor-properties
+    kind: mcq
+    congruent: false
+    callback_eligible: true
+    prompt: |
+      An implementation bug causes two different messages $m_1$ and $m_2$ to be
+      encrypted under the same one-time pad key $k$, producing $c_1$ and $c_2$. An
+      attacker captures both ciphertexts. What is the consequence?
+    options:
+      - text: |
+          Catastrophic. $c_1 \oplus c_2 = m_1 \oplus m_2$ with the key entirely
+          cancelled, and any guessable structure in either message peels the other
+          open at that offset.
+        correct: true
+        explain: |
+          Correct. $(m_1 \oplus k) \oplus (m_2 \oplus k) = m_1 \oplus m_2$ because
+          $k \oplus k = 0$. The key never appears in the result and is never needed.
+          A fixed header, an English word, or a JSON key name in one message reveals
+          the other message's bytes at that offset; iterating the guess is
+          crib-dragging. This is the same failure as CTR nonce reuse.
+      - text: |
+          Security is degraded but not destroyed - the attacker learns some
+          statistical information about the pair, roughly as if the effective key were
+          half as long.
+        misconception: M5
+        explain: |
+          This is the graceful-degradation model: a moderate mistake should produce a
+          moderate leak. XOR does not degrade gracefully. The key term vanishes
+          exactly and completely, leaving a plain relation between the two plaintexts
+          with no residual key uncertainty. There is no "half a key" left to search.
+      - text: |
+          Nothing practical, provided the keystream came from a strong generator: each
+          ciphertext individually remains indistinguishable from random.
+        misconception: M3
+        explain: |
+          Each ciphertext viewed alone does remain uniform, which is what makes this
+          option attractive - and it is the same reasoning that wrongly declares ECB
+          secure because AES is. The strength of the primitive says nothing about
+          patterns *across* outputs. The break lives entirely in the relationship
+          between $c_1$ and $c_2$, which no property of the generator can hide once
+          the same $k$ is used twice.
+      - text: |
+          Confidentiality is unaffected since $k$ is still secret; the real exposure is
+          that the attacker can now tamper with both messages using the shared
+          keystream.
+        misconception: M1
+        explain: |
+          This inverts the failure. Key secrecy is not the property that broke -
+          $k$ stays secret and the plaintexts leak anyway, because $k$ cancels out of
+          $c_1 \oplus c_2$. Reasoning "the key is secret, therefore confidentiality
+          holds, therefore the risk must be an integrity risk" is the confidentiality/
+          integrity conflation applied backwards. Note that a one-time pad had no
+          integrity to lose in the first place.
+    difficulty: core
+
+  - id: u0-q10
+    concept: c-key-entropy
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A passphrase is built by drawing 6 words uniformly at random from a 7776-word
+      list. How many bits of entropy does it have? Give the answer to one decimal
+      place.
+    answer: 77.5
+    check: numeric(0.6)
+    rubric: |
+      H = L * log2(A) = 6 * log2(7776) = 6 * 12.925 = 77.5 bits. Answering 12.9 means
+      the reader gave the per-word entropy. Answering 6 or 7776 means a parameter was
+      reported instead of the entropy. Answering 46656 (6 * 7776) means multiplying by
+      the alphabet size rather than its logarithm. Note for feedback: 77.5 bits is
+      well under the 128-bit floor, and no KDF closes a 50-bit gap.
+    difficulty: core
+
+  - id: u0-q11
+    concept: c-key-entropy
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A service encrypts user data with AES-256. The key is produced by Argon2id from
+      a password that is 10 characters drawn uniformly from the 26 lowercase letters.
+      An attacker steals the ciphertext database and attacks offline.
+      (a) How many bits of entropy does the password have?
+      (b) How many bits of security does the encryption have against this attacker?
+      (c) What does Argon2id buy, quantitatively?
+      (d) Does the choice of AES-256 over AES-128 change the answer?
+    answer: |
+      (a) H = 10 * log2(26) = 10 * 4.70 = 47.0 bits.
+      (b) About 47 bits before accounting for the KDF - the attacker enumerates
+      passwords, not keys, because that search space is far smaller than 2^256.
+      (c) Argon2id does not add entropy. It raises the cost per guess by tuned time
+      and memory parameters; a configuration costing roughly 2^20 times a bare hash
+      raises the total work factor to about 47 + 20 = 67 bits. That is the ceiling on
+      what key stretching can contribute - roughly 20 bits, not the 81 needed to reach
+      128.
+      (d) No. Both key sizes are vastly larger than the 2^47 password space, so the
+      cheapest attack is identical in both cases. The key width was never the binding
+      constraint.
+    check: llm
+    rubric: |
+      Pass requires (a) approximately 47 bits (accept 46-48, or the expression
+      10*log2(26)) and (b) the recognition that the attacker searches the password
+      space, not the key space. Full credit adds (c) that a KDF raises per-guess cost
+      rather than creating entropy, with a numeric estimate of roughly 20 bits, and
+      (d) that AES-256 versus AES-128 is irrelevant here.
+      Characteristic errors: answering 256 bits for (b) because the key is 256 bits is
+      M2 - key length treated as the security level - fail. Answering that Argon2id
+      "makes the password as strong as a random 256-bit key" is the same error applied
+      to the KDF, fail. Answering that AES-256 helps because it doubles the strength
+      is M2, fail. Reporting (a) as 260 (10 * 26) or 4.7 = partial arithmetic error;
+      pass only if (b) through (d) are sound.
+    difficulty: core
+
+  - id: u0-q12
+    concept: c-key-entropy
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A fleet of $2^{24}$ IoT devices each holds an AES-128 key derived by HKDF from a
+      40-bit secret burned in at the factory. Every device's secret is drawn
+      independently and uniformly. An attacker captures one known-plaintext ciphertext
+      from every device and does not care which device they break.
+      (a) How many bits of security protect one *specific* named device?
+      (b) How many bits protect the fleet against "break any one device"?
+      (c) Recompute (b) for the counterfactual where each device holds an independent
+          uniform 128-bit key.
+      (d) State the general rule this illustrates, and connect it to why 256-bit keys
+          are standardized even though 128 bits already outlasts the universe.
+    answer: |
+      (a) 40 bits. The attacker enumerates the 2^40 factory secrets, running HKDF and
+      an AES trial on each. The 128-bit key width is irrelevant; the derivation input
+      is the search space.
+      (b) About 40 - 24 = 16 bits. Searching for a hit against any of N = 2^24
+      independent targets costs roughly 2^n / N, because each candidate secret is
+      tested against the whole captured set at once. 2^16 trials is instant.
+      (c) 128 - 24 = 104 bits. Still comfortable, but the fleet has objectively lost
+      24 bits relative to a single target.
+      (d) General rule: bits of security is log2 of the best known attack cost, and
+      the attacker gets to choose both the search space (the lowest-entropy input in
+      the chain) and the goal (any target, not a chosen one). Multi-target attacks are
+      one of the three real reasons 256-bit keys exist - alongside Grover's algorithm
+      halving the exponent of exhaustive search, and margin against future
+      cryptanalysis. None of the three is "twice as strong."
+    check: llm
+    rubric: |
+      Full credit requires all four: (a) 40, (b) 16 with the 2^n / N reasoning,
+      (c) 104, (d) the multi-target rule plus at least one of the other two
+      justifications for 256-bit keys. Pass requires (a) and (b) correct with the
+      divide-by-N argument stated, plus a coherent (d).
+      Characteristic errors: answering 128 for (a) is M2 (key width read as security
+      level), fail. Answering 40 for (b) - refusing to credit the multi-target
+      discount - is a partial: the reasoning is one step short, not inverted. Any
+      answer that computes (b) as 40/24 or otherwise divides the exponents rather than
+      subtracting them is M2 arithmetic, fail. Claiming (c) is 128 because the keys are
+      independent misses that independence is exactly what makes the parallel search
+      work.
+    difficulty: stretch
+
+  - id: u0-q13
+    concept: c-modular-arithmetic
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      Work in $\mathbb{Z}_{11}^* = \{1, 2, \ldots, 10\}$ under multiplication mod 11.
+      Show that $2$ is a generator and that $3$ is not. State the order of the group,
+      the order of $3$, and explain what Fermat's little theorem implies about the
+      modulus that exponents are reduced under.
+    answer: |
+      Group order: |Z_11^*| = 11 - 1 = 10.
+      Powers of 2 mod 11: 2, 4, 8, 5, 10, 9, 7, 3, 6, 1. That is all ten elements
+      before returning to 1, so 2 generates the group.
+      Powers of 3 mod 11: 3, 9, 5, 4, 1. It returns to the identity after 5 steps, so
+      3 has order 5 and generates only the 5-element subgroup {1, 3, 4, 5, 9}. It is
+      not a generator. Note 5 divides 10, as Lagrange's theorem requires.
+      Fermat's little theorem: for prime p and a not divisible by p, a^(p-1) = 1 mod p.
+      Here a^10 = 1 mod 11 for every a in the group. So exponents cycle with period
+      dividing 10: a^e mod 11 depends only on e mod 10. Bases are reduced mod p = 11,
+      exponents are reduced mod p - 1 = 10. Two different moduli in one formula, and
+      mixing them up is a standard implementation bug.
+    check: llm
+    rubric: |
+      Pass requires: (1) the power sequence for 2 covering all 10 elements (a correct
+      list, or an explicit statement that the order of 2 is 10), (2) the order of 3
+      being 5 with the observation that it therefore misses elements, and (3) the
+      base-mod-p / exponent-mod-(p-1) distinction. Any 2 of 3 = pass.
+      Arithmetic check: 2^1..2^10 mod 11 = 2, 4, 8, 5, 10, 9, 7, 3, 6, 1.
+      3^1..3^5 mod 11 = 3, 9, 5, 4, 1.
+      Characteristic errors: saying 3 is a generator because 3 is coprime to 11
+      confuses "has an inverse" (true for every element here) with "generates" - fail.
+      Reducing exponents mod 11 instead of mod 10 is the bug the item exists to catch -
+      fail item (3) even if (1) and (2) are right. Giving the group order as 11 rather
+      than 10 (counting 0, which has no inverse) = partial.
+    difficulty: core

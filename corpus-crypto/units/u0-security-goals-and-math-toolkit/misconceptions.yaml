@@ -1,0 +1,208 @@
+# Unit-local misconception bank for u0.
+# Ids are namespaced (u0-m*) so they never collide with the global bank (M1-M16).
+# Global entries already covering this unit: M1 (encryption-implies-integrity),
+# M2 (linear-key-strength-scaling). Do not duplicate those here.
+misconceptions:
+- id: u0-m1
+  name: secret-algorithm-adds-security
+  wrong_model: >-
+    Keeping the algorithm secret adds a meaningful layer of security on top of the
+    key. An attacker who does not know how the cipher works has a much harder job
+    than one who only lacks the key, so a proprietary design is strictly stronger
+    than a published one.
+  why_appealing: >-
+    It is true in most of software: an attacker who cannot read your source has a
+    harder time finding bugs. Defense in depth is a real principle everywhere else
+    in systems work, so "hide the design too" reads like one more free layer rather
+    than a category error.
+  failing_prediction: >-
+    Predicts that a cipher shipped only as a compiled binary or a hardware block
+    keeps its design secret long enough to matter. Every widely deployed secret
+    cipher has been reverse engineered out of firmware or silicon and then broken:
+    GSM's A5/1, the DVD Content Scramble System, and Mifare Classic's Crypto-1 were
+    all recovered from shipped devices and then attacked in software, with Crypto-1
+    falling to a laptop-speed key recovery. The secrecy bought months, not bits.
+  correction: >-
+    Kerckhoffs's principle: assume the attacker knows the algorithm and everything
+    about the system except the key. Security must live entirely in the keyspace,
+    because the key is the only part you can rotate cheaply when it leaks. A secret
+    algorithm is not an extra layer of security, it is an unmeasurable quantity that
+    also blocks the peer review that finds the real breaks. State the threat model
+    as "attacker has the code" and design to that.
+  units:
+  - u0
+- id: u0-m2
+  name: cpa-security-implies-cca-security
+  wrong_model: >-
+    An attacker who can get arbitrary plaintexts encrypted (chosen-plaintext attack)
+    is strictly more powerful than one who can only submit ciphertexts, so a scheme
+    proven secure against CPA is automatically secure against an attacker who also
+    gets to send ciphertexts at the receiver.
+  why_appealing: >-
+    CPA feels like the "hard" case because the attacker gets to choose the input and
+    see the output, which is the classic setup for breaking anything. Submitting
+    garbage ciphertext to a receiver looks useless by comparison, since the receiver
+    is not going to hand the plaintext back.
+  failing_prediction: >-
+    Predicts that CBC mode with a random IV and no MAC, which genuinely is IND-CPA
+    secure, stays secure when the attacker can replay modified ciphertexts to a
+    server. It does not. The server does not need to return plaintext; a one-bit
+    signal of whether padding was well formed (an error code, a different response,
+    or just a timing difference) is enough to decrypt any ciphertext byte by byte
+    in about 128 queries per byte. That is Vaudenay's padding oracle, and it is why
+    POODLE and Lucky13 broke deployed TLS.
+  correction: >-
+    CPA and CCA are different attacker capabilities, not different amounts of one
+    capability. CPA models a passive-plus-encryption-oracle attacker; CCA models an
+    active attacker who can inject ciphertext and observe any behavioral difference
+    the receiver exhibits, including errors and timing. CPA security says nothing
+    about what happens when the receiver's decryption path becomes an oracle.
+    Getting from CPA to CCA takes an integrity mechanism, which is exactly the
+    separation M1 is about.
+  units:
+  - u0
+  - u3
+- id: u0-m3
+  name: xor-itself-obscures
+  wrong_model: >-
+    XOR is the operation that provides the secrecy. Mixing plaintext with some other
+    byte string via XOR scrambles it, so XORing data against a fixed key, a repeated
+    passphrase, or any non-obvious constant hides the data.
+  why_appealing: >-
+    XOR output looks like noise when you hexdump it, and it is the only arithmetic
+    in the one-time pad, the single scheme with a proof of perfect secrecy. If the
+    unbreakable cipher is "just XOR", the scrambling must be coming from the XOR.
+  failing_prediction: >-
+    Predicts that a message XORed against a repeated 8-byte key is unreadable without
+    the key. It is Vigenere with a different alphabet and it falls in seconds: the
+    key length shows up as a periodicity in the ciphertext (Kasiski spacing, index
+    of coincidence, or minimum normalized Hamming distance between candidate blocks),
+    and once you split the ciphertext into that many interleaved streams, each stream
+    is a single-byte XOR that yields to letter-frequency counting. No key guessing,
+    no exponential search.
+  correction: >-
+    XOR contributes nothing to secrecy on its own; it is a public, self-inverse,
+    bit-parallel mixing operation, and self-inverse is precisely why decryption is
+    the same code path as encryption. All of the one-time pad's security lives in
+    the pad: uniformly random, at least as long as the message, and used exactly
+    once. Strip any one of those three and the XOR does not save you. Every later
+    stream construction (CTR, GCM) is XOR against a keystream, and its security
+    argument is entirely about the keystream, never about the XOR.
+  units:
+  - u0
+  - u1
+- id: u0-m4
+  name: short-key-inherits-perfect-secrecy
+  wrong_model: >-
+    The one-time pad's perfect secrecy comes from XORing against unpredictable bytes,
+    so generating those bytes from a 128-bit or 256-bit seed with a strong PRNG gives
+    the same perfect secrecy with a key you can actually manage.
+  why_appealing: >-
+    The construction really is identical from the encryptor's point of view: stretch
+    a seed into a long random-looking stream and XOR. A cryptographic PRNG's output
+    is, by definition, indistinguishable from random, and "indistinguishable from
+    random" sounds like it should inherit whatever a random pad gives you.
+  failing_prediction: >-
+    Predicts that an attacker with unbounded computing power learns nothing about a
+    1 MB message encrypted under a 256-bit stream cipher key, the same as under a
+    true pad. It fails immediately. Under a true pad, every one of the 2^8000000
+    possible plaintexts has a key that produces the observed ciphertext, so the
+    attacker's posterior equals their prior. Under a 256-bit seed, only 2^256
+    plaintexts are reachable at all; the unbounded attacker enumerates all seeds and
+    finds that exactly one candidate is intelligible English. The message is uniquely
+    recovered.
+  correction: >-
+    Shannon's theorem: perfect secrecy requires the key entropy to be at least the
+    message entropy, H(K) >= H(M). That is not an artifact of a weak PRNG, it is an
+    information-theoretic floor no construction escapes, which is why the pad must
+    be as long as the message. Stream ciphers deliberately give up perfect secrecy
+    for computational security: the claim shrinks from "no attacker learns anything"
+    to "no attacker running in feasible time learns anything". Those are different
+    guarantees, and every practical cipher in this book is in the second class.
+  units:
+  - u0
+  - u1
+- id: u0-m5
+  name: modular-division-always-defined
+  wrong_model: >-
+    Arithmetic mod n behaves like ordinary arithmetic with wraparound, so you can
+    add, subtract, multiply, and divide freely; every nonzero value has a
+    multiplicative inverse, just like with the rationals.
+  why_appealing: >-
+    Addition, subtraction, and multiplication really do work exactly as expected mod
+    n, so three out of four operations reinforce the "it is just wraparound" model.
+    And in a programming language, `%` is a total function that always returns
+    something, which makes it feel like nothing can be undefined here.
+  failing_prediction: >-
+    Predicts that 2 has an inverse mod 6, some x with 2x = 1 (mod 6). Enumerate all
+    six candidates: 2x mod 6 runs over {0, 2, 4, 0, 2, 4}, and never hits 1. No
+    inverse exists. The same failure kills RSA key generation whenever gcd(e, phi(n))
+    is not 1: there is no d to compute, and a decrypt exponent chosen anyway silently
+    produces wrong plaintext for most messages.
+  correction: >-
+    a has a multiplicative inverse mod n if and only if gcd(a, n) = 1, and you find
+    it with the extended Euclidean algorithm, not by trial. When n is prime, every
+    nonzero residue is coprime to n, so all inverses exist and Z_p is a field. That
+    is the entire reason cryptographic moduli are prime or have carefully controlled
+    factorization: it guarantees the group structure the protocols depend on. "Mod
+    is the remainder operator" is a fine mental model for wraparound and a wrong one
+    for division.
+  units:
+  - u0
+  - u4
+  - u5
+- id: u0-m6
+  name: password-length-equals-key-bits
+  wrong_model: >-
+    A 16-character password is 128 bits (16 bytes) of key material, so it delivers
+    the same 128 bits of security as a randomly generated AES-128 key.
+  why_appealing: >-
+    The byte count is right there and easy to compute, and the password does get fed
+    through a KDF that emits exactly a 128-bit or 256-bit key, so the output really
+    is full width. Every part of the pipeline downstream of the human sees a
+    full-length key.
+  failing_prediction: >-
+    Predicts that cracking a 16-character human-chosen passphrase costs about 2^128
+    work. Real password crackers do not search the 2^128 key space, they search the
+    space the human actually drew from: wordlists, keyboard patterns, and mangling
+    rules. A memorable 16-character password typically carries somewhere in the
+    20-40 bit range, which is minutes to hours on commodity GPUs, and that is why
+    every leaked-hash dump gets majority-cracked regardless of password length.
+  correction: >-
+    Bits of security is the log2 of the number of guesses the attacker actually has
+    to make, which is set by the entropy of the process that generated the secret,
+    not by the width of the field it is stored in. A uniform random 128-bit key has
+    128 bits by construction; a human-chosen string has whatever its generating
+    distribution has. A slow KDF (Argon2, scrypt, PBKDF2) multiplies the attacker's
+    per-guess cost by a constant work factor, which buys perhaps 15-20 bits of
+    effective margin; it does not manufacture entropy that was never there.
+  units:
+  - u0
+- id: u0-m7
+  name: layered-encryption-adds-key-bits
+  wrong_model: >-
+    Encrypting twice under two independent keys concatenates their strength, so
+    double encryption with two 56-bit keys gives 112 bits of security, and in general
+    stacking ciphers adds up their key bits.
+  why_appealing: >-
+    The attacker seemingly must guess both keys, and guessing two independent n-bit
+    values feels like a 2n-bit search. It also matches the correct intuition from M2
+    that key bits are exponents, so adding key bits should multiply the work factor.
+  failing_prediction: >-
+    Predicts that breaking double-DES costs about 2^112 operations. It costs about
+    2^57. Given one known plaintext/ciphertext pair (P, C), the attacker encrypts P
+    under all 2^56 values of K1 and stores the results in a table, then decrypts C
+    under all 2^56 values of K2 and looks each result up. A hit reveals the middle
+    value, and therefore both keys. That is the meet-in-the-middle attack, and it is
+    why the industry went to triple-DES rather than double-DES: 3-key 3DES still
+    only delivers about 112 bits, not 168.
+  correction: >-
+    Composing ciphers trades the attacker's time for memory rather than doubling the
+    exponent. The meet-in-the-middle attack turns a 2^2n search into roughly 2^n
+    time plus 2^n storage, so a second layer buys about one bit of key strength, not
+    n. Bits of security are a property of the best known attack against the whole
+    construction, never a sum over the parts. When you need more strength, widen the
+    key of a single well-analyzed cipher instead of stacking two.
+  units:
+  - u0
+  - u1
