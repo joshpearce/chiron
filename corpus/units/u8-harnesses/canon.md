@@ -100,10 +100,13 @@ That is also why it can be crowded out: its tokens compete for attention mass
 with the 90,000 tokens of tool output that arrived after it.
 
 **Role boundaries are enforced at exactly one layer, and it is not the model.**
-Modern tokenizers reserve the delimiter IDs so that no sequence of user
-characters can encode `<|start|>` - the tokenizer maps that literal text to
-ordinary text tokens instead. So the channel boundary is real and it is
-cryptographically dull: it is a namespace reservation in the vocabulary. What is
+Modern tokenizers reserve the delimiter IDs, so when the harness encodes
+untrusted content with special-token parsing disabled - which is the correct
+and usual configuration, and a real vulnerability class when it is missed - no
+sequence of user characters can produce the `<|start|>` ID. The literal text
+encodes as ordinary text tokens instead. So the channel boundary is real and it
+is cryptographically dull: it is a namespace reservation in the vocabulary,
+enforced by the encoder your harness calls. What is
 not enforced anywhere is the authority boundary. Once past the delimiters, the
 model is running next-token prediction over a flat stream in which
 "instruction-ness" is a learned textual property - a statistical prior that

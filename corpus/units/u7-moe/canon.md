@@ -436,8 +436,8 @@ teacher model:
 | active experts (top-8) | 8 | 0.265B | 2.1B |
 | **active per token** | | | **3.3B** |
 
-Active fraction: $3.3 / 35.1 = 9.5\%$. You read one-tenth of the model per
-token.
+Active fraction: $3.3 / 35.1 = 9.4\%$. You read roughly one-tenth of the model
+per token.
 
 Convert to the only currency decode cares about. At 4.35 bits/weight
 ($b = 0.544$ bytes):

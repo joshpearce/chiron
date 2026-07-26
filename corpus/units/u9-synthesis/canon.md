@@ -208,7 +208,12 @@ prompt: |
   Checkpoint 2. Before any transformer block runs, how many parameters are
   in the embedding matrix alone, given $V = 128{,}000$ and
   $d_{model} = 4096$? Answer in millions, to three decimal places.
-answer: "524.288"
+answer: 524.288
+rubric: |
+  128,000 x 4,096 = 524,288,000 parameters = 524.288 million. Graded
+  numerically. 0.524 means they answered in billions; 524,288 means they
+  answered in thousands; anything near 1,048.576 double-counted by adding a
+  separate unembedding matrix, which this configuration ties to the embedding.
 check: numeric(0.01)
 ```
 
@@ -270,7 +275,11 @@ query heads); the outer factor 2 accounts for the second matrix multiply, the
 weighted sum of value vectors, which has the same shape. With $n = 8192$,
 $d_{head} = 128$, $h_q = 32$, $L = 64$: one block costs
 $2 \times 2 \times 8192^2 \times 128 \times 32 = 1.10 \times 10^{12}$, and
-across 64 blocks that is $7.04 \times 10^{13}$, or 70 TFLOPs.
+across 64 blocks that is $7.04 \times 10^{13}$, or 70 TFLOPs. That counts all
+$n^2$ score entries; a fused causal kernel skips the tiles that lie entirely
+above the diagonal and gets roughly half of it back, so treat 70 TFLOPs as an
+upper bound. The scaling is what matters here, and halving a quadratic leaves
+a quadratic.
 
 Total: 430 TFLOPs. At 450 TFLOP/s sustained, prefill takes about **0.96
 seconds**. That is your time-to-first-token, and it is compute-bound: 430 TFLOPs
@@ -314,8 +323,9 @@ answer: |
   (22B params at 4 bits = 11 GB) from memory, and does 2 x 22e9 = 44 GFLOPs of
   arithmetic with them. That is 4 FLOPs per byte read. The hardware can do 225
   FLOPs per byte. So the compute units idle ~98% of the time waiting on memory:
-  decode is memory-bandwidth-bound. 11 GB / 2 TB/s = 5.5 ms, which is the entire
-  observed per-token latency.
+  decode is memory-bandwidth-bound. 11 GB / 2 TB/s = 5.5 ms, which is the weight
+  term and the bulk of the observed per-token latency. Stage 6 adds the
+  KV-cache read on top of it.
 
   Prefill: the same weight read services 8,192 tokens at once, so the ratio is
   8,192 x 4 = ~33,000 FLOPs per byte, far above 225. The bottleneck moves to the
@@ -817,12 +827,12 @@ id: u9-b8
 type: self-explain
 concept: c-full-trace
 prompt: |
-  Final checkpoint. Turn 2 of an agentic session generates a token in 5.6 ms.
+  Final checkpoint. Turn 2 of an agentic session generates a token in 6.8 ms.
   Turn 25, on the same model, same hardware, no other load, generates a token in
-  16 ms. Nothing about the request got harder - it is the same kind of small
+  18.6 ms. Nothing about the request got harder - it is the same kind of small
   edit.
 
-  Give the full causal chain from "turn 25" to "16 ms." Then state the one
+  Give the full causal chain from "turn 25" to "18.6 ms." Then state the one
   architectural change that would most reduce this specific degradation, and say
   which term in the cost model it touches.
 answer: |

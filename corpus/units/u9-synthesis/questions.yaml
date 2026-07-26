@@ -64,8 +64,16 @@ pretest:
       4 bits each (0.5 bytes). The accelerator's memory bandwidth is 2 TB/s
       ($2 \times 10^{12}$ bytes per second). Ignoring the KV cache, estimate the
       wall-clock milliseconds to generate one token. Answer in milliseconds.
-    answer: "5.5"
+    answer: 5.5
     check: numeric(0.5)
+    rubric: |
+      22e9 x 0.5 bytes = 11 GB; 11e9 / 2e12 = 5.5e-3 s = 5.5 ms. Graded
+      numerically.
+      Diagnostic values to record for the planner: 58.75 means they used the
+      total 235B rather than the active 22B (no total-vs-active distinction);
+      22 means they used fp16 bytes rather than 4-bit; an answer derived from
+      FLOPs or "depends on the GPU" means the bandwidth model is absent
+      entirely, which is U9-M3 and routes to Stage 3 at full depth.
 
 check:
   - id: u9-q1
@@ -148,7 +156,9 @@ check:
       (22B params at 4 bits = 11 GB) and performs 2 x 22e9 = 44 GFLOPs with
       them: 4 FLOPs per byte read. Hardware balance is ~225 FLOPs per byte, so
       arithmetic units sit idle and time = bytes / bandwidth =
-      11 GB / 2 TB/s = 5.5 ms. That is the whole observed latency.
+      11 GB / 2 TB/s = 5.5 ms. That is the weight term, and it accounts for the
+      bulk of the observed latency; the KV-cache read for an 8,192-token context
+      (2.15 GB) adds roughly another millisecond on top.
 
       Prefill: the same single weight read services 8,192 positions, so
       arithmetic intensity is ~8,192 x 4 = ~33,000 FLOPs per byte, far above
@@ -568,9 +578,11 @@ check:
       What masking is: before the softmax, a matrix of 0 on and below the
       diagonal and $-\infty$ above it is added to the attention scores. After
       exponentiation, $-\infty$ becomes 0, so every future position receives
-      exactly zero weight in the similarity-weighted average. It is an additive
-      mask on a score matrix that was already computed for all pairs - masking
-      does not skip work, it zeroes it.
+      exactly zero weight in the similarity-weighted average. Definitionally it
+      is an additive term on a score matrix computed for all pairs. Fused
+      kernels do skip tiles that are entirely above the diagonal, which saves
+      roughly half the score work as a constant factor, but the scaling stays
+      quadratic in $n$ and the mask is not what makes execution ordered.
 
       Why prefill is parallel: a dependency structure is not an execution order.
       Position 7,000 depends on position 3's key and value, and both are computed
@@ -587,7 +599,7 @@ check:
     check: llm
     rubric: |
       MUST contain: (1) the mask is an additive $-\infty$ triangular term applied
-      to already-computed scores before softmax; (2) prefill processes all
+      to the score matrix before softmax; (2) prefill processes all
       positions in one parallel pass - a dependency is not a schedule (M9);
       (3) generation is sequential because each step's input is the previous
       step's sampled output, which does not exist in advance.
@@ -595,9 +607,11 @@ check:
       decoding as evidence that the barrier is about token availability rather
       than about masking.
       Characteristic errors: accepting the premise = M9 uncorrected. Saying
-      masking "skips" computing future scores = mechanically wrong in the standard
-      implementation (they are computed then zeroed) and matters for the n^2 cost
-      argument.
+      masking "skips" future scores is acceptable only if the learner keeps the
+      cost scaling quadratic - fused kernels do skip fully-masked tiles for about
+      a 2x constant-factor saving. Treating that skipping as making attention
+      linear in $n$, or as evidence that positions are visited in order, is the
+      error to catch.
   - id: u9-q11
     concept: c-full-trace
     kind: constructed
@@ -612,8 +626,15 @@ check:
 
       Compute the sampling probability of the highest-scoring token. Give three
       decimal places.
-    answer: "0.506"
+    answer: 0.506
     check: numeric(0.01)
+    rubric: |
+      Divide by T first: z/T = [0.5, 0, -0.5]. Exponentiate: [1.6487, 1.0000,
+      0.6065], sum 3.2552. p_max = 1.6487 / 3.2552 = 0.506. Graded numerically.
+      Diagnostic values: 0.867 means they multiplied by T instead of dividing,
+      which sharpens the distribution when T > 1 must flatten it. 0.665 is the
+      T = 1 answer - temperature was never applied at all. Any value above 0.665
+      has the direction of the temperature knob backwards.
   - id: u9-q12
     concept: c-full-trace
     kind: constructed
@@ -627,8 +648,18 @@ check:
       in fp16 at 2 bytes per value, serving a context of 65,536 tokens.
 
       Give the total cache size in GiB, where 1 GiB = 1024^3 bytes.
-    answer: "24"
+    answer: 24
     check: numeric(0.01)
+    rubric: |
+      Per token per block: 2 (K and V) x 8 x 128 x 2 bytes = 4,096 bytes.
+      Per token, all blocks: 4,096 x 96 = 393,216 bytes. Full context:
+      393,216 x 65,536 = 25,769,803,776 bytes = 24 GiB exactly. Graded
+      numerically.
+      Diagnostic values: 12 dropped the leading factor of 2 for storing both
+      keys and values - the most common sizing error. 96 used the query-head
+      count in place of h_kv (assuming a typical 32), which means the point of
+      grouped-query attention has not landed. 0.25 stopped at a single block.
+      25.77 answered in decimal GB rather than GiB.
   - id: u9-q13
     concept: c-full-trace
     kind: constructed

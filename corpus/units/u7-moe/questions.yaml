@@ -1,7 +1,7 @@
 # u7 - Mixture of Experts. Item bank.
 # Concepts: c-moe-routing, c-moe-tradeoff.
 # Refutation targets: M12 (global bank) plus U7-M1..U7-M4 (unit-local).
-# 13 check items: 9 constructed/congruent (69%), 4 mcq. 4 callback_eligible,
+# 13 check items: 9 constructed/congruent (69%), 4 mcq. 5 callback_eligible,
 # 2 stretch.
 
 pretest:
