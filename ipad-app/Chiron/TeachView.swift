@@ -133,6 +133,20 @@ final class TeachModel: ObservableObject {
         }
     }
 
+    /// Generation outlives this screen, but the screen's state does not - leaving
+    /// and coming back would otherwise show an empty conversation while a book
+    /// is still being written. Re-attach to whatever is still running.
+    func adoptRunningJob() async {
+        guard job == nil, let url = URL(string: "\(sync.baseURL)/teach/jobs") else { return }
+        guard let (data, _) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 10)),
+              let all = try? JSONDecoder().decode([String: [Job]].self, from: data),
+              let running = all["jobs"]?.first(where: { !$0.done }) else { return }
+        slug = running.slug
+        title = running.title
+        job = running
+        await poll()
+    }
+
     func poll() async {
         while let j = job, !j.done, !Task.isCancelled {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
@@ -175,6 +189,7 @@ struct TeachView: View {
             footer
         }
         .frame(maxWidth: 760)
+        .task { await teach.adoptRunningJob() }
     }
 
     private var header: some View {
