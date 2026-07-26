@@ -39,6 +39,24 @@ Do this first:
   real weak-learner check - gate failed correctly, remediation issued,
   misconceptions U0-M1 + M2 diagnosed.
 
+### Every screen has now been seen, and both learner paths run end to end
+
+Driven hands-free in the simulator against the live server (no cable, no
+unlock):
+
+- **Strong path**: subjects -> chapter u2 generated over Wi-Fi -> 9-item check
+  submitted -> **100%, gate cleared, extensions unlocked, advanced to u3**.
+  This is the first time the client side has completed an exchange at all.
+- **Weak path**: every item answered with a confident misconception ->
+  **0%, gate held**, per-item feedback naming the misconception (M2,
+  softmax-truth-probability) with a real explanation, and the
+  Remediate / Override choice with the debt-ledger note.
+- **Screens confirmed by eye**: library, reader (cream paper, serif, math
+  typeset inline), check (math typeset, confidence slider), gate cleared, gate
+  failed, break timer.
+
+Your learner state has been **reset**, so you start the flight clean.
+
 ### Two app-breaking bugs the simulator found in ten minutes
 
 Running the app in the iOS Simulator (no cable, no unlock dance) immediately
