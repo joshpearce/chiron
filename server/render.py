@@ -18,7 +18,51 @@ from markdown_it import MarkdownIt
 
 BEAT_FENCE = re.compile(r"```beat\s*\n(.*?)```", re.S)
 
+# Display math first so $$...$$ is not mistaken for two empty $...$ spans.
+MATH_SPAN = re.compile(r"\$\$.+?\$\$|(?<!\\)\$(?!\s)(?:\\.|[^$\\])+?(?<!\s)\$", re.S)
+
 md = MarkdownIt("commonmark", {"html": True}).enable("table")
+
+
+def _protect_math(text: str) -> tuple[str, list[str]]:
+    """Pull math spans out before markdown conversion.
+
+    CommonMark treats a backslash before ASCII punctuation as an escape, so
+    markdown-it silently rewrites `\\{` -> `{` and `\\}` -> `}` inside what we
+    intend as LaTeX. KaTeX then sees an unmatched brace and renders an error
+    box. Hiding math behind placeholders keeps the TeX byte-exact.
+    """
+    spans: list[str] = []
+
+    def stash(m: re.Match) -> str:
+        spans.append(m.group(0))
+        # Placeholder must survive markdown untouched: letters and digits only.
+        return f"MATHPLACEHOLDER{len(spans) - 1}ENDMATH"
+
+    return MATH_SPAN.sub(stash, text), spans
+
+
+def _restore_math(html: str, spans: list[str]) -> str:
+    """Put math back, HTML-escaped.
+
+    LaTeX routinely contains `<`, `>` and `&` (subscripts like x_{<t},
+    alignment in matrices). Emitted raw, the browser's HTML parser swallows
+    `<t}` as an unknown tag and the equation silently loses characters. Escaped,
+    the parser leaves it alone and KaTeX - which reads textContent - still sees
+    the original TeX.
+    """
+    for i, span in enumerate(spans):
+        safe = (span.replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;"))
+        html = html.replace(f"MATHPLACEHOLDER{i}ENDMATH", safe)
+    return html
+
+
+def _render_md(text: str) -> str:
+    """Markdown -> HTML with LaTeX preserved byte-exact."""
+    protected, spans = _protect_math(text)
+    return _restore_math(md.render(protected), spans)
 
 
 def _extract_beats(markdown_text: str, beats_out: list) -> str:
@@ -41,9 +85,9 @@ def render_chapter(unit, assembled_sections: list, directives: dict,
         html_parts.append('<div class="planner-note">'
                           + md.render(directives["opening_note_md"]) + "</div>")
     if unit.intro_md:
-        html_parts.append(md.render(_extract_beats(unit.intro_md, beats)))
+        html_parts.append(_render_md(_extract_beats(unit.intro_md, beats)))
     for sec in assembled_sections:
-        html_parts.append(md.render(_extract_beats(sec["markdown"], beats)))
+        html_parts.append(_render_md(_extract_beats(sec["markdown"], beats)))
 
     return {
         "unit": unit.id,
