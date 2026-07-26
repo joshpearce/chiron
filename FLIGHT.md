@@ -11,7 +11,23 @@ which matters - see the logging note below.
 **The service is Go** on both the sprite and the Mac. `start-flight.sh` runs
 `bin/chiron-server`; `scripts/sprite-deploy.sh` ships it to the sprite.
 
-**Still to do before flying: the Wi-Fi soft AP has never carried traffic.**
+### Testing at home does not need the soft AP
+
+If the Mac and the iPad are both on the same Wi-Fi, the iPad just talks to the
+Mac's LAN address - point the app at `http://<mac-lan-ip>:8080` (find it with
+`ipconfig getifaddr en0`). No Internet Sharing, no AdHoc service, and no losing
+the Mac's internet. That is the right way to test the reading experience.
+
+The macOS firewall may block the first incoming connection, because
+`bin/chiron-server` is an unsigned local binary. If the app's badge will not go
+green, allow it once:
+
+```
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add ~/dev/mjbraun/studies/dynamic-book/bin/chiron-server
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp ~/dev/mjbraun/studies/dynamic-book/bin/chiron-server
+```
+
+**The soft AP is for the plane, where there is no network to be on.**
 macOS will not share a connection from Wi-Fi to Wi-Fi, so the option is absent
 while Wi-Fi is the uplink. `scripts/setup-adhoc.sh` creates the loopback service
 that frees Wi-Fi to be the share target; the Internet Sharing toggle itself is
