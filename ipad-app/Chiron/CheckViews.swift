@@ -268,6 +268,11 @@ struct SpineView: View {
                         Text(state.summary).font(.callout).foregroundStyle(.secondary)
                     }
                 }
+                if let err = model.errorMessage {
+                    Section {
+                        Text(err).foregroundStyle(.red).font(.callout)
+                    }
+                }
                 Section {
                     Button(role: .destructive) {
                         confirmingReset = true
@@ -289,7 +294,13 @@ struct SpineView: View {
             .alert("Start over?", isPresented: $confirmingReset) {
                 Button("Cancel", role: .cancel) { }
                 Button("Start over", role: .destructive) {
-                    Task { await model.startOver() }
+                    Task {
+                        await model.startOver()
+                        // The spine is a sheet over the screen startOver()
+                        // changes. Without dismissing it the reset happens and
+                        // the learner sees nothing at all.
+                        presentation.wrappedValue.dismiss()
+                    }
                 }
             } message: {
                 Text("Every grade, gate result and debt entry for this subject is discarded. This cannot be undone from the app.")
