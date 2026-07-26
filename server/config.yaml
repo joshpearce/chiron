@@ -1,0 +1,32 @@
+# book-server configuration
+corpus_dir: ../corpus
+state_dir: ../state
+static_dir: static
+
+upstreams:
+  # First healthy upstream wins. Health = GET {base_url}/models within 3s.
+  - name: lmstudio
+    base_url: http://127.0.0.1:1234/v1
+    model: qwen/qwen3.6-35b-a3b
+    enabled: true
+  - name: hodar
+    base_url: http://hodar:11434/v1     # via tailscale, only if flight wifi; TODO Matt: url + model
+    model: ""
+    enabled: false
+
+llm:
+  temperature: 0.7
+  timeout_s: 240          # hard client timeout (documented infinite-loop pathology)
+  max_tokens:
+    grader: 900
+    planner: 1200
+    author: 3500
+
+session:
+  mastery_gate: 0.80
+  extension_trigger: 0.90
+  check_items: 9
+  callback_fraction: 0.4
+  chunk_minutes: 22
+  break_minutes: 5
+  long_break_every_chunks: 4

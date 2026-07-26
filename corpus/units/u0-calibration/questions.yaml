@@ -1,0 +1,392 @@
+# u0 calibration item bank.
+# The pretest here is deliberately larger than in other units: it spans the math
+# floor of the whole syllabus (dot products, matmul shapes, softmax, chain rule,
+# notation) and seeds the two-axis expertise profile. Items are EXPECTED to be
+# missed. The check items calibrate rather than gate - keep them quick.
+
+pretest:
+  - id: u0-p1
+    concept: c-dotprod
+    prompt: |
+      Compute the dot product of $u = [1, -2, 4]$ and $v = [3, 5, -1]$.
+      Answer with a single number.
+    answer: "-11"
+    check: numeric(0.001)
+
+  - id: u0-p2
+    concept: c-matmul
+    prompt: |
+      $X$ has shape $(32, 128)$ and $W$ has shape $(128, 512)$. What is the
+      shape of $XW$? Answer in the exact form `rows x cols`, for example
+      `3 x 8`.
+    answer: "32 x 512"
+    check: exact
+
+  - id: u0-p3
+    concept: c-notation
+    prompt: |
+      Softmax turns a vector of scores into a set of positive numbers summing
+      to 1. Compare $\text{softmax}([2, 1])$ with $\text{softmax}([12, 11])$.
+      Are the two outputs the same or different? One sentence on why.
+    answer: |
+      Identical. Softmax depends only on differences between scores: adding the
+      same constant to every entry multiplies every exponential by the same
+      factor, which cancels in the normalization. Both inputs have a gap of 1,
+      so both give the same distribution, roughly $[0.73, 0.27]$.
+    check: llm
+    rubric: |
+      Pass requires the verdict "same/identical" AND a reason resting on
+      shift-invariance (only differences between scores matter, or the common
+      factor cancels in the denominator).
+      Partial: correct verdict with a vague reason ("the gap is the same")
+      that does not mention cancellation or differences.
+      Fail: says "different" - diagnoses treating softmax outputs as absolute
+      magnitudes rather than a normalized comparison (see M2 in the global
+      bank); route through u2's softmax section at full depth.
+      A learner who computes the actual numbers and gets ~[0.73, 0.27] for both
+      passes regardless of how the reason is phrased.
+
+  - id: u0-p4
+    concept: c-notation
+    prompt: |
+      Let $f(x) = (3x + 1)^2$. Compute $f'(1)$, the derivative of $f$ evaluated
+      at $x = 1$. Answer with a single number.
+    answer: "24"
+    check: numeric(0.001)
+
+  - id: u0-p5
+    concept: c-notation
+    prompt: |
+      $L$ is a scalar loss and $W$ is a weight matrix of shape $(768, 3072)$.
+      What is the shape of $\partial L / \partial W$? Answer in the exact form
+      `rows x cols`, for example `3 x 8`.
+    answer: "768 x 3072"
+    check: exact
+
+  - id: u0-p6
+    concept: c-notation
+    prompt: |
+      What does $\mathbb{E}_{x \sim \mathcal{D}}[f(x)]$ denote, and how is it
+      actually computed during training? Two sentences.
+    answer: |
+      It denotes the expected value of $f(x)$ when $x$ is drawn from the
+      distribution $\mathcal{D}$ - the average of $f$ over all possible inputs,
+      weighted by their probability under $\mathcal{D}$. It cannot be computed
+      exactly because $\mathcal{D}$ is not enumerable, so training estimates it
+      by the mean of $f(x_i)$ over the examples in a batch.
+    check: llm
+    rubric: |
+      Pass requires both: (1) an average/expected value of $f$ under the
+      distribution $\mathcal{D}$, not over a fixed finite set; (2) that it is
+      estimated in practice by a sample mean over a batch.
+      Partial: (1) only, or (2) stated as if the batch mean were the definition.
+      Fail and what it diagnoses: "the average over the training set" with no
+      distribution involved = U0-M5. "The most likely / typical value of f" =
+      U0-M7. Either answer means the notation section should be delivered.
+
+  - id: u0-p7
+    concept: c-dotprod
+    prompt: |
+      $q$ and $k$ are both row vectors of shape $(1, d)$. Write the dot product
+      $q \cdot k$ as a matrix product of $q$ and $k$, and state the shape of
+      the result.
+    answer: |
+      $q k^T$, of shape $(1, 1)$ - a scalar. The transpose turns $k$ into a
+      $(d, 1)$ column so the inner dimensions $d$ match and contract away.
+    check: llm
+    rubric: |
+      Pass requires the expression $q k^T$ (or an equivalent explicitly showing
+      one factor transposed) AND the result being a scalar / shape $(1,1)$.
+      Partial: correct shape reasoning but writes $q^T k$, which yields a
+      $(d,d)$ outer product - note the error, it is a real orientation slip.
+      Fail and what it diagnoses: writing $qk$ with no transpose and calling it
+      valid = U0-M4 (orientation treated as cosmetic). Answering that the
+      result is a vector of length $d$ = confusing the dot product with
+      elementwise multiplication, U0-M1.
+
+  - id: u0-p8
+    concept: c-matmul
+    prompt: |
+      $X$ has shape $(n, 512)$, $W_1$ has shape $(512, 2048)$, $W_2$ has shape
+      $(2048, 512)$. (a) What is the shape of $X W_1 W_2$? (b) Is $X W_2 W_1$ a
+      valid product? One line each.
+    answer: |
+      (a) $(n, 512)$: $XW_1$ is $(n, 2048)$, and multiplying by $W_2$ contracts
+      the 2048 to give $(n, 512)$.
+      (b) No. $X$ is $(n, 512)$ and $W_2$ is $(2048, 512)$; the inner
+      dimensions 512 and 2048 do not match, so the product is undefined.
+    check: llm
+    rubric: |
+      Pass requires both parts: (a) $(n, 512)$, and (b) not valid, because the
+      inner dimensions do not match.
+      Partial: (a) correct, (b) wrong or unjustified.
+      Fail and what it diagnoses: answering (b) "yes, matrix multiplication is
+      commutative" or "yes, you would just loop differently" = U0-M1.
+      Answering (b) "yes, transpose it and it works" without noticing that this
+      computes a different function = U0-M4.
+
+check:
+  - id: u0-q1
+    concept: c-dotprod
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    # solo item of the dot-product fade sequence (worked in canon, then u0-b2)
+    prompt: |
+      Compute the dot product of $[2, 0, -3]$ and $[1, 4, 2]$. Answer with a
+      single number.
+    answer: "-4"
+    check: numeric(0.001)
+    difficulty: warmup
+
+  - id: u0-q2
+    concept: c-dotprod
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A query vector $q$ is compared against two key vectors that point in
+      exactly the same direction as each other, but $k_2$ is five times as long
+      as $k_1$. Compare $q \cdot k_1$ with $q \cdot k_2$, and compare the
+      cosine similarity of $q$ with each. Explain the difference in one or two
+      sentences.
+    answer: |
+      $q \cdot k_2 = 5 \, (q \cdot k_1)$: the dot product scales linearly with
+      the length of either input. The cosine similarities are identical, because
+      cosine divides out both magnitudes and depends only on the angle, which is
+      unchanged. The dot product measures alignment scaled by both magnitudes;
+      the cosine measures alignment alone.
+    check: llm
+    rubric: |
+      Must contain: (1) the dot product is 5x larger for $k_2$ (any statement
+      that it scales with magnitude, with the correct direction of the effect);
+      (2) the cosines are equal because the angle is unchanged.
+      Pass = both. Partial = (1) with no cosine comparison, or (2) with the dot
+      products called equal in direction-terms but scaled correctly.
+      Fail and what it diagnoses: saying both dot products are equal because the
+      direction is the same = U0-M2. Saying $k_1$ scores higher because it is
+      nearer to $q$ = U0-M6. Either failure means the dot-product section is
+      required at full depth before u3.
+    difficulty: core
+
+  - id: u0-q3
+    concept: c-dotprod
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      $q = [3, 0]$, $k_1 = [0.6, 0.8]$, $k_2 = [6, 8]$. Note that $k_1$ and
+      $k_2$ point in exactly the same direction. Which key gets the larger raw
+      attention score $q \cdot k$, and what does that tell you?
+    options:
+      - text: "$k_2$, by a factor of 10, even though the two keys point in identical directions - the dot product scales with magnitude as well as alignment."
+        correct: true
+        explain: "Correct. $q \\cdot k_1 = 1.8$ and $q \\cdot k_2 = 18$. Same direction, same angle, ten times the score. This is exactly why unnormalized attention scores can be dominated by a single large-magnitude key."
+      - text: "Neither - the scores are equal, since the two keys have the same direction and the dot product measures direction agreement."
+        misconception: U0-M2
+        explain: "Attractive because on unit-length vectors - which is all your embedding database ever stores - the dot product and cosine similarity are the same number. They are not the same function. Cosine divides out both magnitudes; the dot product does not, and nothing inside a transformer normalizes before the score is taken."
+      - text: "$k_1$, because it is much closer to $q$ in the plane, and closeness is what a similarity score rewards."
+        misconception: U0-M6
+        explain: "Attractive because 'similar' and 'nearby' are the same word in everyday use. Check it: $\\lVert q - k_1 \\rVert \\approx 2.53$ while $\\lVert q - k_2 \\rVert \\approx 8.54$, so $k_1$ really is much closer - and it scores ten times lower. The dot product is not a distance and is not even a decreasing function of distance."
+      - text: "$k_2$, because a longer vector is a more confident match and the score is $\\lVert k \\rVert$ times the cosine of the angle, so length is the deciding factor."
+        misconception: U0-M2
+        explain: "The arithmetic here is right - the formula given is correct and $k_2$ does score higher - but the reading is wrong on both sides. The score is $\\lVert q \\rVert \\lVert k \\rVert \\cos\\theta$, scaled by BOTH magnitudes, not just the key's. And length is not the deciding factor in general: a long vector at 90 degrees still scores zero. Magnitude and alignment both matter, multiplicatively."
+    difficulty: warmup
+
+  - id: u0-q4
+    concept: c-matmul
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      $A$ has shape $(4, 3)$ and $B$ has shape $(3, 7)$. What is the shape of
+      $AB$? Answer in the exact form `rows x cols`, for example `3 x 8`.
+    answer: "4 x 7"
+    check: exact
+    difficulty: warmup
+
+  - id: u0-q5
+    concept: c-matmul
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      $A = \begin{bmatrix} 2 & 1 \\ 0 & 3 \end{bmatrix}$ and
+      $B = \begin{bmatrix} 1 & 4 \\ 5 & -2 \end{bmatrix}$.
+      Compute the single entry $(AB)_{12}$ - row 1, column 2 of the product.
+      Answer with a single number.
+    answer: "6"
+    check: numeric(0.001)
+    difficulty: core
+
+  - id: u0-q6
+    concept: c-matmul
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    # solo item of the matrix-multiply fade sequence (worked in canon, then u0-b3)
+    prompt: |
+      $A = \begin{bmatrix} 1 & 2 & 0 \\ 0 & -1 & 3 \end{bmatrix}$ of shape
+      $(2,3)$ and $B = \begin{bmatrix} 2 & 1 \\ 1 & 0 \\ 4 & 2 \end{bmatrix}$
+      of shape $(3,2)$. Compute $AB$.
+      Answer as `a, b; c, d` - the first row's two entries, a semicolon, then
+      the second row's two entries.
+    answer: "4, 1; 11, 6"
+    check: exact
+    difficulty: core
+
+  - id: u0-q7
+    concept: c-matmul
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      $A$ has shape $(2,3)$ and $B$ has shape $(3,2)$, so both $AB$ and $BA$
+      are defined. What is the relationship between them?
+    options:
+      - text: "They are different objects - $AB$ is $2 \\times 2$ and $BA$ is $3 \\times 3$ - because each is a different composition of the two maps."
+        correct: true
+        explain: "Correct. Matrix multiply composes functions, and the order of composition determines both the shape and the function. $AB$ means 'apply $A$'s map, then $B$'s'; $BA$ is the other order, a different function on a different space."
+      - text: "They are equal, because matrix multiplication is built out of multiplying and adding ordinary numbers, and both of those commute."
+        misconception: U0-M1
+        explain: "Attractive because it is true of the individual arithmetic operations inside the loop. But the loop pairs row $i$ of the left operand with column $j$ of the right one, and swapping the operands re-pairs everything. Commutativity of the scalar multiplications says nothing about the pairing. Here the two products are not even the same size."
+      - text: "$BA = (AB)^T$ - swapping the order just transposes the result."
+        misconception: U0-M4
+        explain: "Attractive because $(AB)^T = B^T A^T$ is a real identity and this looks like it. It is not: the true identity transposes both factors as well as reordering them. Shapes alone refute the claim here, since $(AB)^T$ is $2 \\times 2$ and $BA$ is $3 \\times 3$. Treating a transpose as a cosmetic fix-up is the orientation error."
+      - text: "They contain the same numbers in a different arrangement, since no information is created or destroyed by reordering a product."
+        misconception: U0-M1
+        explain: "Attractive because a nested loop over the same inputs feels like it must touch the same data. It does touch the same inputs, but it sums different groupings of them: $AB$ has 4 entries and $BA$ has 9, so they cannot be rearrangements of each other. $BA$ is in fact singular here - $A$ flattens 3 dimensions down to 2, and no later map recovers what was lost."
+    difficulty: core
+
+  - id: u0-q8
+    concept: c-notation
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A batch of token embeddings entering a transformer has shape
+      $(b, n, d_{\text{model}})$. Say what each of the three symbols denotes,
+      and give the shape of the weight matrix $W$ that would project each token
+      vector to width $d_{\text{ff}}$.
+    answer: |
+      $b$ is the batch size (independent sequences processed together), $n$ is
+      the sequence length in tokens, $d_{\text{model}}$ is the width of each
+      token's vector - the residual stream width. $W$ has shape
+      $(d_{\text{model}}, d_{\text{ff}})$: input dimension first under the
+      row-vector convention, so the $d_{\text{model}}$ axis contracts and the
+      output is $(b, n, d_{\text{ff}})$.
+    check: llm
+    rubric: |
+      Must contain: (1) all three symbols correctly identified - batch size,
+      sequence length, per-token vector width; (2) the weight shape
+      $(d_{\text{model}}, d_{\text{ff}})$ in that order.
+      Pass = both. Partial = (1) correct with the weight shape transposed.
+      Fail and what it diagnoses: giving $(d_{\text{ff}}, d_{\text{model}})$
+      while also describing $Wx$ rather than $xW$ is internally consistent
+      column-convention reasoning - not a failure of understanding, but flag
+      U0-M4 and confirm the learner knows which convention this book uses.
+      Confusing $n$ with $d_{\text{model}}$, or treating $b$ as anything other
+      than independent parallel sequences, is a genuine miss.
+    difficulty: core
+
+  - id: u0-q9
+    concept: c-notation
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      $L$ is a scalar loss and $W$ has shape $(256, 1024)$. What is the shape of
+      $\nabla_W L$? Answer in the exact form `rows x cols`, for example `3 x 8`.
+    answer: "256 x 1024"
+    check: exact
+    difficulty: warmup
+
+  - id: u0-q10
+    concept: c-notation
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      A paper writes the training objective as
+      $L(\theta) = \mathbb{E}_{x \sim \mathcal{D}}[\ell(x; \theta)]$.
+      What does the $\mathbb{E}$ notation mean here?
+    options:
+      - text: "The average of the per-example loss over the distribution $\\mathcal{D}$, weighted by how likely each $x$ is - approximated in practice by the mean over a batch."
+        correct: true
+        explain: "Correct, and the two halves matter separately. The objective is defined over a distribution nobody can enumerate; what training computes is a noisy sample estimate of it. The gap between the two is why batch size affects gradient noise."
+      - text: "The mean of the per-example loss over the training set, which is the dataset the paper used."
+        misconception: U0-M5
+        explain: "Attractive because it is what the code computes, and because the dataset is the only concrete thing in sight. But then the objective would be defined by your data, and there would be no such thing as generalization error - a model that memorized the training set would have optimally solved the stated problem. The dataset is a sample from $\\mathcal{D}$, not $\\mathcal{D}$."
+      - text: "The most likely, or typical, value of the loss - what you should expect to see on a given example."
+        misconception: U0-M7
+        explain: "Attractive because 'expected' in English means 'what you would predict'. In this notation it means the probability-weighted mean, which is a different statistic from the mode and often a value no single example ever takes. On a skewed loss distribution the mean and the typical value can be far apart."
+      - text: "The sum of the loss over all examples, which is what gets accumulated during an epoch."
+        misconception: U0-M5
+        explain: "Attractive because accumulate-then-step is what a training loop looks like. But a sum scales with dataset size while an expectation does not, so the two differ by a factor of $N$ - which would make the effective learning rate depend on how much data you happened to load. Frameworks divide for exactly this reason."
+    difficulty: warmup
+
+  - id: u0-q11
+    concept: c-notation
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A paper writes attention as
+      $\text{softmax}\!\left(\frac{QK^T}{\sqrt{d_k}}\right)V$ with $Q$, $K$, $V$
+      each of shape $(n, d_k)$. Using only shape reasoning: (a) why is $K$
+      transposed, (b) what is the shape of $QK^T$ and what does one entry of it
+      mean, (c) what is the shape of the final output?
+    answer: |
+      (a) $Q$ is $(n, d_k)$ and $K$ is $(n, d_k)$; their inner dimensions do not
+      match ($d_k$ against $n$), so the product is undefined. Transposing $K$
+      gives $(d_k, n)$, and the $d_k$ axes contract.
+      (b) $QK^T$ is $(n, n)$. Entry $(i,j)$ is the dot product of query row $i$
+      with key row $j$ - one alignment score per (query position, key position)
+      pair.
+      (c) Softmax does not change shape, so $(n,n)$ times $V$ of shape
+      $(n, d_k)$ contracts the second $n$ and gives $(n, d_k)$ - the same shape
+      as the input, one output vector per position.
+    check: llm
+    rubric: |
+      Must contain: (1) the transpose exists to make the inner dimensions
+      match, so the $d_k$ axes contract; (2) $QK^T$ has shape $(n,n)$ and one
+      entry is a dot product between one query and one key; (3) the output is
+      $(n, d_k)$.
+      Pass = all three. Partial = any two, with (2) counting only if both the
+      shape and the dot-product reading are present.
+      Fail and what it diagnoses: giving $(d_k, d_k)$ for $QK^T$ = contracting
+      the wrong axis, re-teach the shape contract. Describing an entry of
+      $QK^T$ as a similarity between two tokens' meanings rather than a dot
+      product of two projected vectors = premature semantics, harmless here but
+      flag it before u3. Claiming the transpose is a storage or layout detail
+      = U0-M4.
+      This item is stretch: a learner who has never read an attention equation
+      can still derive all three answers from shapes alone, which is the point.
+    difficulty: stretch
+
+  - id: u0-q12
+    concept: c-matmul
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      $X$ has shape $(n, d)$ and $W$ has shape $(d, m)$. Describe entry $(i,j)$
+      of $XW$ as a dot product: which vector is dotted with which?
+    answer: |
+      Entry $(i,j)$ is the dot product of row $i$ of $X$ - the $i$-th token's
+      $d$-dimensional vector - with column $j$ of $W$, which is also
+      $d$-dimensional. Both operands have length $d$, the shared inner
+      dimension, which is why they can be dotted at all. The full product is an
+      $n \times m$ grid of such dot products.
+    check: llm
+    rubric: |
+      Must contain: (1) row $i$ of $X$ dotted with column $j$ of $W$ - the
+      row/column pairing must be correct and in the right order; (2) both
+      operands have length $d$, the contracted inner dimension.
+      Pass = both. Partial = (1) only.
+      Fail and what it diagnoses: "row $i$ of $X$ with row $j$ of $W$" or any
+      pairing that ignores which axis contracts = the shape rule is being
+      applied as memorized bookkeeping rather than understood, U0-M1. Answering
+      with elementwise multiplication of $X_{ij}$ and $W_{ij}$ = U0-M1 in its
+      strongest form; deliver the matmul section before any later unit.
+    difficulty: core

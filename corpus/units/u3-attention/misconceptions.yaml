@@ -1,0 +1,48 @@
+# Unit-local misconception additions for u3 (attention).
+# Same schema as corpus/misconception-bank.yaml. These are the failure modes
+# that show up specifically when an expert engineer meets the attention
+# equation for the first time. The global-bank entries this unit refutes
+# head-on are M1 (agentive attention), M9 (sequential processing), and
+# M10 (parallel-therefore-linear); those live in the global bank and are not
+# repeated here.
+
+misconceptions:
+  - id: U3-M1
+    name: qkv-are-separate-stores
+    wrong_model: "Q, K, and V are three separate data structures - a query, an index, and a value store - the way they would be in a real retrieval system. The keys and values come from somewhere other than the queries."
+    why_appealing: "The names are lifted verbatim from key-value stores, and in every database an engineer has used, the query comes from the caller and the K/V pairs come from the store. The analogy is deliberate and it is 80% right."
+    failing_prediction: "If K and V came from a store rather than the sequence, they would have a row count independent of the number of tokens, and you could grow the store without changing the input. Instead all three are $X W$ for the same $X$: $Q$, $K$, and $V$ always have exactly $n$ rows, one per token, and adding a token adds a row to all three simultaneously."
+    correction: "Q, K, V are three learned linear projections of the same input matrix $X$. Every token simultaneously issues a query, advertises a key, and offers a value. The 'store' is the sequence itself, rebuilt from scratch on every forward pass."
+    units: [u3, u4]
+
+  - id: U3-M2
+    name: scaling-is-normalization
+    wrong_model: "Dividing by $\\sqrt{d_k}$ normalizes the query and key vectors, or rescales scores to a fixed range, the way you would normalize features before a distance computation."
+    why_appealing: "It looks like every normalization step an engineer has written, and 'divide by something derived from the data' is the shape of feature scaling. Both a norm and $\\sqrt{d_k}$ have units of length."
+    failing_prediction: "If it were normalization, the divisor would depend on the actual vectors - their norms, the row max, the observed score range - and would differ per row. It does not: $\\sqrt{d_k}$ is a compile-time constant determined by the head dimension alone. A row whose scores are all tiny gets divided by the same 8 as a row whose scores are enormous, which no normalization scheme would do."
+    correction: "It is a fixed variance correction, not a normalization. Raw dot products of $d_k$-dimensional vectors have variance $d_k$; dividing by the standard deviation $\\sqrt{d_k}$ restores roughly unit variance so softmax stays out of its saturated, zero-gradient regime. It is chosen from the architecture, never from the data."
+    units: [u3]
+
+  - id: U3-M3
+    name: mask-filters-the-output
+    wrong_model: "The causal mask filters or drops results after attention has been computed - it zeroes out the future entries of the attention matrix, or removes future tokens from the sequence."
+    why_appealing: "'Masking' in every other engineering context means applying a filter to a finished result, and zeroing the upper triangle of $A$ produces a matrix that looks correct."
+    failing_prediction: "If the mask were applied after the softmax, the surviving weights would keep the values they had when they were competing against the future, so row $i$ would sum to less than 1 - and the deficit would be worst at position 1 and shrink toward the end. Early tokens' outputs would be systematically shrunk toward zero purely as a function of index. Measured rows of a real causal attention matrix sum to exactly 1 at every position."
+    correction: "The mask is added to the scores BEFORE the softmax, as $-\\infty$ (in practice a large negative constant). The softmax denominator then sums only the visible positions, so the surviving weights renormalize to 1. Masking is part of the score computation, not post-processing."
+    units: [u3, u6]
+
+  - id: U3-M4
+    name: weight-matrix-is-the-output
+    wrong_model: "The $n \\times n$ attention matrix is the output of the attention layer - attention 'produces an attention map'."
+    why_appealing: "The $n \\times n$ heatmap is the picture in every paper and blog post, so it reads as the artifact the layer exists to produce. It is also the only genuinely novel-looking object in the equation."
+    failing_prediction: "If the $n \\times n$ matrix were the output, the next layer would receive something whose width grows with sequence length, and a residual connection back into a $d_{model}$-wide stream would be shape-incompatible. Attention layers stack trivially, so their output must have the same shape as their input."
+    correction: "The output is $AV$, shape $n \\times d_v$ - one vector per token, same row count as the input. The $n \\times n$ matrix $A$ is a transient intermediate consumed by the final multiply. It is interesting to visualize and is never passed forward."
+    units: [u3, u4]
+
+  - id: U3-M5
+    name: softmax-over-columns
+    wrong_model: "The softmax normalizes the whole $n \\times n$ score matrix, or normalizes down the columns, so that each key's total attention received sums to 1."
+    why_appealing: "'Softmax the scores' does not say along which axis, and a conservation intuition - each token has one unit of influence to give out - feels principled."
+    failing_prediction: "Under column normalization, how much position $i$ reads from position $j$ would change when an unrelated position $m$ changes its query, because $m$ competes in the same column. Deleting a token from the end of the prompt would alter the outputs of earlier tokens in a causal model, which would break the KV cache outright."
+    correction: "Softmax is row-wise. Row $i$ holds query $i$'s scores against every key, and normalizing it gives query $i$ a distribution over positions to read from. Rows sum to 1; columns sum to whatever they sum to, and carry no meaning. A single key may be heavily read by many queries or by none."
+    units: [u3, u6]

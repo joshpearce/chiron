@@ -1,0 +1,62 @@
+# Unit-local misconceptions for u0. Same schema as the global bank.
+# These are notation- and primitive-level errors: too low-level for the global
+# bank, but they are what an expert engineer actually brings to a first reading
+# of ML math. Every one of them is a correct belief from some other domain
+# (databases, one-variable calculus, observability) applied one domain over.
+
+misconceptions:
+  - id: U0-M1
+    name: matmul-is-bookkeeping
+    wrong_model: "Matrix multiplication is a triple-nested loop, and the inner-dimensions-must-match rule is arbitrary storage bookkeeping - some other pairing would have worked equally well."
+    why_appealing: "The loop is literally what the hardware runs, and an engineer's instinct to reason at the memory-layout level is usually the productive instinct."
+    failing_prediction: "If the pairing were arbitrary convention, reordering the operands would produce the same numbers rearranged - but for $A$ of shape $(2,3)$ and $B$ of shape $(3,2)$, $AB$ has 4 entries and $BA$ has 9. They are not rearrangements of each other, and one is singular while the other need not be."
+    correction: "A matrix IS a linear map. $AB$ is the composition of two maps, and the shape rule is the type check that one map's output space is the next one's input space. The loop is the implementation; composition is the meaning."
+    units: [u0, u2, u4]
+
+  - id: U0-M2
+    name: dot-product-is-cosine
+    wrong_model: "The dot product is a similarity score in the cosine sense - it measures how aligned two vectors are, and magnitude is not part of it."
+    why_appealing: "Every embedding store an engineer has used normalizes to unit length, and on unit vectors the dot product and the cosine are literally the same number. The intuition is correct in the only place most people have met it."
+    failing_prediction: "If magnitude did not enter, scaling a vector without rotating it would leave its score unchanged - but with $q = [3,0]$, $k_1 = [0.6, 0.8]$ and $k_2 = 10 k_1$, the cosine is $0.6$ for both while the dot products are $1.8$ and $18$."
+    correction: "$u \\cdot v = \\lVert u \\rVert \\lVert v \\rVert \\cos\\theta$ - alignment scaled by both magnitudes. Nothing inside a transformer normalizes before the score is taken, which is why score magnitude grows with $d_k$ and needs the $1/\\sqrt{d_k}$ correction, and why one large-norm key can dominate an attention distribution."
+    units: [u0, u3]
+
+  - id: U0-M6
+    name: dot-product-measures-distance
+    wrong_model: "A larger dot product means the two vectors are closer together in space; the dot product is a proximity measure."
+    why_appealing: "'Similar' and 'nearby' are the same word in ordinary use, and vector search is sold as nearest-neighbor retrieval, so proximity is the framing the tooling teaches."
+    failing_prediction: "If the dot product tracked distance it would decrease as vectors get farther apart - but for $q = [3,0]$, the nearer key $k_1 = [0.6,0.8]$ (distance $2.53$) scores $1.8$ while the farther key $k_2 = [6,8]$ (distance $8.54$) scores $18$. Farther, and ten times the score."
+    correction: "The dot product is not a distance and is not monotone in distance. It is a projection: how much of one vector lies along the other, times how long the other is. Squared Euclidean distance and the dot product are related by $\\lVert u - v \\rVert^2 = \\lVert u \\rVert^2 - 2(u \\cdot v) + \\lVert v \\rVert^2$, so they agree on ranking only when all norms are held equal."
+    units: [u0, u3]
+
+  - id: U0-M3
+    name: gradient-is-a-slope
+    wrong_model: "$\\partial L / \\partial W$ is a number - the slope of the loss, saying which way training is heading."
+    why_appealing: "That is exactly what a derivative is in one-variable calculus, which for most engineers is the last place a derivative was used for anything."
+    failing_prediction: "If the gradient were a scalar, the update $W \\leftarrow W - \\eta \\, \\partial L / \\partial W$ would subtract one number from every weight, moving all of them by the same amount in the same direction forever. Training would be a single global dial with no capacity to differentiate between parameters."
+    correction: "The gradient has the same shape as the thing it differentiates with respect to (denominator layout). Entry $(i,j)$ is the sensitivity of the scalar loss to weight $W_{ij}$ alone. Every weight receives its own individually computed step, which is what makes the entrywise update well-defined."
+    units: [u0, u2, u5]
+
+  - id: U0-M4
+    name: orientation-is-cosmetic
+    wrong_model: "Row-vector versus column-vector convention is a cosmetic choice - a transpose you fix up when the shapes complain."
+    why_appealing: "In scalar arithmetic orientation genuinely is nothing, and broadcasting in tensor libraries hides orientation errors until they surface far downstream as a wrong-but-plausible shape."
+    failing_prediction: "If it were cosmetic, a shape derived under one convention would carry over to the other - but a linear layer's weight matrix is $(d_{\\text{out}}, d_{\\text{in}})$ under $Wx$ and $(d_{\\text{in}}, d_{\\text{out}})$ under $xW$. The same weights are stored transposed between the two worlds, and every shape you derive in the wrong convention is backwards."
+    correction: "The convention is a global choice that must be identified before any equation can be read, and it is announced nowhere and checked by nothing. This book uses row vectors throughout: data on the left, weights on the right, inner dimensions contract at the join. A transpose in a real equation ($K^T$, $W^T$ in backprop) is load-bearing, not tidying."
+    units: [u0, u3, u4, u5]
+
+  - id: U0-M5
+    name: expectation-is-the-dataset-mean
+    wrong_model: "$\\mathbb{E}[\\cdot]$ is the average over the training set - the distribution language is formality for 'mean of the numbers I have'."
+    why_appealing: "It is what the training loop computes, and the dataset is the only concrete object in sight. The batch mean is right there in the code."
+    failing_prediction: "If the objective were defined over the dataset, then a model that memorized the dataset would have optimally solved the stated problem and generalization error would not exist as a concept - yet held-out loss is the only number anyone reports."
+    correction: "The objective is an expectation over a distribution nobody can enumerate; the batch mean is an unbiased but noisy estimate of it. That gap is not pedantry - it is why gradient noise scales as $1/\\sqrt{b}$, why batch size is a tuning knob, and why the loss you optimize is never the loss you care about."
+    units: [u0, u2, u5]
+
+  - id: U0-M7
+    name: expectation-is-the-typical-value
+    wrong_model: "$\\mathbb{E}[X]$ means the value you should expect to see - the typical or most likely outcome."
+    why_appealing: "'Expected' in English means 'what you would predict', and for symmetric distributions the mean really is the typical value, so the intuition survives most casual encounters."
+    failing_prediction: "If the expectation were the typical outcome, it would always be a value the variable can actually take - but the expected value of a fair die roll is 3.5, and the expected per-token loss of a language model is a number no single token need ever produce."
+    correction: "$\\mathbb{E}$ is the probability-weighted mean, a different statistic from the mode. On skewed distributions - which loss distributions are, heavily - the mean sits far from the typical value and is dragged by the tail. This is why a handful of pathological examples can dominate a training objective."
+    units: [u0, u5]
