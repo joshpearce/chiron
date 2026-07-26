@@ -64,6 +64,27 @@ and numeric items are graded in code and cost nothing). Worst case, an all-
 constructed check runs a little over a minute. Against 20-25 minutes of
 reading per chunk, the boundary wait is not the bottleneck.
 
+### A grading bug that was marking wrong answers correct
+
+Writing `server/corpus_lint.py` - a linter encoding the mechanical half of the
+verify pass - surfaced a defect in **my** code, not the corpus. The numeric
+comparison used `max(tol, |expected| * tol)`, which makes the tolerance
+*relative at the same magnitude*: `numeric(1)` meant plus or minus **100%**, so
+an answer double the correct one was graded right. Several parameter-count and
+bandwidth items were effectively ungradeable.
+
+Tolerance is now absolute (what `numeric(0.01)` reads as, and what the
+authoring spec documents), the offline JS grader mirrors it exactly, and
+`server/test_checkers.py` pins the contract - a beat must not grade one way in
+the reader and another at the boundary. While there, exact-match answers became
+tolerant of separator spacing, so `4,1;11,6` is no longer marked wrong against
+`4, 1; 11, 6`.
+
+The corpus now lints clean (0 errors). Run `.venv/bin/python corpus_lint.py`
+after any corpus edit - it checks tolerance collisions, machine-readable
+answers, distractor-to-misconception resolution, spec ratios, and depth
+headings that drifted from canon.
+
 ### Two app-breaking bugs the simulator found in ten minutes
 
 Running the app in the iOS Simulator (no cable, no unlock dance) immediately
