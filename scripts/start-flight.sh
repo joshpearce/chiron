@@ -32,11 +32,20 @@ echo "== 4/5 LM Studio API server =="
 lms server start || true
 
 echo "== 5/5 book-server on :8080 (all interfaces, so the iPad can reach it) =="
+# Binding all interfaces is not optional: a localhost bind leaves the iPad
+# unable to reach the Mac, which presents as the app hanging on "Thinking about
+# what you need next" rather than as a server misconfiguration.
 cd "$ROOT/server"
+pkill -f "chiron-server -addr" 2>/dev/null || true
 pkill -f "uvicorn main:app" 2>/dev/null || true
 sleep 1
-nohup .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8080 >> /tmp/book-server.log 2>&1 &
-sleep 4
+if [ ! -x "$ROOT/bin/chiron-server" ]; then
+  echo "  building chiron-server"
+  (cd "$ROOT/server-go" && go build -o "$ROOT/bin/chiron-server" ./cmd/chiron-server)
+fi
+nohup "$ROOT/bin/chiron-server" -addr 0.0.0.0:8080 -config "$ROOT/server/config.yaml" \
+  >> /tmp/book-server.log 2>&1 &
+sleep 3
 
 echo
 "$ROOT/scripts/preflight-check.sh" || true

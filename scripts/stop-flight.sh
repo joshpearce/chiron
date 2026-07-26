@@ -13,6 +13,7 @@ else
 fi
 
 sudo pmset -a disablesleep 0
+pkill -f "chiron-server -addr" 2>/dev/null || true
 pkill -f "uvicorn main:app" 2>/dev/null || true
 pkill -f "usb_bridge.py" 2>/dev/null || true
 lms unload --all 2>/dev/null || true

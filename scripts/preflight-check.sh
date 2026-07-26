@@ -28,7 +28,7 @@ fi
 if lsof -nP -i :8080 2>/dev/null | grep -q "TCP \*:8080"; then
   ok "book-server bound to all interfaces (iPad can reach it)"
 else
-  bad "book-server bound to localhost ONLY - the iPad will hang. Restart with --host 0.0.0.0"
+  bad "book-server bound to localhost ONLY - the iPad will hang. Restart with -addr 0.0.0.0:8080"
 fi
 
 # 3. The address the iPad is configured to use
