@@ -145,9 +145,11 @@ struct GateView: View {
                 }
             }
 
-            ScrollView {
+            let misses = results.filter { $0.feedbackMd != nil && !$0.passed }
+            if !misses.isEmpty {
+                ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(results.filter { $0.feedbackMd != nil && !$0.passed }) { r in
+                    ForEach(misses) { r in
                         VStack(alignment: .leading, spacing: 4) {
                             Label(r.itemId, systemImage: "xmark.circle")
                                 .font(.caption).foregroundStyle(.secondary)
@@ -157,8 +159,9 @@ struct GateView: View {
                         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
                     }
                 }
+                }
+                .frame(maxHeight: 380)
             }
-            .frame(maxHeight: 380)
 
             if gate.passed {
                 Button("Continue") { Task { await model.continueAfterGate(override: false) } }

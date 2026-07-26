@@ -39,6 +39,37 @@ Do this first:
   real weak-learner check - gate failed correctly, remediation issued,
   misconceptions U0-M1 + M2 diagnosed.
 
+### Two app-breaking bugs the simulator found in ten minutes
+
+Running the app in the iOS Simulator (no cable, no unlock dance) immediately
+surfaced two failures that neither the server tests nor the browser proxy could
+see, because both live in how Xcode packages the app:
+
+- **KaTeX was flattened into the bundle root.** `chapter.html` and the new
+  check-screen renderer both ask for `katex/katex.min.css` and
+  `katex/contrib/auto-render.min.js`; those paths did not exist, so **no math
+  would have rendered anywhere in the app** - the entire point of the book.
+  Fixed by making `Resources/katex` a folder reference in `project.yml`.
+  Note the device build cached the old flat layout: it took deleting
+  DerivedData, after which output moved to `ipad-app/build/`.
+- **One numeric answer killed the whole offline book.** Compute items answer
+  with a bare number (`answer: 6`); the client typed that field as a string, so
+  a single item made the entire 11-chapter bundle fail to decode and the
+  built-in fallback silently reported "No bundled book found". Fixed on both
+  sides - the server stringifies at the payload boundary, and the client now
+  decodes leniently.
+
+Both are verified fixed on screen in the simulator: the offline book loads and
+the check prompt renders as typeset math rather than raw `$[2, 0, -3]$`.
+
+**Use the simulator for UI work from now on** - `xcrun simctl` installs and
+launches without touching the iPad, and `simctl io <dev> screenshot` gives you
+the screen. Launch arguments drive it hands-free: `selftest` runs the full
+exchange loop, `showcheck` jumps straight to the most math-heavy check screen.
+Caveat: the simulator runs iOS 26 while the mini 4 runs iOS 15.8, so it is
+right for layout and logic but not a substitute for a real-device pass, and it
+cannot test the USB transport at all.
+
 ### The big one: every equation in the book was at risk
 
 Driving the app's real renderer in a browser (`server/test_render.py` writes a

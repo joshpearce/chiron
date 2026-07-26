@@ -9,8 +9,8 @@ struct ChironApp: App {
             ContentView()
                 .environmentObject(model)
                 .task {
-                    if SelfTest.showCheckRequested {
-                        SelfTest.showCheck(model)
+                    if let screen = SelfTest.inspectScreen {
+                        SelfTest.inspect(model, screen: screen)
                     } else if SelfTest.requested {
                         await SelfTest.run(model)
                     }
@@ -68,6 +68,10 @@ struct ContentView: View {
                 GeneratingOverlay()
             }
         }
+        // Fill the screen so the top-right chrome pins to the display corner.
+        // Without this the ZStack shrinks to its content and the badge drifts
+        // into the middle of the page on short screens like the gate.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showSpine) { SpineView() }
         .overlay(alignment: .topTrailing) {
             if !model.isMenu {

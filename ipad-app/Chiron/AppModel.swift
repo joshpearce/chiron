@@ -167,10 +167,15 @@ final class AppModel: ObservableObject {
     /// Debug affordance: the bundled chapters, for inspection harnesses.
     var staticChapters: [ChapterPayload] { staticBook }
 
-    /// Debug affordance: show a specific chapter without going through an
-    /// exchange, so a screen can be inspected in isolation.
-    func loadChapterForInspection(_ ch: ChapterPayload) {
-        setChapter(ch)
+    /// Debug affordances: show a specific chapter or screen without going
+    /// through an exchange, so any screen can be inspected in isolation.
+    func loadChapterForInspection(_ ch: ChapterPayload) { setChapter(ch) }
+    func showReadingForInspection() { screen = .reading }
+    func showPretestForInspection() { screen = .pretest }
+    func showBreakForInspection() {
+        screen = .takingBreak(BreakSuggestion(
+            minutes: 5, kind: "short",
+            note: "Chunk done. Five minutes, eyes off screens."))
     }
 
     private func advanceStatic() {
