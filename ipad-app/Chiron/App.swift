@@ -84,7 +84,11 @@ struct LibraryView: View {
 
     var body: some View {
         VStack(spacing: 28) {
-            VStack(spacing: 6) {
+            VStack(spacing: 10) {
+                Image("Logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 160)
                 Text("Chiron").font(.system(size: 52, weight: .semibold, design: .serif))
                 Text("Choose a subject. The book adapts as you read.")
                     .foregroundStyle(.secondary)
