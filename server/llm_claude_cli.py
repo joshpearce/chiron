@@ -9,7 +9,7 @@ extracted, checked against the schema's required keys, and retried once.
 from __future__ import annotations
 
 import json
-import os
+import shutil
 import subprocess
 
 from llm import UpstreamError
@@ -21,7 +21,6 @@ ROLE_TIMEOUTS = {"grader": 300, "planner": 300, "author": 900}
 # opus's latency, which is what makes a nine-item check tolerable. Authoring is
 # open-ended prose the learner reads for 25 minutes, so it keeps opus.
 ROLE_MODELS = {"grader": "sonnet", "planner": "sonnet", "author": "opus"}
-CRED_PATH = os.path.expanduser("~/.claude/.credentials.json")
 
 
 class ClaudeCLIChain:
@@ -30,26 +29,44 @@ class ClaudeCLIChain:
         self.model = model
         self.role_models = ROLE_MODELS
 
-    def _logged_in(self) -> bool:
-        return os.path.exists(CRED_PATH)
+    def _available(self) -> bool:
+        # Presence of the binary, not of credentials: the login lives in a
+        # file on Linux but in the Keychain on macOS, so probing storage
+        # reports "not logged in" on a machine that works fine. An actual
+        # auth failure surfaces through the CLI's own stderr, which says more
+        # than a guess would.
+        return shutil.which("claude") is not None
 
     def healthy_upstream(self):
-        return {"name": "claude-cli", "model": self.model} if self._logged_in() else None
+        return {"name": "claude-cli", "model": self.model} if self._available() else None
 
     def model_for(self, role: str) -> str:
         return self.model or self.role_models.get(role, "opus")
 
     def status(self) -> dict:
-        ok = self._logged_in()
+        ok = self._available()
         return {"connected": ok, "upstream": "claude-cli",
                 "model": self.model or "per-role: " + ", ".join(
                     f"{r}={m}" for r, m in self.role_models.items()),
-                "error": None if ok else "claude CLI not logged in"}
+                "error": None if ok else "`claude` not on PATH"}
+
+    def command(self, role: str, prompt: str, system: str) -> list[str]:
+        return ["claude", "-p", prompt,
+                "--append-system-prompt", system,
+                "--output-format", "json",
+                # These roles are pure text generation. Leaving the tools
+                # enabled let the model spend its one turn on a tool call,
+                # which exits non-zero as error_max_turns and throws the work
+                # away; it also prepends ~17k tokens of tool schemas to every
+                # call, which is most of what made grading slow.
+                "--tools", "",
+                "--max-turns", "1",
+                "--model", self.model_for(role)]
 
     def structured(self, role: str, system: str, user: str, schema: dict,
                    schema_name: str = "result") -> dict:
-        if not self._logged_in():
-            raise UpstreamError("claude-cli: not logged in")
+        if not self._available():
+            raise UpstreamError("claude-cli: `claude` not on PATH")
         prompt = (f"{user}\n\n"
                   f"Respond with ONLY a single JSON object matching this JSON Schema - "
                   f"no prose, no code fences, no tool use:\n"
@@ -58,18 +75,17 @@ class ClaudeCLIChain:
         for attempt in range(2):
             try:
                 proc = subprocess.run(
-                    ["claude", "-p", prompt,
-                     "--append-system-prompt", system,
-                     "--output-format", "json",
-                     "--max-turns", "1",
-                     "--model", self.model_for(role)],
+                    self.command(role, prompt, system),
                     capture_output=True, text=True,
                     timeout=ROLE_TIMEOUTS.get(role, 240),
                 )
             except subprocess.TimeoutExpired as e:
                 raise UpstreamError(f"claude-cli: timed out ({role})") from e
             if proc.returncode != 0:
-                last_err = proc.stderr.strip()[-300:] or f"exit {proc.returncode}"
+                # With --output-format json the CLI reports the cause on
+                # stdout, so stderr alone leaves a bare "exit 1".
+                detail = (proc.stderr.strip() or proc.stdout.strip())[-400:]
+                last_err = detail or f"exit {proc.returncode}"
                 continue
             try:
                 envelope = json.loads(proc.stdout)

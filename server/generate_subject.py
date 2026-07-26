@@ -26,6 +26,8 @@ import yaml
 from llm_anthropic import make_chain
 
 HERE = Path(__file__).parent
+# Authoring wants the strongest engine available, which is rarely the one the
+# flight config points at; CHIRON_PROVIDER overrides it (see make_chain).
 CFG = yaml.safe_load((HERE / "config.yaml").read_text())
 SPEC = (HERE.parent / "corpus/authoring-spec.md")
 

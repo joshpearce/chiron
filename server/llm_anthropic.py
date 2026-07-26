@@ -11,6 +11,7 @@ model claude-opus-5, structured output via output_config.format json_schema
 from __future__ import annotations
 
 import json
+import os
 
 from llm import UpstreamError
 
@@ -104,10 +105,15 @@ class AnthropicChain:
 
 def make_chain(cfg: dict):
     """Chain factory: 'anthropic' -> Claude SDK; 'claude-cli' -> headless
-    Claude Code (subscription auth); anything else -> LM Studio."""
+    Claude Code (subscription auth); anything else -> LM Studio.
+
+    CHIRON_PROVIDER overrides the configured provider, so a test or an
+    authoring run can pick an engine without editing the config the flight
+    server actually boots from.
+    """
     from llm import LLMChain
 
-    provider = cfg.get("provider")
+    provider = os.environ.get("CHIRON_PROVIDER") or cfg.get("provider")
     if provider == "anthropic":
         return AnthropicChain(cfg.get("anthropic_model", MODEL))
     if provider == "claude-cli":

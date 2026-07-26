@@ -1,0 +1,309 @@
+misconceptions:
+- id: M1
+  name: encryption-implies-integrity
+  wrong_model: Encrypting data also guarantees an attacker cannot tamper with it -
+    if they cannot read the plaintext, they cannot meaningfully change it either.
+  why_appealing: Confidentiality and integrity both feel like 'the attacker can't
+    do bad things to my data,' so one property intuitively seems to cover the other.
+  failing_prediction: Predicts that flipping bits in a CTR-mode ciphertext should
+    either fail to decrypt or produce garbage the receiver would notice. In fact CTR-mode
+    bit flips propagate to identical bit flips in the decrypted plaintext with no
+    error raised at all - an attacker can predictably alter specific plaintext bits
+    (e.g. an amount field) with zero detection.
+  correction: Confidentiality (attacker can't read it) and integrity (attacker can't
+    modify it undetected) are independent properties requiring independent mechanisms.
+    Encryption alone buys you neither integrity nor authenticity - you need a MAC
+    or an AEAD construction.
+  units:
+  - u0
+  - u1
+- id: M2
+  name: linear-key-strength-scaling
+  wrong_model: Security scales linearly with key length - a 256-bit key is roughly
+    'twice as secure' as a 128-bit key.
+  why_appealing: Doubling most resources (RAM, bandwidth, cores) gives roughly proportional
+    real-world benefit, so doubling key length feels like it should give a proportional
+    security benefit too.
+  failing_prediction: Predicts brute-forcing AES-256 takes about 2x as long as AES-128.
+    It actually takes 2^128 times longer - the security parameter is an exponent,
+    not a linear scale.
+  correction: Key length is the exponent in the attacker's work factor (2^n guesses
+    for an n-bit key), so each additional bit doubles the work; going from 128 to
+    256 bits is not a 2x increase, it's a 2^128x increase.
+  units:
+  - u0
+- id: M3
+  name: ecb-inherits-aes-security
+  wrong_model: Since AES the block cipher is unbroken, encrypting data block-by-block
+    with AES (ECB mode) is secure - the cipher's strength should carry through.
+  why_appealing: ECB looks like 'just use the secure primitive directly, no extra
+    moving parts to get wrong,' which reads as simpler and therefore safer.
+  failing_prediction: Predicts that ECB-encrypting an image should produce output
+    indistinguishable from random noise. In practice, identical plaintext blocks always
+    produce identical ciphertext blocks, so large-scale structure in the input (the
+    ECB penguin) remains visible in the ciphertext.
+  correction: A secure block cipher (PRP) only guarantees that individual block encryptions
+    are indistinguishable from random - it says nothing about patterns across blocks.
+    Mode of operation, not just the cipher, determines whether the overall scheme
+    leaks structure; ECB deterministically maps repeated plaintext to repeated ciphertext.
+  units:
+  - u1
+- id: M4
+  name: iv-must-be-secret
+  wrong_model: The IV is used inside the encryption computation just like the key,
+    so it must be kept secret to preserve security.
+  why_appealing: Both the key and the IV feed into the cipher's internal state, so
+    treating them with the same secrecy requirement seems consistent.
+  failing_prediction: Predicts that sending the IV in the clear alongside the ciphertext
+    (as every real CBC/CTR implementation does) should break confidentiality. It does
+    not - CBC and CTR remain secure with a public IV, and every deployed protocol
+    transmits it unencrypted.
+  correction: CBC's security proof requires the IV to be unpredictable in advance
+    (or unique, depending on the mode), not secret. Secrecy and unpredictability/uniqueness
+    are different requirements with different consequences when violated.
+  units:
+  - u1
+- id: M5
+  name: ctr-nonce-reuse-graceful-degradation
+  wrong_model: CTR mode reusing a (key, nonce) pair for two messages weakens security
+    a bit, similar to how reusing an IV in CBC only partially degrades things.
+  why_appealing: Most crypto misuse feels like it should degrade security proportionally
+    to how badly you misused it - a small mistake, a small leak.
+  failing_prediction: Predicts that reusing a CTR nonce leaks only some information
+    about the two plaintexts. In fact XORing the two resulting ciphertexts cancels
+    the keystream entirely, yielding the XOR of the two plaintexts directly - full
+    recovery of both messages is possible via crib-dragging, a classic two-time-pad
+    break.
+  correction: 'CTR mode nonce reuse is not a graceful-degradation failure, it is a
+    full catastrophic break: the keystream becomes a reusable one-time pad, and any
+    known-plaintext or statistical structure in one message can be used to recover
+    the other.'
+  units:
+  - u1
+- id: M6
+  name: naive-hash-key-mac
+  wrong_model: 'A message authentication code can be built as H(key || message): hash
+    the message with a secret key glued on the front, since only the key holder could
+    reproduce that exact hash.'
+  why_appealing: It is the simplest possible way to 'add a secret' to a hash, and
+    hashing already feels tamper-evident, so prepending a key seems like it should
+    upgrade that to authentication.
+  failing_prediction: 'Predicts H(key||msg) is unforgeable without knowledge of key.
+    For Merkle-Damgard hashes (SHA-1, SHA-256) it is not: given H(key||msg) and len(key),
+    an attacker can compute H(key || msg || padding || extension) for a chosen extension
+    without ever learning key, because the internal chaining state after processing
+    key||msg is exactly the hash output itself, and Merkle-Damgard lets you resume
+    hashing from that state.'
+  correction: Use HMAC's nested construction, HMAC(key,msg) = H((key XOR opad) ||
+    H((key XOR ipad) || msg)), which is proven resistant to length-extension precisely
+    because the outer hash re-processes an already-hashed value, breaking the state-resumption
+    trick.
+  units:
+  - u2
+- id: M7
+  name: collision-and-preimage-same-cost
+  wrong_model: Finding a collision in an n-bit hash function costs about the same
+    as finding a preimage - both should take roughly 2^n attempts.
+  why_appealing: Both attacks are phrased as 'search an n-bit output space,' so it
+    is natural to assume the same output space size implies the same search cost.
+  failing_prediction: Predicts that finding two colliding SHA-256 inputs requires
+    about 2^256 hash computations, same as finding a preimage. The birthday bound
+    means a collision is findable in about 2^128 computations - the square root of
+    the preimage cost - because you are comparing pairs among a growing set of samples,
+    not searching for one fixed target.
+  correction: 'Collision resistance degrades at half the bit-strength of preimage
+    resistance due to the birthday bound: an n-bit hash gives roughly n bits of preimage
+    security but only n/2 bits of collision security, which is exactly why hash output
+    sizes are chosen twice as large as the desired collision-resistance level.'
+  units:
+  - u2
+- id: M8
+  name: gcm-nonce-reuse-confidentiality-only
+  wrong_model: Reusing a nonce in AES-GCM is bad in the same way CTR nonce reuse is
+    bad - it leaks the XOR of two plaintexts, a confidentiality problem, but authentication
+    is unaffected.
+  why_appealing: GCM's encryption core literally is CTR mode, so it seems reasonable
+    that GCM's nonce-reuse failure mode is just CTR's failure mode with an extra authentication
+    tag riding along unaffected.
+  failing_prediction: Predicts that after a nonce reuse, forged/modified ciphertexts
+    should still be rejected by GCM's authentication tag. In fact nonce reuse also
+    lets an attacker recover the authentication subkey H algebraically from two tag
+    computations, after which they can forge valid authentication tags for arbitrary
+    chosen ciphertexts - this is the published 'forbidden attack' on GCM.
+  correction: 'GCM nonce reuse is catastrophic for both confidentiality and integrity
+    simultaneously, not just confidentiality: the keystream reuse leaks plaintext
+    XOR (as in any CTR-mode misuse) and additionally exposes the polynomial authentication
+    key H, breaking unforgeability for all future messages under that key.'
+  units:
+  - u3
+- id: M9
+  name: mac-order-doesnt-matter
+  wrong_model: Encrypt-then-MAC and MAC-then-encrypt are interchangeable - both apply
+    the same two operations, just in a different order, so security should be equivalent.
+  why_appealing: The two primitives (a cipher and a MAC) are identical in both schemes;
+    only the order of two black-box operations changes, and composition order often
+    does not matter for correctness in software.
+  failing_prediction: Predicts that MAC-then-encrypt (e.g. classic SSL/TLS CBC-HMAC)
+    is just as resistant to chosen-ciphertext tampering as encrypt-then-MAC. In practice,
+    MAC-then-encrypt forces the receiver to decrypt (and check padding) before it
+    can verify the MAC, and the padding-validity outcome is an observable side channel
+    - this is exactly what powered the padding-oracle attacks (Vaudenay, POODLE, Lucky13)
+    that broke real TLS deployments.
+  correction: 'Composition order changes the security proof entirely: encrypt-then-MAC
+    lets the receiver verify the MAC over the ciphertext and reject tampered data
+    before ever decrypting it, so no decryption-dependent side channel can leak; MAC-then-encrypt
+    has no such guarantee and is not generically secure against active attackers.'
+  units:
+  - u3
+- id: M10
+  name: dh-implies-authentication
+  wrong_model: Diffie-Hellman key exchange authenticates the two parties, since only
+    they can derive the resulting shared secret - agreeing on a secret sounds like
+    proving who you are.
+  why_appealing: DH's headline property is 'a passive eavesdropper cannot compute
+    the shared secret,' which is easy to conflate with 'the parties have confirmed
+    each other's identity.'
+  failing_prediction: 'Predicts that plain, unauthenticated DH is immune to man-in-the-middle.
+    It is not: an active attacker can run one DH exchange with the client and a separate
+    DH exchange with the server, establishing two independent shared secrets and transparently
+    relaying (and reading/modifying) all traffic between them - each side believes
+    it has a private channel to the other.'
+  correction: DH guarantees only that a passive observer of the exchanged public values
+    cannot compute the shared secret; it makes no claim about who is on the other
+    end. Authentication requires an additional mechanism (signatures over the exchange,
+    certificates) layered on top - which is precisely why TLS signs the handshake
+    transcript rather than trusting raw ECDHE alone.
+  units:
+  - u4
+- id: M11
+  name: dlp-and-factoring-are-the-same-hardness
+  wrong_model: The discrete logarithm problem and integer factoring are essentially
+    the same hard problem, so RSA and Diffie-Hellman should use comparably sized keys
+    for comparable security, and elliptic-curve keys should need to be just as large
+    as RSA keys for the same strength.
+  why_appealing: RSA and DH/DSA are almost always taught side by side as 'the two
+    classic hard-problem asymmetric schemes,' and both are described informally as
+    'exponentiation is easy, the inverse is hard,' inviting the assumption that they
+    are the same hardness with different packaging.
+  failing_prediction: Predicts that a 256-bit elliptic-curve key needs to be roughly
+    as large as a 256-bit RSA modulus for equivalent security - i.e. wildly insecure.
+    In practice a 256-bit EC key (secp256r1/Curve25519-class) is considered roughly
+    equivalent in strength to a 3072-bit RSA key, because the best known attacks on
+    elliptic-curve discrete log run in fully exponential time, while the best known
+    attacks on factoring and finite-field discrete log (GNFS, index calculus) run
+    in subexponential time.
+  correction: Factoring, finite-field discrete log, and elliptic-curve discrete log
+    are three distinct hard problems with different best-known attack complexity classes,
+    so they require different key sizes for the same security level - there is no
+    single 'crypto key size' number that transfers across problem types.
+  units:
+  - u4
+- id: M12
+  name: textbook-rsa-is-safe-to-use-directly
+  wrong_model: RSA encryption is c = m^e mod n, a one-way trapdoor function - since
+    it is computationally hard to invert without the private key d, it should be safe
+    to encrypt a message directly with it.
+  why_appealing: The trapdoor property (easy forward, hard backward without the secret)
+    is exactly the property that makes public-key encryption possible at all, so it
+    feels like the whole security story.
+  failing_prediction: 'Predicts textbook RSA(m) behaves like a secure public-key encryption
+    scheme (semantically secure / IND-CPA). It does not: RSA is deterministic, so
+    encrypting the same plaintext twice gives the same ciphertext, enabling equality
+    and dictionary attacks; and it is multiplicatively homomorphic, since (m1^e mod
+    n)*(m2^e mod n) = (m1*m2)^e mod n, which enables chosen-ciphertext manipulation
+    (Bleichenbacher-style attacks) and small-exponent/broadcast attacks against unpadded
+    messages.'
+  correction: One-wayness of the trapdoor function is necessary but not sufficient
+    for secure encryption. Real systems use randomized padding schemes (OAEP) that
+    inject fresh randomness and structural checks into every encryption, destroying
+    both determinism and the exploitable algebraic structure of raw modular exponentiation.
+  units:
+  - u5
+- id: M13
+  name: signing-is-encrypting-with-the-private-key
+  wrong_model: A digital signature is just public-key encryption run backwards - 'encrypt
+    with the private key, decrypt with the public key' - so signing and encrypting
+    are the same operation with the key roles swapped.
+  why_appealing: For textbook RSA specifically, sign(m) = m^d mod n and encrypt(m)
+    = m^e mod n look like literally the same modular exponentiation with the exponents
+    swapped, which generalizes (wrongly) into 'signing is just reverse encryption'
+    as a mental model for all signature schemes.
+  failing_prediction: Predicts that, like an IV, the per-signature randomness used
+    in ECDSA can be reused across different messages without serious consequence -
+    a merely 'weaker' choice, not a broken one. In fact reusing the ephemeral nonce
+    k across two ECDSA signatures on different messages lets anyone with both signatures
+    solve two linear equations for two unknowns and recover the signer's private key
+    directly - this is exactly how the Sony PS3 signing key and multiple Bitcoin wallets
+    were extracted.
+  correction: Signature schemes (ECDSA, EdDSA, RSA-PSS) are a distinct algebraic construction
+    from encryption, not encryption performed in reverse; ECDSA in particular depends
+    on a fresh, unpredictable per-signature secret nonce, and reusing or biasing that
+    nonce is a total private-key compromise, unlike IV reuse in a cipher which is
+    comparatively contained.
+  units:
+  - u5
+- id: M14
+  name: tls-handshake-is-just-a-dh-exchange
+  wrong_model: The TLS 1.3 handshake's job is to run a Diffie-Hellman exchange to
+    agree on a session key - once that succeeds, the connection should be secure.
+  why_appealing: ECDHE is the headline cryptographic operation in the handshake and
+    the part most often diagrammed, so it is easy to treat as the whole mechanism
+    and see certificates, transcript hashes, and Finished messages as bureaucratic
+    overhead around it.
+  failing_prediction: 'Predicts that a successful DH exchange alone protects the negotiation
+    from tampering and confirms server identity, and that if an active attacker altered
+    the ClientHello''s offered cipher suites or extensions, the resulting connection
+    would still be safe as long as the DH math checked out. Real TLS downgrade attacks
+    rely on exactly this gap: without the transcript hash binding every handshake
+    message and the server''s signature over that transcript (CertificateVerify),
+    an attacker can tamper with the negotiation itself and remain undetected.'
+  correction: ECDHE only produces a shared secret between whoever performed the two
+    halves of the exchange - it says nothing about who that is or whether the negotiation
+    was tampered with. The transcript hash (a running hash of every handshake message)
+    plus the server's signature over it and the Finished MACs are what authenticate
+    the server and detect any tampering with the negotiation, and they are load-bearing,
+    not decorative.
+  units:
+  - u6
+- id: M15
+  name: 0-rtt-is-just-riskier-1-rtt
+  wrong_model: TLS 1.3's 0-RTT early data is a slightly riskier version of normal
+    encrypted application data - since it's still encrypted with a real derived key,
+    it's safe to send anything that doesn't strictly need forward secrecy.
+  why_appealing: 0-RTT data is genuinely encrypted end to end with a proper key derived
+    from the resumption PSK, so it is easy to assume 'encrypted' covers the relevant
+    risk and the only tradeoff is a slightly weaker key schedule.
+  failing_prediction: 'Predicts that an attacker who captures a 0-RTT ClientHello
+    plus early data record cannot do anything useful with it since they can''t decrypt
+    it. In fact they don''t need to: they can simply replay the exact same captured
+    record to the server again, and the server will decrypt and process it a second
+    time (or more) - because 0-RTT keys are derived without fresh server-contributed
+    randomness before the data is accepted, there is no built-in replay protection.'
+  correction: 0-RTT's exposure is a replay problem, not a confidentiality problem
+    - the data is genuinely encrypted, but a network attacker can resend the identical
+    captured record and have it processed again. 0-RTT should only be used for operations
+    that are safe to execute more than once (or paired with application-level anti-replay),
+    never for state-changing requests like a purchase.
+  units:
+  - u6
+- id: M16
+  name: tls-success-implies-correct-validation
+  wrong_model: TLS itself validates the certificate chain and hostname correctly,
+    so if an HTTPS connection succeeds (padlock shown, no error), certificate verification
+    happened as designed.
+  why_appealing: Certificate validation is specified as part of the TLS/PKI standard
+    and is 'supposed to' run on every connection, so a successful connection feels
+    like proof that it did.
+  failing_prediction: Predicts that a shipped, widely-used TLS client library cannot
+    silently skip signature or hostname verification while still reporting success.
+    Apple's 'goto fail' bug (CVE-2014-1266) shipped for months with a duplicated goto
+    statement that caused the signature-verification code to be skipped entirely -
+    connections to attacker-controlled servers with invalid certificates succeeded
+    normally, with no error shown to the user or the calling application.
+  correction: TLS's security guarantees are only as strong as the specific implementation's
+    validation code path actually executed at runtime; 'the connection used TLS' or
+    'no error was thrown' is not itself evidence that chain and hostname validation
+    ran and rejected correctly - that has to be verified directly (test against a
+    known-bad cert) rather than inferred from a successful handshake.
+  units:
+  - u7

@@ -1,0 +1,206 @@
+learner:
+  profile: Experienced software engineer, fluent in systems and code, who wants the
+    real equations behind symmetric ciphers, hashes, MACs, key exchange, and TLS 1.3
+    rather than diagrams-only hand-waving. Rusty on number theory (modular arithmetic,
+    groups, discrete logs) and unfamiliar with formal crypto notation (PRP, IND-CPA,
+    negligible-function style claims) - these get explained from scratch, in place,
+    the first time they appear. No prior crypto coursework assumed. Comfortable with
+    big-O style reasoning, bit manipulation, and reading protocol state machines,
+    so those are leaned on for intuition instead of re-taught.
+defaults:
+  mastery_gate: 0.8
+  extension_trigger: 0.9
+  check_min_items: 8
+  check_constructed_fraction: 0.6
+  check_callback_fraction: 0.4
+  chunk_minutes:
+  - 20
+  - 25
+units:
+- id: u0
+  slug: security-goals-and-math-toolkit
+  title: Security Goals and the Math Toolkit
+  minutes: 10
+  prereqs: []
+  concepts:
+  - id: c-cia-triad
+    name: Confidentiality, integrity, and authenticity as separate properties
+  - id: c-threat-model
+    name: 'Threat models: passive vs active attackers, CPA vs CCA'
+  - id: c-modular-arithmetic
+    name: Modular arithmetic and groups, refreshed
+  - id: c-xor-properties
+    name: XOR as a self-inverse operation and the one-time pad
+  - id: c-key-entropy
+    name: Keyspace size, bits of security, and exponential brute-force cost
+  notes: 'Sets vocabulary used everywhere downstream: what ''secure'' means as three
+    distinct, independently failable properties, and the two pieces of math notation
+    (mod arithmetic, XOR) reused in every later unit. The one-time pad gives a clean
+    worked example of perfect secrecy before anything gets approximate. This is the
+    one unit with no crypto-specific prereqs, so it is the entry point.'
+- id: u1
+  slug: symmetric-ciphers-and-modes
+  title: Symmetric Block Ciphers and Modes of Operation
+  minutes: 15
+  prereqs:
+  - u0
+  concepts:
+  - id: c-block-cipher
+    name: Block cipher as a keyed pseudorandom permutation (PRP)
+  - id: c-spn
+    name: Substitution-permutation network structure (AES round intuition)
+  - id: c-ecb-mode
+    name: ECB mode and why identical blocks leak
+  - id: c-cbc-mode
+    name: 'CBC mode: chaining, IV requirement, padding-oracle exposure'
+  - id: c-ctr-mode
+    name: 'CTR mode: block cipher as a stream cipher via a counter'
+  - id: c-iv-nonce
+    name: 'IV vs nonce: uniqueness and unpredictability requirements'
+  notes: AES is presented as a keyed permutation built from rounds of substitution
+    and diffusion - enough to reason about why it behaves like a PRP, not a from-scratch
+    S-box derivation. The real payload is that a secure block cipher does not make
+    a secure mode; ECB and CTR are used to make that observable rather than asserted.
+- id: u2
+  slug: hash-functions-and-macs
+  title: Hash Functions and Message Authentication Codes
+  minutes: 14
+  prereqs:
+  - u0
+  concepts:
+  - id: c-cryptographic-hash
+    name: Preimage, second-preimage, and collision resistance
+  - id: c-birthday-bound
+    name: 'Birthday bound: collision search costs sqrt(2^n), not 2^n'
+  - id: c-merkle-damgard
+    name: Merkle-Damgard iterated construction
+  - id: c-length-extension-attack
+    name: Length-extension attack on Merkle-Damgard hashes
+  - id: c-mac
+    name: Message authentication codes and unforgeability
+  - id: c-hmac
+    name: HMAC's nested construction and why naive H(key||msg) fails
+  notes: 'Independent of u1 (no block cipher needed), so it can run in parallel conceptually,
+    but is sequenced after symmetric ciphers to keep ''confidentiality primitives''
+    and ''integrity primitives'' as two clean back-to-back blocks before they get
+    combined in u3. HMAC is the unit''s payload: understanding why the obvious construction
+    is broken motivates the nested one.'
+- id: u3
+  slug: authenticated-encryption
+  title: Authenticated Encryption (AEAD)
+  minutes: 14
+  prereqs:
+  - u1
+  - u2
+  concepts:
+  - id: c-aead
+    name: 'AEAD: combined confidentiality, integrity, and associated data'
+  - id: c-encrypt-then-mac
+    name: 'Composition order: encrypt-then-MAC vs MAC-then-encrypt'
+  - id: c-gcm-mode
+    name: 'GCM: CTR-mode encryption plus GHASH polynomial authentication'
+  - id: c-nonce-reuse-catastrophe
+    name: Nonce reuse in GCM as a total break, not a partial leak
+  - id: c-chacha20-poly1305
+    name: ChaCha20-Poly1305 as an alternative AEAD construction
+  notes: 'This is where u1''s cipher modes and u2''s MACs get fused, and where the
+    two most consequential real-world footguns live: MAC-then-encrypt padding oracles
+    (Lucky13-style) and AES-GCM nonce reuse. Both misconceptions here are ''partial
+    correctness that fails catastrophically at the boundary,'' which is exactly the
+    kind of trap this audience is likely to hold.'
+- id: u4
+  slug: number-theory-and-key-exchange
+  title: Number Theory and Diffie-Hellman Key Exchange
+  minutes: 15
+  prereqs:
+  - u0
+  concepts:
+  - id: c-modular-exponentiation
+    name: Modular exponentiation and why it is easy forward, hard backward
+  - id: c-discrete-log-problem
+    name: The discrete logarithm problem
+  - id: c-cyclic-group
+    name: Cyclic groups, generators, and group order
+  - id: c-diffie-hellman
+    name: Diffie-Hellman key exchange, worked with small numbers
+  - id: c-elliptic-curve-group
+    name: Elliptic-curve groups and ECDH as DH in a different group
+  - id: c-mitm-on-dh
+    name: Why unauthenticated DH is fully vulnerable to man-in-the-middle
+  notes: 'This is the pivot from symmetric to asymmetric crypto and the unit most
+    likely to need the rustiest math rebuilt from scratch: groups, generators, and
+    ''easy forward, hard backward'' get a small worked numeric example (single-digit
+    modulus) before ECDH is introduced as ''the same protocol, a different group.''
+    Only depends on u0''s modular arithmetic, so it could in principle run earlier,
+    but is sequenced here so key exchange, encryption, and signatures form one contiguous
+    asymmetric arc before TLS.'
+- id: u5
+  slug: public-key-encryption-and-signatures
+  title: Public-Key Encryption and Digital Signatures
+  minutes: 14
+  prereqs:
+  - u4
+  concepts:
+  - id: c-rsa-trapdoor
+    name: 'RSA trapdoor: n=pq, Euler''s totient, the e/d relationship'
+  - id: c-rsa-padding
+    name: Why textbook RSA is broken and what OAEP fixes
+  - id: c-digital-signature
+    name: Digital signatures as a distinct primitive from encryption
+  - id: c-ecdsa
+    name: ECDSA signing and why per-signature nonce reuse leaks the private key
+  - id: c-certificate-chain
+    name: 'Certificate chains: binding a public key to an identity via CA signatures'
+  notes: Builds directly on u4's modular exponentiation and discrete-log framing to
+    introduce RSA and ECDSA as two different hard-problem instantiations of 'sign
+    with a secret, verify with a public value.' Certificate chains are introduced
+    here (not in u6) because they are a signature-scheme application, and TLS then
+    just consumes them.
+- id: u6
+  slug: tls-1-3-handshake
+  title: The TLS 1.3 Handshake, End to End
+  minutes: 16
+  prereqs:
+  - u3
+  - u5
+  concepts:
+  - id: c-tls-handshake-flow
+    name: 'TLS 1.3 message flow: ClientHello/ServerHello to Finished, 1-RTT'
+  - id: c-ephemeral-ecdhe
+    name: Ephemeral ECDHE and forward secrecy
+  - id: c-hkdf
+    name: 'HKDF: extract-and-expand key derivation'
+  - id: c-tls-key-schedule
+    name: 'The TLS 1.3 key schedule tree: early, handshake, and master secrets'
+  - id: c-transcript-hash
+    name: 'Transcript hash: binding every handshake message against tampering'
+  - id: c-0-rtt-replay-risk
+    name: 0-RTT early data and its replay exposure
+  notes: 'The synthesis unit: every prior unit is a component TLS 1.3 assembles -
+    AEAD (u3) for the record layer, ECDHE (u4/u5) for the key agreement, signatures
+    and certs (u5) for authentication, HMAC/HKDF (u2) for key derivation. The handshake
+    is walked as an actual message sequence with the key-schedule equations worked
+    numerically, not just diagrammed.'
+- id: u7
+  slug: where-real-systems-fail
+  title: Where Real Systems Get Cryptography Wrong
+  minutes: 12
+  prereqs:
+  - u6
+  concepts:
+  - id: c-padding-oracle-attack
+    name: Padding-oracle attacks (Vaudenay/POODLE-style)
+  - id: c-nonce-reuse-in-practice
+    name: Real-world AES-GCM nonce collisions
+  - id: c-downgrade-attack
+    name: Protocol and cipher-suite downgrade attacks
+  - id: c-timing-side-channel
+    name: Timing side channels from non-constant-time comparisons
+  - id: c-cert-validation-failures
+    name: Certificate and hostname validation bugs (e.g. goto fail)
+  - id: c-supply-chain-crypto-misuse
+    name: Weak randomness and nonce reuse in the wild (PS3 ECDSA, etc.)
+  notes: 'Terminal unit: takes the mechanisms from u1-u6 and shows each one''s real
+    incident, closing the loop from ''here is the equation'' to ''here is the CVE
+    that happened when someone got the equation''s precondition wrong.'' Deliberately
+    kept short - this is application of prior units, not new primitives.'
