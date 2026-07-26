@@ -418,6 +418,11 @@ read a book is not here to fill in a form. If an answer is vague on something \
 that matters, follow up once; if it is still vague, choose a sensible default \
 and say which default you chose.
 
+Every reply must do one of exactly two things. Either `done` is false and \
+reply_md ENDS IN A QUESTION - never a summary of what you are about to build, \
+because the learner has nothing to answer and the conversation stalls - or \
+`done` is true and you have written the brief. There is no third kind of turn.
+
 When you have enough, set done and write the brief as a single paragraph in \
 the learner's own voice: what they want, what they already know, how long they \
 have, and how deep the math goes. Everything the planner sees comes from that \
@@ -433,7 +438,15 @@ def elicit_turn(chain: LLMChain, messages: list[dict]) -> dict:
                         for m in messages)
     user = f"CONVERSATION SO FAR:\n\n{convo}\n\nYour turn."
     try:
-        return chain.structured("planner", ELICITOR_SYSTEM, user, ELICIT_SCHEMA, "elicit")
+        out = chain.structured("planner", ELICITOR_SYSTEM, user, ELICIT_SCHEMA, "elicit")
+        # A turn that neither asks nor finishes is a dead end - the learner is
+        # handed a summary with nothing to reply to. Smaller local models do
+        # this; rather than stall the screen, turn it back into a question.
+        if not out.get("done") and "?" not in out.get("reply_md", ""):
+            out["reply_md"] = (out.get("reply_md", "").rstrip()
+                               + "\n\nHave I got that right, or is there something "
+                                 "important I have wrong?")
+        return out
     except UpstreamError as e:
         return {"reply_md": f"No model reachable ({e}). Nothing was lost - try again when connected.",
                 "done": False, "brief": "", "slug": "", "title": ""}

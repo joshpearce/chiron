@@ -518,11 +518,23 @@ def _generate(slug: str, title: str, brief: str) -> None:
         note(stage="failed", error=str(e)[:300], done=True)
 
 
+def _slugify(raw: str) -> str:
+    """Normalize a model-proposed slug into a directory-safe id.
+
+    The slug names a directory, so it has to be constrained - but rejecting the
+    model's formatting (underscores, capitals, trailing punctuation) would fail
+    the request over something with an obvious right answer. Reject only what
+    normalizes to nothing.
+    """
+    slug = re.sub(r"[^a-z0-9]+", "-", raw.strip().lower()).strip("-")
+    return slug[:32].strip("-")
+
+
 @app.post("/teach/create")
 def teach_create(c: TeachCreate):
-    slug = c.slug.strip().lower()
+    slug = _slugify(c.slug)
     if not SLUG_OK.match(slug):
-        raise HTTPException(422, "slug must be lowercase letters, digits and hyphens")
+        raise HTTPException(422, "slug must contain letters or digits")
     if slug in SUBJECTS:
         raise HTTPException(409, f"subject '{slug}' already exists")
     with _jobs_lock:

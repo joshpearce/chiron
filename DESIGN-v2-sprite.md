@@ -69,9 +69,21 @@ misconceptions.
 - **Flipping the sprite URL to public is deliberately left to Matt.** It is an
   outward-facing exposure change, and an open endpoint backed by his Claude
   subscription is somebody else's free tokens. Set `auth_token` first.
-- **Grading latency is the real v2 problem**: ~55s per item, because each grade
-  is a separate `claude -p` with full harness startup. A 9-item check would take
-  ~8 minutes. Batching all items into one call is the fix (tracked separately).
+- **Grading latency was not what it looked like.** The diagnosis was "per-call
+  harness startup dominates, so batch the items" - and batching measured as no
+  improvement at all (162s vs 165s), which should have been the clue. The
+  actual cause was that `claude -p` ran with its built-in tools enabled: the
+  ~17k tokens of tool schemas were re-sent on every call, and worse, the model
+  could spend its single `--max-turns 1` turn on a tool call, which exits
+  non-zero as `error_max_turns` and throws the generated work away. So grading
+  was not merely slow, it was intermittently failing outright.
+
+  With `--tools ""` the red-team runs 5/5 at **~7s per item** (measured on the
+  Mac; the sprite still needs the deploy to confirm). A nine-item check goes
+  from ~8 minutes to under a minute, which removes the reason batching existed.
+  `batch_grading` stays off by default.
+
+  **The sprite is still running the old code.** Deploying is Matt's call.
 
 ## Open questions
 
