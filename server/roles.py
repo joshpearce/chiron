@@ -223,7 +223,10 @@ def author_chapter(chain: LLMChain, unit, directives: dict, corpus) -> tuple[lis
     assembled = []  # [{heading, markdown, beats:[ids]}]
     for s in unit.sections:
         md = s.markdown()
-        if depth in unit.depths and s.heading in unit.depths[depth]:
+        # swap only when the variant is substantial - depth files legitimately
+        # contain "nothing to add here" stubs for some sections
+        if (depth in unit.depths and s.heading in unit.depths[depth]
+                and len(unit.depths[depth][s.heading]) > 400):
             # swap prose, keep the canonical beats appended after variant prose
             beats = [seg for seg in s.segments if seg["type"] == "beat"]
             md = f"## {s.heading}\n\n" + unit.depths[depth][s.heading]
