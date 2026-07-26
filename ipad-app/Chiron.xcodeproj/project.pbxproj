@@ -12,6 +12,7 @@
 		3FC1C085C37DA34DC9042909 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA965B5A2EF9CB2D031CB1FE /* AppModel.swift */; };
 		49C25BFB2FE00A68F00BB1A9 /* book.css in Resources */ = {isa = PBXBuildFile; fileRef = 1F4412C6E6B26DC131C54235 /* book.css */; };
 		5C223EEF7AE0AF48A9942AE5 /* SelfTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AA842BA32080A6287EB9A6 /* SelfTest.swift */; };
+		88AD80E868C1EF47C403E25D /* Servers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BD9A46CBDBDDEEAFF860927 /* Servers.swift */; };
 		8B7415A0D57A05F203D74AE1 /* book.js in Resources */ = {isa = PBXBuildFile; fileRef = 756BF2C5D73A3EFF3BD5C55C /* book.js */; };
 		8C8562A01FFD05DE4D17DD2A /* default-book.json in Resources */ = {isa = PBXBuildFile; fileRef = 4424A63E2C94C4589C4B5A8F /* default-book.json */; };
 		9A12A71D111DEE5FB1A1265C /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A19EB4693171E14B4F6BAD /* App.swift */; };
@@ -28,6 +29,7 @@
 /* Begin PBXFileReference section */
 		1CB1CBACDDC9D2B6E47206C7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1F4412C6E6B26DC131C54235 /* book.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = book.css; sourceTree = "<group>"; };
+		2BD9A46CBDBDDEEAFF860927 /* Servers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Servers.swift; sourceTree = "<group>"; };
 		2D6F3642FDD052AC3AE16540 /* Chiron.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chiron.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3091646F01947C00333241BA /* Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credentials.swift; sourceTree = "<group>"; };
 		4424A63E2C94C4589C4B5A8F /* default-book.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "default-book.json"; sourceTree = "<group>"; };
@@ -71,6 +73,7 @@
 				6CE4AEBB512C66BBEEE9B508 /* Models.swift */,
 				8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */,
 				87AA842BA32080A6287EB9A6 /* SelfTest.swift */,
+				2BD9A46CBDBDDEEAFF860927 /* Servers.swift */,
 				4FDBD0C79377E20146856D09 /* Sync.swift */,
 				6F177C08E551698E85C6707E /* TeachView.swift */,
 				18688403B5A7406E79EB56D8 /* Resources */,
@@ -179,6 +182,7 @@
 				AF29D4E2D309DDDCBC3C20E1 /* Models.swift in Sources */,
 				B512708502B49BDBA48396AE /* ReaderView.swift in Sources */,
 				5C223EEF7AE0AF48A9942AE5 /* SelfTest.swift in Sources */,
+				88AD80E868C1EF47C403E25D /* Servers.swift in Sources */,
 				A0641BBC47F65EC186C3AA87 /* Sync.swift in Sources */,
 				CE4995FD409AD790A8F172C0 /* TeachView.swift in Sources */,
 			);

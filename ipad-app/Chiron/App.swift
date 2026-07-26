@@ -168,11 +168,11 @@ struct LibraryView: View {
             }
         }
         .task { await model.refreshSubjects() }
-        .sheet(isPresented: $showSettings) { ConnectionSettings() }
+        .sheet(isPresented: $showSettings) { ConnectionSettings(store: model.sync.servers) }
     }
 }
 
-/// Server address and shared key.
+/// Saved servers: pick one, add, edit, delete.
 ///
 /// This lives on the library screen as well as the start screen: once a chapter
 /// has been restored the app opens straight into the reader, and the start
@@ -181,70 +181,170 @@ struct LibraryView: View {
 struct ConnectionSettings: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.presentationMode) private var presentation
+    @ObservedObject private var store: ServerStore
+    @State private var editing: SavedServer?
+    @State private var addingNew = false
+
+    init(store: ServerStore) { self.store = store }
+
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    if store.servers.isEmpty {
+                        Text("No servers saved yet.").foregroundStyle(.secondary)
+                    }
+                    ForEach(store.servers) { server in
+                        Button {
+                            store.select(server)
+                            model.sync.baseURL = server.url
+                            Task {
+                                await model.sync.probe()
+                                await model.refreshSubjects()
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: server.id == store.selectedID
+                                      ? "largecircle.fill.circle" : "circle")
+                                    .foregroundStyle(server.id == store.selectedID ? Color.accentColor : .secondary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(server.name)
+                                    Text(server.url).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button {
+                                    editing = server
+                                } label: {
+                                    Image(systemName: "pencil")
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .onDelete { offsets in
+                        offsets.map { store.servers[$0] }.forEach(store.delete)
+                        if let s = store.selected { model.sync.baseURL = s.url }
+                        Task { await model.sync.probe() }
+                    }
+                } header: {
+                    Text("Servers")
+                } footer: {
+                    Text("Swipe a server to delete it. The shared key is only needed for a server on the open internet.")
+                }
+
+                Section {
+                    Button {
+                        addingNew = true
+                    } label: {
+                        Label("Add a server", systemImage: "plus")
+                    }
+                }
+
+                Section { ConnectionBadge() }
+            }
+            .navigationTitle("Connection")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { presentation.wrappedValue.dismiss() }
+                }
+            }
+        }
+        .navigationViewStyle(.stack)
+        .sheet(isPresented: $addingNew) {
+            ServerEditor(store: store, server: nil) { Task { await refresh() } }
+        }
+        .sheet(item: $editing) { server in
+            ServerEditor(store: store, server: server) { Task { await refresh() } }
+        }
+    }
+
+    private func refresh() async {
+        if let s = store.selected { model.sync.baseURL = s.url }
+        await model.sync.probe()
+        await model.refreshSubjects()
+    }
+}
+
+/// Add or edit one server.
+struct ServerEditor: View {
+    @Environment(\.presentationMode) private var presentation
+    @ObservedObject var store: ServerStore
+    let server: SavedServer?
+    let onSave: () -> Void
+
+    @State private var name = ""
     @State private var url = ""
-    @State private var token = ""
+    @State private var key = ""
     /// Typing a shared key on a tablet keyboard without being able to see it is
     /// how you end up debugging a 401 that was a transposed character.
     @State private var revealKey = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Connection").font(.title2.weight(.semibold))
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Server").font(.caption).foregroundStyle(.secondary)
-                TextField("http://192.168.2.1:8080", text: $url)
-                    .textFieldStyle(.roundedBorder)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Shared key").font(.caption).foregroundStyle(.secondary)
-                HStack(spacing: 8) {
-                    Group {
-                        if revealKey {
-                            TextField("blank on the local network", text: $token)
-                        } else {
-                            SecureField("blank on the local network", text: $token)
+        NavigationView {
+            Form {
+                Section("Name") {
+                    TextField("Mac, sprite, ...", text: $name)
+                        .disableAutocorrection(true)
+                }
+                Section("Address") {
+                    TextField("http://192.168.2.1:8080", text: $url)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        .keyboardType(.URL)
+                }
+                Section {
+                    HStack(spacing: 8) {
+                        Group {
+                            if revealKey {
+                                TextField("blank on the local network", text: $key)
+                            } else {
+                                SecureField("blank on the local network", text: $key)
+                            }
                         }
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        Button {
+                            revealKey.toggle()
+                        } label: {
+                            Image(systemName: revealKey ? "eye.slash" : "eye")
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel(revealKey ? "Hide the key" : "Show the key")
                     }
-                    .textFieldStyle(.roundedBorder)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-                    Button {
-                        revealKey.toggle()
-                    } label: {
-                        Image(systemName: revealKey ? "eye.slash" : "eye")
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel(revealKey ? "Hide the key" : "Show the key")
+                } header: {
+                    Text("Shared key")
+                } footer: {
+                    Text("Only needed for a server reachable from the open internet.")
                 }
-                Text("Only needed for a server on the open internet.")
-                    .font(.caption2).foregroundStyle(.secondary)
             }
-            HStack {
-                ConnectionBadge()
-                Spacer()
-                Button("Cancel") { presentation.wrappedValue.dismiss() }
-                    .buttonStyle(.bordered)
-                Button("Save") {
-                    model.sync.baseURL = url.trimmingCharacters(in: .whitespaces)
-                    Credentials.token = token   // blank clears it, which the LAN case wants
-                    Task {
-                        await model.sync.probe()
-                        await model.refreshSubjects()
-                    }
-                    presentation.wrappedValue.dismiss()
+            .navigationTitle(server == nil ? "Add a server" : "Edit server")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { presentation.wrappedValue.dismiss() }
                 }
-                .buttonStyle(.borderedProminent)
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        if let existing = server {
+                            store.update(existing, name: name, url: url, key: key)
+                        } else {
+                            store.add(name: name, url: url, key: key)
+                        }
+                        onSave()
+                        presentation.wrappedValue.dismiss()
+                    }
+                    .disabled(url.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
             }
-            Spacer()
+            .onAppear {
+                if let s = server {
+                    name = s.name
+                    url = s.url
+                    key = Credentials.token(for: s.id) ?? ""
+                }
+            }
         }
-        .padding(28)
-        .frame(maxWidth: 560)
-        .onAppear {
-            url = model.sync.baseURL
-            token = Credentials.token ?? ""
-        }
+        .navigationViewStyle(.stack)
     }
 }
 
@@ -269,31 +369,12 @@ struct ConnectionBadge: View {
 
 struct StartView: View {
     @EnvironmentObject var model: AppModel
-    @State private var url: String = ""
-    @State private var token: String = ""
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 24) {
             Text(model.currentSubjectTitle)
                 .font(.system(size: 40, weight: .semibold, design: .serif))
-            HStack {
-                TextField("server", text: $url)
-                    .textFieldStyle(.roundedBorder)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-                    .frame(width: 280)
-                Button("Save") {
-                    model.sync.baseURL = url
-                    // Blank clears it, which is what the LAN case wants.
-                    Credentials.token = token
-                    Task { await model.sync.probe() }
-                }
-            }
-            SecureField("shared key (blank on the local network)", text: $token)
-                .textFieldStyle(.roundedBorder)
-                .autocapitalization(.none)
-                .disableAutocorrection(true)
-                .frame(width: 360)
             Button {
                 Task { await model.start() }
             } label: {
@@ -305,15 +386,23 @@ struct StartView: View {
                 model.startStatic()
             }
             .buttonStyle(.bordered)
+            HStack(spacing: 14) {
+                ConnectionBadge()
+                Button {
+                    showSettings = true
+                } label: {
+                    Label(model.sync.servers.selected?.name ?? "Server", systemImage: "gearshape")
+                }
+                .font(.callout)
+            }
             Button("Back to library") { model.backToLibrary() }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
             if let err = model.errorMessage {
                 Text(err).foregroundStyle(.red).font(.callout)
             }
         }
-        .onAppear {
-            url = model.sync.baseURL
-            token = Credentials.token ?? ""
+        .sheet(isPresented: $showSettings) {
+            ConnectionSettings(store: model.sync.servers)
         }
     }
 }

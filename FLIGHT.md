@@ -23,8 +23,8 @@ The macOS firewall may block the first incoming connection, because
 green, allow it once:
 
 ```
-sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add ~/dev/mjbraun/studies/dynamic-book/bin/chiron-server
-sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp ~/dev/mjbraun/studies/dynamic-book/bin/chiron-server
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add ~/dev/mjbraun/studies/chiron/bin/chiron-server
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp ~/dev/mjbraun/studies/chiron/bin/chiron-server
 ```
 
 **The soft AP is for the plane, where there is no network to be on.**
@@ -215,7 +215,7 @@ stray LaTeX. The bundle was regenerated and the corrected build is on the iPad.
 
 USB path: plug the USB-C cable Mac <-> iPad, then on the Mac:
 ```
-cd ~/dev/mjbraun/studies/dynamic-book/server && .venv/bin/python usb_bridge.py
+cd ~/dev/mjbraun/studies/chiron/server && .venv/bin/python usb_bridge.py
 ```
 In the app, just submit the check as normal - the request parks in the outbox
 and the bridge delivers it (badge shows "usb"). Cable only needs to be in at

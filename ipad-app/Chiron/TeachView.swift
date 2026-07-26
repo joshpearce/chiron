@@ -139,7 +139,7 @@ final class TeachModel: ObservableObject {
     func adoptRunningJob() async {
         guard job == nil, let url = URL(string: "\(sync.baseURL)/teach/jobs") else { return }
         var listReq = URLRequest(url: url, timeoutInterval: 10)
-        Credentials.authorize(&listReq)
+        Credentials.authorize(&listReq, serverID: sync.serverID)
         guard let (data, _) = try? await URLSession.shared.data(for: listReq),
               let all = try? JSONDecoder().decode([String: [Job]].self, from: data),
               let running = all["jobs"]?.first(where: { !$0.done }) else { return }
@@ -154,7 +154,7 @@ final class TeachModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 5_000_000_000)
             guard let url = URL(string: "\(sync.baseURL)/teach/jobs?slug=\(slug)") else { return }
             var pollReq = URLRequest(url: url, timeoutInterval: 10)
-            Credentials.authorize(&pollReq)
+            Credentials.authorize(&pollReq, serverID: sync.serverID)
             if let (data, _) = try? await URLSession.shared.data(for: pollReq),
                let fresh = try? JSONDecoder().decode(Job.self, from: data) {
                 job = fresh
@@ -167,7 +167,7 @@ final class TeachModel: ObservableObject {
         var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        Credentials.authorize(&req)
+        Credentials.authorize(&req, serverID: sync.serverID)
         req.httpBody = body
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }

@@ -74,7 +74,7 @@ final class AppModel: ObservableObject {
     func refreshSubjects() async {
         var req: URLRequest? = URL(string: "\(sync.baseURL)/subjects").map { url in
             var r = URLRequest(url: url, timeoutInterval: 3)
-            Credentials.authorize(&r)
+            Credentials.authorize(&r, serverID: sync.serverID)
             return r
         }
         if let r = req,
@@ -113,7 +113,7 @@ final class AppModel: ObservableObject {
     func refreshState() async {
         guard let url = URL(string: "\(sync.baseURL)/state?subject=\(subjectID)") else { return }
         var req = URLRequest(url: url, timeoutInterval: 10)
-        Credentials.authorize(&req)
+        Credentials.authorize(&req, serverID: sync.serverID)
         guard let (data, resp) = try? await URLSession.shared.data(for: req),
               (resp as? HTTPURLResponse)?.statusCode == 200,
               let st = try? JSONDecoder().decode(BookState.self, from: data) else { return }
@@ -144,7 +144,7 @@ final class AppModel: ObservableObject {
         var req = URLRequest(url: url, timeoutInterval: 30)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        Credentials.authorize(&req)
+        Credentials.authorize(&req, serverID: sync.serverID)
         // Hand-encoded: confirm is a bool on the wire, and a [String: String]
         // dictionary would send it as the string "true", which the server
         // rejects - deliberately, since this discards everything.

@@ -12,6 +12,9 @@ final class Sync: ObservableObject {
     @Published var baseURL: String {
         didSet { UserDefaults.standard.set(baseURL, forKey: "baseURL") }
     }
+    /// Saved servers. The selected one drives baseURL and supplies its own key.
+    let servers = ServerStore()
+    var serverID: UUID? { servers.selected?.id }
     @Published var connected = false
     @Published var transport = "offline"   // wifi | usb | offline
     @Published var busy = false
@@ -27,6 +30,10 @@ final class Sync: ObservableObject {
 
     init() {
         baseURL = UserDefaults.standard.string(forKey: "baseURL") ?? "http://192.168.2.1:8080"
+        // Anything configured before servers were a list becomes the first
+        // saved entry, so upgrading does not read as losing the setup.
+        servers.migrateIfNeeded(currentURL: baseURL)
+        if let selected = servers.selected { baseURL = selected.url }
         startUSBListener()
         Task { await probe() }
     }
@@ -35,7 +42,7 @@ final class Sync: ObservableObject {
         if let url = URL(string: "\(baseURL)/health") {
             var req = URLRequest(url: url, timeoutInterval: 3)
             req.httpMethod = "GET"
-            Credentials.authorize(&req)
+            Credentials.authorize(&req, serverID: serverID)
             if let (_, resp) = try? await URLSession.shared.data(for: req),
                (resp as? HTTPURLResponse)?.statusCode == 200 {
                 connected = true
@@ -60,7 +67,7 @@ final class Sync: ObservableObject {
             var req = URLRequest(url: url, timeoutInterval: 600)
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            Credentials.authorize(&req)
+            Credentials.authorize(&req, serverID: serverID)
             req.httpBody = body
             if let (data, resp) = try? await URLSession.shared.data(for: req),
                (resp as? HTTPURLResponse)?.statusCode == 200 {
