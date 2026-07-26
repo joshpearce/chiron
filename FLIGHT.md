@@ -32,6 +32,24 @@ Do this first:
   real weak-learner check - gate failed correctly, remediation issued,
   misconceptions U0-M1 + M2 diagnosed.
 
+### The big one: every equation in the book was at risk
+
+Driving the app's real renderer in a browser (`server/test_render.py` writes a
+loadable page) surfaced a **systemic math-corruption bug** that had shipped in
+the bundle:
+
+- CommonMark treats `\{` and `\}` as markdown escapes, so markdown-it stripped
+  the backslashes before KaTeX saw them - producing an unmatched-brace parse
+  error rendered as a red error box in u9.
+- LaTeX containing `<` (the subscript `x_{<t}`, all over u1's probability
+  notation) was swallowed by the browser's HTML parser as an unknown tag,
+  silently truncating equations mid-expression.
+
+Both are fixed in `render.py` (math is pulled out before markdown and
+HTML-escaped on the way back), with `server/test_math_render.py` as the guard.
+Audited across all 11 units afterwards: **2045 equations render, 0 errors**, no
+stray LaTeX. The bundle was regenerated and the corrected build is on the iPad.
+
 ### Bugs found and fixed overnight
 
 - **Server bound to localhost** in one start path, so the iPad could not reach
@@ -62,6 +80,9 @@ Do this first:
 
 ## At the gate / on the plane
 
+0. **`scripts/preflight-check.sh`** - read-only GO/NO-GO on the whole stack.
+   Run it after start-flight.sh and again after switching to airplane mode. It
+   specifically catches the localhost-bind failure that looks like an app hang.
 1. Mac: run `scripts/start-flight.sh` (asks for sudo twice: GPU memory cap + disablesleep).
 2. Wi-Fi path: System Settings > General > Sharing > Internet Sharing ON
    (share from "AdHoc" to Wi-Fi). iPad: airplane mode ON, then Wi-Fi back ON,
@@ -97,11 +118,21 @@ Buy it, connect the Mac, and hodar becomes the second upstream automatically
   sets disablesleep).
 - Expect fans during generation bursts; idle between boundaries is cheap.
 
-## After landing
+## After landing - do this before you close the laptop
 
-`scripts/stop-flight.sh`, Internet Sharing OFF in System Settings.
-Export the spaced-review schedule: `curl http://127.0.0.1:8080/state | ...`
-(day 1 / day 3 / day 10 review of missed items - do these or the 8 hours decay).
+Export the spaced-review schedule while the server still has your session state:
+
+```
+curl -s http://127.0.0.1:8080/review-schedule > ~/chiron-review.md
+```
+
+It is self-contained (every prompt with its reference answer, plus the
+misconceptions you actually leaned on and why they fail), so it works with no
+server and no network. Day 1 / day 3 / day 10 - this is the part that decides
+whether the eight hours survive the month. Optionally push it to the Remarkable
+with the `remarkable` skill.
+
+Then `scripts/stop-flight.sh` and turn Internet Sharing off in System Settings.
 
 ## Emergency debugging
 
