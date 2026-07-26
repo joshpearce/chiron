@@ -1,6 +1,6 @@
 #!/bin/bash
 # One command at the gate: memory cap, model, server. Ends with a GO/NO-GO.
-# Run from anywhere:  ~/dev/mjbraun/studies/chiron/scripts/start-flight.sh
+# Run from anywhere:  ~/dev/mjbraun/chiron/scripts/start-flight.sh
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MODEL="qwen/qwen3.6-35b-a3b"
