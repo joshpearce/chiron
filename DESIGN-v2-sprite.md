@@ -112,7 +112,9 @@ misconceptions.
   from ~8 minutes to under a minute, which removes the reason batching existed.
   `batch_grading` stays off by default.
 
-  **The sprite is still running the old code.** Deploying is Matt's call.
+  **Deployed.** The sprite runs the Go service now; `scripts/sprite-deploy.sh`
+  builds, tests, copies and swaps it, re-supplying the shared key from the
+  existing service environment so it is never printed or written to disk.
 
 ## Open questions
 
@@ -122,3 +124,37 @@ misconceptions.
 - Cost ceiling per user for authoring runs (a full verified book was ~10
   author agents + 4 verify agents of frontier-model work)
 - Sharing: can a generated+verified subject be published to other users?
+
+## The service is Go
+
+The sprite runs a single static binary (`server-go/`, ~12 MB, CGO off) rather
+than FastAPI. The HTTP API, `config.yaml`, the corpus format and the learner
+state format are all unchanged, so the iPad app and the corpus needed no edits -
+and the Go server reads a `learner.json` the Python one wrote, in place.
+
+Parity was established before the swap: an identical start exchange against the
+same corpus produced **byte-identical chapter HTML** from both implementations
+(14,833 characters), and `/state` matched field for field.
+
+Deploy with `scripts/sprite-deploy.sh` (add `--corpus` to sync the corpus and
+config too). It runs the test suite before shipping and verifies 200/401/200
+from outside afterwards.
+
+### Measured on the sprite, after the swap
+
+- Health, auth and subject listing: correct through the public URL.
+- A chapter with no measured evidence: **0.14 s** - the planner deliberately
+  cold-starts without a model call, so the first chapter is instant.
+- A **full remediation boundary: ~6 minutes**. That is 3 free-text grades plus
+  a planner call plus an opus rewrite producing a 29.6k-character
+  representation-switched chapter. Grading alone is ~7 s/item; the authoring
+  call is the bulk of it. Worth knowing before treating the sprite as a
+  low-latency path - the local Qwen flight path does the same boundary in ~31 s
+  because it does not re-author with a frontier model.
+
+### Still Python
+
+`server/` remains, unchanged and working, as the reference implementation the
+parity test was run against. `corpus_lint.py` is also still Python - it is a
+development tool rather than part of the service, so nothing on the sprite needs
+it.
