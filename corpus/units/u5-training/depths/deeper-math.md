@@ -428,3 +428,23 @@ per prompt, a reward model forward pass, several epochs) moves this to perhaps
 $10^{-4}$. Whatever post-training does, it does it by moving the weights a very
 short distance. That is a mechanism-level argument for M15 that does not depend
 on any benchmark.
+
+## What you now have
+
+Four derivations to keep from this depth pass. The softmax-cross-entropy
+Jacobian $\partial L/\partial z = p - y$ is exact, not a convenient
+approximation: the softmax Jacobian
+$\mathrm{diag}(p) - pp^{\top}$ contracts against $-e_t/p_t$ and the $p_t$
+cancels, which is why the fused kernel is stable when $p_t \to 0$ and the
+composed version is not. The layer rule is one pair,
+$\partial L/\partial W = (\partial L/\partial a)\, x^{\top}$ for the weights and
+$\partial L/\partial x = W^{\top}(\partial L/\partial a)$ for the blame passed
+upstream - an outer product and a transposed matrix-vector product, and the
+transpose is the whole reason a backward pass costs about what a forward pass
+costs. Adam's bias correction divides $m$ and $v$ by exactly the geometric mass
+their zero initialization removed, $1 - \beta^t$, which is why the corrected
+ratio at $t = 1$ is exactly $\mathrm{sign}(g)$. And the Chinchilla form
+$L = E + AN^{-\alpha} + BD^{-\beta}$ is separable in $N$ and $D$, so the
+compute-optimal allocation falls out of a single Lagrange condition and gives
+$D/N$ roughly constant - the 20-tokens-per-parameter rule is a derived
+consequence, not a measured coincidence.

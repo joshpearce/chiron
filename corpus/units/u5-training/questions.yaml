@@ -329,7 +329,7 @@ check:
       optimizer state fresh at step t = 1. Compute w after one AdamW step, to
       4 decimal places.
     answer: 0.7896
-    check: numeric(0.001)
+    check: numeric(0.00005)
     rubric: >
       m = 0.04, v = 0.00016; bias-corrected mhat = 0.04/0.1 = 0.4 and
       vhat = 0.00016/0.001 = 0.16, so sqrt(vhat) = 0.4 and the adaptive step is
@@ -342,6 +342,8 @@ check:
       that makes uncorrected Adam diverge in its first few hundred steps. Any
       answer whose adaptive step is far from 0.01 mishandled bias correction,
       since at t = 1 the corrected ratio is exactly sign(g).
+      The tolerance is deliberately tighter than the 0.0004 decay term so that
+      the omitted-decay answer is scored wrong rather than absorbed by it.
 
   - id: u5-q8
     concept: c-optimizers

@@ -359,3 +359,26 @@ drive the loser's probability down much harder than it raises the winner's,
 sending mass to sequences in neither set, so both go down together. That is not
 a slower or less accurate solution to the same problem. It is a different
 answer.
+
+## What you now have
+
+The five analogies worth keeping, each with its leash. Cross-entropy is a
+scoring function over a probability distribution, not an assertion count - it
+has an irreducible floor the way a compressor has an entropy bound, and a
+build that reports zero has cheated. Backprop is distributed tracing over a
+computation graph: one trace, per-span attribution, no re-running the request
+per component - but unlike a trace it is exact rather than sampled. AdamW is
+per-parameter autoscaling on a fleet where each service is normalized to its
+own baseline traffic - which is exactly why the decay term had to be moved
+outside the autoscaler. SGD's landscape is not a search for a global optimum
+but a random walk into any acceptable configuration, the way two independent
+deployments of the same service reach different but equally healthy steady
+states. And post-training is configuration, not compilation: it selects among
+behaviors the binary already contains.
+
+**Where all five break:** every one of them describes an *engineered* system
+with named parts and stated contracts. Training has neither. The parts are
+learned, the contracts are statistical, and nothing in the system knows what
+any of its components are for. Push any of these analogies to the point where
+you expect to inspect, name, or individually replace a component, and it fails
+- which is the same boundary M4 and M5 are drawn along.

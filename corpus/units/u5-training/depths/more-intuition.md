@@ -387,3 +387,18 @@ If the capability was never built, preference data cannot conjure it, and the
 same optimization that rewards helpful answers rewards confident-sounding ones.
 You can teach a model to say "I do not know" more often. You cannot teach it,
 this way, to know.
+
+## What you now have
+
+A picture with four moving parts. Loss is surprise, measured in how far the
+right answer sat from the top of the model's list, and it bottoms out at the
+genuine unpredictability of language rather than at zero - the target is a
+floor, not the ground. Blame flows backward through the same wiring the signal
+came forward along, each junction multiplying what arrived by how sensitive it
+was, so one sweep prices every weight. The optimizer reads that price and moves
+each weight a step whose size is set by how *consistent* its blame has been, not
+how large - which is why a weight receiving a steady whisper travels as far as
+one receiving an intermittent shout. And the whole run does not converge on a
+destination; it wanders downhill into one of unimaginably many comfortable
+basins, any of which works. Post-training is then a matter of habit, not
+education: it changes which of the model's existing voices does the talking.

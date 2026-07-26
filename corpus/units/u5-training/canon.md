@@ -169,8 +169,10 @@ equally likely tokens at each step. A perplexity of 1 means total certainty. A
 model that has learned nothing and outputs uniform logits over a 50,257-token
 vocabulary has $L = \ln(50257) = 10.825$ and $\text{PPL} = 50257$, exactly the
 vocabulary size, which is what "no information" should look like. Our worked
-example above had $L = 0.417030$, so $\text{PPL} = e^{0.417030} = 1.517$: the
-model is about as unsure as a coin weighted 2:1.
+example above had $L = 0.417030$, so $\text{PPL} = e^{0.417030} = 1.517$: on
+that one token the model is behaving as though it were choosing among 1.5
+equally likely options. On a single token perplexity is exactly $1/p_t$, and
+$1/0.659001 = 1.517$ confirms it.
 
 Perplexity is a strictly monotone function of loss, so it ranks models
 identically. It exists because "the model is effectively choosing among 8 tokens"
@@ -630,6 +632,8 @@ out exactly the initialization bias and decays to a no-op as $t$ grows.
 
 ### Worked: one weight, two optimizers
 
+<!-- fade: adamw-step -->
+
 A single weight $w = 0.5$ with gradient $g = 0.2$, learning rate
 $\eta = 0.01$, at step $t = 1$ from a fresh optimizer state. Adam
 hyperparameters $\beta_1 = 0.9$, $\beta_2 = 0.999$, $\epsilon = 10^{-8}$,
@@ -663,24 +667,50 @@ warmup and SGD mostly does not.
 
 ```beat
 id: u5-b7
-type: compute
+type: completion
 concept: c-optimizers
 prompt: |
+  Same procedure, new numbers. Fill the blanks with expression AND value.
   A weight $w = -0.3$ receives gradient $g = -0.05$. Learning rate
   $\eta = 0.001$, weight decay $\lambda = 0.1$, $\beta_1 = 0.9$,
   $\beta_2 = 0.999$, $\epsilon = 10^{-8}$, optimizer state fresh at $t = 1$.
-  Compute $w$ after one AdamW step, to 5 decimal places.
-answer: -0.29897
+
+  1. $m = (1 - \beta_1) g = (0.1)(-0.05) = -0.005$
+  2. $v = (1 - \beta_2) g^2 = (0.001)(0.0025) = 2.5 \times 10^{-6}$
+  3. $\hat m = m / (1 - \beta_1^1) =$ ____ , $\hat v = v / (1 - \beta_2^1) =$ ____
+  4. adaptive step $= \eta \, \hat m / (\sqrt{\hat v} + \epsilon) =$ ____
+  5. decoupled decay $= \eta \lambda w =$ ____
+  6. $w \leftarrow w - (\text{step}) - (\text{decay}) =$ ____
+  7. One sentence: the ratio $\hat m / \sqrt{\hat v}$ came out to exactly
+     $-1$ here. State why that is guaranteed at $t = 1$ for any $g$, and what
+     it implies about the size of Adam's first step. ____
+answer: |
+  3. $\hat m = -0.005 / 0.1 = -0.05$; $\hat v = 2.5\times10^{-6} / 0.001
+     = 0.0025$, so $\sqrt{\hat v} = 0.05$.
+  4. $0.001 \times (-0.05 / 0.05) = -0.001$
+  5. $(0.001)(0.1)(-0.3) = -0.00003$
+  6. $w = -0.3 - (-0.001) - (-0.00003) = -0.29897$
+  7. At $t = 1$ bias correction divides $m$ by $(1-\beta_1)$ and $v$ by
+     $(1-\beta_2)$, which exactly undoes the factors applied when they were
+     formed, so $\hat m = g$ and $\hat v = g^2$. The ratio is therefore
+     $g / |g| = \mathrm{sign}(g)$ and the first step is exactly $\eta$ in
+     magnitude regardless of how large or small the gradient was.
+# Variant blanks: blank 4+6 for a fast arithmetic pass; blank 3+7 to isolate
+# bias correction; blank 5+7 for the mastery pass, since the decoupled decay
+# and the sign(g) property are the two ideas that separate AdamW from SGD.
 rubric: |
-  $\hat m = -0.05$, $\hat v = 0.0025$, $\sqrt{\hat v} = 0.05$, so the adaptive
-  step is $0.001 \times (-1) = -0.001$; the decoupled decay term is
-  $\eta \lambda w = (0.001)(0.1)(-0.3) = -0.00003$. Then
-  $w = -0.3 - (-0.001) - (-0.00003) = -0.29897$.
-  An answer of $-0.29995$ is the SGD update (adaptive normalization skipped).
-  An answer of $-0.29900$ omitted the decoupled weight decay.
-  An answer of $-0.30103$ added the step instead of subtracting it (sign flip:
-  a negative gradient must move the weight UP).
-check: numeric(0.0001)
+  3 must give -0.05 and 0.0025. 4 must be -0.001, NOT -0.00005: an answer that
+  scales with the gradient magnitude skipped the normalization and is the SGD
+  update in disguise. 5 must be -0.00003 and must be subtracted separately -
+  folding $\lambda w$ into $g$ before step 1 is Adam-with-L2, not AdamW, and
+  fails the beat. 6 must be -0.29897; -0.29900 means the decay was dropped,
+  -0.30103 means the step was added rather than subtracted (a negative gradient
+  must move the weight UP).
+  7 is mandatory: the answer must say the corrected ratio is sign(g) and the
+  first step is exactly $\eta$. An answer that says Adam "picks its own
+  learning rate" is U5M3 and fails - $\eta$ still sets the scale, which is
+  precisely what step 7 shows.
+check: llm
 ```
 
 ## What gradient descent actually finds
@@ -848,7 +878,7 @@ not the mechanism.
 Run the arithmetic on the bit-counting claim to see how badly it loses. A 70B
 parameter model in bf16 is 140GB. Its training corpus at 15T tokens is on the
 order of 50TB of text. Storage would require compressing 50TB into 140GB
-losslessly enough to reproduce arbitrary passages, a ratio of roughly 375:1 on
+losslessly enough to reproduce arbitrary passages, a ratio of roughly 357:1 on
 natural language, well past any achievable lossless bound. The model is not storing the
 corpus. It is storing a function that predicts it.
 

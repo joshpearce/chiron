@@ -639,7 +639,7 @@ number does not depend on $n$ at all.
 
 Set them equal:
 
-$$n^* = \frac{6.66 \times 10^9}{786{,}432} \approx 8{,}471 \text{ tokens}$$
+$$n^* = \frac{6.66 \times 10^9}{786{,}432} \approx 8{,}469 \text{ tokens}$$
 
 Below ~8.5k of context, generating a token is dominated by pushing activations
 through weights. Above it, attention over the cache dominates, and it keeps
@@ -669,10 +669,10 @@ prompt: |
 
   At what context length n do the two become equal? Answer in tokens, as a
   bare number rounded to the nearest whole token.
-answer: 8471
+answer: 8469
 rubric: |
   Expected work: 4 * 128 * 32 * 48 = 786432 FLOPs per token of context;
-  2 * 3.33e9 = 6.66e9; 6.66e9 / 786432 = 8471.3.
+  2 * 3.33e9 = 6.66e9; 6.66e9 / 786432 = 8468.6.
   Common wrong answers to watch for in variants: using 35e9 total parameters
   instead of 3.33e9 active gives ~89,000, which is the MoE-cost error; dropping
   the factor of 4 (counting only scores, not the value sum, or forgetting
@@ -1058,7 +1058,7 @@ prompt: |
 answer: 3.36
 rubric: |
   Expected work: 0.8^5 = 0.32768; (1 - 0.32768) / 0.2 = 3.3616.
-  Diagnostic wrong answers: 3.36 is correct; 2.69 means the learner used
+  Diagnostic wrong answers: 3.36 is correct; 2.95 means the learner used
   alpha^k instead of alpha^(k+1) and dropped the bonus token; 4.0 means they
   answered "k accepted tokens on average" without the geometric series;
   5.0 means they computed 1/(1-alpha) and ignored the k cap.

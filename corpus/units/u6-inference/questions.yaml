@@ -91,10 +91,12 @@ check:
       Expected work: divide logits by T to get [4, 0, -2]; exponentiate to
       [54.5982, 1.0, 0.1353]; sum 55.7335; 54.5982/55.7335 = 0.9796.
       Diagnostic wrong answers: 0.8438 means the learner used T = 1 and never
-      applied temperature; 0.6652 means they multiplied the logits by T instead
-      of dividing, giving [1.0, 0, -0.5]; 0.9820 means they exponentiated first
-      and then divided the exponentials by T, which is not what temperature
-      does.
+      applied temperature; 0.6285 means they multiplied the logits by T instead
+      of dividing, giving [1.0, 0, -0.5]; 0.9997 means they divided by T twice,
+      giving [8, 0, -4].
+      Note for graders: dividing the EXPONENTIALS by T rather than the logits is
+      a no-op, since the common factor cancels in the normalization - a learner
+      who describes doing that and reports 0.8438 has made the T = 1 error.
 
   - id: u6-q2
     concept: c-sampling
@@ -102,6 +104,7 @@ check:
     congruent: false
     callback_eligible: false
     difficulty: warmup
+    check: choice
     prompt: >
       Two API calls, identical prompt, one at temperature=0.7 and one at
       temperature=1.5. Which statement is true?
@@ -180,6 +183,75 @@ check:
       the fix is to raise temperature instead = M6 inverted; asserting the
       softmax probability at T=0 measures confidence in correctness = M2.
 
+  - id: u6-q14
+    concept: c-sampling
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    difficulty: core
+    check: choice
+    prompt: >
+      A service is pinned at top_p = 0.9. On the logit vector
+      z = [3.0, 1.0, 0.0, -1.0, -2.0], that setting keeps 1 token at T = 0.5,
+      2 tokens at T = 1.0, 4 tokens at T = 2.0, and all 5 at T = 4.0. What does
+      this demonstrate about the relationship between the two settings?
+    options:
+      - text: >
+          top-p truncates the distribution that temperature has already
+          reshaped, so its cut point - and therefore the number of reachable
+          tokens - is a property of the pair, not of top_p alone. At low
+          temperature top_p silently becomes greedy decoding.
+        correct: true
+        explain: >
+          Correct. The two operate in sequence on the same logits: temperature
+          reweights, then top-p reads the cumulative mass of the reweighted
+          distribution and deletes the tail beyond it. A fixed top_p is
+          therefore not a fixed setting, which is why (T=0.3, top_p=0.9) and
+          (T=1.2, top_p=0.9) are different samplers rather than two points on
+          one dial.
+      - text: >
+          The two are redundant controls on the same creativity axis, so the
+          survivor count varying with temperature is just the expected additive
+          effect of turning both knobs.
+        misconception: U6-2
+        explain: >
+          The one-dial model, which is what the numbers refute. If the effects
+          merely added, top_p = 0.9 would remove a roughly fixed amount of tail
+          at any temperature. Instead its effect ranges from disabling sampling
+          entirely to doing nothing at all - not an additive contribution but a
+          dependent one, since top-p consumes temperature's output.
+      - text: >
+          Temperature changes the ranking of the tokens, so different tokens
+          enter the top-p nucleus at different temperatures.
+        misconception: U6-2
+        explain: >
+          Temperature never reorders anything. Dividing logits by T and
+          softmaxing is equivalent to raising each probability to the power 1/T
+          and renormalizing, and x -> x^(1/T) is monotone increasing, so the
+          ranking is identical at every temperature. What changes is the
+          cumulative mass at each rank, which is what moves the cut point.
+      - text: >
+          At high temperature the model considers more candidate continuations,
+          so there are simply more tokens available for top-p to keep.
+        misconception: M6
+        explain: >
+          The model does not "consider" anything at sampling time and the
+          candidate set never changes - all five tokens have a nonzero logit at
+          every temperature, including T = 0.5 where top-p discards four of
+          them. The tail was always there; temperature only sets how much mass
+          sits in it.
+      - text: >
+          It shows top_p should be applied before temperature, so that the
+          survivor set is stable and the two settings stop interfering.
+        misconception: U6-2
+        explain: >
+          Reordering does not decouple them, it just changes which one reads the
+          other's output - top-p on raw logits still has a cut point that the
+          subsequent temperature divide then reweights. Some older
+          implementations did truncate first; the standard order (temperature,
+          then top-k, then top-p, then sample) is a convention worth checking in
+          your stack, not a fix for a dependency that cannot be removed.
+
   - id: u6-q4
     concept: c-kv-cache
     kind: constructed
@@ -200,7 +272,7 @@ check:
       instead of the 8 key/value heads - the single most common cache-sizing
       error, and the one that hides why GQA exists; 0.25 means they dropped the
       factor of 2 for storing both K and V; 16.0 means they used d_model = 4096
-      in place of H_kv * d_head, which is the MHA-shaped assumption.
+      in place of d_head = 128, cached at full residual width per head.
 
   - id: u6-q5
     concept: c-kv-cache
@@ -208,6 +280,7 @@ check:
     congruent: false
     callback_eligible: false
     difficulty: warmup
+    check: choice
     prompt: >
       Mid-conversation, your serving process evicts the entire KV cache and
       recomputes it from the same token sequence. What happens to the next
@@ -351,9 +424,9 @@ check:
       z = round(0.18/0.02) = 9. 0.045/0.02 = 2.25, plus z = 11.25, rounds to
       code 11. w_hat = 0.02 * (11 - 9) = 0.04. Error -0.005, within s/2 = 0.01.
       Diagnostic wrong answers: 0.045 means the learner did not round to the
-      grid at all; 0.06 means they rounded 11.25 up to 12; 0.02 means they used
-      s = (max - min)/16 rather than /15, forgetting that 16 levels give 15
-      intervals.
+      grid at all; 0.06 means they rounded 11.25 up to 12; 0.0375 means they
+      used s = (max - min)/16 = 0.01875 rather than /15, forgetting that 16
+      levels give 15 intervals.
 
   - id: u6-q9
     concept: c-quant
@@ -361,6 +434,7 @@ check:
     congruent: false
     callback_eligible: true
     difficulty: core
+    check: choice
     prompt: >
       Model A is a 35B-parameter model quantized to 4 bits (about 19 GB).
       Model B is a 9B-parameter model in fp16 (about 18 GB). Same architecture
@@ -433,8 +507,8 @@ check:
       A structural cause independent of bit width: activation outliers. Trained
       transformers develop a few residual-stream channels with values 10-100x
       the rest. One such weight in a group stretches the group's range, tripling
-      the step size for the other 63 and pushing 9% error to about 24% - 3-bit
-      quality at 4-bit storage. This is why GPTQ and AWQ, which handle outlier
+      the step size for the other 63 and pushing 9% error to about 27% - worse
+      than 3-bit quality, at 4-bit storage cost. This is why GPTQ and AWQ, which handle outlier
       channels separately, stay on the plateau where round-to-nearest does not.
       Group size and which tensors you leave in higher precision (embeddings,
       the output head, norm gains, MoE router logits) are the other structural
@@ -467,7 +541,7 @@ check:
     check: numeric(0.02)
     rubric: >
       Expected work: 0.7^7 = 0.08235; (1 - 0.08235)/0.3 = 3.0588.
-      Diagnostic wrong answers: 2.65 means the learner used alpha^k rather than
+      Diagnostic wrong answers: 2.94 means the learner used alpha^k rather than
       alpha^(k+1), dropping the bonus token the target's own forward pass
       provides at position k+1; 3.33 means they computed 1/(1-alpha) and ignored
       that k caps the run; 4.2 means they computed alpha*k, treating acceptances
@@ -529,6 +603,7 @@ check:
     congruent: false
     callback_eligible: false
     difficulty: warmup
+    check: choice
     prompt: >
       Under what condition does speculative decoding stop being a win?
     options:
