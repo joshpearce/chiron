@@ -3,10 +3,15 @@ import WebKit
 
 struct ReaderContainer: View {
     @EnvironmentObject var model: AppModel
+    /// Passed in rather than read from the model. Leaving the reader to unwrap
+    /// `model.chapter` itself crashed on the way out: backToLibrary() nils the
+    /// chapter and switches screen, and SwiftUI re-evaluated this body against
+    /// the nil chapter before the screen change took effect.
+    let chapter: ChapterPayload
 
     var body: some View {
         VStack(spacing: 0) {
-            ReaderView(chapter: model.chapter!)
+            ReaderView(chapter: chapter)
                 .ignoresSafeArea(edges: .bottom)
             Divider()
             HStack {

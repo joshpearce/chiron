@@ -37,8 +37,8 @@ struct ContentView: View {
             case .start:
                 StartView()
             case .reading:
-                if model.chapter != nil {
-                    ReaderContainer()
+                if let chapter = model.chapter {
+                    ReaderContainer(chapter: chapter)
                 } else {
                     StartView()
                 }
@@ -100,6 +100,7 @@ struct ContentView: View {
 
 struct LibraryView: View {
     @EnvironmentObject var model: AppModel
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 28) {
@@ -141,17 +142,80 @@ struct LibraryView: View {
             }
             .buttonStyle(.bordered)
             .disabled(!model.sync.connected)
-            HStack {
+            HStack(spacing: 14) {
                 ConnectionBadge()
                 Button {
                     Task { await model.refreshSubjects() }
                 } label: { Image(systemName: "arrow.clockwise") }
+                Button {
+                    showSettings = true
+                } label: { Label("Server", systemImage: "gearshape") }
+                    .font(.callout)
             }
             if let err = model.errorMessage {
                 Text(err).foregroundStyle(.red).font(.callout)
             }
         }
         .task { await model.refreshSubjects() }
+        .sheet(isPresented: $showSettings) { ConnectionSettings() }
+    }
+}
+
+/// Server address and shared key.
+///
+/// This lives on the library screen as well as the start screen: once a chapter
+/// has been restored the app opens straight into the reader, and the start
+/// screen - the only place these fields used to exist - is unreachable without
+/// finishing or abandoning the chapter.
+struct ConnectionSettings: View {
+    @EnvironmentObject var model: AppModel
+    @Environment(\.presentationMode) private var presentation
+    @State private var url = ""
+    @State private var token = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Connection").font(.title2.weight(.semibold))
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Server").font(.caption).foregroundStyle(.secondary)
+                TextField("http://192.168.2.1:8080", text: $url)
+                    .textFieldStyle(.roundedBorder)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Shared key").font(.caption).foregroundStyle(.secondary)
+                SecureField("blank on the local network", text: $token)
+                    .textFieldStyle(.roundedBorder)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                Text("Only needed for a server on the open internet.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            HStack {
+                ConnectionBadge()
+                Spacer()
+                Button("Cancel") { presentation.wrappedValue.dismiss() }
+                    .buttonStyle(.bordered)
+                Button("Save") {
+                    model.sync.baseURL = url.trimmingCharacters(in: .whitespaces)
+                    Credentials.token = token   // blank clears it, which the LAN case wants
+                    Task {
+                        await model.sync.probe()
+                        await model.refreshSubjects()
+                    }
+                    presentation.wrappedValue.dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            Spacer()
+        }
+        .padding(28)
+        .frame(maxWidth: 560)
+        .onAppear {
+            url = model.sync.baseURL
+            token = Credentials.token ?? ""
+        }
     }
 }
 

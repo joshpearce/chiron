@@ -72,10 +72,10 @@ final class AppModel: ObservableObject {
     // MARK: - library
 
     func refreshSubjects() async {
-        var req: URLRequest?
-        if let url = URL(string: "\(sync.baseURL)/subjects") {
-            req = URLRequest(url: url, timeoutInterval: 3)
-            Credentials.authorize(&req!)
+        var req: URLRequest? = URL(string: "\(sync.baseURL)/subjects").map { url in
+            var r = URLRequest(url: url, timeoutInterval: 3)
+            Credentials.authorize(&r)
+            return r
         }
         if let r = req,
            let (data, resp) = try? await URLSession.shared.data(for: r),
