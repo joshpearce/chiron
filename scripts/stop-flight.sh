@@ -1,5 +1,17 @@
 #!/bin/bash
 # Undo everything start-flight.sh changed.
+# Exports the review schedule FIRST - tearing down the server without it throws
+# away the only artifact that makes the session survive the week.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+OUT="$HOME/chiron-review-$(date +%Y-%m-%d).md"
+if curl -s --max-time 20 http://127.0.0.1:8080/review-schedule > "$OUT" 2>/dev/null \
+   && [ -s "$OUT" ]; then
+  echo "review schedule saved: $OUT ($(wc -c < "$OUT" | tr -d ' ') bytes)"
+else
+  rm -f "$OUT"
+  echo "WARNING: could not export the review schedule (server already down?)"
+fi
+
 sudo pmset -a disablesleep 0
 pkill -f "uvicorn main:app" 2>/dev/null || true
 pkill -f "usb_bridge.py" 2>/dev/null || true

@@ -1,8 +1,10 @@
 #!/bin/bash
-# One command at the gate: memory cap, model, server, bridge.
+# One command at the gate: memory cap, model, server. Ends with a GO/NO-GO.
 # Run from anywhere:  ~/dev/mjbraun/studies/dynamic-book/scripts/start-flight.sh
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+MODEL="qwen/qwen3.6-35b-a3b"
+CTX=32768
 
 echo "== 1/5 GPU memory cap (needs sudo, resets every reboot) =="
 sudo sysctl iogpu.wired_limit_mb=25600
@@ -10,24 +12,44 @@ sudo sysctl iogpu.wired_limit_mb=25600
 echo "== 2/5 keep Mac awake lid-closed (undo: sudo pmset -a disablesleep 0) =="
 sudo pmset -a disablesleep 1
 
-echo "== 3/5 load model (32K ctx) =="
-lms load qwen/qwen3.6-35b-a3b --context-length 32768 -y || echo "already loaded?"
+echo "== 3/5 load model at ${CTX} context =="
+# A model already loaded at a different context length is the failure that
+# looks like success: `lms load` errors, the guard swallows it, and the flight
+# runs at whatever was loaded before. Check, and only reload if needed.
+# Column positions in `lms ps` are not stable (SIZE is "20.43 GB", two fields),
+# so pick the first bare integer >= 1024 on the model's row - that is CONTEXT.
+CURRENT=$(lms ps 2>/dev/null | awk -v m="$MODEL" '$1 == m {
+    for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+$/ && $i + 0 >= 1024) { print $i; exit }
+  }')
+if [ -n "$CURRENT" ] && [ "$CURRENT" -ge "$CTX" ] 2>/dev/null; then
+  echo "   already loaded with ${CURRENT} context - keeping it"
+else
+  [ -n "$CURRENT" ] && { echo "   loaded at ${CURRENT}, reloading"; lms unload --all >/dev/null 2>&1 || true; }
+  lms load "$MODEL" --context-length "$CTX" -y
+fi
 
 echo "== 4/5 LM Studio API server =="
 lms server start || true
 
-echo "== 5/5 book-server on :8080 =="
+echo "== 5/5 book-server on :8080 (all interfaces, so the iPad can reach it) =="
 cd "$ROOT/server"
 pkill -f "uvicorn main:app" 2>/dev/null || true
-nohup .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8080 > /tmp/book-server.log 2>&1 &
-sleep 3
-curl -s http://127.0.0.1:8080/health && echo
+sleep 1
+nohup .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8080 >> /tmp/book-server.log 2>&1 &
+sleep 4
 
-cat <<'EOF'
+echo
+"$ROOT/scripts/preflight-check.sh" || true
 
-Ready. Now:
-  Wi-Fi path : System Settings > Sharing > Internet Sharing ON (AdHoc -> Wi-Fi).
-               iPad joins the network, app server = http://192.168.2.1:8080
-  USB path   : plug the cable and run:  server/.venv/bin/python server/usb_bridge.py
-  Teardown   : scripts/stop-flight.sh
+cat <<EOF
+
+Next:
+  Wi-Fi path : System Settings > General > Sharing > Internet Sharing ON
+               (share from "AdHoc" to Wi-Fi). iPad: airplane mode, then Wi-Fi
+               back on, join the network. App server field: http://192.168.2.1:8080
+  USB path   : plug the cable, then run
+               $ROOT/server/.venv/bin/python $ROOT/server/usb_bridge.py
+  No Mac     : app start screen > "No server? Read the built-in book"
+  Landing    : curl -s http://127.0.0.1:8080/review-schedule > ~/chiron-review.md
+  Teardown   : $ROOT/scripts/stop-flight.sh
 EOF
