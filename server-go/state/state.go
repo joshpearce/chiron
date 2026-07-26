@@ -416,6 +416,26 @@ func (l *Learner) setLevel(cid, level string, eventN int, why string) {
 	c.Level = level
 }
 
+// Reset clears the learner model back to a fresh session.
+//
+// The event log is truncated rather than appended to: it is the provenance
+// record for the state that exists, and keeping a previous run's grades under a
+// snapshot that no longer reflects them makes the review export lie about what
+// was missed. The old log is kept beside it, once, so a reset by mistake is
+// recoverable.
+func (l *Learner) Reset() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if _, err := os.Stat(l.logPath()); err == nil {
+		if err := os.Rename(l.logPath(), l.logPath()+".previous"); err != nil {
+			return err
+		}
+	}
+	l.Data = fresh()
+	return l.save()
+}
+
 // ---------- read-side queries ----------
 
 func (l *Learner) UnitStatus(unitID string) string {

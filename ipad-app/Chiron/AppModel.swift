@@ -94,11 +94,58 @@ final class AppModel: ObservableObject {
         subjectID = id
         staticMode = false
         restore()
+        // The cache is for reading detached; when the server is reachable it
+        // wins, so the spine cannot show progress the server never recorded.
+        await refreshState()
         if chapter != nil {
             screen = .reading
         } else {
             screen = .start
         }
+    }
+
+    /// Pull the authoritative state from the server.
+    ///
+    /// The persisted copy is a cache for reading offline, not the truth. Left
+    /// unrefreshed it drifts: a spine restored from disk showed units as passed
+    /// that the server had no record of, because the only thing that ever
+    /// updated it was the response to an exchange.
+    func refreshState() async {
+        guard let url = URL(string: "\(sync.baseURL)/state?subject=\(subjectID)") else { return }
+        var req = URLRequest(url: url, timeoutInterval: 10)
+        Credentials.authorize(&req)
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              (resp as? HTTPURLResponse)?.statusCode == 200,
+              let st = try? JSONDecoder().decode(BookState.self, from: data) else { return }
+        bookState = st
+        persist()
+    }
+
+    /// Discard all progress for this subject, server-side and locally.
+    func startOver() async {
+        errorMessage = nil
+        guard let url = URL(string: "\(sync.baseURL)/reset") else { return }
+        var req = URLRequest(url: url, timeoutInterval: 30)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        Credentials.authorize(&req)
+        // Hand-encoded: confirm is a bool on the wire, and a [String: String]
+        // dictionary would send it as the string "true", which the server
+        // rejects - deliberately, since this discards everything.
+        req.httpBody = Data("{\"subject\":\"\(subjectID)\",\"confirm\":true}".utf8)
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              (resp as? HTTPURLResponse)?.statusCode == 200,
+              let st = try? JSONDecoder().decode(BookState.self, from: data) else {
+            errorMessage = "Could not reach the server to start over."
+            return
+        }
+        bookState = st
+        chapter = nil
+        beatResponses = []
+        staticIndex = 0
+        persist()
+        screen = .start
+        await refreshSubjects()
     }
 
     func backToLibrary() {

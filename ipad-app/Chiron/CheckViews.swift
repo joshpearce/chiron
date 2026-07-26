@@ -222,6 +222,7 @@ struct BreakView: View {
 
 struct SpineView: View {
     @EnvironmentObject var model: AppModel
+    @State private var confirmingReset = false
 
     var body: some View {
         NavigationView {
@@ -259,8 +260,26 @@ struct SpineView: View {
                         Text(state.summary).font(.callout).foregroundStyle(.secondary)
                     }
                 }
+                Section {
+                    Button(role: .destructive) {
+                        confirmingReset = true
+                    } label: {
+                        Label("Start this subject over", systemImage: "arrow.counterclockwise")
+                    }
+                } footer: {
+                    Text("Clears every grade, gate result and debt entry for this subject.")
+                }
             }
             .navigationTitle("The spine")
+            .task { await model.refreshState() }
+            .alert("Start over?", isPresented: $confirmingReset) {
+                Button("Cancel", role: .cancel) { }
+                Button("Start over", role: .destructive) {
+                    Task { await model.startOver() }
+                }
+            } message: {
+                Text("Every grade, gate result and debt entry for this subject is discarded. This cannot be undone from the app.")
+            }
         }
         .navigationViewStyle(.stack)
     }

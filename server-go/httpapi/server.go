@@ -240,6 +240,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /state", s.handleState)
 	mux.HandleFunc("GET /review-schedule", s.handleReviewSchedule)
 	mux.HandleFunc("POST /exchange", s.handleExchange)
+	mux.HandleFunc("POST /reset", s.handleReset)
 	mux.HandleFunc("POST /teach/turn", s.handleTeachTurn)
 	mux.HandleFunc("POST /teach/create", s.handleTeachCreate)
 	mux.HandleFunc("GET /teach/jobs", s.handleTeachJobs)
