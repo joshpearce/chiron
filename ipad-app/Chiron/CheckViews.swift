@@ -30,9 +30,7 @@ struct ItemFlowView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text(.init(item.prompt))   // markdown-ish prompt
-                        .font(.system(.title3, design: .serif))
-                        .textSelection(.enabled)
+                    MathText(text: item.prompt, size: 20)
 
                     if item.kind == "mcq", let options = item.options {
                         ForEach(options.indices, id: \.self) { i in
@@ -41,8 +39,8 @@ struct ItemFlowView: View {
                             } label: {
                                 HStack(alignment: .top) {
                                     Image(systemName: iconFor(i))
-                                    Text(.init(options[i].text)).multilineTextAlignment(.leading)
-                                    Spacer()
+                                    MathText(text: options[i].text, size: 17)
+                                    Spacer(minLength: 0)
                                 }
                                 .padding(10)
                                 .background(backgroundFor(i), in: RoundedRectangle(cornerRadius: 10))
@@ -50,8 +48,7 @@ struct ItemFlowView: View {
                             .buttonStyle(.plain)
                             if revealed, let r = item.reveal?.options?[i],
                                selected == i || r.correct {
-                                Text(.init(r.explain))
-                                    .font(.callout)
+                                MathText(text: r.explain, size: 15)
                                     .foregroundStyle(r.correct ? .green : .orange)
                                     .padding(.leading, 30)
                             }
@@ -65,7 +62,7 @@ struct ItemFlowView: View {
                         if revealed, let reveal = item.reveal {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Reference answer").font(.headline)
-                                Text(.init(reveal.answer ?? "")).textSelection(.enabled)
+                                MathText(text: reveal.answer ?? "", size: 17)
                                 if item.check == "llm" {
                                     Text("Your answer will be graded against the rubric at the next check-in.")
                                         .font(.footnote).foregroundStyle(.secondary)

@@ -96,6 +96,7 @@
 		E6A19B565BDE7A7F3BD40B4B /* mhchem.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 0CAAEFA9E1EC9A19EAFE8B7B /* mhchem.min.js */; };
 		F19B8A8656D732FCFDE24260 /* KaTeX_Caligraphic-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = FA45D2D12FCE598B344BDD4D /* KaTeX_Caligraphic-Regular.woff2 */; };
 		F1E1E1647EC9971FD9739E94 /* KaTeX_Size1-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CE6856D2C9001EC9AFD4D1F8 /* KaTeX_Size1-Regular.ttf */; };
+		F2ECDC1E394FEBDB5B86B36F /* MathText.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF7A7AA69D4E3E6C07183050 /* MathText.swift */; };
 		F46447C3421936C299644C1C /* chapter.html in Resources */ = {isa = PBXBuildFile; fileRef = 6C775179B7AF96D0B1017B5E /* chapter.html */; };
 		F97FCF83941ED1688F76FC0E /* KaTeX_SansSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7B187317C0C0C7B4618B5554 /* KaTeX_SansSerif-Regular.ttf */; };
 		FB205DE704466DA35AE087CB /* render-a11y-string.min.js in Resources */ = {isa = PBXBuildFile; fileRef = B1EBBD791176AEBB672CFA7A /* render-a11y-string.min.js */; };
@@ -192,6 +193,7 @@
 		D531D4771F1A2F274A1C5128 /* KaTeX_Main-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_Main-Regular.ttf"; sourceTree = "<group>"; };
 		D9A34155C89A1E80EA5D9CA0 /* render-a11y-string.mjs */ = {isa = PBXFileReference; path = "render-a11y-string.mjs"; sourceTree = "<group>"; };
 		DE7893BC4C88D83ECF339A4B /* KaTeX_AMS-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_AMS-Regular.ttf"; sourceTree = "<group>"; };
+		DF7A7AA69D4E3E6C07183050 /* MathText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathText.swift; sourceTree = "<group>"; };
 		E2FE61D5DEE733655FF1363B /* render-a11y-string.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "render-a11y-string.js"; sourceTree = "<group>"; };
 		E5B44C590F364DB8007652A8 /* KaTeX_Main-BoldItalic.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Main-BoldItalic.woff2"; sourceTree = "<group>"; };
 		EDD599ECC5D2961605D94463 /* KaTeX_Script-Regular.woff */ = {isa = PBXFileReference; path = "KaTeX_Script-Regular.woff"; sourceTree = "<group>"; };
@@ -221,6 +223,7 @@
 				478BD8C483632C32A1A65736 /* Assets.xcassets */,
 				4E21F930C36788EA6466D67F /* CheckViews.swift */,
 				1CB1CBACDDC9D2B6E47206C7 /* Info.plist */,
+				DF7A7AA69D4E3E6C07183050 /* MathText.swift */,
 				6CE4AEBB512C66BBEEE9B508 /* Models.swift */,
 				8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */,
 				87AA842BA32080A6287EB9A6 /* SelfTest.swift */,
@@ -509,6 +512,7 @@
 				9A12A71D111DEE5FB1A1265C /* App.swift in Sources */,
 				3FC1C085C37DA34DC9042909 /* AppModel.swift in Sources */,
 				A67BB45B6191D6A590258527 /* CheckViews.swift in Sources */,
+				F2ECDC1E394FEBDB5B86B36F /* MathText.swift in Sources */,
 				AF29D4E2D309DDDCBC3C20E1 /* Models.swift in Sources */,
 				B512708502B49BDBA48396AE /* ReaderView.swift in Sources */,
 				5C223EEF7AE0AF48A9942AE5 /* SelfTest.swift in Sources */,
