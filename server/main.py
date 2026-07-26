@@ -11,13 +11,14 @@ on the USB path.
 
 from __future__ import annotations
 
+import hmac
 import random
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
 import checkers
@@ -33,6 +34,30 @@ CFG = yaml.safe_load((HERE / "config.yaml").read_text())
 
 app = FastAPI(title="chiron-server")
 chain = make_chain(CFG)
+
+# Optional shared-secret auth. Empty (the default) leaves the server open,
+# which is correct on the flight LAN where the only client is the iPad on a
+# Mac-hosted network. Set it before exposing the server on a public URL -
+# without it, anyone who finds the endpoint can spend the tutor's model budget.
+AUTH_TOKEN = (CFG.get("auth_token") or "").strip()
+
+
+@app.middleware("http")
+async def require_token(request, call_next):
+    if AUTH_TOKEN and request.url.path != "/ping":
+        supplied = request.headers.get("authorization", "")
+        expected = f"Bearer {AUTH_TOKEN}"
+        # Constant-time compare: a length/prefix-leaking check on a shared
+        # secret is a bad habit even on a small deployment.
+        if not hmac.compare_digest(supplied, expected):
+            return JSONResponse({"detail": "unauthorized"}, status_code=401)
+    return await call_next(request)
+
+
+@app.get("/ping")
+def ping():
+    """Unauthenticated liveness probe - deliberately reveals nothing."""
+    return {"ok": True}
 SESSION = CFG["session"]
 rng = random.Random()
 

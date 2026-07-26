@@ -47,6 +47,32 @@ delivery = the app's subject library refreshing from `/subjects`.
   middle path without APNs.
 - If paid account: token-based APNs from the sprite is straightforward.
 
+## Status (overnight 2026-07-26) - the sprite is live and proven
+
+`chiron` sprite in the `matthew-braun` org, URL https://chiron.example.
+Runs the same chiron-server with `provider: claude-cli` - the tutor roles go
+through headless `claude -p` on Matt's Claude Code subscription, so no API key
+exists on the box. Verified end to end: chapter generation, and a real
+weak-learner check that failed the gate, issued remediation, and diagnosed two
+misconceptions.
+
+**Decided by testing, not assumption:**
+
+- **The app cannot use the public URL as-is.** It returns 302 to a
+  browser-based sprite auth flow (`sprites.dev/auth/sprite`), which an HTTP
+  client cannot complete. Options: (a) `sprite update --url-auth public` plus
+  the server's own token, (b) put the sprite on the tailnet.
+- **Server-side token auth is implemented and tested** (`auth_token` in
+  config.yaml; `Bearer` header, constant-time compare, `/ping` exempt as an
+  unauthenticated liveness probe). Empty by default, which is correct for the
+  flight LAN. Verified: no header -> 401, wrong token -> 401, correct -> 200.
+- **Flipping the sprite URL to public is deliberately left to Matt.** It is an
+  outward-facing exposure change, and an open endpoint backed by his Claude
+  subscription is somebody else's free tokens. Set `auth_token` first.
+- **Grading latency is the real v2 problem**: ~55s per item, because each grade
+  is a separate `claude -p` with full harness startup. A 9-item check would take
+  ~8 minutes. Batching all items into one call is the fix (tracked separately).
+
 ## Open questions
 
 - Auth between app and sprite (per-user sprite -> per-user token; sprites.md

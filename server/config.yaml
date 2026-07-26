@@ -33,3 +33,8 @@ session:
   chunk_minutes: 22
   break_minutes: 5
   long_break_every_chunks: 4
+
+# Shared secret for the exchange API. Empty = open (correct on the flight LAN,
+# where the only client is the iPad on a Mac-hosted network). Set this before
+# exposing the server on a public URL.
+auth_token: ""
