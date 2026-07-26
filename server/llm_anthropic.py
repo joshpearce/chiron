@@ -103,10 +103,15 @@ class AnthropicChain:
 
 
 def make_chain(cfg: dict):
-    """Chain factory: provider 'anthropic' -> Claude; anything else -> the
-    OpenAI-compatible LM Studio chain."""
+    """Chain factory: 'anthropic' -> Claude SDK; 'claude-cli' -> headless
+    Claude Code (subscription auth); anything else -> LM Studio."""
     from llm import LLMChain
 
-    if cfg.get("provider") == "anthropic":
+    provider = cfg.get("provider")
+    if provider == "anthropic":
         return AnthropicChain(cfg.get("anthropic_model", MODEL))
+    if provider == "claude-cli":
+        from llm_claude_cli import ClaudeCLIChain
+
+        return ClaudeCLIChain(cfg.get("claude_cli_model", "opus"))
     return LLMChain(cfg["upstreams"], cfg["llm"])
