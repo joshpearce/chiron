@@ -9,7 +9,13 @@ struct ChironApp: App {
             ContentView()
                 .environmentObject(model)
                 .task {
-                    if let screen = SelfTest.inspectScreen {
+                    if let server = SelfTest.serverOverride {
+                        model.sync.baseURL = server
+                        await model.sync.probe()
+                    }
+                    if SelfTest.teachRequested {
+                        model.screen = .teach
+                    } else if let screen = SelfTest.inspectScreen {
                         SelfTest.inspect(model, screen: screen)
                     } else if SelfTest.requested {
                         await SelfTest.run(model)
@@ -62,6 +68,8 @@ struct ContentView: View {
                 GateView(gate: gate, results: results)
             case .takingBreak(let suggestion):
                 BreakView(suggestion: suggestion)
+            case .teach:
+                TeachView(sync: model.sync, demo: SelfTest.teachDemo)
             }
 
             if model.sync.busy {
@@ -74,7 +82,7 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showSpine) { SpineView() }
         .overlay(alignment: .topTrailing) {
-            if !model.isMenu {
+            if !model.isMenu && !model.isTeaching {
                 HStack(spacing: 12) {
                     ConnectionBadge()
                     Button { showSpine = true } label: {
@@ -125,6 +133,14 @@ struct LibraryView: View {
                     .buttonStyle(.plain)
                 }
             }
+            Button {
+                model.screen = .teach
+            } label: {
+                Label("Teach me something else", systemImage: "sparkles")
+                    .font(.callout)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!model.sync.connected)
             HStack {
                 ConnectionBadge()
                 Button {

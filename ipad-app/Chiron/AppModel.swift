@@ -15,6 +15,7 @@ final class AppModel: ObservableObject {
         case check
         case gate(Gate, [GradeResult])
         case takingBreak(BreakSuggestion)
+        case teach
     }
 
     @Published var screen: Screen = .menu
@@ -31,6 +32,7 @@ final class AppModel: ObservableObject {
         subjects.first(where: { $0.id == subjectID })?.title ?? "How AI Works"
     }
     var isMenu: Bool { if case .menu = screen { return true }; return false }
+    var isTeaching: Bool { if case .teach = screen { return true }; return false }
 
     // Static fallback: the bundled default-path book (subject "ai"), used when
     // no server is reachable. Reading + JS-graded beats + reveal-based

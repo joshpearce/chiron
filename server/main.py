@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import hmac
 import random
+import re
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -77,11 +79,52 @@ class Subject:
 
 
 SUBJECTS: dict[str, Subject] = {}
+
+
+def register_subject(sid: str, title: str, corpus_dir: Path, state_dir: Path) -> Subject:
+    corpus = Corpus(corpus_dir.resolve())
+    SUBJECTS[sid] = Subject(id=sid, title=title, corpus=corpus,
+                            state=LearnerState(state_dir.resolve(), corpus))
+    return SUBJECTS[sid]
+
+
 for spec in CFG["subjects"]:
-    corpus = Corpus((HERE / spec["corpus_dir"]).resolve())
-    SUBJECTS[spec["id"]] = Subject(
-        id=spec["id"], title=spec["title"], corpus=corpus,
-        state=LearnerState((HERE / spec["state_dir"]).resolve(), corpus))
+    register_subject(spec["id"], spec["title"],
+                     HERE / spec["corpus_dir"], HERE / spec["state_dir"])
+
+
+def discover_subjects() -> list[str]:
+    """Register every corpus-<slug>/ sibling directory not already configured.
+
+    A subject the learner asked for through Teach-me has to survive a restart,
+    and the alternative - rewriting config.yaml - would strip the comments that
+    explain the flight settings. The corpus directory on disk is the record.
+
+    Only fully-authored corpora are registered. A syllabus exists from the
+    moment planning finishes, so a half-generated subject would otherwise show
+    up in the library as a book whose chapters are missing.
+    """
+    found = []
+    configured = {s.corpus.dir.resolve() for s in SUBJECTS.values()}
+    for d in sorted((HERE.parent).glob("corpus-*")):
+        syllabus = d / "syllabus.yaml"
+        if not (d.is_dir() and syllabus.exists()) or d.resolve() in configured:
+            continue
+        sid = d.name.removeprefix("corpus-")
+        try:
+            corpus = Corpus(d)
+        except Exception:            # noqa: BLE001 - a malformed corpus must not stop boot
+            continue
+        if len(corpus.units) < len(corpus.syllabus.get("units", [])):
+            continue
+        meta = corpus.syllabus
+        register_subject(sid, meta.get("title", sid.replace("-", " ").title()),
+                         d, HERE.parent / "state" / sid)
+        found.append(sid)
+    return found
+
+
+discover_subjects()
 
 
 def _ctx(subject_id: str) -> Subject:
@@ -402,3 +445,101 @@ def exchange(ex: Exchange):
         "state": _state_payload(ctx),
         "break_suggestion": break_suggestion,
     }
+
+
+# --------------------------------------------------------------- teach me
+#
+# The learner describes what they want to learn, the tutor asks until it can
+# write a brief, and generation runs from that brief. Generation takes minutes
+# per unit, so it runs on a worker thread and the client polls; the subject
+# appears in /subjects once every unit is authored.
+
+SLUG_OK = re.compile(r"^[a-z0-9][a-z0-9-]{1,31}$")
+JOBS: dict[str, dict] = {}
+_jobs_lock = threading.Lock()
+
+
+class TeachMessage(BaseModel):
+    role: str            # learner | tutor
+    text: str
+
+
+class TeachTurn(BaseModel):
+    messages: list[TeachMessage]
+
+
+class TeachCreate(BaseModel):
+    slug: str
+    title: str
+    brief: str
+
+
+@app.post("/teach/turn")
+def teach_turn(t: TeachTurn):
+    """One elicitation turn. The client keeps the transcript and sends it whole,
+    so the server holds no conversation state."""
+    if not t.messages:
+        raise HTTPException(422, "no messages")
+    return roles.elicit_turn(chain, [m.model_dump() for m in t.messages])
+
+
+def _generate(slug: str, title: str, brief: str) -> None:
+    import generate_subject
+
+    def note(**kw):
+        with _jobs_lock:
+            JOBS[slug].update(kw)
+
+    try:
+        note(stage="planning")
+        generate_subject.plan(slug, brief)
+        syllabus = yaml.safe_load(
+            (HERE.parent / f"corpus-{slug}" / "syllabus.yaml").read_text())
+        if title:
+            syllabus["title"] = title
+            (HERE.parent / f"corpus-{slug}" / "syllabus.yaml").write_text(
+                yaml.safe_dump(syllabus, sort_keys=False))
+        units = syllabus["units"]
+        note(stage="authoring", units_total=len(units))
+        failures = generate_subject.units(slug, [])
+        note(units_done=len(units) - failures)
+        if failures:
+            note(stage="failed", error=f"{failures} of {len(units)} units failed to author",
+                 done=True)
+            return
+        # Registering is what makes it readable, so it happens only after the
+        # lint pass has something to lint.
+        errors = generate_subject.verify(slug)
+        new = discover_subjects()
+        note(stage="ready" if slug in new else "failed",
+             lint_errors=errors, done=True,
+             error=None if slug in new else "generated corpus did not load")
+    except Exception as e:                       # noqa: BLE001 - a job must not kill the server
+        note(stage="failed", error=str(e)[:300], done=True)
+
+
+@app.post("/teach/create")
+def teach_create(c: TeachCreate):
+    slug = c.slug.strip().lower()
+    if not SLUG_OK.match(slug):
+        raise HTTPException(422, "slug must be lowercase letters, digits and hyphens")
+    if slug in SUBJECTS:
+        raise HTTPException(409, f"subject '{slug}' already exists")
+    with _jobs_lock:
+        if JOBS.get(slug, {}).get("done") is False:
+            raise HTTPException(409, f"'{slug}' is already being generated")
+        JOBS[slug] = {"slug": slug, "title": c.title, "stage": "queued",
+                      "units_total": 0, "units_done": 0, "done": False, "error": None}
+    threading.Thread(target=_generate, args=(slug, c.title, c.brief), daemon=True).start()
+    return JOBS[slug]
+
+
+@app.get("/teach/jobs")
+def teach_jobs(slug: str | None = None):
+    with _jobs_lock:
+        if slug:
+            job = JOBS.get(slug)
+            if job is None:
+                raise HTTPException(404, f"no generation job for '{slug}'")
+            return job
+        return {"jobs": list(JOBS.values())}

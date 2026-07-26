@@ -149,11 +149,7 @@ stray LaTeX. The bundle was regenerated and the corrected build is on the iPad.
 
 ### Known, not fixed (deliberate)
 
-- **Sprite grading is slow**: ~55s per item because each grade is a separate
-  `claude -p` invocation with full harness startup, so a 9-item check takes
-  ~8 min. Fix is to batch all items into one call, but that touches
-  flight-path grading code and was not worth the risk the night before. Local
-  Qwen grading is ~5s/item and is what tomorrow uses.
+- **One unexplained 404** in an early bridge log. (see below)
 - **One unexplained 404** in an early bridge log. The shape is reproducible
   (an unknown `subject` returns 404) but the actual trigger was not confirmed,
   and the stale-app theory was disproven (only `com.mjbraun.chiron` is

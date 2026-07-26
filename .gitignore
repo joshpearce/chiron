@@ -4,3 +4,4 @@ state/
 *.xcuserdata
 build/
 DynamicBook.xcodeproj/
+build-sim/

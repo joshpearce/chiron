@@ -18,6 +18,7 @@
 		A67BB45B6191D6A590258527 /* CheckViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E21F930C36788EA6466D67F /* CheckViews.swift */; };
 		AF29D4E2D309DDDCBC3C20E1 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE4AEBB512C66BBEEE9B508 /* Models.swift */; };
 		B512708502B49BDBA48396AE /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */; };
+		CE4995FD409AD790A8F172C0 /* TeachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F177C08E551698E85C6707E /* TeachView.swift */; };
 		DD2CA6AC8A2B62274888FC97 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 478BD8C483632C32A1A65736 /* Assets.xcassets */; };
 		F2ECDC1E394FEBDB5B86B36F /* MathText.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF7A7AA69D4E3E6C07183050 /* MathText.swift */; };
 		F46447C3421936C299644C1C /* chapter.html in Resources */ = {isa = PBXBuildFile; fileRef = 6C775179B7AF96D0B1017B5E /* chapter.html */; };
@@ -35,6 +36,7 @@
 		68F5F83F9E5D2EEB587385EF /* katex */ = {isa = PBXFileReference; lastKnownFileType = folder; name = katex; path = Chiron/Resources/katex; sourceTree = SOURCE_ROOT; };
 		6C775179B7AF96D0B1017B5E /* chapter.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = chapter.html; sourceTree = "<group>"; };
 		6CE4AEBB512C66BBEEE9B508 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		6F177C08E551698E85C6707E /* TeachView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeachView.swift; sourceTree = "<group>"; };
 		756BF2C5D73A3EFF3BD5C55C /* book.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = book.js; sourceTree = "<group>"; };
 		87AA842BA32080A6287EB9A6 /* SelfTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTest.swift; sourceTree = "<group>"; };
 		8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
@@ -67,6 +69,7 @@
 				8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */,
 				87AA842BA32080A6287EB9A6 /* SelfTest.swift */,
 				4FDBD0C79377E20146856D09 /* Sync.swift */,
+				6F177C08E551698E85C6707E /* TeachView.swift */,
 				18688403B5A7406E79EB56D8 /* Resources */,
 			);
 			path = Chiron;
@@ -173,6 +176,7 @@
 				B512708502B49BDBA48396AE /* ReaderView.swift in Sources */,
 				5C223EEF7AE0AF48A9942AE5 /* SelfTest.swift in Sources */,
 				A0641BBC47F65EC186C3AA87 /* Sync.swift in Sources */,
+				CE4995FD409AD790A8F172C0 /* TeachView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

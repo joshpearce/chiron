@@ -123,6 +123,7 @@ def plan(slug: str, brief: str) -> int:
 
     out_dir.mkdir(parents=True, exist_ok=True)
     syllabus = {
+        "title": result["title"],
         "learner": {"profile": result["learner_profile"]},
         "defaults": {"mastery_gate": 0.80, "extension_trigger": 0.90,
                      "check_min_items": 8, "check_constructed_fraction": 0.6,

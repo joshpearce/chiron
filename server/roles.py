@@ -381,3 +381,59 @@ def compose_check(unit, state, corpus, n_items: int, callback_fraction: float,
                   if q["id"] not in seen][: n_items - len(items)]
     rng.shuffle(items)
     return items
+
+
+ELICIT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "reply_md": {"type": "string",
+                     "description": "what to say to the learner now: one question, or the summary that accompanies a finished brief"},
+        "done": {"type": "boolean",
+                 "description": "true only when the brief below is complete enough to plan a syllabus from"},
+        "brief": {"type": "string",
+                  "description": "the full curriculum brief, written in the learner's voice; empty until done"},
+        "slug": {"type": "string", "description": "short kebab-case id for the subject; empty until done"},
+        "title": {"type": "string", "description": "display title for the subject; empty until done"},
+    },
+    "required": ["reply_md", "done", "brief", "slug", "title"],
+}
+
+ELICITOR_SYSTEM = """A learner wants a book written for them. Your job is to find \
+out enough to plan one, then write the brief - not to teach anything yet.
+
+Ask ONE question per turn, and only questions whose answer would change the \
+curriculum. Those are, roughly in order of value:
+
+1. What they want to be able to DO afterwards. "Understand X" is not yet an \
+answer; "debug X in production", "read the papers", "make the build/buy call" \
+each produce different books.
+2. What they already know, specifically enough to skip it. An expert bored \
+through three chapters of review stops reading.
+3. How much time they have, since the spine is budgeted against it.
+4. How much math they want, and whether they want it derived or just used.
+
+Do not ask what you can reasonably infer, and do not ask two things at once. \
+Four questions is usually plenty and seven is too many - a learner who came to \
+read a book is not here to fill in a form. If an answer is vague on something \
+that matters, follow up once; if it is still vague, choose a sensible default \
+and say which default you chose.
+
+When you have enough, set done and write the brief as a single paragraph in \
+the learner's own voice: what they want, what they already know, how long they \
+have, and how deep the math goes. Everything the planner sees comes from that \
+paragraph, so anything you learned and left out is lost. Your reply_md that \
+turn should state the shape of the book you are about to build and name the \
+defaults you assumed, so a wrong assumption is caught before generation."""
+
+
+def elicit_turn(chain: LLMChain, messages: list[dict]) -> dict:
+    """One turn of the Teach-me conversation. `messages` is the whole history,
+    oldest first, each {role: learner|tutor, text: str}."""
+    convo = "\n\n".join(f"{'LEARNER' if m['role'] == 'learner' else 'YOU'}: {m['text']}"
+                        for m in messages)
+    user = f"CONVERSATION SO FAR:\n\n{convo}\n\nYour turn."
+    try:
+        return chain.structured("planner", ELICITOR_SYSTEM, user, ELICIT_SCHEMA, "elicit")
+    except UpstreamError as e:
+        return {"reply_md": f"No model reachable ({e}). Nothing was lost - try again when connected.",
+                "done": False, "brief": "", "slug": "", "title": ""}

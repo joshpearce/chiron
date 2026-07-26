@@ -29,6 +29,30 @@ enum SelfTest {
     /// taps deep and unreachable from a script. Used from the simulator:
     /// `simctl launch <dev> <id> showreader` (also: showcheck, showpretest,
     /// showbreak). Optionally follow with a unit id, e.g. `showreader u5`.
+    /// `server=http://127.0.0.1:8080` on the command line points the app at a
+    /// different host for one launch. The simulator needs this: it shares the
+    /// Mac's network stack, but a fresh app container has no local-network
+    /// grant, so the Mac's LAN address (192.168.2.1) is unreachable while
+    /// loopback is not.
+    static var serverOverride: String? {
+        CommandLine.arguments.first { $0.hasPrefix("server=") }?
+            .replacingOccurrences(of: "server=", with: "")
+    }
+
+    /// `showteach` opens the Teach-me conversation directly. It is not part of
+    /// inspectScreen because that path loads the bundled book first, and this
+    /// screen has no chapter behind it.
+    static var teachRequested: Bool {
+        CommandLine.arguments.contains("showteach")
+    }
+
+    /// `showteach demo` seeds a transcript so the conversation layout can be
+    /// inspected without typing - the same trick showreader/showcheck use to
+    /// reach a screen that is otherwise several taps deep.
+    static var teachDemo: Bool {
+        teachRequested && CommandLine.arguments.contains("demo")
+    }
+
     static var inspectScreen: String? {
         for name in ["showreader", "showcheck", "showpretest", "showbreak"]
         where CommandLine.arguments.contains(name) {
