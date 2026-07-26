@@ -101,6 +101,11 @@ func (c *ClaudeCLI) Structured(role, system, user string, schema map[string]any,
 	lastErr := "unknown"
 	for attempt := range 2 {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		// The prompt carries learner and corpus text, and on the sprite some of
+		// it arrives from a client. It is passed as a single argv element to
+		// exec, never through a shell, so there is nothing to inject into: no
+		// word splitting, no globbing, no metacharacters. Building a command
+		// string and handing it to `sh -c` is what would make this dangerous.
 		argv := c.Command(role, prompt, system)
 		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 		stdout, err := cmd.Output()

@@ -541,6 +541,9 @@ func (s *Server) handleReviewSchedule(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "unknown subject: %s", s.subjectParam(r))
 		return
 	}
+	// Served as text/plain, not HTML: this is a markdown document meant to be
+	// printed or synced to a reader, so there is no markup context for the
+	// learner's own answers to escape into.
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, review.Build(sub.Learner, sub.Corpus, sub.Title, time.Now()))

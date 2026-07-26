@@ -1,6 +1,9 @@
 package roles
 
 import (
+	// math/rand, deliberately: this shuffles quiz items and breaks ties between
+	// equally-weighted callbacks. Nothing here is a secret or a token, and a
+	// seedable generator is what makes check composition reproducible in tests.
 	"math/rand"
 	"sort"
 
