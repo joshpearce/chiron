@@ -98,9 +98,10 @@ check:
       Sum = 20.085537 + 2.718282 + 2.718282 = 25.522101; p_0 = 0.786986;
       L = -ln(0.786986) = 0.239545. An answer near 0.787 reported the
       probability instead of its negative log. An answer near 2.240 took the
-      loss on a wrong index. An answer near 0.347 used log base 10 instead of
-      the natural log, which is the units error behind most cross-model
-      perplexity confusion.
+      loss on a wrong index (index 1 or 2, where p = 0.106507). An answer near
+      0.104 used log base 10 instead of the natural log, which is the units
+      error behind most cross-model perplexity confusion; nats are the ML
+      convention and the tolerance will not absorb the factor of ln(10).
 
   - id: u5-q2
     concept: c-xent
@@ -142,6 +143,7 @@ check:
     congruent: false
     callback_eligible: false
     difficulty: warmup
+    check: choice
     prompt: >
       A model reports a mean cross-entropy of 2.0 nats per token on a
       50,257-token vocabulary, so its perplexity is e^2.0 = 7.39. What does
@@ -263,6 +265,7 @@ check:
     congruent: false
     callback_eligible: false
     difficulty: core
+    check: choice
     prompt: >
       During training you notice a hidden unit whose pre-activation is negative
       on every example in every batch, so its ReLU output is always 0. What
@@ -384,6 +387,7 @@ check:
     congruent: false
     callback_eligible: false
     difficulty: core
+    check: choice
     prompt: >
       A 7B model's loss has been flat for 20,000 steps. Which diagnosis is best
       supported?
@@ -477,6 +481,7 @@ check:
     congruent: false
     callback_eligible: false
     difficulty: core
+    check: choice
     prompt: >
       Held-out loss improves smoothly as parameter count grows across five
       orders of magnitude, with no upturn. What does this rule out?
@@ -573,6 +578,7 @@ check:
     congruent: false
     callback_eligible: false
     difficulty: core
+    check: choice
     prompt: >
       A base model and its RLHF'd chat descendant are evaluated on MMLU. The
       base model is prompted carefully with few-shot examples. What result

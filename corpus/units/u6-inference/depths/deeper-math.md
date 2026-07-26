@@ -196,7 +196,7 @@ hence leaves $k^{(\ell)}_i$ and $v^{(\ell)}_i$ unchanged, hence caching them is
 exact. Note where the argument would break: remove the causal mask and the sum
 runs over all $j$, position $i$'s stream depends on the whole sequence, and no
 KV caching is possible. Bidirectional encoders (BERT and friends) genuinely
-cannot cache this way. Causality is not just a training-objective choice; it is
+cannot cache this way. Causality is not merely a training-objective choice; it is
 what makes cheap autoregressive inference exist at all.
 
 ### The memory formula, and what is not in it
@@ -343,7 +343,7 @@ dot-product error is $0.0901, 0.0895, 0.0900$. A 9% weight perturbation gives a
 So where does the robustness actually come from? Three places, none of which is
 dimensional averaging:
 
-1. **The perturbation is 9%, not 87.5%.** Bit-counting was simply the wrong
+1. **The perturbation is 9%, not 87.5%.** Bit-counting was the wrong
    accounting. This is most of the answer.
 2. **Flatness of the loss basin.** SGD with minibatch noise converges to regions
    where $\nabla^2 \mathcal{L}$ has small eigenvalues in most directions. To

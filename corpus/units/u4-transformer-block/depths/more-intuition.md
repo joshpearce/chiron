@@ -214,7 +214,7 @@ in the business of managing magnitude for safety.
 And that is exactly why removing it breaks a trained model at any precision. The
 downstream weights were fitted against normalized pictures. Hand them the raw
 belt and they are receiving something in units they have never seen - not too
-large for the number format, simply not what they were calibrated against. Doing
+large for the number format, merely not what they were calibrated against. Doing
 it in double precision changes nothing at all, because nothing overflowed. The
 error is a units error, not a range error.
 

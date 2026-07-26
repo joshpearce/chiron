@@ -279,8 +279,9 @@ Same procedure at $g = 8$ gives 4 KiB per token per layer, 128 KiB per token,
 **1.00 GiB** at 8k context. At $g = 1$ (MQA): 512 B, 16 KiB, **128 MiB**.
 
 Those 4 GiB are not idle storage. Generating one token requires reading the
-entire cache from HBM - 128 MiB of KV per token at 8k context under MHA, 32 MiB
-under GQA $g{=}8$. Decode is memory-bandwidth-bound, so a 4x cut in bytes moved
+entire cache from HBM - all 4.00 GiB of it per token at 8k context under MHA
+(128 MiB of that per layer), against 1.00 GiB under GQA $g{=}8$. Decode is
+memory-bandwidth-bound, so a 4x cut in bytes moved
 is close to a 4x cut in the attention part of per-token latency, and it is what
 lets you hold 4x the concurrent sequences in the same VRAM. That is the entire
 argument for GQA.
@@ -355,7 +356,7 @@ $$ \mathrm{MLP}(u) = \sigma\!\left(u W_1\right) W_2, \qquad W_1 \in \mathbb{R}^{
 
 where $d_{ff}$ is the hidden (intermediate) width, conventionally $4d$, and
 $\sigma$ is an element-wise nonlinearity - GELU in the GPT family,
-$\mathrm{GELU}(z) \approx z \cdot \Phi(z)$ where $\Phi$ is the standard normal
+$\mathrm{GELU}(z) = z \cdot \Phi(z)$ where $\Phi$ is the standard normal
 CDF, so it behaves like ReLU but is smooth near zero. Three steps: project up
 to $d_{ff}$, apply $\sigma$ element-wise, project back down to $d$.
 
@@ -376,8 +377,8 @@ $d_{ff} = 3072$, vocabulary 50,257, learned positions 1024. Including biases
 and the LayerNorm gains, a block is 7,087,872 parameters; twelve of them are
 85,054,464; token embeddings are $50{,}257 \times 768 = 38{,}597{,}376$;
 position embeddings $1024 \times 768 = 786{,}432$; the final norm 1,536. Total:
-**124,439,808**. That is the "124M" on the model card, and 68% of the
-non-embedding half of it is MLP weight.
+**124,439,808**. That is the "124M" on the model card, and 66.6% of the
+85,056,000 non-embedding parameters in it are MLP weight.
 
 ```beat
 id: u4-b4

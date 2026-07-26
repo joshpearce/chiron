@@ -118,6 +118,10 @@ struct StartView: View {
                     .font(.title2).padding(.horizontal, 40).padding(.vertical, 10)
             }
             .buttonStyle(.borderedProminent)
+            Button("No server? Read the built-in book") {
+                model.startStatic()
+            }
+            .buttonStyle(.bordered)
             if let err = model.errorMessage {
                 Text(err).foregroundStyle(.red).font(.callout)
             }

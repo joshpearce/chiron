@@ -82,7 +82,7 @@ pretest:
       downstream weight matrix was fitted against normalized inputs, and the
       residual stream's magnitude grows with depth, so without the norm each
       block receives vectors in units it was never trained on. Nothing
-      overflows - the numbers are simply wrong by a depth-dependent factor.
+      overflows - the numbers are wrong by a depth-dependent factor.
     check: llm
     rubric: |
       Pass requires BOTH "output is garbage" AND "precision is irrelevant".
@@ -280,7 +280,10 @@ check:
       Diagnostic wrong answers: 33,554,432 means attention was omitted;
       16,777,216 means the MLP was omitted (U4M5, treating the MLP as
       negligible); 268,435,456 means attention was multiplied by $h = 16$
-      (U4M1); 25,165,824 means only one MLP matrix was counted.
+      (U4M1); 46,137,344 means $W^O$ was left out of the attention count.
+      Note that 33,554,432 is ambiguous here - it is both "attention omitted"
+      and "only one MLP matrix counted", since $4d^2 = d\,d_{ff}$ when
+      $d_{ff} = 4d$; probe before diagnosing.
     difficulty: core
 
   - id: u4-q6
@@ -656,9 +659,10 @@ check:
       Total $= 84{,}934{,}656$, which is $2d^2 + 2d^2(g/h) = 2.25 d^2$, or
       56.25% of MHA's $4d^2 = 150{,}994{,}944$.
       Diagnostic wrong answers: 150,994,944 means $g$ was ignored and MHA was
-      counted (U4M2); 75,497,472 means $W^Q$ or $W^O$ was also shrunk by
-      $g/h$, which is the same error in the other direction - the query and
-      output projections never shrink; 9,437,184 means only K and V were
+      counted (U4M2); 18,874,368 means $W^Q$ and $W^O$ were shrunk by $g/h$
+      as well, which is the same error in the other direction - the query and
+      output projections never shrink; 75,497,472 means $W^K$ and $W^V$ were
+      dropped entirely rather than shrunk; 9,437,184 means only K and V were
       counted.
     difficulty: core
 

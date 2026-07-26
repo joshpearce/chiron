@@ -191,7 +191,7 @@ Now the important part, which is why a faceted sculpture still works. The model
 does not consult individual weights the way a database consults individual rows.
 Every computation is a sum over thousands of weights at once. Rounding each of
 those thousands by a small amount and then adding them up gives you a sum that
-is off by a small amount - the errors do not conspire, they are just a bit of
+is off by a small amount - the errors do not conspire, they are a bit of
 haze on the result. Nothing catastrophic happens because nothing depended on any
 one weight being exact.
 

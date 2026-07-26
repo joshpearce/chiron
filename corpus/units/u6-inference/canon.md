@@ -236,7 +236,7 @@ prompt: |
       Z = ____(a)____
 
   Step 4, divide each exponential by Z to get p(4.0):
-      p = [0.3743, ____(b)____, 0.1768, 0.1377, 0.1072]
+      p = [0.3659, ____(b)____, 0.1728, 0.1346, 0.1048]
 
   Step 5, accumulate p from the largest entry down until the running total
   first reaches 0.9. How many tokens survive top-p = 0.9?
@@ -246,19 +246,25 @@ prompt: |
   the T = 0.5 computation earlier in this section and this T = 4.0 computation.
       ____(d)____
 answer: |
-  (a) Z = 2.1170 + 1.2840 + 1.0000 + 0.7788 + 0.6065 = 5.6563
+  (a) Z = 2.1170 + 1.2840 + 1.0000 + 0.7788 + 0.6065 = 5.7863
 
-  (b) 1.2840 / 5.6563 = 0.2270
+  (b) 1.2840 / 5.7863 = 0.2219
 
-  (c) Cumulative sums: 0.3743, 0.6013, 0.7781, 0.9158. The running total first
-      reaches 0.9 at the fourth token, so survivors = 4.
+  (c) Cumulative sums: 0.3659, 0.5878, 0.7606, 0.8952, 1.0000. Four tokens give
+      0.8952, which is below 0.9, so the fifth is required: survivors = 5, the
+      entire vocabulary. At T = 4.0 the distribution is flat enough that
+      top-p = 0.9 truncates nothing at all - the mirror image of T = 0.5, where
+      it kept a single token and became greedy decoding.
 
   (d) None of them. The logits are [3.0, 1.0, 0.0, -1.0, -2.0] in both
       computations; only the divisor applied to them after the forward pass
       changed.
 rubric: |
-  (a) 5.6563 +/- 0.01. (b) 0.2270 +/- 0.005. (c) exactly 4; answering 3 means
-  the learner stopped at 0.7781 without checking that it is below 0.9.
+  (a) 5.7863 +/- 0.01. (b) 0.2219 +/- 0.005.
+  (c) exactly 5. Answering 4 is the expected trap - the learner eyeballed
+  0.8952 as "about 0.9" instead of checking the inequality. Give partial credit
+  and correct it explicitly, since the whole point is that the cut is
+  mechanical, not approximate.
   (d) must be "none" or equivalent. Any answer naming a changed logit is M6 and
   fails the beat regardless of (a)-(c) being right.
   Pass = (d) correct AND at least two of (a), (b), (c) correct.
@@ -266,6 +272,10 @@ rubric: |
   keeping (c) and (d) blank in every variant - those two carry the concept.
 check: llm
 ```
+
+Across the four temperatures worked in this section, `top_p=0.9` keeps 1, 2, 4,
+and 5 of the five tokens at $T = 0.5, 1.0, 2.0, 4.0$. Same parameter, same
+logits, and it ranges from disabling sampling entirely to doing nothing at all.
 
 ## T=0 is not truth mode
 
@@ -327,7 +337,8 @@ prompt: |
 
   In your own words, explain (a) why their expectation is wrong, (b) what T=0
   actually guarantees, and (c) what part of the pipeline the hallucination
-  actually comes from. Do not just assert it - say what T=0 does mechanically.
+  actually comes from. Do not assert it and move on - say what T=0 does
+  mechanically.
 answer: |
   (a) The expectation assumes temperature reaches back into the model and that
   T=0 selects for correctness. It does not. Temperature divides the logits after
@@ -383,7 +394,7 @@ the inputs did not already contain. It is a memoization table.
 The belief is appealing because the word "cache" and the word "memory" sit next
 to each other in every engineer's head, because the cache genuinely does persist
 across tokens, and because chat genuinely does feel stateful. The statefulness
-is real - it is just located somewhere else. The state is the token sequence.
+is real - it is located somewhere else. The state is the token sequence.
 The harness re-sends the entire conversation as tokens on every request (u8
 covers the assembly). The cache is an optimization over reprocessing those
 tokens, nothing more.

@@ -23,6 +23,22 @@ final class AppModel: ObservableObject {
 
     let sync = Sync()
 
+    // Static fallback: the bundled default-path book, used when no server is
+    // reachable. Reading + JS-graded beats + reveal-based self-checks survive;
+    // adaptivity and free-text grading do not.
+    @Published var staticMode = false
+    private var staticIndex: Int {
+        get { UserDefaults.standard.integer(forKey: "staticIndex") }
+        set { UserDefaults.standard.set(newValue, forKey: "staticIndex") }
+    }
+    private lazy var staticBook: [ChapterPayload] = {
+        guard let url = Bundle.main.url(forResource: "default-book", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let obj = try? JSONDecoder().decode([String: [ChapterPayload]].self, from: data)
+        else { return [] }
+        return obj["chapters"] ?? []
+    }()
+
     private var beatResponses: [BeatResponse] = []
     private var chapterOpenedAt: Date?
     private let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -75,6 +91,23 @@ final class AppModel: ObservableObject {
         await run(ExchangeRequest(phase: "start", choice: choice))
     }
 
+    func startStatic() {
+        staticMode = true
+        guard !staticBook.isEmpty else {
+            errorMessage = "No bundled book found."
+            return
+        }
+        setChapter(staticBook[min(staticIndex, staticBook.count - 1)])
+        openedChapter()
+    }
+
+    private func advanceStatic() {
+        staticIndex = min(staticIndex + 1, staticBook.count - 1)
+        setChapter(staticBook[staticIndex])
+        openedChapter()
+        persist()
+    }
+
     func openedChapter() {
         chapterOpenedAt = Date()
         if chapter?.pretest.isEmpty == false && !pretestDone {
@@ -88,6 +121,7 @@ final class AppModel: ObservableObject {
 
     func submitPretest(_ responses: [ItemResponse]) async {
         pretestDone = true
+        if staticMode { screen = .reading; return }
         // Pretest grades fold into the boundary exchange offline; if connected,
         // send now so the planner can compress the CURRENT chapter.
         guard sync.connected else { screen = .reading; return }
@@ -99,6 +133,7 @@ final class AppModel: ObservableObject {
     func beginCheck() { screen = .check }
 
     func submitCheck(_ responses: [ItemResponse], override: Bool = false) async {
+        if staticMode { advanceStatic(); return }
         var req = ExchangeRequest(unit: chapter?.unit)
         req.checkResponses = responses
         req.beatResponses = beatResponses
@@ -108,6 +143,7 @@ final class AppModel: ObservableObject {
     }
 
     func skipCheck() async {
+        if staticMode { advanceStatic(); return }
         var req = ExchangeRequest(unit: chapter?.unit)
         req.skippedCheck = true
         req.beatResponses = beatResponses
