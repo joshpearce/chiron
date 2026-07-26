@@ -17,13 +17,19 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import os
 import sys
 import time
 from pathlib import Path
 
 import httpx
 
-BASE = "http://127.0.0.1:8080"
+# CHIRON_TEST_BASE points the suite at an already-running server instead of
+# starting one. That is how the same simulated learners get run against a
+# different implementation of the same protocol - and it also means the suite
+# will not delete a state directory it does not own.
+BASE = os.environ.get("CHIRON_TEST_BASE", "http://127.0.0.1:8080")
+EXTERNAL = "CHIRON_TEST_BASE" in os.environ
 HERE = Path(__file__).parent
 
 # canned wrong answers voiced through bank misconceptions
@@ -39,6 +45,16 @@ WRONG_BY_CONCEPT = {
 
 
 def reset_state():
+    if EXTERNAL:
+        # Someone else owns this server and its state; just check it is up.
+        for _ in range(30):
+            try:
+                if httpx.get(f"{BASE}/health", timeout=2).status_code == 200:
+                    return
+            except httpx.HTTPError:
+                pass
+            time.sleep(1)
+        raise SystemExit(f"{BASE} did not respond")
     subprocess.run(["pkill", "-f", "uvicorn main:app"], capture_output=True)
     shutil.rmtree(HERE.parent / "state", ignore_errors=True)
     # Bind all interfaces: a localhost-only rebind leaves the iPad unable to
