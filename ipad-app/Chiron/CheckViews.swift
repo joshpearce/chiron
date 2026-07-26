@@ -222,11 +222,19 @@ struct BreakView: View {
 
 struct SpineView: View {
     @EnvironmentObject var model: AppModel
+    @Environment(\.presentationMode) private var presentation
     @State private var confirmingReset = false
 
     var body: some View {
         NavigationView {
             List {
+                if model.bookState == nil {
+                    Section {
+                        Text("No progress loaded yet.")
+                        Text("If the server is reachable this fills in on its own; pull to refresh otherwise.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
                 if let state = model.bookState {
                     Section("Progress") {
                         ForEach(state.spine) { entry in
@@ -271,7 +279,13 @@ struct SpineView: View {
                 }
             }
             .navigationTitle("The spine")
+            .refreshable { await model.refreshState() }
             .task { await model.refreshState() }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { presentation.wrappedValue.dismiss() }
+                }
+            }
             .alert("Start over?", isPresented: $confirmingReset) {
                 Button("Cancel", role: .cancel) { }
                 Button("Start over", role: .destructive) {

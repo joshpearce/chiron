@@ -118,6 +118,22 @@ final class AppModel: ObservableObject {
               (resp as? HTTPURLResponse)?.statusCode == 200,
               let st = try? JSONDecoder().decode(BookState.self, from: data) else { return }
         bookState = st
+
+        // A cached chapter outlives the state it was generated from. After the
+        // server's progress is reset or diverges, the app would otherwise keep
+        // serving a chapter written for a learner who no longer exists - one
+        // authored as "already fluent" for someone starting from scratch. If
+        // the server does not have this unit in progress, the cached chapter is
+        // stale and goes.
+        if let ch = chapter, ch.unit != "catchup" {
+            let known = st.spine.first { $0.unit == ch.unit }
+            let inProgress = known?.status == "active" || known?.inFringe == true
+            if !inProgress {
+                chapter = nil
+                beatResponses = []
+                if case .reading = screen { screen = .start }
+            }
+        }
         persist()
     }
 

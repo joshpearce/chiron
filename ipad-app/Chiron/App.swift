@@ -83,16 +83,27 @@ struct ContentView: View {
         .sheet(isPresented: $showSpine) { SpineView() }
         .overlay(alignment: .topTrailing) {
             if !model.isMenu && !model.isTeaching {
-                HStack(spacing: 12) {
+                // Labelled, not bare glyphs: on the mini these were two small
+                // icons in the corner with nothing to say what they did, and
+                // the way back out of a chapter should not be a guess.
+                HStack(spacing: 10) {
                     ConnectionBadge()
                     Button { showSpine = true } label: {
-                        Image(systemName: "list.bullet.rectangle")
+                        Label("Spine", systemImage: "list.bullet.rectangle")
+                            .font(.footnote)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
                     }
+                    .background(.thinMaterial, in: Capsule())
                     Button { model.backToLibrary() } label: {
-                        Image(systemName: "books.vertical")
+                        Label("Library", systemImage: "books.vertical")
+                            .font(.footnote)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
                     }
+                    .background(.thinMaterial, in: Capsule())
                 }
-                .padding(10)
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.top, 6)
             }
         }
     }
