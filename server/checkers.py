@@ -47,8 +47,13 @@ def check_answer(check: str, expected, given) -> bool:
         exp, got = _parse_number(expected), _parse_number(given)
         if exp is None or got is None:
             return False
-        # Relative tolerance for large magnitudes, absolute for small.
-        return abs(got - exp) <= max(tol, abs(exp) * tol)
+        # Absolute tolerance, which is what `numeric(0.01)` reads as and what
+        # the authoring spec documents. An earlier max(tol, |exp|*tol) rule
+        # made the tolerance *relative* at the same magnitude, so numeric(1)
+        # silently meant +/-100% and marked an answer twice the correct one as
+        # right. The tiny relative term only absorbs float representation
+        # error on large values.
+        return abs(got - exp) <= tol + abs(exp) * 1e-9
     if check == "choice":
         return _norm(given) == _norm(expected)
     raise ValueError(f"not a mechanical check: {check}")
@@ -68,4 +73,12 @@ def check_mcq(options: list, selected_index: int) -> dict:
 
 
 def _norm(s) -> str:
-    return re.sub(r"\s+", " ", str(s)).strip().lower()
+    """Normalise for exact comparison.
+
+    Multi-value answers ("4, 1; 11, 6") are the common exact-match case, and a
+    learner who types "4,1;11,6" has the right answer. Spacing around
+    separators carries no meaning here, so collapse it rather than failing
+    someone on punctuation style.
+    """
+    text = re.sub(r"\s+", " ", str(s)).strip().lower()
+    return re.sub(r"\s*([,;:])\s*", r"\1", text)

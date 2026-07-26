@@ -118,7 +118,9 @@ function gradeMechanical(check, expected, given) {
     const tol = parseFloat(m[1]);
     const exp = parseNumber(expected), got = parseNumber(given);
     if (exp === null || got === null) return false;
-    return Math.abs(got - exp) <= Math.max(tol, Math.abs(exp) * tol);
+    // Absolute tolerance - must match server/checkers.py exactly, or a beat
+    // grades one way offline and the other way at the boundary.
+    return Math.abs(got - exp) <= tol + Math.abs(exp) * 1e-9;
   }
   return norm(given) === norm(expected);
 }
@@ -135,7 +137,12 @@ function parseNumber(text) {
 }
 
 function norm(s) {
-  return String(s).replace(/\s+/g, " ").trim().toLowerCase();
+  // Must match server/checkers.py `_norm`: multi-value answers like
+  // "4, 1; 11, 6" are the common exact-match case, and spacing around
+  // separators carries no meaning. Diverging here means a beat grades one way
+  // offline and the other way at the chapter boundary.
+  return String(s).replace(/\s+/g, " ").trim().toLowerCase()
+    .replace(/\s*([,;:])\s*/g, "$1");
 }
 
 /* Tiny markdown: paragraphs, bold, italics, inline code. The heavy conversion

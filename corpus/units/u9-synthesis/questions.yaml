@@ -185,6 +185,7 @@ check:
   - id: u9-q3
     concept: c-full-trace
     kind: mcq
+    check: choice
     congruent: false
     callback_eligible: true
     spans: [u6, u8]
@@ -346,6 +347,7 @@ check:
   - id: u9-q6
     concept: c-full-trace
     kind: mcq
+    check: choice
     congruent: false
     callback_eligible: true
     spans: [u1, u8]
@@ -510,6 +512,7 @@ check:
   - id: u9-q9
     concept: c-full-trace
     kind: mcq
+    check: choice
     congruent: false
     callback_eligible: true
     spans: [u5, u6]
@@ -871,6 +874,7 @@ check:
   - id: u9-q16
     concept: c-full-trace
     kind: mcq
+    check: choice
     congruent: false
     callback_eligible: true
     spans: [u1, u3]

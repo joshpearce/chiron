@@ -455,6 +455,7 @@ check:
   - id: u7-q10
     concept: c-moe-routing
     kind: mcq
+    check: choice
     congruent: false
     difficulty: warmup
     prompt: |
@@ -476,6 +477,7 @@ check:
   - id: u7-q11
     concept: c-moe-tradeoff
     kind: mcq
+    check: choice
     congruent: false
     callback_eligible: true
     difficulty: warmup
@@ -499,6 +501,7 @@ check:
   - id: u7-q12
     concept: c-moe-routing
     kind: mcq
+    check: choice
     congruent: false
     difficulty: core
     prompt: |
@@ -520,6 +523,7 @@ check:
   - id: u7-q13
     concept: c-moe-tradeoff
     kind: mcq
+    check: choice
     congruent: false
     difficulty: core
     prompt: |

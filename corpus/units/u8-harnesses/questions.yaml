@@ -365,6 +365,7 @@ check:
   - id: u8-q9
     concept: c-sysprompt
     kind: mcq
+    check: choice
     congruent: false
     callback_eligible: false
     prompt: |
@@ -389,6 +390,7 @@ check:
   - id: u8-q10
     concept: c-toolloop
     kind: mcq
+    check: choice
     congruent: false
     callback_eligible: false
     prompt: |
@@ -412,6 +414,7 @@ check:
   - id: u8-q11
     concept: c-kv-cache
     kind: mcq
+    check: choice
     congruent: false
     callback_eligible: false
     prompt: |

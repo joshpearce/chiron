@@ -41,7 +41,7 @@ pretest:
       anything. How many forward passes through the network does it take to
       process that prompt? Answer with a single number.
     answer: 1
-    check: numeric(0.5)
+    check: numeric(0.01)
 
   - id: u3-p3
     concept: c-qkv
