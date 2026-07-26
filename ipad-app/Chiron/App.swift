@@ -172,6 +172,9 @@ struct ConnectionSettings: View {
     @Environment(\.presentationMode) private var presentation
     @State private var url = ""
     @State private var token = ""
+    /// Typing a shared key on a tablet keyboard without being able to see it is
+    /// how you end up debugging a 401 that was a transposed character.
+    @State private var revealKey = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -185,10 +188,25 @@ struct ConnectionSettings: View {
             }
             VStack(alignment: .leading, spacing: 6) {
                 Text("Shared key").font(.caption).foregroundStyle(.secondary)
-                SecureField("blank on the local network", text: $token)
+                HStack(spacing: 8) {
+                    Group {
+                        if revealKey {
+                            TextField("blank on the local network", text: $token)
+                        } else {
+                            SecureField("blank on the local network", text: $token)
+                        }
+                    }
                     .textFieldStyle(.roundedBorder)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
+                    Button {
+                        revealKey.toggle()
+                    } label: {
+                        Image(systemName: revealKey ? "eye.slash" : "eye")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(revealKey ? "Hide the key" : "Show the key")
+                }
                 Text("Only needed for a server on the open internet.")
                     .font(.caption2).foregroundStyle(.secondary)
             }

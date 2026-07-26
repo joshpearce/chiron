@@ -12,16 +12,5 @@
 # To rotate: pipe a fresh key through scripts/sprite-set-auth.sh, then update
 # the app. Old keys stop working the moment the service restarts.
 set -euo pipefail
-sprite -s chiron exec -- bash -c "sprite-env services list" 2>/dev/null \
-  | python3 -c '
-import sys, json
-for line in sys.stdin:
-    line = line.strip()
-    if not line.startswith("["):
-        continue
-    for svc in json.loads(line):
-        if svc.get("name") == "chiron-server":
-            print(svc.get("env", {}).get("CHIRON_AUTH_TOKEN", ""), end="")
-            sys.exit(0)
-sys.exit("chiron-server service not found")
-'
+. "$(dirname "$0")/sprite-service.sh"
+sprite_current_key

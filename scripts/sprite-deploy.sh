@@ -41,28 +41,13 @@ if $SYNC_CORPUS; then
 fi
 
 echo "==> swapping the service"
-sprite -s chiron exec -- bash -c '
-  set -e
-  K=$(sprite-env services list 2>/dev/null | python3 -c "
-import sys, json
-for line in sys.stdin:
-    line = line.strip()
-    if line.startswith(\"[\"):
-        for s in json.loads(line):
-            if s[\"name\"] == \"chiron-server\":
-                print(s.get(\"env\", {}).get(\"CHIRON_AUTH_TOKEN\", \"\"), end=\"\")
-")
-  [ -n "$K" ] || { echo "FATAL: no CHIRON_AUTH_TOKEN on the existing service" >&2; exit 1; }
-  sprite-env services stop chiron-server 2>/dev/null || true
+. "$(dirname "$0")/sprite-service.sh"
+KEY=$(sprite_current_key)
+[ -n "$KEY" ] || { echo "FATAL: no CHIRON_AUTH_TOKEN on the existing service" >&2; exit 1; }
+sprite -s chiron exec -- bash -c "
   mv /home/sprite/chiron/bin/chiron-server.new /home/sprite/chiron/bin/chiron-server
-  sprite-env services delete chiron-server 2>/dev/null || true
-  sprite-env services create chiron-server \
-    --cmd /home/sprite/chiron/bin/chiron-server \
-    --args "-addr,0.0.0.0:8080,-config,/home/sprite/chiron/server/config.yaml" \
-    --env "CHIRON_AUTH_TOKEN=$K" \
-    --dir /home/sprite/chiron/server
-  sleep 4
-' 2>&1 | grep -Ev '"type":"(stdout|stderr)"' | tail -2
+  $(sprite_service_script "$KEY")" \
+  2>&1 | grep -Ev '"type":"(stdout|stderr|started|stopping|stopped|complete)"' | sed 's/^/    /'
 
 echo "==> verifying from outside"
 K=$(scripts/sprite-get-auth.sh)
