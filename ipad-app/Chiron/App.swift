@@ -9,7 +9,9 @@ struct ChironApp: App {
             ContentView()
                 .environmentObject(model)
                 .task {
-                    if SelfTest.requested {
+                    if SelfTest.showCheckRequested {
+                        SelfTest.showCheck(model)
+                    } else if SelfTest.requested {
                         await SelfTest.run(model)
                     }
                 }

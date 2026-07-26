@@ -41,12 +41,27 @@ final class AppModel: ObservableObject {
         set { UserDefaults.standard.set(newValue, forKey: "staticIndex-\(subjectID)") }
     }
     private lazy var staticBook: [ChapterPayload] = {
-        guard let url = Bundle.main.url(forResource: "default-book", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let obj = try? JSONDecoder().decode([String: [ChapterPayload]].self, from: data)
-        else { return [] }
-        return obj["chapters"] ?? []
+        guard let url = Bundle.main.url(forResource: "default-book", withExtension: "json") else {
+            staticLoadError = "default-book.json not in bundle"
+            return []
+        }
+        guard let data = try? Data(contentsOf: url) else {
+            staticLoadError = "default-book.json unreadable"
+            return []
+        }
+        do {
+            let obj = try JSONDecoder().decode([String: [ChapterPayload]].self, from: data)
+            return obj["chapters"] ?? []
+        } catch {
+            // A silent empty fallback is the worst outcome here: the built-in
+            // book is the last resort when everything else has failed, so say
+            // exactly why it did not load.
+            staticLoadError = "default-book.json failed to decode: \(error)"
+            return []
+        }
     }()
+
+    private(set) var staticLoadError: String?
 
     private var beatResponses: [BeatResponse] = []
     private var chapterOpenedAt: Date?
@@ -142,11 +157,20 @@ final class AppModel: ObservableObject {
     func startStatic() {
         staticMode = true
         guard !staticBook.isEmpty else {
-            errorMessage = "No bundled book found."
+            errorMessage = staticLoadError ?? "No bundled book found."
             return
         }
         setChapter(staticBook[min(staticIndex, staticBook.count - 1)])
         openedChapter()
+    }
+
+    /// Debug affordance: the bundled chapters, for inspection harnesses.
+    var staticChapters: [ChapterPayload] { staticBook }
+
+    /// Debug affordance: show a specific chapter without going through an
+    /// exchange, so a screen can be inspected in isolation.
+    func loadChapterForInspection(_ ch: ChapterPayload) {
+        setChapter(ch)
     }
 
     private func advanceStatic() {

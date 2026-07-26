@@ -41,6 +41,17 @@ struct CheckItem: Codable, Identifiable {
             let explain: String
             let correct: Bool
         }
+
+        // Compute items answer with a bare number (`answer: 6`). Strict String
+        // decoding turns one such item into a total decode failure for the
+        // whole book, so accept either shape and normalise to text. The server
+        // also stringifies these; this is the belt to that suspenders.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            answer = try c.decodeLenientString(forKey: .answer)
+            rubric = try c.decodeLenientString(forKey: .rubric)
+            options = try c.decodeIfPresent([OptionReveal].self, forKey: .options)
+        }
     }
 }
 
@@ -198,6 +209,18 @@ struct BreakSuggestion: Codable {
     let minutes: Int
     let kind: String
     let note: String
+}
+
+extension KeyedDecodingContainer {
+    /// Decode a field that should be text but may arrive as a number or bool.
+    func decodeLenientString(forKey key: Key) throws -> String? {
+        if let s = try? decodeIfPresent(String.self, forKey: key) { return s }
+        if let d = try? decode(Double.self, forKey: key) {
+            return d == d.rounded() ? String(Int(d)) : String(d)
+        }
+        if let b = try? decode(Bool.self, forKey: key) { return b ? "true" : "false" }
+        return nil
+    }
 }
 
 // Minimal JSON passthrough for payloads the webview owns.

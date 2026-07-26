@@ -8,7 +8,14 @@ targets:
     type: application
     platform: iOS
     sources:
-      - Chiron
+      # KaTeX must keep its directory structure: chapter.html and MathText.swift
+      # reference "katex/katex.min.css" and "katex/contrib/auto-render.min.js".
+      # As a normal group Xcode flattens every file to the bundle root, those
+      # paths 404, and no math renders anywhere in the app.
+      - path: Chiron
+        excludes: ["Resources/katex/**"]
+      - path: Chiron/Resources/katex
+        type: folder
     settings:
       base:
         TARGETED_DEVICE_FAMILY: "2"          # iPad only

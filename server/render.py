@@ -119,5 +119,18 @@ def _client_item(q: dict) -> dict:
                         for o in q.get("options", [])],
         }
     else:
-        out["reveal"] = {"answer": q.get("answer", ""), "rubric": q.get("rubric", "")}
+        # Answers to compute items are numbers in the corpus (`answer: 6`).
+        # The client types this field as a string, and a single numeric answer
+        # fails the decode of the whole payload - which silently killed the
+        # entire offline book. Normalise to text at the boundary.
+        out["reveal"] = {"answer": _as_text(q.get("answer", "")),
+                         "rubric": _as_text(q.get("rubric", ""))}
     return out
+
+
+def _as_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return value if isinstance(value, str) else str(value)

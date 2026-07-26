@@ -17,6 +17,27 @@ enum SelfTest {
         CommandLine.arguments.contains("selftest")
     }
 
+    /// Jump straight to a screen for visual inspection, without tapping through
+    /// the UI. `showcheck` opens the terminal check for the most math-heavy
+    /// unit, which is the layout most likely to break and the hardest to reach
+    /// by hand. Used from the simulator: `simctl launch <dev> <id> showcheck`.
+    static var showCheckRequested: Bool {
+        CommandLine.arguments.contains("showcheck")
+    }
+
+    static func showCheck(_ model: AppModel) {
+        model.startStatic()
+        guard let chapters = model.staticChapters as [ChapterPayload]?,
+              let mathiest = chapters.max(by: {
+                  $0.check.reduce(0) { $0 + $1.prompt.filter { $0 == "$" }.count }
+                  < $1.check.reduce(0) { $0 + $1.prompt.filter { $0 == "$" }.count }
+              })
+        else { return }
+        model.loadChapterForInspection(mathiest)
+        model.beginCheck()
+        log.notice("SHOWCHECK unit=\(mathiest.unit, privacy: .public) items=\(mathiest.check.count, privacy: .public)")
+    }
+
     static func run(_ model: AppModel) async {
         log.notice("START transport=\(model.sync.transport, privacy: .public) base=\(model.sync.baseURL, privacy: .public)")
 
