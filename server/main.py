@@ -17,9 +17,11 @@ from pathlib import Path
 
 import yaml
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 import checkers
+import review
 import roles
 from corpus import Corpus
 from llm_anthropic import make_chain
@@ -260,6 +262,17 @@ def subjects():
 @app.get("/state")
 def get_state(subject: str = "ai"):
     return _state_payload(_ctx(subject))
+
+
+@app.get("/review-schedule", response_class=PlainTextResponse)
+def review_schedule(subject: str = "ai"):
+    """Markdown day-1/3/10 review plan built from what actually went wrong.
+
+    Self-contained (prompts + answers inline) so it is useful with no server,
+    no model, and no network - print it, or push it to the Remarkable.
+    """
+    ctx = _ctx(subject)
+    return review.build(ctx.state, ctx.corpus, ctx.title)
 
 
 @app.post("/exchange")
