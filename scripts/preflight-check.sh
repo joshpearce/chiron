@@ -31,13 +31,50 @@ else
   bad "book-server bound to localhost ONLY - the iPad will hang. Restart with -addr 0.0.0.0:8080"
 fi
 
-# 3. The address the iPad is configured to use
+# 3. The address the iPad is configured to use.
+#
+# The bridge IP existing is NOT sufficient: Internet Sharing can be on and
+# sharing to a wired interface with Wi-Fi sharing off, which leaves 192.168.2.1
+# answering perfectly from the Mac while the iPad has no way to reach it. That
+# is the same shape as the localhost-bind failure - green here, dead in the
+# seat - so the AirPort share flag is checked explicitly.
 if ifconfig bridge100 2>/dev/null | grep -q "inet 192.168.2.1"; then
   ok "Internet Sharing up - Mac is 192.168.2.1"
   if curl -s --max-time 5 http://192.168.2.1:8080/health >/dev/null 2>&1; then
     ok "server reachable at http://192.168.2.1:8080 (the app's server field)"
   else
     bad "192.168.2.1:8080 not answering - check the bind above"
+  fi
+
+  # Read the flag out of the plist rather than scraping `defaults` output.
+  AIRPORT=$(python3 - <<'PYEOF' 2>/dev/null
+import plistlib
+try:
+    with open("/Library/Preferences/SystemConfiguration/com.apple.nat.plist", "rb") as f:
+        nat = plistlib.load(f)["NAT"]
+    ap = nat.get("AirPort", {})
+    print(f'{int(ap.get("Enabled", 0))}|{ap.get("NetworkName", "")}')
+except Exception:
+    print("?|")
+PYEOF
+)
+  AIRPORT_ON=${AIRPORT%%|*}
+  SSID=${AIRPORT#*|}
+  if [ "$AIRPORT_ON" = "1" ]; then
+    ok "Wi-Fi sharing ON - iPad joins \"${SSID:-the shared network}\""
+  elif [ "$AIRPORT_ON" = "?" ]; then
+    warn "could not read the Internet Sharing config - verify Wi-Fi sharing by hand"
+  else
+    bad "Wi-Fi sharing OFF - the iPad cannot reach the Mac even though 192.168.2.1 answers here.
+       System Settings > General > Sharing > Internet Sharing, tick Wi-Fi
+       under the share-to list, then re-run this check."
+  fi
+
+  LEASES=$(grep -c ip_address /var/db/dhcpd_leases 2>/dev/null || echo 0)
+  if [ "$LEASES" -gt 0 ]; then
+    ok "$LEASES device(s) have taken a lease on the shared network"
+  else
+    warn "no device has joined the shared network yet - the iPad still needs to connect"
   fi
 else
   warn "Internet Sharing off - Wi-Fi path unavailable (USB bridge or built-in book only)"
