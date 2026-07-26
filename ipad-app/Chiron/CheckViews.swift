@@ -9,6 +9,9 @@ struct ItemFlowView: View {
     let subtitle: String
     let items: [CheckItem]
     let submitLabel: String
+    /// Present on the terminal check, absent on the pretest (which the learner
+    /// never enters by accident - it opens itself).
+    var onExit: (() -> Void)? = nil
     let onSubmit: ([ItemResponse]) async -> Void
 
     @State private var index = 0
@@ -17,12 +20,33 @@ struct ItemFlowView: View {
     @State private var confidence: Double = 2
     @State private var revealed = false
     @State private var responses: [ItemResponse] = []
+    @State private var confirmingExit = false
 
     var item: CheckItem { items[index] }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
+                if onExit != nil {
+                    Button {
+                        // The check is closed-book on purpose - reading the
+                        // chapter mid-check is the crutch effect the design
+                        // exists to prevent. An accidental tap with nothing
+                        // answered costs nothing; leaving with answers on the
+                        // board discards them so a re-entered check starts
+                        // honest rather than half-open-book.
+                        if responses.isEmpty && !revealed {
+                            onExit?()
+                        } else {
+                            confirmingExit = true
+                        }
+                    } label: {
+                        Label("Back to the chapter", systemImage: "chevron.left")
+                            .font(.callout)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
                 Text(title).font(.title2.weight(.semibold))
                 Text(subtitle).font(.callout).foregroundStyle(.secondary)
                 ProgressView(value: Double(index), total: Double(max(items.count, 1)))
@@ -105,6 +129,12 @@ struct ItemFlowView: View {
             }
         }
         .padding(28)
+        .alert("Leave the check?", isPresented: $confirmingExit) {
+            Button("Stay", role: .cancel) { }
+            Button("Discard answers and go back", role: .destructive) { onExit?() }
+        } message: {
+            Text("The check is closed-book, so answers so far are discarded - re-entering starts it fresh.")
+        }
         .frame(maxWidth: 760)
     }
 

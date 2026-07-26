@@ -59,7 +59,8 @@ struct ContentView: View {
                         title: "Comprehension check - \(ch.title)",
                         subtitle: "Closed book. Rate your confidence before each reveal.",
                         items: ch.check,
-                        submitLabel: "Submit check"
+                        submitLabel: "Submit check",
+                        onExit: { model.screen = .reading }
                     ) { responses in
                         await model.submitCheck(responses)
                     }
