@@ -37,6 +37,35 @@ Then the sprite runs tonight's pipeline as a batch job:
 Server already supports multiple subjects (config list + per-subject state);
 delivery = the app's subject library refreshing from `/subjects`.
 
+### Built, and what it actually does
+
+Steps 1, 2 and 4 exist. Step 3 - the adversarial verify pass - is still only
+its mechanical half (`corpus_lint.py`); the judgement-heavy half that
+recomputed the backprop example and re-derived the attention numbers was three
+agents reading, and nothing replaces that yet. **Treat a generated subject as
+unverified prose until it has had one.**
+
+In the app: Library -> "Teach me something else". From a shell:
+
+```
+CHIRON_PROVIDER=claude-cli .venv/bin/python generate_subject.py plan <slug> "<brief>"
+CHIRON_PROVIDER=claude-cli .venv/bin/python generate_subject.py units <slug> [u0 u1 ...]
+.venv/bin/python generate_subject.py verify <slug>
+```
+
+Output lands in `corpus-<slug>/` and the server picks it up at boot - there is
+no config edit, and an incompletely-authored corpus stays invisible. Units are
+authored one file per call and skip files already on disk, so an interrupted
+run resumes rather than re-paying. Budget roughly ten minutes per unit through
+`claude-cli`; `plan` is a couple of minutes.
+
+Quality caveat worth knowing before trusting it: the elicitation was written
+against Claude, and the local Qwen behaves differently on it - it needed an
+explicit "every turn is a question or a finished brief" rule to stop it
+summarizing into a dead end. Generation through a small local model is a
+different proposition from generation through Claude, and has not been
+evaluated for corpus quality at all.
+
 ## Async delivery / notifications
 
 - Curriculum generation takes tens of minutes -> async completion signal.
