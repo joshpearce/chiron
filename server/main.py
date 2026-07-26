@@ -22,7 +22,7 @@ from pydantic import BaseModel
 import checkers
 import roles
 from corpus import Corpus
-from llm import LLMChain
+from llm_anthropic import make_chain
 from render import render_chapter
 from state import LearnerState
 
@@ -30,7 +30,7 @@ HERE = Path(__file__).parent
 CFG = yaml.safe_load((HERE / "config.yaml").read_text())
 
 app = FastAPI(title="chiron-server")
-chain = LLMChain(CFG["upstreams"], CFG["llm"])
+chain = make_chain(CFG)
 SESSION = CFG["session"]
 rng = random.Random()
 

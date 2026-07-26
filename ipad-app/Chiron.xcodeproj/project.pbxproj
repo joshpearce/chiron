@@ -90,6 +90,7 @@
 		D6E317F6EE7D50AD7F1365DD /* KaTeX_Main-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B765460C2E2AED991ADAA30B /* KaTeX_Main-Italic.ttf */; };
 		D86752161E94A344B6A3488D /* KaTeX_Fraktur-Regular.woff in Resources */ = {isa = PBXBuildFile; fileRef = B51CF3E48224158CE1331960 /* KaTeX_Fraktur-Regular.woff */; };
 		DC567C087D3749AF5052329F /* KaTeX_Size3-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9DA0200635794726043CDACF /* KaTeX_Size3-Regular.ttf */; };
+		DD2CA6AC8A2B62274888FC97 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 478BD8C483632C32A1A65736 /* Assets.xcassets */; };
 		DDAA82BE453251EAAADC1583 /* KaTeX_Math-BoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D07BE659077FA88598463603 /* KaTeX_Math-BoldItalic.ttf */; };
 		E6A19B565BDE7A7F3BD40B4B /* mhchem.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 0CAAEFA9E1EC9A19EAFE8B7B /* mhchem.min.js */; };
 		F19B8A8656D732FCFDE24260 /* KaTeX_Caligraphic-Regular.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = FA45D2D12FCE598B344BDD4D /* KaTeX_Caligraphic-Regular.woff2 */; };
@@ -133,6 +134,7 @@
 		3F9C2FAC6C79BD9F5DC97002 /* copy-tex.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "copy-tex.min.js"; sourceTree = "<group>"; };
 		437018421A510ECEEC559442 /* KaTeX_Size3-Regular.woff2 */ = {isa = PBXFileReference; path = "KaTeX_Size3-Regular.woff2"; sourceTree = "<group>"; };
 		4424A63E2C94C4589C4B5A8F /* default-book.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "default-book.json"; sourceTree = "<group>"; };
+		478BD8C483632C32A1A65736 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4933977314BDE64F2503840C /* KaTeX_SansSerif-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "KaTeX_SansSerif-Italic.ttf"; sourceTree = "<group>"; };
 		4E21F930C36788EA6466D67F /* CheckViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckViews.swift; sourceTree = "<group>"; };
 		4EE0A84B6EA5A826DD1B2487 /* katex.min.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = katex.min.js; sourceTree = "<group>"; };
@@ -214,6 +216,7 @@
 			children = (
 				50A19EB4693171E14B4F6BAD /* App.swift */,
 				BA965B5A2EF9CB2D031CB1FE /* AppModel.swift */,
+				478BD8C483632C32A1A65736 /* Assets.xcassets */,
 				4E21F930C36788EA6466D67F /* CheckViews.swift */,
 				1CB1CBACDDC9D2B6E47206C7 /* Info.plist */,
 				6CE4AEBB512C66BBEEE9B508 /* Models.swift */,
@@ -375,6 +378,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					D2AE88B4FBD262E09816A6CA = {
+						DevelopmentTeam = TLA7HBNWRW;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -403,6 +407,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DD2CA6AC8A2B62274888FC97 /* Assets.xcassets in Resources */,
 				0FFEDA922504F22FD6A72592 /* KaTeX_AMS-Regular.ttf in Resources */,
 				799969B3C890EBB73AB74B0C /* KaTeX_AMS-Regular.woff in Resources */,
 				8702BF692A179C9D9A170B42 /* KaTeX_AMS-Regular.woff2 in Resources */,
@@ -635,6 +640,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = TLA7HBNWRW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Chiron/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -655,6 +661,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = TLA7HBNWRW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Chiron/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
