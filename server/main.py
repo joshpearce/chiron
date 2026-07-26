@@ -41,6 +41,12 @@ chain = make_chain(CFG)
 # without it, anyone who finds the endpoint can spend the tutor's model budget.
 AUTH_TOKEN = (CFG.get("auth_token") or "").strip()
 
+# Grade all free-text items of a check in one model call. Off by default: the
+# per-item path is the one verified end to end, and a check is the moment a
+# learner is most exposed to a regression. Worth turning on where per-call
+# startup dominates (the Claude CLI upstream pays ~55s per item).
+BATCH_GRADING = bool(CFG.get("batch_grading", False))
+
 
 @app.middleware("http")
 async def require_token(request, call_next):
@@ -117,13 +123,24 @@ class Exchange(BaseModel):
 # ------------------------------------------------------------------ helpers
 
 def _grade_items(ctx: Subject, responses: list[ItemResponse], results: list) -> tuple[int, int]:
-    """Grade item responses (mechanical first, LLM for free text). Appends
-    result dicts; returns (passed, total)."""
-    passed = 0
+    """Grade item responses (mechanical in code, LLM for free text). Appends
+    result dicts in submission order; returns (passed, total)."""
+    # Resolve every item first so free-text ones can optionally be graded in a
+    # single call. Order is preserved for both events and results.
+    resolved: list[tuple[ItemResponse, dict, str]] = []
     for r in responses:
         q, unit_id = ctx.corpus.find_question(r.item_id)
-        if q is None:
-            continue
+        if q is not None:
+            resolved.append((r, q, unit_id))
+
+    free_text = [(r.item_id, q, r.response or "") for r, q, _ in resolved
+                 if q.get("kind") != "mcq" and not checkers.is_mechanical(q.get("check", "llm"))]
+    batched: dict[str, dict] = {}
+    if BATCH_GRADING and len(free_text) > 1:
+        batched = roles.grade_free_text_batch(chain, free_text, ctx.corpus.misconceptions)
+
+    passed = 0
+    for r, q, unit_id in resolved:
         if q.get("kind") == "mcq":
             g = checkers.check_mcq(q.get("options", []), r.selected_index or 0)
             g["feedback_md"] = g.pop("explain", "")
@@ -132,7 +149,10 @@ def _grade_items(ctx: Subject, responses: list[ItemResponse], results: list) -> 
             g = {"verdict": "pass" if ok else "fail", "misconceptions": [],
                  "feedback_md": f"Reference: {q.get('answer', '')}"}
         else:
-            g = roles.grade_free_text(chain, q, r.response or "", ctx.corpus.misconceptions)
+            # Fall back per item for anything the batch did not return, so a
+            # partial batch degrades rather than silently dropping grades.
+            g = batched.get(r.item_id) or roles.grade_free_text(
+                chain, q, r.response or "", ctx.corpus.misconceptions)
         ok = g["verdict"] in ("pass", "valid_alternative_path")
         passed += ok
         ctx.state.apply("item_graded", {

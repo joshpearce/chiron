@@ -113,5 +113,6 @@ def make_chain(cfg: dict):
     if provider == "claude-cli":
         from llm_claude_cli import ClaudeCLIChain
 
-        return ClaudeCLIChain(cfg.get("claude_cli_model", "opus"))
+        # No model configured means per-role tiers (see llm_claude_cli).
+        return ClaudeCLIChain(cfg.get("claude_cli_model"))
     return LLMChain(cfg["upstreams"], cfg["llm"])

@@ -38,3 +38,8 @@ session:
 # where the only client is the iPad on a Mac-hosted network). Set this before
 # exposing the server on a public URL.
 auth_token: ""
+
+# Grade all free-text items of a check in one model call. Off by default;
+# the per-item path is the verified one. Turn on where per-call startup
+# dominates (e.g. the claude-cli upstream).
+batch_grading: false

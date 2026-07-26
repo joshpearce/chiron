@@ -77,6 +77,67 @@ LEARNER ANSWER:
                 "next_action": "Self-check against the reference, then continue."}
 
 
+BATCH_GRADE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "grades": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "item_id": {"type": "string"},
+                    "verdict": {"type": "string",
+                                "enum": ["pass", "partial", "fail", "valid_alternative_path"]},
+                    "misconceptions": {"type": "array", "items": {"type": "string"}},
+                    "evidence": {"type": "string"},
+                    "feedback_md": {"type": "string"},
+                    "next_action": {"type": "string"},
+                },
+                "required": ["item_id", "verdict", "misconceptions", "evidence",
+                             "feedback_md", "next_action"],
+            },
+        },
+    },
+    "required": ["grades"],
+}
+
+
+def grade_free_text_batch(chain: LLMChain, items: list[tuple[str, dict, str]],
+                          misconception_bank: dict) -> dict[str, dict]:
+    """Grade several free-text answers in one call, keyed by item id.
+
+    Per-item calls dominate check latency when each one pays model or harness
+    startup (~55s per item through the Claude CLI). Grading is independent per
+    item, so batching costs nothing pedagogically - the rubric for each item is
+    still the only contract, and each grade still cites its own evidence.
+
+    Returns whatever it could grade; the caller falls back per item for any id
+    missing from the response, so a partial answer degrades instead of failing.
+    """
+    if not items:
+        return {}
+    ids = "\n".join(f"- {mid}: {m['name']}: {m['wrong_model']}"
+                    for mid, m in misconception_bank.items())
+    blocks = []
+    for item_id, q, answer in items:
+        blocks.append(
+            f"### ITEM {item_id}\n"
+            f"QUESTION:\n{q['prompt']}\n\n"
+            f"REFERENCE ANSWER:\n{q.get('answer', '(rubric only)')}\n\n"
+            f"RUBRIC:\n{q.get('rubric', '(match the reference answer)')}\n\n"
+            f"LEARNER ANSWER:\n{answer}")
+    user = (f"Grade each item below independently against its own rubric.\n\n"
+            f"KNOWN MISCONCEPTIONS (cite by ID only if the answer exhibits one):\n{ids}\n\n"
+            + "\n\n".join(blocks)
+            + f"\n\nReturn one grade per item, using the exact item ids: "
+              f"{', '.join(i[0] for i in items)}")
+    try:
+        out = chain.structured("grader", GRADER_SYSTEM, user, BATCH_GRADE_SCHEMA, "grades")
+    except UpstreamError:
+        return {}
+    return {g["item_id"]: g for g in out.get("grades", []) if "item_id" in g}
+
+
 # ---------------------------------------------------------------- planner
 
 DIRECTIVE_SCHEMA = {

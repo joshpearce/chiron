@@ -14,13 +14,21 @@ import subprocess
 
 from llm import UpstreamError
 
-ROLE_TIMEOUTS = {"grader": 180, "planner": 240, "author": 900}
+ROLE_TIMEOUTS = {"grader": 300, "planner": 300, "author": 900}
+
+# Per-role model tiers. Grading is a bounded judgement against an explicit
+# rubric and sonnet scores 5/5 on the sycophancy red-team at roughly a sixth of
+# opus's latency, which is what makes a nine-item check tolerable. Authoring is
+# open-ended prose the learner reads for 25 minutes, so it keeps opus.
+ROLE_MODELS = {"grader": "sonnet", "planner": "sonnet", "author": "opus"}
 CRED_PATH = os.path.expanduser("~/.claude/.credentials.json")
 
 
 class ClaudeCLIChain:
-    def __init__(self, model: str = "opus"):
+    def __init__(self, model: str | None = None):
+        # An explicit model overrides the per-role tiers entirely.
         self.model = model
+        self.role_models = ROLE_MODELS
 
     def _logged_in(self) -> bool:
         return os.path.exists(CRED_PATH)
@@ -28,9 +36,14 @@ class ClaudeCLIChain:
     def healthy_upstream(self):
         return {"name": "claude-cli", "model": self.model} if self._logged_in() else None
 
+    def model_for(self, role: str) -> str:
+        return self.model or self.role_models.get(role, "opus")
+
     def status(self) -> dict:
         ok = self._logged_in()
-        return {"connected": ok, "upstream": "claude-cli", "model": self.model,
+        return {"connected": ok, "upstream": "claude-cli",
+                "model": self.model or "per-role: " + ", ".join(
+                    f"{r}={m}" for r, m in self.role_models.items()),
                 "error": None if ok else "claude CLI not logged in"}
 
     def structured(self, role: str, system: str, user: str, schema: dict,
@@ -49,7 +62,7 @@ class ClaudeCLIChain:
                      "--append-system-prompt", system,
                      "--output-format", "json",
                      "--max-turns", "1",
-                     "--model", self.model],
+                     "--model", self.model_for(role)],
                     capture_output=True, text=True,
                     timeout=ROLE_TIMEOUTS.get(role, 240),
                 )

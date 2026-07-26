@@ -16,13 +16,16 @@ import yaml
 from pathlib import Path
 
 from corpus import Corpus
-from llm import LLMChain
+from llm_anthropic import make_chain
 import roles
 
 HERE = Path(__file__).parent
 cfg = yaml.safe_load((HERE / "config.yaml").read_text())
 corpus = Corpus(HERE.parent / "corpus")
-chain = LLMChain(cfg["upstreams"], cfg["llm"])
+# Go through the chain factory so this exercises whichever upstream is
+# actually configured - building LLMChain directly silently tested nothing on
+# hosts that use a different provider.
+chain = make_chain(cfg)
 
 SQRT_DK = {
     "prompt": "Why does scaled dot-product attention divide the scores by sqrt(d_k)?",
