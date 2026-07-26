@@ -153,8 +153,10 @@ The two things that most often go wrong, and that you must get right:
 `tol` tighter than the distance to every plausible wrong answer you name in the
 rubric - a tolerance that accepts the error the item exists to catch makes the
 item worthless.
-- **Every MCQ distractor cites a misconception id from the bank**, and every
-option carries an `explain`. A wrong answer must be a diagnosis, not a miss."""
+- **Every MCQ carries `check: choice`**, exactly one option marked `correct`,
+an `explain` on every option, and a misconception id from the bank on every
+distractor. An MCQ without `check: choice` is not graded as an MCQ at all, and
+a wrong answer must be a diagnosis rather than a miss."""
 
 
 def _file_schema(key: str, description: str) -> dict:

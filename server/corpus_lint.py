@@ -50,10 +50,11 @@ def _is_machine_answer(value) -> bool:
     text = value.strip()
     if not text or len(text.split()) > 8:
         return False
-    # Vectors and shapes ("[7, -4]", "4 x 7") compare fine as exact strings.
-    # Vectors, shapes, and tokenizations ("[7, -4]", "4 x 7", "w|i|d|est_")
-    # all compare fine as exact strings.
-    return bool(re.fullmatch(r"[-+0-9.eE/×x,;\[\]() ]+|[A-Za-z0-9 _.\-/|]{1,24}", text))
+    # Vectors, shapes, hex bytes, and tokenizations ("[7, -4]", "4 x 7",
+    # "0xB2,0x00,0x2F", "w|i|d|est_") all compare fine as exact strings. The
+    # ">8 words" guard above is what actually keeps prose out; these classes
+    # only have to be wide enough not to reject a real answer.
+    return bool(re.fullmatch(r"[-+0-9A-Fa-f.eE/×x,;\[\]() ]+|[A-Za-z0-9 _.\-/|]{1,24}", text))
 
 
 def _plausible_wrong_answers(expected: float) -> list[float]:
