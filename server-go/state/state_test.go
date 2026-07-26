@@ -1,0 +1,250 @@
+package state
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/mjbraun/chiron/server/corpus"
+)
+
+func newLearner(t *testing.T) *Learner {
+	t.Helper()
+	c, err := corpus.Load(filepath.Join("..", "..", "corpus"))
+	if err != nil {
+		t.Fatalf("corpus: %v", err)
+	}
+	l, err := Open(t.TempDir(), c)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	return l
+}
+
+func f64(v float64) *float64 { return &v }
+func b(v bool) *bool         { return &v }
+func i(v int) *int           { return &v }
+
+// A single correct answer must not promote a cold concept straight to mastered.
+// The whole gate rests on that being two steps, not one.
+func TestMasteryLadder(t *testing.T) {
+	l := newLearner(t)
+	apply := func(verdict string) {
+		if _, err := l.Apply(Event{Kind: "item_graded", Concept: "c-x",
+			Item: "q1", Verdict: verdict, Confidence: i(4)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := l.ConceptLevel("c-x"); got != "unseen" {
+		t.Errorf("fresh concept is %q", got)
+	}
+	apply("pass")
+	if got := l.ConceptLevel("c-x"); got != "shaky" {
+		t.Errorf("one correct answer from cold -> %q, want shaky", got)
+	}
+	apply("pass")
+	if got := l.ConceptLevel("c-x"); got != "mastered" {
+		t.Errorf("second correct answer -> %q, want mastered", got)
+	}
+	apply("fail")
+	if got := l.ConceptLevel("c-x"); got != "shaky" {
+		t.Errorf("a miss after mastery -> %q, want shaky", got)
+	}
+}
+
+func TestValidAlternativePathCountsAsCorrect(t *testing.T) {
+	l := newLearner(t)
+	for range 2 {
+		if _, err := l.Apply(Event{Kind: "item_graded", Concept: "c-y", Item: "q",
+			Verdict: "valid_alternative_path"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := l.ConceptLevel("c-y"); got != "mastered" {
+		t.Errorf("valid alternative path must count as correct, got %q", got)
+	}
+}
+
+// Overriding a failed gate advances the learner but must leave a debt entry -
+// that is the whole bargain.
+func TestOverrideAdvancesButAccruesDebt(t *testing.T) {
+	l := newLearner(t)
+	if _, err := l.Apply(Event{Kind: "override", Unit: "u0",
+		Concepts: []string{"c-notation"}, ItemsMissed: []string{"u0-q1"},
+		Reason: "failed_gate"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := l.UnitStatus("u0"); got != "overridden" {
+		t.Errorf("unit status %q", got)
+	}
+	debt := l.OpenDebt()
+	if len(debt) != 1 || debt[0].Reason != "failed_gate" {
+		t.Fatalf("debt ledger: %+v", debt)
+	}
+	if !l.ClearedUnits()["u0"] {
+		t.Error("an overridden unit must count as cleared for availability")
+	}
+	if _, err := l.Apply(Event{Kind: "debt_retired", Unit: "u0"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(l.OpenDebt()) != 0 {
+		t.Error("retiring the debt should close it")
+	}
+}
+
+// The fringe is what the learner may read next. It must never offer a unit
+// whose files are missing, or one whose prerequisites are unmet.
+func TestFringeRespectsPrereqsAndMissingUnits(t *testing.T) {
+	l := newLearner(t)
+	fringe := l.Fringe()
+	if len(fringe) != 1 || fringe[0] != "u0" {
+		t.Fatalf("a fresh learner's fringe should be exactly [u0], got %v", fringe)
+	}
+	if _, err := l.Apply(Event{Kind: "check_result", Unit: "u0",
+		Score: f64(1), Passed: b(true)}); err != nil {
+		t.Fatal(err)
+	}
+	fringe = l.Fringe()
+	if len(fringe) == 0 || fringe[0] != "u1" {
+		t.Errorf("after clearing u0 the fringe should open u1, got %v", fringe)
+	}
+	for _, uid := range fringe {
+		if _, ok := l.corpus.Units[uid]; !ok {
+			t.Errorf("fringe offers %s, which is not authored", uid)
+		}
+	}
+}
+
+// A low-confidence correct answer is the fluency illusion showing; it belongs
+// in the review queue even though the concept reads as mastered.
+func TestFragileConceptsCatchLowConfidenceCorrect(t *testing.T) {
+	l := newLearner(t)
+	if _, err := l.Apply(Event{Kind: "item_graded", Concept: "c-z", Item: "q1",
+		Verdict: "pass", Confidence: i(4)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.Apply(Event{Kind: "item_graded", Concept: "c-z", Item: "q2",
+		Verdict: "pass", Confidence: i(2)}); err != nil {
+		t.Fatal(err)
+	}
+	if l.ConceptLevel("c-z") != "mastered" {
+		t.Fatalf("expected mastered, got %q", l.ConceptLevel("c-z"))
+	}
+	found := false
+	for _, c := range l.FragileConcepts() {
+		if c == "c-z" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("mastered-but-unconfident must land in the review queue")
+	}
+}
+
+func TestMisconceptionsActivateAndClear(t *testing.T) {
+	l := newLearner(t)
+	if _, err := l.Apply(Event{Kind: "item_graded", Concept: "c-a", Item: "q1",
+		Verdict: "fail", Misconceptions: []string{"M2"}, Evidence: "softmax gives truth"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := l.ActiveMisconceptions(); len(got) != 1 || got[0] != "M2" {
+		t.Fatalf("active misconceptions %v", got)
+	}
+	if _, err := l.Apply(Event{Kind: "misconception_cleared", ID: "M2", Why: "u3 check"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := l.ActiveMisconceptions(); len(got) != 0 {
+		t.Errorf("cleared misconception still active: %v", got)
+	}
+}
+
+// Progress must survive the state directory disappearing under a running
+// server - a wiped volume mid-flight is not an acceptable way to lose a session.
+func TestSurvivesStateDirDisappearing(t *testing.T) {
+	c, err := corpus.Load(filepath.Join("..", "..", "corpus"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	l, err := Open(dir, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.Apply(Event{Kind: "summary", Text: "still here"}); err != nil {
+		t.Fatalf("write after the directory vanished: %v", err)
+	}
+	if l.Data.Summary != "still here" {
+		t.Error("event was not applied")
+	}
+}
+
+// The snapshot has to stay readable by, and from, the Python implementation.
+func TestSnapshotShapeMatchesPython(t *testing.T) {
+	l := newLearner(t)
+	raw, err := os.ReadFile(l.snapshotPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"version", "concepts", "units", "misconceptions",
+		"debt", "profile", "pacing", "summary", "current_unit", "chapter_cache"} {
+		if _, ok := m[key]; !ok {
+			t.Errorf("snapshot is missing %q", key)
+		}
+	}
+	pacing, _ := m["pacing"].(map[string]any)
+	for _, key := range []string{"chunks", "breaks", "fatigue_flag", "session_started"} {
+		if _, ok := pacing[key]; !ok {
+			t.Errorf("pacing is missing %q", key)
+		}
+	}
+}
+
+// Every applied event must be replayable: the log is the provenance record.
+func TestEventLogIsAppendOnlyAndComplete(t *testing.T) {
+	l := newLearner(t)
+	for _, kind := range []string{"unit_started", "summary", "fatigue"} {
+		if _, err := l.Apply(Event{Kind: kind, Unit: "u0", Text: "x"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err := os.ReadFile(l.logPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := 0
+	for _, line := range splitLines(string(raw)) {
+		var ev Event
+		if err := json.Unmarshal([]byte(line), &ev); err != nil {
+			t.Fatalf("log line is not valid json: %v", err)
+		}
+		lines++
+		if ev.N != lines {
+			t.Errorf("event %d has n=%d - the sequence must be gapless", lines, ev.N)
+		}
+	}
+	if lines != 3 {
+		t.Errorf("%d events logged, want 3", lines)
+	}
+}
+
+func splitLines(s string) []string {
+	var out []string
+	start := 0
+	for i := range len(s) {
+		if s[i] == '\n' {
+			if line := s[start:i]; line != "" {
+				out = append(out, line)
+			}
+			start = i + 1
+		}
+	}
+	return out
+}
