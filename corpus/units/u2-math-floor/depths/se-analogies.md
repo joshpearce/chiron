@@ -106,7 +106,7 @@ dot product is signed and unbounded, so it distinguishes "disagrees" from
 "unrelated" - a distinction bitsets cannot express - and its magnitude conflates
 two different things. A long vector that agrees weakly can score identically to a
 short vector that agrees perfectly. If you carry the popcount intuition you will
-read a high attention score as strong semantic match when it may just be a
+read a high attention score as strong semantic match when it may be nothing more than a
 high-norm key. That conflation is real and load-bearing: normalizing it away is
 what cosine similarity does, and the fact that attention deliberately does not
 normalize it away is part of why key and query norms matter.
@@ -185,7 +185,7 @@ identical zero and lose distinctions permanently. Temperature does not lose
 information in the same way, because the logits still exist upstream and any
 temperature can be applied to them. And the dashboard analogy suggests temperature
 is only about viewing, which understates it: the transformed distribution is
-actually sampled from, so it changes which token comes out, not just how the
+actually sampled from, so it changes which token comes out, not merely how the
 numbers look. It is a presentation transform whose output is then acted on.
 
 **"Set temperature to 0 to see what it really thinks" is like setting a log level
@@ -261,8 +261,8 @@ the quantities become tensors - the inner dimensions cancel the way the units do
 
 **Where this breaks:** exchange rates are constants for the duration of the
 calculation. Local derivatives are functions of the current activations, so every
-"rate" in the chain is recomputed on every training step from the values that
-just came out of the forward pass. There is no fixed conversion table. That
+"rate" in the chain is recomputed on every training step from the values the
+forward pass produced. There is no fixed conversion table. That
 dependence is the entire reason the forward pass must be retained, and it is why
 "just cache the gradients" is not a thing.
 

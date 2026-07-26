@@ -1,0 +1,37 @@
+# Unit-local misconception additions for u1 (core-bet).
+# Same schema as corpus/misconception-bank.yaml. IDs are namespaced U1-* so
+# they never collide with the global M* bank. Referenced by distractors in
+# u1/questions.yaml and by refutation blocks in u1/canon.md.
+
+misconceptions:
+  - id: U1-M1
+    name: tokens-are-words
+    wrong_model: "Tokenization is a cosmetic preprocessing step - the model effectively sees words, and token boundaries have no consequences for what it can do."
+    why_appealing: "Tokenizer output looks like words for most English text, and every tutorial draws the input as a sentence. The abstraction leaks so rarely in normal use that it reads as an implementation detail."
+    failing_prediction: "If tokens were words, character-level and digit-level behavior would be uniform across inputs - but the model's accuracy on spelling and arithmetic depends on how the specific string happens to chunk. `strawberry` is one token with a leading space and three without, and `2847 + 1913` arrives as `284`,`7`,` +`,` `,`191`,`3`, so place value is misaligned in a way that varies with operand length."
+    correction: "The model consumes integer IDs for frequency-derived byte sequences, never characters and never words. Token boundaries are artifacts of corpus statistics, not linguistic structure, and every sub-token operation (spelling, counting letters, digit arithmetic, rhyme) is indirect and therefore unreliable in patterned ways."
+    units: [u1]
+
+  - id: U1-M2
+    name: next-token-means-myopic
+    wrong_model: "Because the loss scores each position only on the immediately following token, the model is myopic: it cannot plan, set anything up, or commit to a structure that pays off later."
+    why_appealing: "The objective genuinely is a sum of independent per-position terms, and greedy-looking objectives usually do produce greedy behavior. The inference from 'objective is local' to 'behavior is local' feels like sound reasoning."
+    failing_prediction: "If the model were myopic, long-range commitments would only happen by coincidence - no correctly scanning rhymed couplet, no matched delimiter after deep nesting, no setup whose punchline lands 60 tokens later. Those appear constantly and at rates no coincidence explains."
+    correction: "The loss terms are additive; the computations producing them share parameters. Gradient from position t+40 flows back into whatever produced the hidden state at position t, so encoding a plan early is directly rewarded by the late term. The objective decomposes per position; credit assignment does not."
+    units: [u1, u5]
+
+  - id: U1-M3
+    name: vocab-size-is-word-knowledge
+    wrong_model: "Vocabulary size measures how many words the model knows, and words outside the vocabulary cannot be produced."
+    why_appealing: "'Vocabulary' means exactly this for a person, and word-level NLP models before subword tokenization really did have an out-of-vocabulary problem with an <UNK> token."
+    failing_prediction: "If V bounded expressible words, a model with V=32,000 could not emit a novel identifier, a rare chemical name, or a made-up word - it emits all of these routinely, by composing subword pieces down to individual bytes."
+    correction: "V is a budget trading embedding and output-layer cost against tokens-per-character. Base units are retained as fallbacks, so nothing is unrepresentable; rare strings merely cost more tokens. Vocabulary size constrains sequence length and parameter count, never expressiveness."
+    units: [u1]
+
+  - id: U1-M4
+    name: embeddings-are-pretrained-inputs
+    wrong_model: "Embeddings are pretrained word vectors (word2vec/GloVe-style) loaded in as fixed inputs, produced by a separate earlier process with its own semantic objective."
+    why_appealing: "This was literally the standard architecture from roughly 2013 to 2018, and anyone who built NLP systems in that window loaded exactly such a table. The word 'embedding' is inherited from it."
+    failing_prediction: "If the table were fixed input data, it would receive no gradient - but the embedding matrix is a parameter, updated by the same backward pass as every other weight, and its rows are randomly initialized. Freeze it and final loss is measurably worse; inspect gradients and rows for tokens present in the batch have nonzero gradient while absent rows have exactly zero."
+    correction: "The embedding matrix is trained end to end with the rest of the model, from random initialization, on the language modeling objective alone. There is no separate semantic training stage. A consequence: a token's row only receives updates when that token appears in a batch, so very rare vocabulary entries end training near their initialization - the mechanism behind glitch tokens."
+    units: [u1]

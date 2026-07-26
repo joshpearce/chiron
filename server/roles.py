@@ -134,6 +134,10 @@ def plan_directives(chain: LLMChain, state, unit, check_summary: str) -> dict:
         "opening_note_md": "", "summary": state.data["summary"],
         "next_action": "Read the chapter and work every beat before its reveal.",
     }
+    # Cold start: no measured evidence yet -> nothing for a planner to adapt.
+    # Default directives, no LLM call, instant first chapter.
+    if not check_summary and not state.active_misconceptions() and not state.open_debt():
+        return fallback
     sections = "\n".join(f"- {s.heading}" for s in unit.sections)
     depths = ", ".join(unit.depths.keys()) or "(none)"
     user = f"""LEARNER STATE SUMMARY:
@@ -155,10 +159,15 @@ Available depth variants: {depths}
 Concepts: {', '.join(f"{c['id']} ({state.concept_level(c['id'])})" for c in unit.concepts)}"""
     try:
         out = chain.structured("planner", PLANNER_SYSTEM, user, DIRECTIVE_SCHEMA, "directives")
-        # sanitize: only real headings and known misconception ids survive
+        # sanitize: only real headings and known misconception ids survive,
+        # and degenerate text fields fall back rather than propagating junk
         headings = {s.heading for s in unit.sections}
         out["sections_to_rewrite"] = [s for s in out["sections_to_rewrite"]
                                       if s["heading"] in headings][:3]
+        if len(out.get("summary", "").strip()) < 20:
+            out["summary"] = state.data["summary"]
+        if len(out.get("next_action", "").strip()) < 10:
+            out["next_action"] = fallback["next_action"]
         return out
     except UpstreamError:
         return fallback
@@ -302,5 +311,9 @@ def compose_check(unit, state, corpus, n_items: int, callback_fraction: float,
             callbacks.append((weight, rng.random(), dict(q, unit=uid)))
     callbacks.sort(key=lambda t: (-t[0], t[1]))
     items += [q for _, _, q in callbacks[: n_items - len(items)]]
+    if len(items) < n_items:  # early units have no callback pool - top up from current
+        seen = {q["id"] for q in items}
+        items += [dict(q, unit=unit.id) for q in current_pool
+                  if q["id"] not in seen][: n_items - len(items)]
     rng.shuffle(items)
     return items

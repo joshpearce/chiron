@@ -76,7 +76,7 @@ rotate: the stretched direction gets carried around to vertical. Two different
 final pictures, from the same two operations. You already know this from image
 editing, from applying CSS transforms, from any pipeline where a filter's input
 is the previous filter's output. Function composition has never commuted, in any
-domain, and matrices are just function composition with the bookkeeping done
+domain, and matrices are function composition with the bookkeeping done
 ahead of time.
 
 The special cases where order does not matter have an equally physical
@@ -133,7 +133,7 @@ You have a handful of scores and you need to turn them into a share of the pot -
 a way of dividing one unit of confidence among the options, with the better-scored
 options getting more.
 
-The naive move is to just divide each score by the total. That breaks the moment
+The naive move is to divide each score by the total. That breaks the moment
 a score is negative, and scores are routinely negative. A negative share of the
 pot is not a thing.
 
@@ -142,7 +142,7 @@ This is worse than it looks, and the reason is the whole point of this section.
 Squaring throws away the sign, so an option the network scored as strongly
 disfavored gets treated identically to one it scored as strongly favored. The
 option the network liked least walks away with the largest share. The scoring is
-not just distorted; it is inverted for half the range.
+not merely distorted; it is inverted for half the range.
 
 What you actually need is a way of turning scores into shares that never
 reverses the ordering, never produces a negative, and never breaks - and one more
@@ -166,7 +166,7 @@ the same amount to every score, and every share grows by the same factor, so
 after dividing by the new total, nothing moved. This is the same reason inflating
 everyone's salary by ten percent leaves the relative distribution untouched.
 
-One last picture worth carrying. Suppose you skipped all this and just took the
+One last picture worth carrying. Suppose you skipped all this and took the
 highest-scoring option, winner take all. That is a cliff: the shares are one and
 zero, and nudging a score changes nothing at all until it crosses the leader, at
 which point everything flips at once. There is no local signal telling you which
@@ -291,7 +291,7 @@ formal names.
 
 If several gears in a row each have a ratio below one, the product shrinks fast.
 Twenty gears at a ratio of one half apiece, and the last gear barely quivers when
-you turn the first. Nudge a weight in an early layer and the loss simply does not
+you turn the first. Nudge a weight in an early layer and the loss does not
 notice. That layer receives no usable signal and effectively stops learning. This
 is the vanishing gradient problem, and it is the reason deep networks were hard to
 train before residual connections gave the signal a direct route back that skips

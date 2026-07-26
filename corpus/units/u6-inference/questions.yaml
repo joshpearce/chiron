@@ -1,0 +1,574 @@
+# u6 - Inference: making it run
+# Pretest items are expected to fail; they exist for calibration and the
+# pretesting effect. Check items compose an 8+ item terminal check.
+
+pretest:
+  - id: u6-p1
+    concept: c-sampling
+    prompt: >
+      You call your local model twice with the identical prompt, once with
+      temperature=0 and once with temperature=1.2. Name every quantity computed
+      inside the network's forward pass that differs between the two calls, and
+      say what temperature=0 guarantees about the output.
+    answer: >
+      Nothing inside the forward pass differs. Embeddings, attention scores,
+      MLP activations, the residual stream, and the final logit vector are all
+      bit-identical; temperature is never an input to the network. It is applied
+      to the returned logits, dividing them before the softmax that defines the
+      sampling distribution. temperature=0 guarantees determinism only - it is
+      argmax over that same distribution. It guarantees nothing about
+      correctness, which is why a greedy decode reproduces the same
+      hallucination on every run.
+    check: llm
+    rubric: >
+      Pass requires both: (1) nothing in the forward pass differs, including the
+      logits; (2) T=0 gives determinism, not correctness. Naming the logits as
+      differing, or saying T=0 shows "what the model really knows", is M6 -
+      expected on the pretest, and the planner should route to the sampling
+      refutation section. Saying only "the sampled token differs" without
+      locating temperature after the forward pass is partial.
+
+  - id: u6-p2
+    concept: c-kv-cache
+    prompt: >
+      You are running a 35B-parameter model locally with a 32,000-token
+      conversation loaded. Roughly how much RAM does the KV cache consume, and
+      which of the model's architectural dimensions determine that number?
+    answer: >
+      Around 3 GiB, from bytes = 2 * L * H_kv * d_head * bytes_per_scalar * n.
+      The factor of 2 is one key and one value vector. Only the layer count, the
+      number of KEY/VALUE heads (not query heads), the head width, the cache
+      precision, and the sequence length matter. d_model, the MLP width, the
+      number of experts, and the total parameter count do not appear.
+    check: llm
+    rubric: >
+      Pass requires the formula's structure (2 x layers x kv-heads x head-dim x
+      bytes x tokens) and an order-of-magnitude figure in single-digit GiB.
+      Answering in megabytes indicates no working model of cache size.
+      Using total parameter count or d_model as the driver is the most common
+      pretest error and should route the planner to the derivation section.
+      Describing the cache as holding conversation state rather than key/value
+      projections is M17.
+
+  - id: u6-p3
+    concept: c-quant
+    prompt: >
+      The model file on your laptop is 19 GB and the model has 35 billion
+      parameters. How many bits does that give each weight, and what did
+      quantization discard to get there?
+    answer: >
+      19e9 bytes * 8 / 35.35e9 params = about 4.3 bits per weight: 4 bits of
+      payload plus roughly 0.31 bits of per-group scale and zero-point overhead
+      at group size 64. Nothing was discarded in the sense of removed content.
+      Every weight is still present, stored as one of 16 levels spanning its
+      group's range, and reconstructed as scale * (code - zero_point). What was
+      spent is precision - each weight is off by at most half a quantization
+      step, about 9% of the weights' standard deviation.
+    check: llm
+    rubric: >
+      Pass requires roughly 4.3 bits per weight AND an answer to "what was
+      discarded" that says precision-per-weight rather than content. Any
+      framing of the form "7/8 of the information / most of its knowledge /
+      the rarer facts were dropped" is M16, which is the expected pretest
+      failure - route to the quantization sections. Computing about 4.3 bits
+      but still describing it as deleted knowledge is a partial credit case
+      worth flagging: the arithmetic is fine and the model is wrong.
+
+check:
+  - id: u6-q1
+    concept: c-sampling
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    difficulty: core
+    prompt: >
+      A forward pass returns logits z = [2.0, 0.0, -1.0] over a three-token
+      vocabulary. Compute the probability assigned to the first token at
+      temperature T = 0.5. Answer as a bare decimal to four places.
+    answer: "0.9796"
+    check: numeric(0.001)
+    rubric: >
+      Expected work: divide logits by T to get [4, 0, -2]; exponentiate to
+      [54.5982, 1.0, 0.1353]; sum 55.7335; 54.5982/55.7335 = 0.9796.
+      Diagnostic wrong answers: 0.8438 means the learner used T = 1 and never
+      applied temperature; 0.6652 means they multiplied the logits by T instead
+      of dividing, giving [1.0, 0, -0.5]; 0.9820 means they exponentiated first
+      and then divided the exponentials by T, which is not what temperature
+      does.
+
+  - id: u6-q2
+    concept: c-sampling
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    difficulty: warmup
+    prompt: >
+      Two API calls, identical prompt, one at temperature=0.7 and one at
+      temperature=1.5. Which statement is true?
+    options:
+      - text: >
+          The logit vectors are identical; only the distribution sampled from
+          them differs.
+        correct: true
+        explain: >
+          Correct. Temperature is applied after the forward pass returns. The
+          network never receives it, so every activation including the logits
+          is bit-identical across the two calls.
+      - text: >
+          The higher-temperature call activates a broader set of the model's
+          knowledge, producing different logits.
+        misconception: M6
+        explain: >
+          This is the core temperature-changes-knowledge error. It predicts the
+          logits differ; they do not. Nothing about temperature reaches the
+          weights, and the ranking of tokens is provably identical at every
+          temperature because x -> x^(1/T) is monotone increasing.
+      - text: >
+          The logits differ because the higher temperature adds noise to the
+          attention scores during the forward pass.
+        misconception: M6
+        explain: >
+          Same error with a mechanism attached, which makes it more seductive.
+          No serving stack injects noise into attention on the basis of the
+          temperature parameter; temperature is a scalar divide applied to the
+          returned logit vector, typically a single line of Python.
+      - text: >
+          The softmax outputs at temperature=0.7 are better-calibrated estimates
+          of which token is factually correct.
+        misconception: M2
+        explain: >
+          Softmax outputs are not probabilities of correctness at any
+          temperature. They are a normalized exponential weighting calibrated to
+          training-data frequency. Lowering temperature concentrates that
+          weighting; it does not make it truth-tracking.
+
+  - id: u6-q3
+    concept: c-sampling
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    difficulty: core
+    prompt: >
+      A teammate argues: "We should run all production inference at
+      temperature=0. It removes the randomness, so the model gives us its
+      actual best answer instead of a random one, and that will cut our
+      hallucination rate."
+      Evaluate this. Say what temperature=0 does mechanically, what it buys,
+      what it does not buy, and name one concrete reason greedy decoding can be
+      worse than sampling.
+    answer: >
+      Mechanically, temperature=0 is argmax over the same distribution every
+      other temperature samples from. The logits are unchanged. It buys
+      determinism, which is genuinely useful for tests, diffs, caching, and bug
+      reproduction. It does not buy correctness: the argmax token is the one the
+      model scored highest, and the score reflects training-data frequency, not
+      truth. Greedy decoding hallucinates at close to the same rate as moderate
+      sampling, and reproduces the same hallucination on every run.
+      Concrete reasons greedy can be worse: (a) argmax at each position does not
+      maximize sequence probability, so a locally-best token can force a poor
+      continuation - this is why beam search exists; (b) determinism removes the
+      variance signal, and disagreement across samples is a real uncertainty
+      indicator, which is what self-consistency methods exploit.
+    check: llm
+    rubric: >
+      Must contain: (1) T=0 is argmax over the same distribution, logits
+      unchanged; (2) determinism is the benefit and correctness is not; (3) at
+      least one concrete greedy failure - sequence-probability suboptimality or
+      loss of the sampling-variance signal.
+      Pass = all three. Partial = (1) and (2) with no concrete failure named.
+      Fail patterns: agreeing that T=0 lowers hallucination rate = M6; arguing
+      the fix is to raise temperature instead = M6 inverted; asserting the
+      softmax probability at T=0 measures confidence in correctness = M2.
+
+  - id: u6-q4
+    concept: c-kv-cache
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    difficulty: core
+    prompt: >
+      A model has 32 layers, d_model = 4096, 32 query heads, 8 key/value heads,
+      head width 128, and an fp16 KV cache (2 bytes per scalar). Compute the
+      total KV cache size in GiB for a 4,096-token context. Answer as a bare
+      decimal.
+    answer: "0.5"
+    check: numeric(0.01)
+    rubric: >
+      Expected work: 2 * 32 * 8 * 128 * 2 = 131,072 bytes per token = 128 KiB;
+      times 4,096 tokens = 536,870,912 bytes = 0.5 GiB.
+      Diagnostic wrong answers: 2.0 means the learner used the 32 query heads
+      instead of the 8 key/value heads - the single most common cache-sizing
+      error, and the one that hides why GQA exists; 0.25 means they dropped the
+      factor of 2 for storing both K and V; 16.0 means they used d_model = 4096
+      in place of H_kv * d_head, which is the MHA-shaped assumption.
+
+  - id: u6-q5
+    concept: c-kv-cache
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    difficulty: warmup
+    prompt: >
+      Mid-conversation, your serving process evicts the entire KV cache and
+      recomputes it from the same token sequence. What happens to the next
+      token's logits?
+    options:
+      - text: >
+          They are bit-identical to what they would have been. The eviction cost
+          time and nothing else.
+        correct: true
+        explain: >
+          Correct, and this is the decisive test. The cache holds key and value
+          projections, each a pure function of the tokens up to that position -
+          guaranteed by the causal mask. Recomputing from the same tokens
+          reproduces them exactly.
+      - text: >
+          They shift slightly, because the model loses some of the accumulated
+          context state it had built up over the conversation.
+        misconception: M17
+        explain: >
+          This treats the cache as semantic memory. If it held state that the
+          tokens did not, recomputation could not reproduce it - but it does,
+          exactly. The conversation's state lives in the token sequence; the
+          cache is recomputation avoidance over that sequence.
+      - text: >
+          They change substantially, because the model must re-derive the
+          conversation's meaning from scratch and may interpret it differently.
+        misconception: M17
+        explain: >
+          The stronger form of the same error. The forward pass is deterministic:
+          the same weights on the same tokens give the same activations every
+          time. There is no re-interpretation step.
+      - text: >
+          They are identical, but only because the harness re-sends the full
+          message history; if it had sent only the newest message the cache
+          would have held the earlier turns.
+        misconception: M13
+        explain: >
+          The first clause is right and the reasoning is wrong. The harness does
+          re-send the full history, but that is not what makes the cache exact -
+          the cache is keyed to a token prefix and cannot survive without those
+          tokens in the first place. This conflates the harness's assembly job
+          (u8) with the cache's memoization job.
+
+  - id: u6-q6
+    concept: c-kv-cache
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    difficulty: stretch
+    prompt: >
+      A model with 64 layers and head width 128 is offered in two variants:
+      full multi-head attention with 64 query heads and 64 key/value heads, and
+      grouped-query attention with 64 query heads and 8 key/value heads.
+      State the ratio of their KV cache sizes, explain why grouped-query
+      attention does not reduce attention FLOPs, and say what that asymmetry
+      implies about when GQA is worth its quality cost.
+    answer: >
+      Ratio 8:1, exactly H_q / H_kv = 64/8. Cache size is
+      2 * L * H_kv * d_head * bytes * n, so it is linear in the key/value head
+      count and independent of the query head count.
+      GQA does not reduce FLOPs because all 64 query heads still run - each
+      still dots its query against a full set of keys and takes a weighted sum
+      over values. The 8 key/value heads are shared, with each key/value head
+      serving 8 query heads. The same number of dot products happens; fewer
+      distinct K/V tensors are stored and read.
+      The asymmetry: the benefit (memory and bandwidth) scales with context
+      length, while the cost (reduced key/value diversity, a small quality hit)
+      does not. So GQA is close to free at long context and hardest to justify
+      at short context. Since long context is the regime that is memory-bound
+      and the regime everyone wants, every recent model ships it.
+    check: llm
+    rubric: >
+      Must contain: (1) ratio 8, derived from H_q/H_kv, not guessed; (2) FLOPs
+      unchanged because all query heads still compute, with K/V shared; (3) the
+      asymmetry - benefit grows with n, cost does not.
+      Pass = all three. Partial = (1) and (2), missing the scaling argument.
+      Fail patterns: claiming GQA reduces compute proportionally (conflates
+      storage with arithmetic); claiming the cache depends on query heads
+      (the M10-adjacent sizing error also seen in u6-q4); claiming GQA is a
+      quality improvement rather than a memory optimization.
+
+  - id: u6-q7
+    concept: c-kv-cache
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    difficulty: core
+    prompt: >
+      You observe that submitting a 4,000-token prompt returns the first token
+      in about a second, but generating 400 tokens afterward takes eight
+      seconds. Prefill did ten times the position-processing and finished eight
+      times faster. Explain why, in terms of what each phase does per forward
+      pass and what resource each is limited by.
+    answer: >
+      Prefill is one forward pass over all 4,000 positions at once. Within a
+      forward pass all positions are computed in parallel - order is carried
+      only by positional information and the causal mask, not by sequential
+      execution. That pass multiplies a 4000-row activation matrix by each
+      weight matrix, so each weight is read from memory once and reused across
+      4,000 rows. High arithmetic intensity, compute-bound, near peak FLOPs.
+      Decode is 400 separate forward passes, genuinely serial because pass t+1
+      needs the token pass t sampled. Each pass multiplies a single-row vector
+      by each weight matrix, so every weight is read from memory and used once.
+      Arithmetic intensity of about 2/bytes-per-weight, memory-bandwidth-bound,
+      with the arithmetic units idle waiting on RAM.
+      So prefill does more total arithmetic and less memory traffic per unit of
+      work, and finishes faster. The per-token decode rate is set by
+      bandwidth divided by active-weight bytes, not by FLOPs.
+    check: llm
+    rubric: >
+      Must contain: (1) prefill is one pass with all positions computed in
+      parallel; (2) decode is one pass per token and serial by data dependency;
+      (3) the resource distinction - prefill compute-bound / weight reuse across
+      rows, decode bandwidth-bound / weights read once per token.
+      Pass = all three. Partial = (1) and (2) without the bandwidth argument.
+      Fail patterns: describing prefill as processing prompt tokens one at a
+      time or "faster because it is optimized" = M9, the reader still believes
+      the forward pass is sequential; attributing the decode cost purely to
+      FLOPs without naming memory bandwidth misses the reason quantization
+      speeds up decode and not prefill.
+
+  - id: u6-q8
+    concept: c-quant
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    difficulty: core
+    prompt: >
+      Quantize this group of 8 weights to 4 bits with affine group quantization
+      (16 levels, scale s = (max - min)/15, zero-point z = round(-min/s), codes
+      q = round(w/s + z), reconstruction w_hat = s * (q - z)):
+
+      w = [0.12, -0.03, 0.045, -0.18, 0.09, 0.00, 0.06, -0.09]
+
+      Give the reconstructed value of the third weight, 0.045. Answer as a bare
+      decimal.
+    answer: "0.04"
+    check: numeric(0.0005)
+    rubric: >
+      Expected work: max 0.12, min -0.18, range 0.30, s = 0.02,
+      z = round(0.18/0.02) = 9. 0.045/0.02 = 2.25, plus z = 11.25, rounds to
+      code 11. w_hat = 0.02 * (11 - 9) = 0.04. Error -0.005, within s/2 = 0.01.
+      Diagnostic wrong answers: 0.045 means the learner did not round to the
+      grid at all; 0.06 means they rounded 11.25 up to 12; 0.02 means they used
+      s = (max - min)/16 rather than /15, forgetting that 16 levels give 15
+      intervals.
+
+  - id: u6-q9
+    concept: c-quant
+    kind: mcq
+    congruent: false
+    callback_eligible: true
+    difficulty: core
+    prompt: >
+      Model A is a 35B-parameter model quantized to 4 bits (about 19 GB).
+      Model B is a 9B-parameter model in fp16 (about 18 GB). Same architecture
+      family, same training recipe. What should you expect on benchmarks?
+    options:
+      - text: >
+          Model A substantially outperforms Model B, landing within a few points
+          of its own fp16 version.
+        correct: true
+        explain: >
+          Correct, and it is the result that breaks bit-counting. Quantization
+          perturbs each weight by about 9% of the weights' standard deviation -
+          it does not delete content. Parameter count buys feature composition
+          that no amount of per-weight precision recovers.
+      - text: >
+          They perform about the same, since they hold roughly the same total
+          number of bits.
+        misconception: M16
+        explain: >
+          This is exactly the prediction bit-counting makes, and it is wrong by
+          a wide margin. Total bits is not the quantity that determines
+          capability. If it were, the 4-bit 35B would be interchangeable with an
+          fp16 9B, and it is not close.
+      - text: >
+          Model B outperforms Model A, because Model A has had 3/4 of its stored
+          facts truncated away.
+        misconception: M16
+        explain: >
+          The strong form of the lossy-compression model. No facts were
+          truncated - every weight is still present, stored as one of 16 levels
+          within its group's range. Nothing was dropped; precision was spent.
+      - text: >
+          Model A wins on recall-style benchmarks but loses on reasoning
+          benchmarks, because 4-bit keeps the lookup table intact and damages
+          the computation.
+        misconception: M4
+        explain: >
+          The directional claim about reasoning degrading first is actually
+          right, and that is what makes this distractor dangerous. The reasoning
+          is wrong: there is no lookup table. Reasoning degrades first because
+          small perturbations compound over long dependent chains, not because
+          quantization spares stored rows and harms computation.
+
+  - id: u6-q10
+    concept: c-quant
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    difficulty: stretch
+    prompt: >
+      Quantization to 4 bits costs a trained model a couple of points on
+      benchmarks. Going to 2 bits with the same round-to-nearest method
+      collapses it. Explain why the degradation curve is a plateau with a cliff
+      rather than a straight line, using the relationship between bit width and
+      reconstruction error, and name one structural cause of the cliff that is
+      not about bit width at all.
+    answer: >
+      Error scales as 2^-bits: with a group's range fixed, the step is
+      range/(2^b - 1) and the reconstruction error standard deviation is
+      step/sqrt(12). Measured against the weights' own standard deviation, that
+      is about 0.5% at 8 bits, 9% at 4 bits, 19% at 3 bits, and 45% at 2 bits.
+      So each bit removed roughly doubles the perturbation, but the model's
+      response to perturbation is not linear. Training with stochastic gradients
+      converges to wide, flat basins, so the loss is nearly unchanged for small
+      weight perturbations - the damage goes like the noise variance times the
+      trace of the loss Hessian, and flat basins have small trace. That is the
+      plateau. Past some perturbation size the quadratic approximation fails,
+      distinct features start collapsing into the same quantization level, and
+      no downstream computation can separate them again. That is the cliff.
+      A structural cause independent of bit width: activation outliers. Trained
+      transformers develop a few residual-stream channels with values 10-100x
+      the rest. One such weight in a group stretches the group's range, tripling
+      the step size for the other 63 and pushing 9% error to about 24% - 3-bit
+      quality at 4-bit storage. This is why GPTQ and AWQ, which handle outlier
+      channels separately, stay on the plateau where round-to-nearest does not.
+      Group size and which tensors you leave in higher precision (embeddings,
+      the output head, norm gains, MoE router logits) are the other structural
+      knobs.
+    check: llm
+    rubric: >
+      Must contain: (1) error roughly doubles per bit removed, with at least
+      approximate figures or the 2^-b relationship; (2) a nonlinearity argument
+      for why the response is flat then steep - flat loss basins, or feature
+      collapse, or both; (3) one structural cause named concretely - outliers,
+      group size, or unquantized-tensor selection.
+      Pass = all three. Partial = (1) and (3) without the plateau mechanism.
+      Fail patterns: "fewer bits means less information so it degrades" is M16
+      and explains a straight line, not a cliff - it fails the question; framing
+      the cliff as facts being lost once the bit budget drops below the fact
+      count is M16 plus M4.
+
+  - id: u6-q11
+    concept: c-specdec
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    difficulty: core
+    prompt: >
+      A speculative decoding setup drafts k = 6 tokens per step with a measured
+      per-token acceptance rate alpha = 0.7. Expected tokens emitted per target
+      forward pass is (1 - alpha^(k+1)) / (1 - alpha). Compute it. Answer as a
+      bare decimal to two places.
+    answer: "3.06"
+    check: numeric(0.02)
+    rubric: >
+      Expected work: 0.7^7 = 0.08235; (1 - 0.08235)/0.3 = 3.0588.
+      Diagnostic wrong answers: 2.65 means the learner used alpha^k rather than
+      alpha^(k+1), dropping the bonus token the target's own forward pass
+      provides at position k+1; 3.33 means they computed 1/(1-alpha) and ignored
+      that k caps the run; 4.2 means they computed alpha*k, treating acceptances
+      as independent draws rather than a run terminated by the first rejection.
+
+  - id: u6-q12
+    concept: c-specdec
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    difficulty: stretch
+    prompt: >
+      Target distribution p = [0.5, 0.3, 0.2]; draft distribution
+      q = [0.6, 0.2, 0.2]. The draft samples a token from q; it is accepted with
+      probability min(1, p(x)/q(x)); on rejection a replacement is drawn from
+      the normalized residual max(0, p - q).
+      Work out the overall emission probability of each of the three tokens and
+      state what the result proves. Then answer: if the draft model were
+      replaced by one that is far worse - say q = [0.05, 0.05, 0.90] - what
+      changes and what does not?
+    answer: >
+      Acceptance probabilities: min(1, 0.5/0.6) = 0.8333, min(1, 0.3/0.2) = 1,
+      min(1, 0.2/0.2) = 1.
+      Drafted-and-accepted mass: 0.6 * 0.8333 = 0.50, 0.2 * 1 = 0.20,
+      0.2 * 1 = 0.20. Total 0.90, so rejection probability is 0.10, all of it
+      from token 1 being drafted and refused.
+      Residual max(0, p - q) = [0, 0.1, 0], normalizing to [0, 1, 0], so a
+      rejection emits token 2 with certainty.
+      Emission: token 1 = 0.50 + 0.10*0 = 0.50; token 2 = 0.20 + 0.10*1 = 0.30;
+      token 3 = 0.20 + 0.10*0 = 0.20. That is exactly p.
+      This proves speculative decoding is exact, not approximate: the output
+      distribution is the target's, not a blend. The draft's over-weighting of
+      token 1 was corrected precisely by the acceptance rule, and the residual
+      delivered exactly the mass token 2 was owed.
+      With the far worse draft, the acceptance rate collapses - accepted mass
+      becomes min(p,q) summed = 0.05 + 0.05 + 0.20 = 0.30, so 70% of drafts are
+      rejected - and throughput drops toward the non-speculative rate of one
+      token per target pass. What does not change is correctness: the same
+      cancellation makes the emission distribution exactly p again. Exactness
+      holds for any q whatsoever; only speed depends on the draft's quality.
+    check: llm
+    rubric: >
+      Must contain: (1) the three emission probabilities recovering
+      [0.5, 0.3, 0.2] with the acceptance and residual terms shown; (2) the
+      conclusion that the output distribution is exactly the target's; (3) for
+      the bad draft, speed degrades and correctness does not, with the
+      unconditional-in-q point made explicitly.
+      Pass = all three. Partial = (1) and (2) with a hedged answer on the bad
+      draft ("quality might suffer a little").
+      Fail patterns: concluding the output is "very close to" or "a blend of"
+      p and q - this is the central misreading and the whole reason the section
+      exists; claiming a bad draft biases the output; claiming acceptance should
+      be a check of whether the target's argmax agrees, which would in fact bias
+      toward the draft on flat distributions.
+
+  - id: u6-q13
+    concept: c-specdec
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    difficulty: warmup
+    prompt: >
+      Under what condition does speculative decoding stop being a win?
+    options:
+      - text: >
+          When the machine is already compute-saturated, as under heavy batched
+          serving, because there is no idle arithmetic capacity to reclaim.
+        correct: true
+        explain: >
+          Correct. The technique converts spare compute into tokens by verifying
+          k drafted positions in one pass. If the arithmetic units are already
+          busy with other users' tokens, there is nothing spare to convert, and
+          the draft model's cost is pure overhead. This is why providers run it
+          for low-latency single-stream and disable it under load.
+      - text: >
+          When the draft model is poor, because the output quality degrades
+          toward the draft model's quality.
+        misconception: U6-1
+        explain: >
+          Output quality never degrades. The modified rejection sampling rule
+          emits from the target's exact distribution for any draft whatsoever.
+          A poor draft lowers the acceptance rate and therefore the speedup - it
+          can make the technique a net loss on throughput, but the tokens it
+          emits are the same tokens. This option is on the right track about
+          poor drafts and wrong about what they cost you.
+      - text: >
+          When the context is long, because the draft model cannot maintain the
+          full KV cache.
+        misconception: M17
+        explain: >
+          The draft model maintains its own KV cache over the same tokens, and
+          cache size is a memory cost, not a correctness or capability limit.
+          The premise that a cache must be "maintained" as accumulated state
+          rather than recomputed from tokens is the KV-cache-as-memory error.
+      - text: >
+          When temperature is above zero, because sampling randomness makes the
+          drafted tokens impossible to verify.
+        misconception: M6
+        explain: >
+          Backwards. The verification rule is defined in terms of the two
+          distributions p and q, so it works at any temperature; greedy
+          decoding is the degenerate case. Temperature is applied to both models
+          before the acceptance test, and the exactness guarantee holds
+          throughout.

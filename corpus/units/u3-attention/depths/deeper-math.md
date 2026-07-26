@@ -68,7 +68,7 @@ narrow heads beat one wide head. That argument is the whole of the next unit.
 
 The value path has no such coupling: $W^V$ appears exactly once, unmultiplied
 by anything learned, so $V$'s coordinates are as identifiable as any layer's
-activations. Key and value are different kinds of object, not just different
+activations. Key and value are different kinds of object, not merely different
 matrices.
 
 ## Scaled dot-product attention: the equation

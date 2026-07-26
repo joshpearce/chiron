@@ -1,0 +1,666 @@
+# u5 (training) item bank.
+# Misconception IDs: M* from corpus/misconception-bank.yaml,
+# U5M* from this unit's misconceptions.yaml.
+
+pretest:
+  - id: u5-p1
+    concept: c-xent
+    prompt: >
+      A language model is trained to minimize cross-entropy loss. Suppose you
+      had unlimited compute, unlimited data, and a perfect architecture. What
+      loss value would that ideal model reach on held-out text, and why that
+      value?
+    answer: >
+      Not zero. It would reach the entropy of the true next-token distribution
+      given context, roughly 1.7 nats per token on standard English corpora.
+      Cross-entropy decomposes as (entropy of the data) + (KL divergence from
+      the model to the data), and only the second term is reducible by better
+      modeling. The first is the genuine stochasticity of language: after "I
+      went to the" there are many legitimate continuations, and the ideal model
+      assigns each its true frequency rather than putting 1.0 on one of them.
+    check: llm
+    rubric: >
+      Pass requires (1) the answer is NOT zero, and (2) a reason grounded in
+      the irreducible randomness/entropy of language rather than in practical
+      limits like compute or data. Naming a rough number is a bonus, not
+      required. Answering "zero, or as close as possible" = fail, cites M18 and
+      is the expected pretest response. Answering "nonzero because you can
+      never train perfectly" = fail; that locates the floor in the optimizer
+      rather than in the data.
+
+  - id: u5-p2
+    concept: c-backprop
+    prompt: >
+      You have a 70-billion-parameter model and a single scalar loss for one
+      batch. Estimate how many backward passes are required to obtain the
+      gradient of that loss with respect to all 70 billion parameters, and
+      roughly what one backward pass costs relative to one forward pass.
+    answer: >
+      One backward pass, costing roughly 2x a forward pass (so a full training
+      step is about 3x inference on the same batch). Reverse-mode
+      differentiation gives the sensitivity of ONE output to ALL inputs in a
+      single sweep, which is the right direction when you have one loss and
+      many parameters. Each layer does one vector-Jacobian product to pass
+      blame back plus one outer product for its own weight gradient, each
+      comparable in cost to that layer's forward matmul.
+    check: llm
+    rubric: >
+      Pass requires answering ONE backward pass and a cost within roughly 1x-3x
+      of the forward pass. Any answer scaling with parameter count (70 billion
+      passes, "one per parameter", "one per layer times parameters") = fail,
+      cites U5M1. "One per layer" = partial: right that it is not
+      per-parameter, wrong that layers are sequential passes rather than
+      stages of one pass. An answer of 100x-1000x the forward cost = fail on
+      the second half; this is the belief that makes people think training is
+      unaffordable for reasons other than data volume.
+
+  - id: u5-p3
+    concept: c-posttrain
+    prompt: >
+      Base model and chat model, same checkpoint lineage. The chat model
+      answers your questions helpfully; the base model rambles. Roughly what
+      fraction of the chat model's factual knowledge and reasoning ability was
+      installed during post-training (SFT/RLHF) rather than pretraining, and
+      what evidence would settle it?
+    answer: >
+      Essentially none. Post-training shapes behavior - format, instruction
+      following, refusals - by raising the probability of continuations the
+      base model could already produce. The evidence: measure a knowledge
+      benchmark like MMLU on the base model with careful few-shot prompting and
+      on the post-trained model; scores move a couple of points and sometimes
+      down. The compute accounting agrees: post-training touches on the order
+      of 10^-6 of the pretraining token budget, which cannot install a world
+      model.
+    check: llm
+    rubric: >
+      Pass requires (1) a fraction near zero / "almost all from pretraining"
+      and (2) at least one form of evidence, either the benchmark comparison
+      or the compute-budget argument. Any substantial fraction attributed to
+      post-training = fail, cites M15, and is the expected pretest response.
+      Answering "none, post-training only adds refusals" = partial; it
+      understates that format and instruction-following are also behavioral
+      changes and both are real.
+
+check:
+  - id: u5-q1
+    concept: c-xent
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    difficulty: warmup
+    prompt: >
+      A model over a 3-token vocabulary emits logits z = [3.0, 1.0, 1.0] and
+      the true next token is index 0. Compute the cross-entropy loss in nats,
+      to 3 decimal places. Useful values: e^3.0 = 20.085537, e^1.0 = 2.718282.
+    answer: 0.240
+    check: numeric(0.01)
+    rubric: >
+      Sum = 20.085537 + 2.718282 + 2.718282 = 25.522101; p_0 = 0.786986;
+      L = -ln(0.786986) = 0.239545. An answer near 0.787 reported the
+      probability instead of its negative log. An answer near 2.240 took the
+      loss on a wrong index. An answer near 0.347 used log base 10 instead of
+      the natural log, which is the units error behind most cross-model
+      perplexity confusion.
+
+  - id: u5-q2
+    concept: c-xent
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    difficulty: core
+    prompt: >
+      Two teams report results on the same held-out corpus with the same
+      tokenizer. Team A reports loss 2.05. Team B reports loss 1.55. A third
+      engineer says "so Team B is 24% of the way from A to a perfect model."
+      Explain what is wrong with that framing and give the correct way to
+      compare the two numbers.
+    answer: >
+      The framing measures distance to zero, and zero is unreachable and
+      undesirable. Cross-entropy decomposes into the irreducible entropy of the
+      data plus the KL divergence from the model to it; only the second term is
+      reducible. With a floor near 1.7 nats, Team A's excess is about 0.35 and
+      Team B's reported 1.55 is BELOW the floor, which is not a better model -
+      it is evidence of contamination, that the held-out set was not actually
+      held out, or that the two numbers are not measured the same way. The
+      correct comparison is excess loss over the floor, and the correct first
+      move here is to audit Team B's evaluation setup. Secondarily, loss is
+      logarithmic, so linear "percent of the way" arithmetic on it is
+      meaningless regardless of the endpoint chosen.
+    check: llm
+    rubric: >
+      Must contain (1) the target is the entropy floor, not zero, and (2) the
+      observation that 1.55 is implausibly at or below the floor, so the right
+      response is to suspect the measurement rather than celebrate. Both = pass.
+      (1) alone = partial. An answer that only computes perplexities and ranks
+      the models = fail, cites M18. An answer claiming 1.55 is mathematically
+      impossible = partial; it is achievable on contaminated or memorized data,
+      which is exactly the diagnosis.
+
+  - id: u5-q3
+    concept: c-xent
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    difficulty: warmup
+    prompt: >
+      A model reports a mean cross-entropy of 2.0 nats per token on a
+      50,257-token vocabulary, so its perplexity is e^2.0 = 7.39. What does
+      that number mean?
+    options:
+      - text: >
+          At each position the model is as uncertain as if it were picking
+          uniformly among about 7.4 equally likely tokens.
+        correct: true
+        explain: >
+          Correct. Perplexity is the effective branching factor. A uniform
+          distribution over k options has perplexity exactly k, so exp(loss)
+          reads as "how many options is this model effectively weighing". Here
+          the model has narrowed 50,257 possibilities to the equivalent of
+          about 7.
+      - text: >
+          The model gets the next token right about 7.4% of the time.
+        misconception: U5M4
+        explain: >
+          Attractive because perplexity is reported as a single headline
+          quality number and people assume a bounded, accuracy-like scale.
+          But perplexity is unbounded above and is not a rate: its worst case
+          here is 50,257, the vocabulary size. It also has no direct conversion
+          to top-1 accuracy, since a model can be confidently narrowed to seven
+          candidates and still pick the right one most of the time.
+      - text: >
+          The model assigns probability 1/7.39 = 0.135 to the correct token at
+          every position.
+        misconception: U5M4
+        explain: >
+          Close to a real relationship but wrong in an important way. The
+          reciprocal of perplexity is the GEOMETRIC MEAN of the probabilities
+          assigned to the true tokens across the corpus, not the value at every
+          position. Individual positions range from near 1.0 (predictable
+          function words) to near 0 (the surprising ones), and the log-scale
+          averaging is what makes the rare surprises dominate the reported
+          number.
+      - text: >
+          The model has 2.0 nats of loss left to eliminate before it is
+          correctly trained.
+        misconception: M18
+        explain: >
+          This is the zero-loss goal. Language has an irreducible entropy of
+          roughly 1.7 nats per token on standard corpora, so a loss of 2.0 has
+          about 0.3 of reducible gap, not 2.0. Driving a training loss to zero
+          means memorization and worse held-out performance.
+
+  - id: u5-q4
+    concept: c-backprop
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    difficulty: stretch
+    prompt: >
+      Work this from scratch. A 2-layer network: input x = [2.0, 1.0];
+      W1 = [[0.2, 0.4], [0.5, -0.3]] with b1 = [0, 0]; ReLU; then
+      W2 = [[1.0, -1.0], [0.5, 0.5]] with b2 = [0, 0]; then softmax and
+      cross-entropy against target class 0. Rows index output units. Compute
+      dL/d(W1)_10, the gradient on the weight from input component 0 to hidden
+      unit 1. Give it to 3 decimal places. Useful values: e^0.1 = 1.105171,
+      e^0.75 = 2.117000.
+    answer: 1.971
+    check: numeric(0.01)
+    rubric: >
+      Forward: a1 = [0.8, 0.7], both positive so h = [0.8, 0.7];
+      z = [0.1, 0.75]; sum of exponentials 3.222171; p = [0.342990, 0.657010].
+      Backward: dL/dz = p - y = [-0.657010, 0.657010];
+      dL/dh = W2^T (dL/dz) = [-0.328505, 0.985516]; both ReLU gates open so
+      dL/da1 is unchanged; dL/d(W1)_10 = (dL/da1)_1 * x_0 = 0.985516 * 2.0 =
+      1.971031.
+      An answer near 0.986 multiplied by x_1 = 1.0 instead of x_0 = 2.0
+      (index transposition). An answer near -0.657 used dL/da1 index 0.
+      An answer near 0.657 stopped at dL/dz and never propagated through W2 at
+      all. A negative answer of the right magnitude dropped the transpose and
+      contracted W2 along the wrong axis - the single most common structural
+      error. Any answer requiring more than one backward sweep in the worked
+      reasoning cites U5M1.
+
+  - id: u5-q5
+    concept: c-backprop
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    difficulty: core
+    prompt: >
+      For softmax followed by cross-entropy with a one-hot target, the gradient
+      of the loss with respect to the logits is exactly p - y. State what each
+      entry of that vector means in terms of the model's prediction, and
+      explain why frameworks implement softmax and cross-entropy as one fused
+      operation rather than two composable ones.
+    answer: >
+      Each entry is the misallocated probability at that vocabulary slot: for
+      the true token, p_t - 1, which is negative and equals how much probability
+      the model failed to put there; for every other token, p_i, exactly the
+      probability it wasted there. Since updates move against the gradient, the
+      true token's logit rises and the others fall, each in proportion to the
+      mass misplaced.
+      The fusion reason is numerical. Computed separately, the loss step needs
+      1/p_t, which overflows when p_t is tiny - precisely the case where the
+      example is most informative and the gradient matters most. Derived
+      jointly, the softmax Jacobian's p_t cancels against the log's 1/p_t
+      analytically, leaving a subtraction that is stable for any p_t. The fused
+      op also avoids materializing the V x V softmax Jacobian, which for a
+      50,000-token vocabulary would be 2.5 billion entries per position.
+    check: llm
+    rubric: >
+      Must contain (1) the interpretation as misallocated probability mass,
+      with the true entry negative, and (2) at least one correct fusion reason:
+      the 1/p_t overflow/cancellation, or avoiding the V x V Jacobian. Both =
+      pass. (1) alone = partial. An answer stating the gradient is "the error"
+      with no account of what the entries are = partial. An answer explaining
+      the fusion as a speed optimization only, with no numerical reason = fail
+      on (2). Any answer describing the gradient as approximate or
+      finite-differenced = fail, cites U5M1.
+
+  - id: u5-q6
+    concept: c-backprop
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    difficulty: core
+    prompt: >
+      During training you notice a hidden unit whose pre-activation is negative
+      on every example in every batch, so its ReLU output is always 0. What
+      happens to the weights feeding that unit over the next 10,000 steps, with
+      AdamW as the optimizer?
+    options:
+      - text: >
+          They receive exactly zero gradient and never change, except for
+          weight decay slowly shrinking them toward zero. The unit cannot
+          recover on its own.
+        correct: true
+        explain: >
+          Correct, and the weight-decay detail matters. The ReLU local
+          derivative is 0 for negative pre-activation, so the incoming blame is
+          annihilated and every weight into the unit gets gradient 0 regardless
+          of how large the downstream blame was. AdamW's decoupled decay is the
+          one term that still touches them, since it does not go through the
+          gradient path - it shrinks them, which does not help. This
+          self-sustaining failure is why leaky variants and careful
+          initialization exist.
+      - text: >
+          They receive small gradients that shrink as the pre-activation gets
+          more negative, so recovery is slow but possible.
+        misconception: U5M6
+        explain: >
+          This imports smooth-gate intuition from sigmoid-like activations,
+          where the derivative is small but nonzero and recovery genuinely is
+          slow-but-possible. ReLU's derivative is not small for negative input,
+          it is exactly 0. Zero times any blame is zero, and no step size,
+          optimizer, or patience multiplies zero into a nonzero update.
+      - text: >
+          Adam's normalization divides the tiny gradient by its own tiny running
+          magnitude, so the unit still gets a full-size step and recovers.
+        misconception: U5M3
+        explain: >
+          A sharp guess that gets Adam's mechanism right and the input wrong.
+          Adam does turn tiny-but-nonzero gradients into full-size steps, which
+          is exactly its dangerous property. But m and v are both driven to
+          exactly 0 here, so the step is 0/(0 + epsilon) = 0. Normalizing
+          nothing yields nothing.
+      - text: >
+          The gradients are zero on this batch but nonzero on others, since the
+          loss is computed over generated sequences that vary between steps.
+        misconception: U5M2
+        explain: >
+          Two errors. The premise states the unit is negative on every example
+          in every batch, so there are no batches where it is not. And the loss
+          is not computed over generated sequences: teacher forcing scores every
+          position against the corpus's true next token, in parallel, with no
+          generation involved.
+
+  - id: u5-q7
+    concept: c-optimizers
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    difficulty: core
+    prompt: >
+      A weight w = 0.8 receives gradient g = 0.4. Learning rate 0.01, weight
+      decay lambda = 0.05, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8,
+      optimizer state fresh at step t = 1. Compute w after one AdamW step, to
+      4 decimal places.
+    answer: 0.7896
+    check: numeric(0.001)
+    rubric: >
+      m = 0.04, v = 0.00016; bias-corrected mhat = 0.04/0.1 = 0.4 and
+      vhat = 0.00016/0.001 = 0.16, so sqrt(vhat) = 0.4 and the adaptive step is
+      0.01 * (0.4/0.4) = 0.01. Decoupled decay is 0.01 * 0.05 * 0.8 = 0.0004.
+      w = 0.8 - 0.01 - 0.0004 = 0.7896.
+      An answer of 0.7960 is the SGD update, skipping the adaptive
+      normalization. An answer of 0.7900 omitted the decoupled weight decay.
+      An answer of 0.7680 skipped bias correction on both moments, giving
+      raw m/sqrt(v) = 0.04/0.012649 = 3.162 and a step 3x too large - the error
+      that makes uncorrected Adam diverge in its first few hundred steps. Any
+      answer whose adaptive step is far from 0.01 mishandled bias correction,
+      since at t = 1 the corrected ratio is exactly sign(g).
+
+  - id: u5-q8
+    concept: c-optimizers
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    difficulty: core
+    prompt: >
+      Your training script uses torch.optim.Adam with weight_decay=0.1. A
+      colleague says switching to AdamW with the same value is cosmetic since
+      "both do weight decay." Explain at the level of the update equation what
+      actually differs, and predict which parameters are affected most by the
+      change.
+    answer: >
+      Adam adds lambda*w into the gradient before the moment updates, so the
+      decay term is subsequently divided by sqrt(vhat) along with everything
+      else. The effective per-parameter decay becomes lambda/sqrt(vhat): weights
+      in high-gradient directions get their decay divided down to nearly
+      nothing, and weights in low-gradient directions get it amplified. AdamW
+      computes the adaptive step from the gradient alone and then subtracts
+      eta*lambda*w separately, making the decay a fixed (1 - eta*lambda)
+      multiplicative shrink that means the same thing for every parameter.
+      Most affected are the parameters at the extremes of the gradient-magnitude
+      distribution - in a transformer, the rarely-updated embedding rows for
+      infrequent tokens (tiny vhat, so previously over-decayed) and the
+      high-gradient projections (large vhat, previously under-decayed). It is
+      not cosmetic; it changes the effective regularization strength
+      per-parameter by orders of magnitude.
+    check: llm
+    rubric: >
+      Must contain (1) the placement difference stated concretely - inside the
+      adaptive normalization versus outside it - and (2) the consequence that
+      the effective decay becomes gradient-magnitude-dependent under Adam.
+      Both = pass. Naming which parameter groups shift most = full credit,
+      not required for pass. "AdamW decays weights and Adam uses L2" with no
+      account of the normalization = partial; the two are literally identical
+      under SGD, so the distinction only exists because of the division.
+      Agreeing that the change is cosmetic = fail.
+
+  - id: u5-q9
+    concept: c-optimizers
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    difficulty: core
+    prompt: >
+      A 7B model's loss has been flat for 20,000 steps. Which diagnosis is best
+      supported?
+    options:
+      - text: >
+          Something in the schedule, data, or numerics - check the learning rate
+          schedule, for gradient clipping firing constantly, and for loss
+          spikes or NaNs in a subset of the batch.
+        correct: true
+        explain: >
+          Correct. In 7 billion dimensions, a point where the loss cannot
+          decrease requires upward curvature in all 7 billion directions
+          simultaneously; critical points are overwhelmingly saddles with
+          available descent directions, and minibatch noise finds them. A flat
+          loss is far more likely to be an operational cause: the schedule
+          decayed the learning rate to nearly nothing, clipping is truncating
+          every update, or a data problem is producing gradients that cancel.
+      - text: >
+          The optimizer has settled into a local minimum and needs a restart
+          from a different seed to find a better one.
+        misconception: M5
+        explain: >
+          This is the 2D bowl picture applied to a 7-billion-dimensional
+          surface. Local minima are vanishingly rare at that dimension, and
+          restarting from a different seed does not find "a better minimum" -
+          it finds a different low-loss region of comparable quality, since
+          there are astronomically many and they are not ranked in the way this
+          answer assumes.
+      - text: >
+          The gradient is pointing away from the minimum, so the model is
+          walking in the wrong direction and needs a larger learning rate to
+          escape.
+        misconception: U5M6
+        explain: >
+          The gradient never points at a minimum; it is the direction of
+          steepest local increase and carries no information about where any
+          minimum sits. "Pointing away from the minimum" is not a state the
+          system can be in, because there is no such direction being tracked.
+          A larger learning rate may or may not help, but this is not why.
+      - text: >
+          The model has reached the entropy floor of the data and no further
+          improvement is possible.
+        misconception: M18
+        explain: >
+          Correct concept, wrong application. The floor is real and does flatten
+          loss curves at the end of a well-run training job, but a 7B model
+          20,000 steps into training is nowhere near it - scaling laws put a
+          model that size well above the floor. Invoking the floor to explain
+          an early plateau is unfalsifiable comfort; check the operational
+          causes first.
+
+  - id: u5-q10
+    concept: c-scaling
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    difficulty: core
+    prompt: >
+      You have a fixed compute budget. Using C = 6ND (C in FLOPs, N parameters,
+      D training tokens), your team proposes doubling N and halving D versus the
+      current plan, keeping C constant. State whether that helps or hurts, why,
+      and name one consideration outside the training budget that bears on the
+      decision.
+    answer: >
+      It hurts, if the current plan is anywhere near compute-optimal. Held-out
+      loss falls off as a sum of a term in N and a term in D, both of which must
+      shrink together; starving D while inflating N buys capacity the model has
+      no experience to fill, which is precisely the misallocation Chinchilla
+      identified. Concretely with the Hoffmann fit, at a fixed budget an
+      allocation near 20 tokens per parameter beats one near 2 tokens per
+      parameter by roughly 0.07 nats at the same cost.
+      The outside consideration: serving. A model twice as large costs twice as
+      much per token to run, for the entire deployment lifetime, while training
+      cost is paid once. That is why production models are typically trained
+      well PAST the compute-optimal token count - deliberately accepting a
+      worse training-compute tradeoff to get a smaller model with the same loss.
+    check: llm
+    rubric: >
+      Must contain (1) the verdict that it hurts, (2) a reason grounded in N and
+      D needing to scale together rather than a vague "bigger is not always
+      better", and (3) one valid outside consideration - inference cost is the
+      canonical one; data availability or memory limits also count. Any 2 of 3
+      = pass. Answering "helps, more parameters means more capability" = fail,
+      cites M11. Answering "hurts because bigger models overfit" = fail; that is
+      the storage model of parameters and predicts the opposite of the measured
+      curve.
+
+  - id: u5-q11
+    concept: c-scaling
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    difficulty: core
+    prompt: >
+      Held-out loss improves smoothly as parameter count grows across five
+      orders of magnitude, with no upturn. What does this rule out?
+    options:
+      - text: >
+          That parameters function primarily as storage for training examples,
+          since a storage device gains nothing on data it never saw and would
+          show a classic overfitting upturn as capacity outgrew the dataset.
+        correct: true
+        explain: >
+          Correct, and this is the load-bearing observation. The measured curve
+          is the signature of improving generalization, not accumulating
+          storage. Capacity buys richer feature composition - more
+          representable features, more relationships, more layers of
+          composition - which is why scaled models handle inputs no training
+          example demonstrates.
+      - text: >
+          That the loss has any lower bound, since a smooth unbroken improvement
+          implies it continues to zero given enough scale.
+        misconception: M18
+        explain: >
+          The curve is a power law with an additive constant, so it is smooth
+          AND bounded below. It approaches the irreducible entropy term
+          asymptotically and never crosses it. Smoothness says nothing about
+          where a curve terminates; extrapolating this one to zero contradicts
+          the fitted form it was extrapolated from.
+      - text: >
+          That larger models memorize any training data at all, since
+          memorization would show up as degraded held-out loss.
+        misconception: M11
+        explain: >
+          Overcorrection. Larger models demonstrably do memorize more, and
+          verbatim extraction of training data from large models is a
+          documented result. What the curve rules out is memorization being the
+          PRIMARY mechanism. Memorization exists and dominates in the
+          small-data regime; it is the exception, not the engine.
+      - text: >
+          That model quality depends on training data volume, since the
+          improvement is attributed to parameter count alone.
+        misconception: M11
+        explain: >
+          The premise is a single-variable slice of a two-variable relationship.
+          Loss depends on both N and D, and the scaling experiments vary both;
+          holding D fixed while raising N gives diminishing returns precisely
+          because the D term does not shrink. Chinchilla's whole result is that
+          data volume matters as much as parameter count.
+
+  - id: u5-q12
+    concept: c-posttrain
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    difficulty: core
+    prompt: >
+      SFT, PPO-based RLHF, and DPO all consume human judgments and all update
+      the same weights. Distinguish them by the SHAPE of supervision each loss
+      consumes and by whether each can push probability AWAY from a bad
+      response. Then state the one capability PPO has that DPO structurally
+      lacks.
+    answer: >
+      SFT consumes a target: a (prompt, response) pair, scored with the same
+      cross-entropy as pretraining, masked so gradient comes only from response
+      tokens. It can only push probability toward a demonstrated response; there
+      is no way to express "worse", because the loss's only sentence is "this is
+      the target."
+      PPO-based RLHF consumes a learned scalar over the model's own samples. A
+      reward model trained on preference pairs scores rollouts, and the policy
+      gradient raises the probability of high-reward tokens and lowers
+      low-reward ones, so it can push away, with a KL penalty against the frozen
+      reference bounding the drift.
+      DPO consumes a pair directly, (winner, loser), with no reward model and no
+      sampling. Its gradient raises log-prob of the winner and lowers the
+      loser's, weighted by how badly the current model has the pair ordered, so
+      it can also push away.
+      What PPO has that DPO structurally lacks: it is online. PPO samples from
+      the current, improving policy and scores what the model actually produces
+      now, so it can discover and correct problems in behavior that did not
+      exist when the data was collected. DPO is offline and can only learn from
+      the fixed pairs on disk.
+    check: llm
+    rubric: >
+      Must contain (1) the three supervision shapes distinguished - target
+      versus scalar-over-own-samples versus pair - with SFT correctly unable to
+      express "worse", and (2) online sampling named as PPO's structural
+      advantage. Both = pass. Getting (1) with only two of three shapes right =
+      partial. Describing DPO as needing a reward model or as an RL algorithm =
+      fail, cites U5M7. Describing the model as receiving or reading its reward
+      score = fail, cites U5M5. Naming DPO's mass-leakage failure (lowering the
+      loser harder than it raises the winner) = full credit.
+
+  - id: u5-q13
+    concept: c-posttrain
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    difficulty: core
+    prompt: >
+      A base model and its RLHF'd chat descendant are evaluated on MMLU. The
+      base model is prompted carefully with few-shot examples. What result
+      should you expect, and why?
+    options:
+      - text: >
+          Within a couple of points of each other, because post-training
+          reallocates probability among behaviors the base model already had
+          rather than adding knowledge.
+        correct: true
+        explain: >
+          Correct, and this is the standard measured result. The compute
+          accounting explains the mechanism: post-training touches on the order
+          of 10^-6 to 10^-4 of the pretraining token budget, which is far too
+          small a perturbation to install a world model. The dramatic
+          base-versus-chat difference is in format compliance, instruction
+          following, and refusals - all behavioral.
+      - text: >
+          A large jump for the chat model, since RLHF is where it learns to
+          answer questions correctly.
+        misconception: M15
+        explain: >
+          This conflates answering in the expected FORM with knowing the answer.
+          RLHF makes the model reliably emit a single lettered choice instead of
+          continuing the document; careful few-shot prompting gets the base
+          model to do the same, and once it does, the scores converge. The
+          behavior change is real and the knowledge change is not.
+      - text: >
+          A large jump for the chat model, because the reward signal teaches it
+          which answers are rated correct and it learns to seek that reward.
+        misconception: U5M5
+        explain: >
+          The model never sees a reward. The scalar is computed outside it by a
+          separate reward model and enters only as a gradient on weights;
+          nothing about "seeking reward" happens inside a forward pass. And the
+          reward model was trained on human preferences over response quality,
+          not on MMLU answer keys, so there is no path by which it transmits
+          factual correctness.
+      - text: >
+          A large drop for the chat model, because RLHF overwrites pretrained
+          weights with the much smaller preference dataset.
+        misconception: M4
+        explain: >
+          This is the lookup-table model of parameters - preference data
+          "overwriting rows" of stored facts. Weights are not rows and
+          post-training does not overwrite regions of them; it makes a small
+          update to all of them. There IS a real and much smaller effect here
+          (the alignment tax, a point or two on some benchmarks, partly from
+          the KL-constrained drift and partly from format changes), but the
+          mechanism is not overwriting.
+
+  - id: u5-q14
+    concept: c-backprop
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    difficulty: stretch
+    prompt: >
+      Training a model needs far more memory than running it, at the same batch
+      size and sequence length, and the gap grows with depth. Explain the
+      mechanism, then explain why gradient checkpointing trades roughly a 33%
+      compute increase for a large memory reduction, and where the 33% comes
+      from.
+    answer: >
+      Reverse-mode differentiation computes each layer's local derivative at the
+      value its input actually took, so every intermediate activation from the
+      forward pass must stay resident until the backward pass reaches it. With
+      L layers the live set is O(L * B * S * d) plus attention intermediates,
+      whereas inference can free each layer's activations as soon as the next
+      layer consumes them. Optimizer state compounds this separately - AdamW
+      keeps two extra values per parameter - but the depth-scaling term is the
+      activations.
+      Gradient checkpointing stores activations only at a subset of layers and
+      discards the rest, then during the backward pass recomputes each discarded
+      segment from its nearest stored checkpoint just before it is needed.
+      Storing every sqrt(L)-th layer reduces resident activations from O(L) to
+      O(sqrt(L)). The compute cost is one extra forward pass over the recomputed
+      segments. Since a training step is roughly one forward plus two forward-
+      equivalents of backward, adding one more forward takes it from about 3
+      units to about 4, which is the ~33% figure.
+    check: llm
+    rubric: >
+      Must contain (1) activations retained for the backward pass as the
+      mechanism, tied to needing the forward values to evaluate local
+      derivatives, and (2) recomputation as the checkpointing trade, and (3) the
+      33% derived from adding one forward pass to a ~3-unit step. Any 2 of 3 =
+      pass; (1) is mandatory for any credit. Attributing the memory gap
+      primarily to optimizer state = partial: it is real and large but does not
+      scale with sequence length and is not what checkpointing addresses.
+      Describing the backward pass as needing extra forward passes per parameter
+      = fail, cites U5M1.

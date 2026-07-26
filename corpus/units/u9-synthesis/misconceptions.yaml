@@ -1,0 +1,37 @@
+# Unit-local additions to the global misconception bank. Same schema.
+# These are synthesis-level errors: each one is only diagnosable once the
+# learner is reasoning across two or more layers at the same time, which is why
+# they do not appear in the global bank attached to a single unit.
+
+misconceptions:
+  - id: U9-M1
+    name: prefill-decode-same-cost
+    wrong_model: "Processing a prompt token and generating a reply token cost the same, because it is the same model doing the same forward pass. Total cost is just (prompt + output) tokens times a constant."
+    why_appealing: "Providers bill both in 'tokens', which implies a common unit of work. And the model genuinely is identical - same weights, same layers, same code path. Nothing in the API surface hints that the two phases sit on opposite sides of a hardware roofline."
+    failing_prediction: "If the two cost the same per token, an 8,192-token prompt would take 8,192 times the per-token generation latency - about 45 seconds at 5.5 ms per token. Measured time-to-first-token is under one second. Conversely, generating 8,192 tokens takes 45 seconds, not one. The same token count differs by ~47x depending on which phase it lands in."
+    correction: "Prefill amortizes one read of the model's weights across every prompt position at once, giving ~33,000 FLOPs per byte moved - far above the hardware's ~225 break-even, so it is compute-bound. Decode reads the same weights to produce a single token, giving ~4 FLOPs per byte, so it is memory-bandwidth-bound and its latency is just (bytes of weights + bytes of KV cache) / bandwidth. Providers price input and output tokens differently for exactly this reason."
+    units: [u6, u9]
+
+  - id: U9-M2
+    name: context-is-model-memory
+    wrong_model: "The context window is state the model holds between turns - a buffer it writes to and reads from, so the conversation accumulates inside the model."
+    why_appealing: "It is the only mental model consistent with the UX. The assistant refers back to things, remembers your name, keeps track of a plan. Every stateful system the engineer has built keeps its state in the process, and 'context window' sounds like an allocated region belonging to the model."
+    failing_prediction: "If the model held the conversation, sending the same conversation to a fresh replica in another datacenter would produce a different, less-informed reply. It produces the identical reply - because the harness re-sends every prior token every single turn. Relatedly, a model would be able to notice that a middle turn was silently deleted from the history; it cannot, because it never had a copy to compare against."
+    correction: "The model is a pure function from a token sequence to a logit vector. It has no state across calls, none. The conversation lives in the harness's data structures, and every turn the harness re-serializes all of it into the input. What looks like memory is the harness re-presenting the past. The KV cache is not a counterexample - it is a derived, recomputable-on-demand memo table over those same tokens (see M17)."
+    units: [u8, u9]
+
+  - id: U9-M3
+    name: latency-tracks-flops
+    wrong_model: "Generation latency is set by how much arithmetic the model does, so it scales with parameter count and with how hard the question is."
+    why_appealing: "This is correct for essentially every other compute-bound workload the engineer has profiled, and it is correct for prefill and for training. It is also reinforced by 'bigger model = slower', which is true but for the wrong reason."
+    failing_prediction: "If latency tracked FLOPs, quantizing weights from fp16 to 4-bit would leave per-token latency unchanged, since the arithmetic is unchanged (4-bit weights are dequantized before the multiply). Measured per-token latency drops by roughly 4x. Symmetrically, asking a trivially easy question yields exactly the same per-token latency as a hard one, because the same weights move regardless."
+    correction: "During decode the accelerator's arithmetic units run at roughly 2% utilization; the clock is set by bytes crossing the memory bus. Per-token latency is approximately (active parameter bytes + KV cache bytes) / memory bandwidth. This is why quantization, grouped-query attention, MoE, batching, and speculative decoding all help decode - every one of them is an attack on bytes moved or on how much work each byte does, not on FLOPs."
+    units: [u6, u7, u9]
+
+  - id: U9-M4
+    name: agent-turn-is-one-inference
+    wrong_model: "An agentic turn that makes five tool calls is one model invocation - the model runs, uses tools along the way, and finishes."
+    why_appealing: "The product presents it as one response. The user asked one thing and got one answer, with the tool calls rendered as steps inside it. Streaming makes it look like a single continuous generation."
+    failing_prediction: "If it were one invocation, the total input tokens billed would equal the prompt length once. Bills show input tokens far exceeding the visible prompt - roughly the sum of the context length at each of the six forward-pass sessions, because every tool result restarts generation over a longer sequence. It also predicts that the model could hold intermediate state across a tool call, but anything not written into the visible token stream before the call is gone."
+    correction: "Five tool calls means six generation sessions: emit call, hard stop, harness executes, append result, new forward pass over the now-longer sequence, repeat. Each session re-reads the entire context (from KV cache where valid). Context grows monotonically across the turn, so later sessions in the same turn are more expensive than earlier ones - this is the per-turn version of the quadratic session cost (see M14)."
+    units: [u8, u9]

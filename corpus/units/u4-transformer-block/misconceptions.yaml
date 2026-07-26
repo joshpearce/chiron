@@ -1,0 +1,64 @@
+# Unit-local misconception additions for u4 (the transformer block).
+# Same schema as corpus/misconception-bank.yaml. IDs are prefixed U4 so they
+# never collide with global bank IDs M1-M18.
+#
+# The unit's confusable-sibling pairs (MHA/MQA/GQA, pre-LN/post-LN) generate
+# most of these. They are interleaved rather than blocked in canon.md, and MCQ
+# distractors deliberately mix members of a pair.
+
+misconceptions:
+  - id: U4M1
+    name: heads-replicate-attention
+    wrong_model: "h attention heads means h copies of the attention machinery, so h times the parameters and h times the cost; heads exist because each one 'specializes' in a different linguistic phenomenon."
+    why_appealing: "'Multi-head' sounds like replication, the way multi-threaded means several copies of a worker. Published head-attribution results (previous-token heads, subject-verb heads) are real, which retro-justifies the specialization story."
+    failing_prediction: "If heads multiplied cost, reconfiguring a model from 12 heads to 1 head at fixed d would cut attention parameters 12x. It changes nothing: W^Q, W^K, W^V, W^O are d x d either way, 4d^2 total, and the head count only sets how their columns are sliced."
+    correction: "Heads partition a fixed budget rather than replicating it. h heads of width d_k = d/h give h simultaneous attention distributions per query position instead of one, each formed on a different learned subspace, at the cost of each head's QK and OV circuits being rank <= d_k. Specialization is an emergent consequence of having several restricted read/write channels, not the mechanism."
+    units: [u4]
+
+  - id: U4M2
+    name: query-heads-are-kv-heads
+    wrong_model: "MQA and GQA change the number of query heads, or share something other than K and V - the query projection, the values only, the weights across layers - and each query head therefore attends over fewer positions."
+    why_appealing: "Three names differing by one letter, all describing 'fewer heads', met in model cards rather than in equations. Nothing in the names says WHICH heads are reduced."
+    failing_prediction: "If GQA cut query heads, the attention score tensor would shrink from h x n x n and the model's output projection W^O would have to change shape. It does not: W^Q and W^O stay d x d in every variant, and only W^K and W^V shrink to d x (g*d_k)."
+    correction: "In all three variants the number of QUERY heads h is unchanged and every query head still attends over every allowed position. Only the number of key/value heads g varies: MHA is g = h, GQA is 1 < g < h with each group of h/g query heads sharing one K and one V, MQA is g = 1. GQA is the family; the other two are its endpoints."
+    units: [u4, u6]
+
+  - id: U4M3
+    name: gqa-saves-flops
+    wrong_model: "GQA and MQA are compute optimizations: fewer key/value heads means fewer FLOPs in attention, so attention runs proportionally faster everywhere."
+    why_appealing: "In every other systems context 'fewer of X' means 'less work'. This is the same instinct that makes M10 attractive, applied one level down."
+    failing_prediction: "If GQA cut attention FLOPs by h/g, prompt prefill - a compute-bound parallel pass - would speed up by that factor on the attention kernels. It does not measurably change. Score computation is h * n * d_k multiply-accumulates per new token under every variant, because shared keys are broadcast to the query heads sharing them, not skipped."
+    correction: "GQA is a memory optimization. It cuts KV cache bytes and the HBM traffic to stream them by exactly h/g. Decode is bandwidth-bound (arithmetic intensity 2h/(g*b), around 1 FLOP/byte for fp16 MHA against a ridge point near 150), so cutting bytes cuts decode latency; FLOPs are untouched, and prefill is unaffected."
+    units: [u4, u6]
+
+  - id: U4M4
+    name: preln-postln-swapped
+    wrong_model: "Pre-LN normalizes the residual stream before the block runs / post-LN normalizes the sublayer's input - some arrangement in which the distinction is about ordering within the block rather than about whether the main path is touched."
+    why_appealing: "'Pre' and 'post' are relative terms with no stated referent, and both arrangements do put a normalization somewhere near the start of a block. The names are recalled long after the equations are."
+    failing_prediction: "If pre-LN normalized the stream itself, a pre-LN checkpoint would need no final normalization before the unembedding - the last block would have left the stream normalized. Every pre-LN checkpoint ships exactly such a tensor (ln_f in GPT-2, model.norm in Llama), and post-LN models ship none."
+    correction: "The referent is the residual addition. Pre-LN: x_l = x_{l-1} + Sublayer(Norm(x_{l-1})) - the norm is on the branch, the main path is untouched addition all the way through, and a final norm is required. Post-LN: x_l = Norm(x_{l-1} + Sublayer(x_{l-1})) - the norm is on the main path, which severs the identity route and is why post-LN needs warmup and struggles past ~18 layers."
+    units: [u4]
+
+  - id: U4M5
+    name: mlp-is-connective-tissue
+    wrong_model: "The feed-forward layer is minor plumbing between attention layers - a nonlinearity to stop the stack collapsing into one linear map. Attention is where the parameters and the substance are."
+    why_appealing: "Attention is the part every explainer draws and the part the paper title is about. The MLP has no diagram and no name worth remembering."
+    failing_prediction: "If the MLP were minor, it would hold a minor share of the weights. A GPT-2 block is 2,359,296 attention parameters against 4,718,592 MLP parameters - two thirds MLP - and a SwiGLU block at d_ff = 3.5d is over 80% MLP. Two thirds to four fifths of every non-embedding parameter in every model you have used is in feed-forward layers."
+    correction: "By weight a transformer is mostly MLP with attention interleaved. Attention is the only cross-position operation and is cheap in parameters (4d^2); the MLP is per-position, holds 8d^2 or more, and is where the association-like structure lives."
+    units: [u4, u5, u7]
+
+  - id: U4M6
+    name: depth-is-refinement
+    wrong_model: "Each layer takes the previous layer's representation and cleans it up, so depth is the same computation done more carefully and a wide enough shallow model could substitute."
+    why_appealing: "It matches every image-model illustration (edges, then textures, then objects) and it is how iterative numerical methods work. It is also half true - representations do sharpen with depth."
+    failing_prediction: "Under refinement, a one-layer attention-only transformer of sufficient width should do anything a two-layer one does, only worse. It cannot do in-context pattern completion ([A][B] ... [A] -> [B]) at any width, because that needs the second layer's KEYS to be a function of what the first layer wrote, and a one-layer model's keys can only be functions of raw embeddings."
+    correction: "Depth buys composition stages: the number of times a feature can be a function of another feature, communicated through the residual stream. Width buys features per stage. A computation with k sequential dependencies needs k stages and cannot be bought sideways - the induction-head circuit is the cleanest case where the boundary is sharp."
+    units: [u4]
+
+  - id: U4M7
+    name: layernorm-normalizes-the-batch
+    wrong_model: "LayerNorm computes statistics over the batch (or over the sequence), like BatchNorm, so it couples examples together and behaves differently at train and inference time."
+    why_appealing: "BatchNorm was learned first by anyone who came through vision, and both are called 'normalization' with a mean and a variance."
+    failing_prediction: "If LayerNorm used batch statistics, it would need running averages at inference and batch size 1 would be degenerate - and changing an unrelated sequence in the batch would change your outputs. None of that happens: transformer inference at batch 1 is exact and batch-order-independent."
+    correction: "LayerNorm and RMSNorm compute statistics across the d feature dimensions of a single token vector - never across the batch, never across positions. There is no train/inference discrepancy and no cross-example coupling, which is exactly why they work for variable-length sequences where BatchNorm does not."
+    units: [u4]

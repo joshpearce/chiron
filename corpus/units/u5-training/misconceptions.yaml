@@ -1,0 +1,61 @@
+# Unit-local misconception additions for u5 (training).
+# Same schema as corpus/misconception-bank.yaml. These are the u5-specific
+# confusions not general enough for the global bank, but needed so that every
+# distractor in u5's questions.yaml is a diagnosis rather than a throwaway.
+
+misconceptions:
+  - id: U5M1
+    name: backprop-is-numerical-differentiation
+    wrong_model: "Backprop estimates gradients by perturbing weights and measuring the change in loss, so gradients are approximate and the quality depends on the step size."
+    why_appealing: "Finite differences is the derivative algorithm most engineers have actually implemented, and 'gradient estimate' language is everywhere in ML writing."
+    failing_prediction: "If backprop perturbed weights, cost would scale with parameter count - one extra forward pass per parameter, so 10^11 forward passes per step. Training a 70B model would take longer than the age of the universe per step. It takes about 2x the forward pass, total, for all parameters."
+    correction: "Backprop is reverse-mode automatic differentiation: exact analytic derivatives, composed by the chain rule, computed in one backward sweep for all parameters at once. The only error is floating-point rounding. What is approximate about the gradient is that it is computed on a minibatch rather than the full dataset, which is a sampling issue, not a differentiation one."
+    units: [u5]
+
+  - id: U5M2
+    name: loss-scores-generated-text
+    wrong_model: "During training the model generates text and the loss measures how close the generated text is to the target text."
+    why_appealing: "That is how you would test the system by hand, and it is how evaluation works at inference time."
+    failing_prediction: "If the loss scored generated output, training a 2000-token document would require 2000 sequential forward passes and one gradient signal per document. Training is one parallel forward pass per document and yields 2000 gradient signals from it."
+    correction: "Teacher forcing: every position is scored independently against the true next token from the corpus, with all positions computed in parallel in a single forward pass. The model never consumes its own output during pretraining, which is precisely the train/inference mismatch that makes generation drift a real phenomenon."
+    units: [u5]
+
+  - id: U5M3
+    name: adam-tunes-the-learning-rate
+    wrong_model: "Adaptive optimizers tune the learning rate for you, so the learning rate hyperparameter matters less with Adam than with SGD."
+    why_appealing: "The word 'adaptive', plus the genuine observation that Adam is far more forgiving of a badly-scaled problem than SGD."
+    failing_prediction: "If Adam set its own step size, the learning rate would be a weak knob - but Adam's step is approximately eta in every direction, so eta sets the step size almost exactly, and changing it by 10x reliably breaks training. Adam is arguably MORE sensitive to eta than SGD, which is why warmup schedules exist for Adam and rarely for SGD."
+    correction: "Adam normalizes each parameter's step by that parameter's own recent gradient magnitude, so all parameters move at a comparable rate set by eta. It removes per-parameter scale differences; it does not choose the global scale. That is still yours to pick."
+    units: [u5]
+
+  - id: U5M4
+    name: perplexity-is-an-accuracy-score
+    wrong_model: "Perplexity is a quality percentage or accuracy-like score where lower is better on a bounded scale, comparable across any two models."
+    why_appealing: "It is the headline number in every model card, and 'lower is better' is the only property most people are told."
+    failing_prediction: "If perplexity were a bounded score, it would have a worst case of 100% or similar - its worst case is the vocabulary size, so the same model reports different perplexity under a different tokenizer with no change in capability."
+    correction: "Perplexity is exp(mean cross-entropy per token): the effective number of equally-likely options the model is choosing among. It is unbounded above, floored by the entropy of the data, and denominated in tokens, so it is comparable only across models sharing a tokenizer. Bits per character is the tokenizer-invariant version."
+    units: [u5]
+
+  - id: U5M5
+    name: model-sees-the-reward
+    wrong_model: "In RLHF the model is shown its reward score and learns from it the way a person learns from feedback - it 'knows' it was rated 0.7 and tries to do better."
+    why_appealing: "Reinforcement learning is described everywhere with reward-and-punishment language borrowed from animal training, and the reward is a number that genuinely exists in the training loop."
+    failing_prediction: "If the model consumed the reward, you could raise quality at inference by telling it the score of its last answer - it has no channel to receive one. Nothing about the reward reaches the model except as a gradient on its weights."
+    correction: "The reward is a scalar computed outside the model by a separate reward model, used to weight a policy gradient that updates weights. The model never represents, sees, or reasons about it. What changes is the probability of the tokens it produced, in proportion to the reward those tokens earned."
+    units: [u5]
+
+  - id: U5M6
+    name: gradient-points-at-the-minimum
+    wrong_model: "The gradient points toward the minimum, so gradient descent walks a direct route there and the learning rate controls how fast you travel that route."
+    why_appealing: "In the 2D bowl picture used in every tutorial, the negative gradient really does point roughly at the bottom."
+    failing_prediction: "If the gradient pointed at the minimum, one step with the right learning rate would arrive - instead training takes 10^5 to 10^6 steps, and in an elongated valley the gradient points almost perpendicular to the direction of the actual minimum, which is why momentum and preconditioning help at all."
+    correction: "The gradient is the direction of steepest local increase, valid only infinitesimally. It has no information about where any minimum is. Optimization is a sequence of local decisions, which is exactly why curvature-aware methods (momentum, Adam's normalization) buy so much."
+    units: [u5]
+
+  - id: U5M7
+    name: dpo-is-rl
+    wrong_model: "DPO is a reinforcement learning algorithm - a simpler or faster variant of PPO that still trains a reward model and samples from the policy."
+    why_appealing: "It optimizes preferences, it appears in the same papers and libraries as RLHF, and its objective contains a beta that looks like the KL coefficient."
+    failing_prediction: "If DPO were RL, it would need rollouts from the current policy - its training loop makes no samples at all, reads a fixed file of preference pairs, and runs through the same code path as supervised fine-tuning."
+    correction: "DPO is a supervised loss on preference pairs, derived by inverting the closed-form optimum of the KL-constrained RL objective so that the reward model cancels out. The beta is inherited from that derivation. Because it is offline it can only learn from the pairs you have, which is the real difference from PPO, not speed."
+    units: [u5]

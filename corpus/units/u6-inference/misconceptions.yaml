@@ -1,0 +1,45 @@
+# Unit-local misconception additions for u6 (inference).
+# Same schema as corpus/misconception-bank.yaml. These are the u6-specific
+# wrong models that the global bank does not already cover; distractors in
+# u6 questions.yaml may cite either these IDs or global bank IDs.
+
+misconceptions:
+  - id: U6-1
+    name: specdec-is-approximate
+    wrong_model: "Speculative decoding trades output quality for speed - a worse draft model means worse output, and it is off by default when quality matters."
+    why_appealing: "Every other 'go faster' technique in systems is a tradeoff, and the word 'speculative' implies guessing. Approximate nearest neighbor, lossy compression, sampling-based estimation: the prior that speed costs fidelity is usually correct."
+    failing_prediction: "If it were approximate, output quality would vary with the draft model's quality - swap in a deliberately terrible draft and the output should degrade. It does not. The emission distribution is provably identical for any draft distribution q, including a uniform one; only the acceptance rate, and therefore the speed, changes."
+    correction: "Modified rejection sampling accepts a drafted token x with probability min(1, p(x)/q(x)) and on rejection emits from the normalized residual max(0, p-q). The two terms sum to exactly p(x) for every token, and the normalizing constant cancels, so exactness holds unconditionally in q. A bad draft costs throughput, never correctness."
+    units: [u6]
+
+  - id: U6-2
+    name: temperature-and-top-p-are-one-dial
+    wrong_model: "Temperature and top-p are two ways of turning the same 'creativity' knob; setting both is redundant, and their effects add up in a predictable way."
+    why_appealing: "Both are described as randomness controls in the same paragraph of every API doc, and both move output in the same qualitative direction."
+    failing_prediction: "If they were one dial, a fixed top_p would have a fixed effect - but top_p = 0.9 keeps 1 token at T = 0.5, 2 tokens at T = 1.0, and 4 tokens at T = 2.0 on the same logit vector. The number of reachable tokens is set by the pair, not by either one. At low temperature, top_p silently becomes greedy decoding."
+    correction: "Temperature reweights the whole distribution and never changes the support or the ranking. top-k and top-p truncate the support, and top-p's cut point depends on the cumulative mass, which temperature has already reshaped. One reweights, the other deletes, and the second reads the output of the first."
+    units: [u6]
+
+  - id: U6-3
+    name: cached-tokens-are-free
+    wrong_model: "Once tokens are in the KV cache, they cost nothing - cached context is free context, so a long cached prefix is as cheap as a short one."
+    why_appealing: "Prefix caching genuinely does eliminate the prefill cost, providers charge a fraction for cached input tokens, and 'cache hit means free' is a sound instinct everywhere else in systems."
+    failing_prediction: "If cached tokens were free, generation speed would be independent of context length - but every decoded token attends over the entire cache, so per-token attention cost grows linearly in context length. On a 48-layer, 32-query-head model, attention arithmetic overtakes all the weight matmuls combined at about 8,500 tokens of context, and at 128k it is 15x larger."
+    correction: "The cache eliminates re-projection of old tokens, not attention over them. Cached context costs memory linearly (96 KiB per token on the model teaching this book) and costs compute on every single subsequent token. A cache hit removes the prefill charge and none of the decode charge."
+    units: [u6, u8]
+
+  - id: U6-4
+    name: quantization-is-a-disk-optimization
+    wrong_model: "Quantization is about fitting the model on disk or in RAM. Once it is loaded, a 4-bit model runs at the same speed as an fp16 one."
+    why_appealing: "The observable artifact is a smaller file, and compression normally costs CPU at read time rather than saving it. Engineers correctly expect decompression to be overhead."
+    failing_prediction: "If quantization were only about capacity, token generation rate would be unchanged after loading - instead 4-bit decoding runs roughly 3.7x faster than fp16 on the same hardware, matching the ratio of bytes moved per token almost exactly. Meanwhile prompt processing speeds up hardly at all, which a capacity story cannot explain."
+    correction: "Decoding is memory-bandwidth-bound: each token requires reading every active weight once, so token rate is bandwidth divided by active-weight bytes. Quantization is primarily a bandwidth optimization and only incidentally a capacity one. Prefill is compute-bound and reuses each loaded weight across thousands of rows, so it sees almost no benefit - which is exactly the asymmetry a disk-space story predicts wrong."
+    units: [u6]
+
+  - id: U6-5
+    name: greedy-maximizes-sequence-probability
+    wrong_model: "Greedy decoding returns the most likely output sequence; beam search is an approximation that gets close to the same thing faster."
+    why_appealing: "Argmax at every step feels like it must compose into argmax overall, and the relationship between greedy and beam search is usually presented the other way round."
+    failing_prediction: "If greedy maximized sequence probability, beam search could never find a higher-probability sequence than greedy - it routinely does, which is the entire reason it exists. A two-step example: step 1 offers [0.6, 0.4]; the 0.6 branch continues at best 0.5 and the 0.4 branch at best 0.99. Greedy scores 0.30, the other path 0.396."
+    correction: "Greedy is a local heuristic on an exponential search tree with no exchange property, so it is not optimal. Beam search is a bounded-width best-first search that is also not exact, and it needs an ad-hoc length normalization because unnormalized sequence probability decreases monotonically with length. 'The most likely sequence' is neither computed nor well-posed as an objective."
+    units: [u6]

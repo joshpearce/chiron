@@ -529,7 +529,7 @@ prompt: |
   Step 3, sum: ____
   Step 4, normalize: $p = $ ____
   Step 5, apply top-p $= 0.95$: sorted cumulative mass is
-  $0.626 \rightarrow 0.856 \rightarrow 1.000$, so the nucleus is ____ and the
+  $0.629 \rightarrow 0.860 \rightarrow 1.000$, so the nucleus is ____ and the
   renormalized distribution is ____
   Step 6, draw one sample.
 
@@ -537,8 +537,8 @@ prompt: |
   the model knows?
 answer: |
   Step 1: $z/T = [1.5,\ 0.5,\ 0.0]$
-  Step 3: $4.482 + 1.649 + 1.000 = 7.131$
-  Step 4: $p = [4.482/7.131,\ 1.649/7.131,\ 1.000/7.131] = [0.629,\ 0.231,\ 0.140]$
+  Step 3: $4.482 + 1.649 + 1.000 = 7.130$
+  Step 4: $p = [4.482/7.130,\ 1.649/7.130,\ 1.000/7.130] = [0.629,\ 0.231,\ 0.140]$
   Step 5: cumulative $0.629 \rightarrow 0.860 \rightarrow 1.000$; 0.95 is not
   reached until the third token, so all three tokens stay in the nucleus and the
   distribution is unchanged: $[0.629,\ 0.231,\ 0.140]$.
@@ -548,7 +548,7 @@ answer: |
   arithmetic on a frozen vector.
 rubric: |
   Step 1 must show division by T (not multiplication) giving [1.5, 0.5, 0.0].
-  Step 3 must be 7.131 +/- 0.01. Step 4 must be [0.629, 0.231, 0.140] +/- 0.01.
+  Step 3 must be 7.130 +/- 0.01. Step 4 must be [0.629, 0.231, 0.140] +/- 0.01.
   Step 5 must conclude that top-p = 0.95 truncates nothing here, because the
   first two tokens hold only 0.860 of the mass - a learner who drops the third
   token has applied the threshold to the wrong quantity.
@@ -611,10 +611,10 @@ $256\ \text{KB} \times 8192 = 2{,}097{,}152\ \text{KB} = 2\ \text{GiB}$.
 
 Two gigabytes of memory for one conversation, and it grows by 256 KB with every
 single token generated. Now put that next to the decode budget: each decode step
-reads 11 GB of weights *and* 2 GB of KV cache, so 13 GB at 2 TB/s = 6.5 ms, not
-5.5. At 100,000 tokens of context the cache alone is 25.6 GB, the read is 36.6
-GB, and per-token latency is 18 ms. Same model, same prompt complexity, 3x
-slower per token purely because the cache got bigger.
+reads 11 GB of weights *and* 2 GiB of KV cache, so about 13.1 GB at 2 TB/s =
+6.6 ms, not 5.5. At 100,000 tokens of context the cache alone is 26.2 GB, the
+read is 37.2 GB, and per-token latency is 18.6 ms. Same model, same prompt
+complexity, 2.8x slower per token purely because the cache got bigger.
 
 Note what this makes of GQA. Dropping from 32 KV heads to 8 cut the cache by 4x
 with a small quality cost. That is not a modeling decision, it is a
@@ -831,7 +831,7 @@ answer: |
   ~100k tokens instead of ~10k. Every generated token's forward pass must attend
   to all n prior positions, which means reading the entire KV cache: n x 256 KB.
   At n = 10k that is ~2.6 GB on top of 11 GB of weights (13.6 GB, ~6.8 ms); at
-  n = 100k it is ~25.6 GB on top of 11 GB (36.6 GB, ~18 ms). Decode is
+  n = 100k it is ~26.2 GB on top of 11 GB (37.2 GB, ~18.6 ms). Decode is
   memory-bandwidth-bound, so per-token latency tracks bytes read almost exactly,
   and bytes read now has a term linear in n that has overtaken the fixed weight
   term.

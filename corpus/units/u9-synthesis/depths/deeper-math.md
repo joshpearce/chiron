@@ -296,9 +296,24 @@ This gives the exact cost of an edit at position $m$ in a sequence of length $n$
 $$\text{cost}(\text{edit at } m) = 2 P_a (n - m) + 4 (n-m) \cdot n \cdot d_{head} h_q L$$
 
 versus $\text{cost}(\text{append of } j) = 2 P_a j + 4 j (n + j) d_{head} h_q L$.
-Editing at $m = 40$ in an 11,632-token sequence costs roughly 290x an
-appending-only turn of the same size. Order your prompt by mutation frequency,
-ascending.
+Both are dominated by their leading token count, so the ratio is roughly
+$(n - m) / j$: the damage from an edit scales with how far from the end it
+sits, and the saving from an append scales with how little you add.
+
+Two instances in an $n = 11{,}632$ sequence, at $P_a = 22 \times 10^9$ and
+$F = 4.5 \times 10^{14}$:
+
+- Edit at $m = 40$, versus appending a 3,400-token tool result: 1.45 s versus
+  0.42 s, a factor of 3.4. Unpleasant but survivable, because the append was
+  itself substantial.
+- Edit at $m = 40$, versus appending a 20-token user message: 1.45 s versus
+  0.002 s, a factor of **580**. This is the common case in a chat loop, and it
+  is where a single volatile field near the front of a prompt quietly costs
+  three orders of magnitude.
+
+Order your prompt by mutation frequency, ascending. The cost of getting it
+wrong is not a constant factor; it is $(n-m)/j$, and both of those move against
+you as a session grows.
 
 **Session cost accumulation.** Let turn $i$ append $a_i$ tokens (tool result plus
 generation) and generate $g_i$ tokens, and let $n_i = \sum_{j<i} a_j$ be the

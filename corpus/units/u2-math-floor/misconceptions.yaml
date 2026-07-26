@@ -1,0 +1,52 @@
+# Unit-local misconception additions for u2. Same schema as the global bank.
+# These are the math-floor-specific wrong models that the global bank does not
+# cover. IDs are namespaced U2-* so they never collide with bank IDs.
+
+misconceptions:
+  - id: U2-M1
+    name: softmax-is-just-normalization
+    wrong_model: "Softmax is normalization - dividing by the sum so things add to 1. The exponential is an implementation detail, or a way to handle negatives."
+    why_appealing: "The normalization step is the visible one, and 'normalize' is a familiar operation. Engineers see the division and stop reading. Calling exp 'a way to handle negatives' is nearly right, which makes it stickier than a plainly wrong idea."
+    failing_prediction: "If exp were only about positivity, any positive monotone map would do and would give similar behavior. Take logits (2, 1, 0): squaring and normalizing gives (0.8, 0.2, 0.0), and so does squaring the logits (-2, 1, 0) - the lowest-scored option walks away with the most weight. Absolute-value normalization is also positive and also wrong. Positivity does not discriminate."
+    correction: "The exponential is forced, not chosen. Requiring that only score differences matter - that adding a constant to every logit change nothing - reduces to g(s+t) = g(s)g(t), whose only continuous positive solutions are exponentials. Exp turns differences into ratios, which is the property nothing else has. It is also what makes softmax the gradient of log-sum-exp, hence a smooth argmax."
+    units: [u2, u6, u7]
+
+  - id: U2-M2
+    name: gradient-points-at-the-minimum
+    wrong_model: "The gradient points toward the minimum, so the negative gradient is the direction to travel to get there."
+    why_appealing: "It is true on a simple bowl, which is the picture everyone carries from school calculus, and the phrase 'steepest descent' sounds like it means 'toward the bottom'."
+    failing_prediction: "If the gradient pointed at the minimum, one appropriately sized step would arrive, and descent trajectories would be straight lines. They are not - descent visibly zigzags. In a long narrow valley the negative gradient points mostly across the valley toward the opposite wall, because the walls are steep and the floor's slope along its length is gentle."
+    correction: "The gradient is computed entirely from the surface at the current point and carries no information about any minimum's location. It gives the direction of steepest local increase and the local rate, and both change as soon as you move. Momentum and adaptive step sizes exist to average out the resulting oscillation."
+    units: [u2, u5]
+
+  - id: U2-M3
+    name: matmul-order-is-cosmetic
+    wrong_model: "The order of matrix factors is a convention or an optimization detail. Matrix multiplication is associative, so ordering is flexible."
+    why_appealing: "Associativity is real and is genuinely used for optimization, which makes 'order is flexible' feel already established. Shapes often still line up after a swap, so nothing crashes, and engineers read 'it runs' as 'it is equivalent'."
+    failing_prediction: "If order were cosmetic, swapping two square weight matrices in a forward pass would leave outputs unchanged. Take a 90-degree rotation R and a stretch B = diag(2, 1): RB and BR are different matrices, and applied to (1, 0) they give (0, 2) and (0, 1) respectively."
+    correction: "Associativity permits regrouping parentheses - (AB)C = A(BC) - and that regrouping is a real and large optimization, which is why LoRA computes B(Ax) rather than (BA)x. Commutativity, which would permit swapping factors, does not hold: AB = BA only when the matrices share a full set of eigenvectors. Learned weight matrices essentially never do."
+    units: [u2, u3, u4]
+
+  - id: U2-M4
+    name: high-dimension-more-traps
+    wrong_model: "More parameters means a more complicated loss surface with more local minima to get trapped in, so large models are harder to optimize."
+    why_appealing: "Direct extrapolation from the 2D picture, where a crater on a hillside genuinely traps a downhill walker, and where more wrinkles plainly mean more craters."
+    failing_prediction: "If trapping got worse with scale, larger models would train less reliably than small ones. The opposite is observed: large models train more stably and more predictably, and their loss curves are smoother."
+    correction: "Being trapped requires a conjunction: the surface must curve upward along every one of the d directions at once. Each added dimension is another chance for an escape route, so entrapment gets rarer, not commoner - under a crude independence model the probability is 2^-d. Almost every critical point is a saddle, and minibatch gradient noise walks off saddles. What actually costs training time is plateaus and ill-conditioning, which are curvature problems rather than trap problems."
+    units: [u2, u5]
+
+  - id: U2-M5
+    name: gradient-magnitude-is-importance
+    wrong_model: "A parameter with a large gradient is an important parameter - the gradient magnitude attributes the loss across parameters."
+    why_appealing: "Profilers and attribution tools work this way, and a large number does feel like it should mean a large role. The words 'contribution' and 'sensitivity' get used interchangeably in casual writing."
+    failing_prediction: "If gradient magnitude measured importance, the ranking would be stable across training steps and pruning by smallest gradient would be safe. Neither holds: gradients change completely from step to step, and a large gradient most often means a parameter is badly set right now rather than that it matters. A parameter sitting at its optimum has zero gradient and can still be load-bearing."
+    correction: "A partial derivative is a local sensitivity - how much the loss would move per unit change in that parameter, at this exact point. It answers a different question from attribution, which asks how much of the current loss is due to that parameter. Attribution methods that do work (ablation, integrated gradients) integrate over a path rather than reading a single gradient."
+    units: [u2, u5]
+
+  - id: U2-M6
+    name: shapes-agree-means-semantics-agree
+    wrong_model: "If the shapes line up and the code runs without error, the computation is correct - or at least equivalent to the intended one."
+    why_appealing: "The type-signature framing for matrices is genuinely useful and is taught here on purpose, and in strongly typed code a passing type check does rule out large classes of bugs. Shape errors are also the loudest and most frequent error in model code, which trains the reflex that shape agreement is the thing to check."
+    failing_prediction: "If shape agreement implied semantic agreement, transposing an operand, swapping two same-shaped weight matrices, or feeding keys where queries belong would all be caught. None of them are - each runs cleanly and produces silently wrong results, and the model trains to a worse loss with no error anywhere."
+    correction: "Shape is the interface, not the implementation. Two functions with the same signature can compute anything. Shape checking rules out wiring errors of one specific kind and is the first check to run, never the last. The real checks are numeric: gradient checking against finite differences, and sanity-checking gradient signs against a physical story about the forward values."
+    units: [u2, u3, u4, u5]

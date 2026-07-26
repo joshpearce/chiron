@@ -318,7 +318,7 @@ check:
       weight is spread broadly across earlier positions.
     answer: |
       (a) With $A \approx I$, the output is $O = AV \approx V = XW^V$. Each
-      output row is just that token's own value vector.
+      output row is that token's own value vector.
 
       (b) A position-wise linear map. It applies the same matrix $W^V$ to
       every token independently, with no mixing between positions - which is

@@ -28,7 +28,7 @@ A matrix is not a grid of numbers you happen to store in row-major order. A
 matrix is a function, and its shape is that function's type signature.
 
 Write $W \in \mathbb{R}^{m \times n}$ for a matrix with $m$ rows and $n$ columns.
-Here $\mathbb{R}$ just means "real numbers", and $m \times n$ means the array is
+Here $\mathbb{R}$ denotes the real numbers, and $m \times n$ means the array is
 $m$ tall and $n$ wide. That object is a linear function
 
 $$W : \mathbb{R}^{n} \rightarrow \mathbb{R}^{m}$$
@@ -285,7 +285,7 @@ about the world.
 
 ### Deriving it from the requirements
 
-Suppose you have scores $z = (z_1, \ldots, z_n)$, called logits, which are just
+Suppose you have scores $z = (z_1, \ldots, z_n)$, called logits, which are
 the raw outputs of the last linear layer. They can be any real numbers, positive
 or negative. You want to turn them into weights $p_i$ that you can sample from.
 Write down what you need:

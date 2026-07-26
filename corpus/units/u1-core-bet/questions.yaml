@@ -1,0 +1,482 @@
+# u1 core-bet: pretest + terminal check bank.
+# Solo fade items: u1-q3 (bpe-tokenize), u1-q8 (embedding-param-count),
+# u1-q9 (hidden-to-logits). Each is the third appearance of a procedure that
+# was worked in canon prose and drilled as a completion beat.
+
+pretest:
+  - id: u1-p1
+    concept: c-lm-objective
+    prompt: |
+      A language model is trained until it is as good as any model can possibly
+      be at predicting the next token in natural English text. What is its
+      training loss? Give a number or a description, and justify it in one
+      sentence.
+    answer: |
+      Not zero, and not close to zero. The loss floor is the entropy of the
+      text distribution itself: given "The cat sat on the ____", several
+      continuations are genuinely possible and no model can know which one the
+      writer chose. A perfect model reproduces the true conditional
+      distribution, which still assigns less than probability 1 to whatever
+      actually occurred, so -log P of the observed token stays positive.
+      Empirically the floor for English is somewhere near 0.7-1.0 nats per
+      token; frontier models sit modestly above it.
+    check: llm
+    rubric: |
+      Pass requires the answer to be non-zero AND to attribute the floor to
+      genuine uncertainty/entropy in language rather than to model limitations.
+      Answering "zero" or "as close to zero as possible" = fail, diagnosing M18
+      (loss-zero-is-goal). This is an expected failure at pretest; the point is
+      to make the later correction land, not to gate anything.
+      Answering non-zero but attributing it to noisy data, insufficient
+      training, or model capacity = partial; the learner has the right number
+      for the wrong reason.
+
+  - id: u1-p2
+    concept: c-tokens
+    prompt: |
+      An LLM is asked how many times the letter `r` appears in `strawberry`.
+      Before you consider whether it gets the answer right: what exactly does
+      the model receive as input for that word, and what would it have to do to
+      answer correctly?
+    answer: |
+      It receives integers, not characters. In GPT-4's tokenizer `strawberry`
+      with no leading space is three token IDs corresponding to `str`, `aw`,
+      `berry`; with a leading space, ` strawberry` is a single token ID. Either
+      way, no letter appears anywhere in the input.
+
+      To answer correctly it must have learned, indirectly, an association
+      between those token IDs and their spelling - from text discussing
+      spelling, letter-by-letter enumerations, and similar. Or it must route
+      around the problem by emitting the word spelled out one character per
+      token and then counting those, which is what chain-of-thought does here.
+    check: llm
+    rubric: |
+      Pass requires: (1) the input is token IDs, not characters, and (2) the
+      model therefore has no direct access to the letters and must rely on an
+      indirect, learned association or on spelling the word out.
+      Answering that the model "sees the word but miscounts", or that it is bad
+      at counting in general, = fail, diagnosing U1-M1 (tokens are a cosmetic
+      preprocessing detail). Expected to fail at pretest.
+
+  - id: u1-p3
+    concept: c-embeddings
+    prompt: |
+      Two 7B models are trained on identical data with identical code and
+      hyperparameters, differing only in the random seed used for weight
+      initialization. Both reach the same final loss.
+
+      How similar do you expect their embedding vectors for the token `dog` to
+      be - cosine similarity near 1, near 0, or somewhere else? Justify.
+    answer: |
+      Near 0. The two vectors have essentially no relationship, because there is
+      no privileged coordinate system: permute one model's dimensions
+      consistently (or, for a norm-free model, rotate them by any orthogonal
+      matrix) and it computes the identical function. The optimizer lands in an
+      arbitrary member of an enormous equivalence class, and two seeds land in
+      different members.
+
+      What IS comparable across the two runs is relational: the cosine
+      similarity between `dog` and `cat` within each model, or the local
+      neighborhood structure. Those correspond well. The absolute vectors do
+      not correspond at all.
+    check: llm
+    rubric: |
+      Pass requires: (1) near 0 / no meaningful correspondence, and (2) some
+      form of the invariance or arbitrary-basis argument, and ideally (3) the
+      observation that relative geometry is what transfers.
+      (1) and (2) = pass.
+      Answering "near 1, because both learned what dog means" = fail,
+      diagnosing M3 (embeddings-contain-meaning). This is the primary
+      calibration item for the unit and is expected to fail.
+
+check:
+  - id: u1-q1
+    concept: c-lm-objective
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A 4,000-token document is used as one training example. State how many
+      distinct prediction problems it contributes to the loss, and write the
+      loss expression, defining every symbol you use.
+    answer: |
+      It contributes 4,000 prediction problems, one per position. The loss is
+
+        L = -(1/T) * sum over t = 1..T of log P_theta(x_t | x_<t)
+
+      where T = 4000 is the document length in tokens, x_t is the token that
+      actually occurred at position t, x_<t is the prefix x_1 through x_(t-1),
+      theta is the model's parameters, and P_theta(x_t | x_<t) is the single
+      probability the model assigned to the observed token at that position.
+      All T predictions are produced in one forward pass.
+    check: llm
+    rubric: |
+      Must contain: (1) 4,000 (not 1, not 3,999 - accept 3,999 as correct given
+      the first token has no context), (2) the negative-log-likelihood summed
+      over positions, (3) conditioning on the prefix, (4) every symbol defined.
+      Pass = (1), (2), (3) present and at least T, x_t, and theta defined.
+      Answering "one problem - predict the end of the document" = fail; the
+      learner has not internalized that the training signal is per-position.
+      An answer that adds a truth, correctness, or quality term to the loss
+      = fail; nothing but agreement with observed text is optimized.
+    difficulty: core
+
+  - id: u1-q2
+    concept: c-lm-objective
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Your colleague argues: "Compression proves LLMs understand the world. Loss
+      equals bits, you can only get few bits by exploiting real structure,
+      therefore GPT-4 has a world model. It's a theorem."
+
+      The premises are correct and the conclusion does not follow. Identify the
+      gap precisely, and give one empirical observation that demonstrates the
+      gap is real rather than hypothetical.
+    answer: |
+      The gap: the coding theorem constrains the LIMIT. A predictor at the
+      entropy floor must have captured the generating structure. It says nothing
+      about what a specific architecture, trained with a specific optimizer on a
+      finite budget, has at its actually-achieved loss. At intermediate loss a
+      large collection of shallow heuristics that each cover most of a pattern
+      lowers the bill substantially while implementing no mechanism at all. The
+      theorem gives no bound on how much of the achieved compression came from
+      mechanism versus heuristic.
+
+      Empirical demonstration, any one: multi-digit arithmetic that is accurate
+      on operand magnitudes common in the corpus and degrades on rare ones - a
+      real addition mechanism has no frequency dependence. Or a reasoning
+      problem solved reliably in its textbook phrasing and failed when the
+      variable names or surface framing change - a real mechanism is invariant
+      to renaming.
+    check: llm
+    rubric: |
+      Must contain: (1) the theorem is about the limit / entropy floor, not
+      about achievable loss, (2) heuristics can lower loss substantially without
+      implementing mechanism, (3) a concrete frequency-dependent or
+      surface-dependent failure as evidence.
+      All three = pass. (1) and (3) = pass. (2) and (3) without (1) = fail; the
+      learner is skeptical for the wrong reason and will not be able to say what
+      WOULD establish world modeling.
+      An answer of the form "it's all just statistics, there is no
+      understanding" with no engagement with why compression pressures toward
+      mechanism = fail. That is the opposite overcorrection.
+    difficulty: stretch
+
+  - id: u1-q3
+    concept: c-tokens
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A BPE tokenizer learned exactly these five merges, in this order:
+
+        1. e + s   -> es
+        2. es + t  -> est
+        3. est + _ -> est_
+        4. l + o   -> lo
+        5. lo + w  -> low
+
+      Tokenize the word `widest`. Apply the merges in order to the character
+      sequence `w i d e s t _`.
+
+      Answer with the final token sequence, pipe-separated, no spaces.
+      Example format: `ab|cd|e`
+    answer: "w|i|d|est_"
+    check: exact
+    difficulty: core
+
+  - id: u1-q4
+    concept: c-tokens
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      With GPT-4's tokenizer, `2847 + 1913` becomes six tokens:
+      `284`, `7`, ` +`, ` `, `191`, `3`.
+
+      Explain why this specific tokenization makes addition structurally
+      difficult, and predict how the difficulty varies with the number of digits
+      in the two operands.
+    answer: |
+      Addition requires aligning operands by place value - units under units,
+      tens under tens - and carrying right to left. This tokenizer chunks digits
+      into runs of up to three counted from the LEFT, so where the chunk
+      boundaries fall relative to the units digit depends on the digit count mod
+      3. The units digit of `2847` is alone in its second token; the units digit
+      of `1913` is likewise alone. Two 4-digit operands happen to align. A
+      4-digit and a 5-digit operand do not: the boundaries land in different
+      places relative to place value, so the model has to learn a different
+      re-alignment for each combination of length residues.
+
+      Prediction: error rates should be lowest when both operands have the same
+      length mod 3, higher when they differ, and should rise with operand
+      magnitude generally as those combinations become rarer in the corpus.
+      Models that tokenize each digit separately (Llama-3 does) should show
+      markedly better arithmetic at the cost of longer sequences.
+    check: llm
+    rubric: |
+      Must contain: (1) place-value alignment is required for addition,
+      (2) chunking runs from the left so boundaries do not align with place
+      value, (3) a prediction that difficulty depends on operand length /
+      digit count rather than on the arithmetic being intrinsically hard.
+      (1) and (2) = pass; (3) upgrades to full credit.
+      An answer attributing the difficulty to the model being "bad at math" or
+      "not a calculator", with no reference to token boundaries, = fail,
+      diagnosing U1-M1.
+    difficulty: core
+
+  - id: u1-q5
+    concept: c-tokens
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      A model's tokenizer has a vocabulary of 32,000 entries. Which statement is
+      correct?
+    options:
+      - text: "The model can represent any string, including words that appear nowhere in the vocabulary, by composing subword pieces down to individual bytes."
+        correct: true
+        explain: "Correct. BPE vocabularies retain the base units (bytes or characters) as fallbacks, and merges only add longer pieces on top. Nothing is unrepresentable; rare strings just cost more tokens. This is the property that eliminated the unknown-token problem that plagued word-level models."
+      - text: "The model has a working vocabulary of 32,000 words and cannot produce anything outside it."
+        misconception: U1-M3
+        explain: "Attractive because 'vocabulary' means exactly this for a person, and because word-level NLP models really did have this limitation. But V is a budget for subword pieces, not a cap on expressible words. Vocabulary size trades embedding and output-layer cost against tokens-per-character; it bounds nothing about what can be said."
+      - text: "Tokens correspond to words, so this model knows 32,000 words - roughly the vocabulary of an educated adult."
+        misconception: U1-M1
+        explain: "The coincidence in magnitude makes this feel right. It is wrong twice: tokens are not words (many are fragments, many include leading spaces, many are punctuation or code artifacts), and a token being present says nothing about the model 'knowing' the word - the embedding for a rare token may be near its random initialization."
+      - text: "Vocabulary size determines how many distinct facts the model can store, since each token is one entry in the model's knowledge table."
+        misconception: M4
+        explain: "This is the lookup-table model of parameters applied to the embedding matrix. The embedding table has exactly one row per token and those rows contain positions, not facts. Whatever knowledge the model has lives in the 96%+ of parameters that are transformations with no rows to index."
+    difficulty: warmup
+
+  - id: u1-q6
+    concept: c-embeddings
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Design an experiment that would falsify the claim "the embedding vector
+      for a token contains that token's meaning." State the procedure, the
+      result the claim predicts, and the result you would actually get. Then
+      state what your experiment does NOT rule out.
+    answer: |
+      Procedure (any one of three):
+
+      (a) Coordinate permutation. Pick a permutation of the d_model coordinates.
+      Apply it to the columns of E, to the input rows of every matrix that reads
+      the residual stream, and to every normalization gain and bias. Run the
+      model.
+      Claim predicts: the meaning-bearing fields are scrambled, so outputs
+      degrade.
+      Actual result: bit-identical outputs on every input. d_model! parameter
+      settings implement the same function, so no coordinate can carry a fixed
+      semantic field.
+
+      (b) Cross-model transplant. Copy one model's row for `dog` into another
+      model's embedding table.
+      Claim predicts: meaning transfers, behavior is roughly preserved.
+      Actual result: noise. The vector is meaningless outside the model whose
+      layers were co-trained to read it.
+
+      (c) Polysemy. Feed `bank` in `the river bank` and `the bank approved the
+      loan` and inspect the layer-0 input at that position.
+      Claim predicts: different meanings imply different representations.
+      Actual result: identical vectors. Disambiguation happens downstream.
+
+      What none of these rule out: that the embedding SPACE encodes a great deal
+      - the relational geometry is real, and directions in it are genuinely
+      meaningful within the model. The refutation is aimed at "the vector
+      contains the meaning, intrinsically and portably", not at "embeddings are
+      structured."
+    check: llm
+    rubric: |
+      Must contain: (1) a concrete procedure, (2) the prediction the wrong model
+      makes, (3) the actual result, (4) an explicit limit on what the experiment
+      shows - specifically that relational geometry is real and is not being
+      denied.
+      (1), (2), (3) = pass. Missing (4) = pass but flag: the learner has
+      overcorrected toward "embeddings are meaningless", which will cause
+      trouble in u3 and u4.
+      An answer proposing to inspect individual dimensions for interpretable
+      features and treating a positive finding as confirmation = fail,
+      diagnosing M3; correlations with individual coordinates are facts about
+      one run's arbitrary basis.
+    difficulty: stretch
+
+  - id: u1-q7
+    concept: c-embeddings
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      You measure a trained model's embedding matrix and find that coordinate
+      412 correlates strongly with word formality across 500 sampled tokens.
+      What does this establish?
+    options:
+      - text: "That in this particular training run, a formality-related direction happens to have substantial overlap with coordinate 412. Retraining with a different seed would place it elsewhere."
+        correct: true
+        explain: "Correct. Coordinate 412 is a label from one arbitrary member of a huge equivalence class of parameter settings (permute all coordinates consistently and the model is bit-identical). The correlation is real for this checkpoint and carries no information about embeddings in general. Interpretability work reports directions, not coordinates, for exactly this reason."
+      - text: "That embeddings store semantic features in their dimensions, and dimension 412 is the formality field."
+        misconception: M3
+        explain: "This is the intuition the finding seems to confirm, which is what makes it dangerous. It fails the permutation test: relabel the coordinates consistently across E and every consumer and the model computes the identical function while your formality field moves to a different index. A field that can be arbitrarily renumbered without consequence is not a field."
+      - text: "That the embeddings were initialized from pretrained word vectors in which that dimension encoded formality."
+        misconception: U1-M4
+        explain: "Plausible to anyone who remembers loading GloVe or word2vec vectors as a first layer. Modern LLM embedding matrices are randomly initialized and trained end to end by the same backward pass as every other parameter. There is no pretrained table being loaded and no inherited dimension semantics."
+      - text: "That the embedding table is where the model's knowledge lives, and formality is one of its stored columns."
+        misconception: M4
+        explain: "The lookup-table model of parameters, applied to the one component that really is a table. The embedding matrix is 2-4% of a large model's parameters and contains starting positions, not knowledge. The remaining 96% has no rows and no columns to store a feature in."
+    difficulty: core
+
+  - id: u1-q8
+    concept: c-embeddings
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      Llama-3-8B has a vocabulary of 128,256 tokens and $d_{model} = 4096$.
+      How many parameters are in its input embedding matrix?
+
+      Answer with the exact integer, digits only, no separators.
+    answer: "525336576"
+    check: exact
+    difficulty: core
+
+  - id: u1-q9
+    concept: c-logits
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A toy model has $d_{model} = 3$ and $V = 3$, with vocabulary
+      [` yes`, ` no`, ` maybe`] at indices 0, 1, 2. Its unembedding matrix, one
+      row per vocabulary entry, is
+
+        W_U = [[ 2,  0, -1],
+               [ 0,  1,  1],
+               [-1, -1,  2]]
+
+      The stack produces hidden state h = [1, 2, -1].
+
+      Compute the logit vector. Answer as three comma-separated numbers, no
+      spaces, in vocabulary order. Example format: `4,-2,0`
+    answer: "3,1,-5"
+    check: exact
+    difficulty: core
+
+  - id: u1-q10
+    concept: c-logits
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A teammate is debugging a generation bug and adds logging that prints the
+      raw logit of the sampled token. They report: "Token A had logit 18.4 and
+      token B had logit 6.2, so the model was three times as confident in A."
+
+      Two things are wrong with that sentence. Name both, and say what they
+      should log instead.
+    answer: |
+      First error: logits are only defined up to an additive constant. Adding
+      the same c to every logit leaves the resulting distribution exactly
+      unchanged, because softmax divides e^(z+c) by the sum of e^(z+c) and the
+      e^c cancels. So an absolute logit value is not a quantity - it is like a
+      voltage with no stated reference. If the two numbers came from different
+      forward passes, comparing them is meaningless.
+
+      Second error: even within one distribution, logits are on a log scale, so
+      a ratio of the logits is not a ratio of probabilities. The gap is what
+      converts: z_i - z_j = log(P_i / P_j). A gap of 12.2 means A is e^12.2,
+      about 200,000 times as likely as B, not three times.
+
+      What to log: either the full distribution (or top-k probabilities after
+      softmax), or logit gaps within a single forward pass - for example the
+      margin between the top and second tokens.
+    check: llm
+    rubric: |
+      Must contain: (1) logits are shift-invariant / defined only up to an
+      additive constant, so absolute values and cross-prompt comparisons are
+      meaningless, (2) logits are log-scale so differences, not ratios, map to
+      probability ratios.
+      Both = pass. Only (2) = fail; the shift invariance is the load-bearing
+      half and the one that produces real bugs.
+      An answer stating the logits should be normalized first "so they are real
+      probabilities that sum to 1 and represent correctness" = pass on the
+      mechanics but flag M2; softmax outputs are sampling weights calibrated to
+      training-data frequency, not probabilities of being correct.
+    difficulty: core
+
+  - id: u1-q11
+    concept: c-logits
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      For prompt A, the model's top token has logit 18.4. For prompt B, the top
+      token has logit 6.2. What can you conclude?
+    options:
+      - text: "Nothing. Logits are defined only up to an additive constant, so absolute values are not comparable across forward passes; only gaps within one distribution carry information."
+        correct: true
+        explain: "Correct. softmax(z + c) = softmax(z) exactly, so a forward pass that produced [18.4, 17.0, ...] and one that produced [6.2, 4.8, ...] can encode identical distributions. The comparable quantity is the margin between top and runner-up within each pass."
+      - text: "The model is much more confident on prompt A - 18.4 versus 6.2 is a large difference in probability."
+        misconception: M2
+        explain: "This treats the score as if it were already a probability, or at least a monotone stand-in for one on a shared scale. The scale is not shared. Even the phrase 'confident' overreaches: after softmax these are sampling weights calibrated to training-corpus frequencies, not estimates of being correct."
+      - text: "Prompt A hits material the model knows well; running prompt B at a lower temperature would raise its logit."
+        misconception: M6
+        explain: "Attractive because temperature visibly changes output quality. But temperature is applied AFTER the logits are computed - it divides them before sampling. It cannot change a logit, because the logit is its input. Nothing downstream of the forward pass can alter what the forward pass produced."
+      - text: "Prompt A's continuation was memorized from training data; prompt B's had to be generalized, which is why its score is lower."
+        misconception: M4
+        explain: "The retrieval framing: high score means a row was found, low score means it had to be reconstructed. There is no such distinction in the mechanism. The logit is a dot product between the hidden state and a token's direction, computed identically whether the continuation is verbatim from the corpus or has never existed."
+    difficulty: warmup
+
+  - id: u1-q12
+    concept: c-lm-objective
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      The training loss is a sum of independent per-position terms: each
+      position is scored only on the token that immediately follows it.
+
+      A colleague concludes that the model must therefore be myopic - that it
+      cannot set anything up in advance, because nothing in the objective
+      rewards a token for helping a token 40 positions later.
+
+      The premise is exactly right and the conclusion is wrong. Explain why, and
+      name a behavior that could not exist if the conclusion held.
+    answer: |
+      The terms of the loss are additive and independent, but the computations
+      producing them are not, because they share parameters. The gradient of the
+      total loss with respect to theta is the sum of every position's gradient,
+      so a parameter setting that makes the hidden state at position t encode
+      structure useful at position t+40 receives credit from position t+40's
+      term. The objective is decomposed per position; the credit assignment is
+      not. Backpropagation routes gradient from the late position back through
+      whatever produced the early state.
+
+      There is a second, separate reason: a token's own probability depends on
+      the context that will follow it only through what the writer of the
+      training text did, and human text is written by processes that planned.
+      Predicting it well therefore requires modeling the plan.
+
+      Behavior that could not exist under the myopic conclusion: producing a
+      correctly-scanning rhyming couplet, where the word choice at the end of
+      line 1 constrains what must be available at the end of line 2. Or emitting
+      a matched closing delimiter after a long nested structure. Or setting up a
+      joke whose punchline lands 60 tokens later. Under a genuinely myopic
+      model, each of these would require a lucky coincidence at every step.
+    check: llm
+    rubric: |
+      Must contain: (1) parameter sharing - the same weights produce every
+      position, so gradient from a late position updates whatever computed the
+      early state, (2) a concrete behavior requiring commitment across many
+      tokens.
+      Both = pass.
+      (2) alone, arguing only from observed behavior with no mechanism, =
+      partial; do not pass, since the learner cannot say WHY the objective
+      permits it.
+      An answer claiming the model "plans ahead by looking at future tokens" =
+      fail; that violates causal masking (u3) and is a distinct error worth
+      correcting immediately.
+      An answer defending the myopic conclusion = fail, diagnosing U1-M2.
+    difficulty: stretch

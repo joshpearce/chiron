@@ -296,7 +296,7 @@ scores in a row are spread over a range of roughly $\pm 8$; at $d_k = 512$,
 roughly $\pm 22$.
 
 Now feed that into softmax. Softmax exponentiates, so what matters is the
-*difference* between scores. Consider just two positions whose raw scores
+*difference* between scores. Consider only two positions whose raw scores
 differ by 10 - unremarkable at $d_k = 64$, where the standard deviation is 8.
 Their weights are
 

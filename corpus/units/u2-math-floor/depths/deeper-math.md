@@ -93,7 +93,7 @@ are simultaneously diagonalizable, meaning they share a full set of eigenvectors
 Rotation and axis-aligned scaling do not - the scaling's eigenvectors are the
 coordinate axes, and a real rotation by 90 degrees has no real eigenvectors at
 all (its eigenvalues are $\pm i$). They have no shared frame in which both are
-simply "stretch along these directions", so they cannot commute.
+only "stretch along these directions", so they cannot commute.
 
 ### Transposes and the reversal rule
 
