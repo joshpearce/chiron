@@ -164,6 +164,9 @@ func Open(dir string, c *corpus.Corpus) (*Learner, error) {
 func (l *Learner) snapshotPath() string { return filepath.Join(l.dir, "learner.json") }
 func (l *Learner) logPath() string      { return filepath.Join(l.dir, "events.jsonl") }
 
+// LogPath exposes the append-only log so the review exporter can replay it.
+func (l *Learner) LogPath() string { return l.logPath() }
+
 func fresh() *Data {
 	return &Data{
 		Concepts:       map[string]*Concept{},
