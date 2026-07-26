@@ -1,0 +1,170 @@
+package render
+
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/mjbraun/chiron/server/checkers"
+	"github.com/mjbraun/chiron/server/corpus"
+)
+
+type checkersOption = checkers.Option
+
+// These cases are the systemic math-corruption bug that shipped once and had to
+// be found by loading the real renderer in a browser. Every equation in the
+// book was at risk from two independent mechanisms: CommonMark eating the
+// backslash in `\{`, and the browser's HTML parser swallowing `x_{<t}` as an
+// unknown tag.
+func TestMathSurvivesMarkdown(t *testing.T) {
+	cases := []struct {
+		name     string
+		in       string
+		contains []string
+		absent   []string
+	}{
+		{
+			name:     "braces keep their backslashes",
+			in:       `The set $\{1, 2\}$ is small.`,
+			contains: []string{`$\{1, 2\}$`},
+		},
+		{
+			name:     "less-than in a subscript is escaped, not swallowed",
+			in:       `Condition on $x_{<t}$ here.`,
+			contains: []string{`x_{&lt;t}`},
+			absent:   []string{`x_{<t}`},
+		},
+		{
+			name:     "display math is one span, not two empty ones",
+			in:       "$$C = M \\oplus K$$",
+			contains: []string{`$$C = M \oplus K$$`},
+		},
+		{
+			name:     "ampersand in matrix alignment is escaped",
+			in:       `$$\begin{bmatrix} a & b \end{bmatrix}$$`,
+			contains: []string{`a &amp; b`},
+		},
+		{
+			name:     "prices are not math",
+			in:       `It costs $5 or maybe $10 tops.`,
+			contains: []string{"$5", "$10"},
+			absent:   []string{"MATHPLACEHOLDER"},
+		},
+		{
+			name:   "escaped dollar stays prose",
+			in:     `A literal \$ sign.`,
+			absent: []string{"MATHPLACEHOLDER"},
+		},
+		{
+			name:     "emphasis inside math is not markdown",
+			in:       `$a_*b_*c$ stays put.`,
+			contains: []string{`$a_*b_*c$`},
+			absent:   []string{"<em>"},
+		},
+		{
+			name:     "an unclosed dollar does not swallow the chapter",
+			in:       "A stray $ here.\n\nA new paragraph with **bold**.",
+			contains: []string{"<strong>bold</strong>"},
+			absent:   []string{"MATHPLACEHOLDER"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			out, err := RenderMarkdown(c.in)
+			if err != nil {
+				t.Fatalf("render: %v", err)
+			}
+			for _, want := range c.contains {
+				if !strings.Contains(out, want) {
+					t.Errorf("output missing %q\ngot: %s", want, out)
+				}
+			}
+			for _, bad := range c.absent {
+				if strings.Contains(out, bad) {
+					t.Errorf("output contains %q, which it must not\ngot: %s", bad, out)
+				}
+			}
+		})
+	}
+}
+
+// The whole-corpus sweep. When this bug was found by hand, the audit was "2045
+// equations render, 0 errors" - so this asserts the same property mechanically:
+// no placeholder leaks into the output, and no raw `<` survives inside math
+// where the HTML parser would eat it.
+func TestWholeCorpusRendersWithoutCorruption(t *testing.T) {
+	c, err := corpus.Load(filepath.Join("..", "..", "corpus"))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	totalEquations, totalBeats := 0, 0
+	for _, id := range c.UnitOrder() {
+		u := c.Units[id]
+		var sections []AssembledSection
+		for _, s := range u.Sections {
+			sections = append(sections, AssembledSection{Heading: s.Heading, Markdown: s.Markdown()})
+		}
+		ch, err := RenderChapter(u, sections, Directives{}, u.Questions.Pretest, u.Questions.Check)
+		if err != nil {
+			t.Fatalf("%s: %v", id, err)
+		}
+		if strings.Contains(ch.HTML, "MATHPLACEHOLDER") || strings.Contains(ch.HTML, "ENDMATH") {
+			t.Errorf("%s: placeholder leaked into the rendered chapter", id)
+		}
+		for _, sp := range findMathSpans(ch.HTML) {
+			eq := ch.HTML[sp.start:sp.end]
+			totalEquations++
+			if strings.Contains(eq, "<") {
+				t.Errorf("%s: raw '<' survived inside math, the parser will eat it: %.60s", id, eq)
+			}
+		}
+		totalBeats += len(ch.Beats)
+		if len(ch.Beats) == 0 {
+			t.Errorf("%s: no beats extracted - step-based interaction is the point", id)
+		}
+		for _, b := range ch.Beats {
+			if !strings.Contains(ch.HTML, `data-beat-id="`+b.ID+`"`) {
+				t.Errorf("%s: beat %s has no placeholder div in the html", id, b.ID)
+			}
+		}
+	}
+	if totalEquations < 2000 {
+		t.Errorf("only %d equations found across the corpus, expected ~2045", totalEquations)
+	}
+	t.Logf("%d equations, %d beats, 0 corrupted", totalEquations, totalBeats)
+}
+
+// MCQ options must reach the app without their answers attached, and free-text
+// items must carry their reveal.
+func TestClientItemsHideAndRevealTheRightThings(t *testing.T) {
+	mcq := corpus.Question{
+		ID: "q1", Kind: "mcq", Prompt: "which", Check: "choice",
+		Options: []checkersOption{{Text: "a", Correct: true, Explain: "yes"},
+			{Text: "b", Explain: "no", Misconception: "M1"}},
+	}
+	item := clientItem(mcq)
+	if len(item.Options) != 2 {
+		t.Fatalf("got %d options", len(item.Options))
+	}
+	for _, o := range item.Options {
+		if o.Text == "" {
+			t.Error("option text missing")
+		}
+	}
+	if item.Reveal == nil || len(item.Reveal.Options) != 2 {
+		t.Fatal("mcq reveal must carry per-option explanations")
+	}
+	if !item.Reveal.Options[0].Correct || item.Reveal.Options[1].Correct {
+		t.Error("reveal must mark exactly the correct option")
+	}
+
+	free := corpus.Question{ID: "q2", Kind: "constructed", Prompt: "why", Check: "llm",
+		Answer: "because", Rubric: "must say because"}
+	fi := clientItem(free)
+	if fi.Reveal == nil || fi.Reveal.Answer != "because" || fi.Reveal.Rubric == "" {
+		t.Errorf("constructed item reveal wrong: %+v", fi.Reveal)
+	}
+	if fi.Difficulty != "core" {
+		t.Errorf("difficulty should default to core, got %q", fi.Difficulty)
+	}
+}
