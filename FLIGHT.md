@@ -14,6 +14,13 @@ Do this first:
    `ios-deploy --bundle <DerivedData>/Chiron.app --args selftest --justlaunch --noinstall`
 3. Then do one human pass in the app (tap Begin, work a beat, take the check)
    to confirm the reading experience, not just the protocol.
+4. **Eyeball the check screen specifically.** 36% of check items contain LaTeX,
+   which SwiftUI's `Text` cannot render - they would have shown as raw `$q$` to
+   you mid-flight. That is now rendered through KaTeX (`MathText.swift`), but it
+   is the one change I could not see on the device. Confirm equations look
+   typeset and nothing is clipped. If a prompt looks cut off, the height
+   measurement failed; it falls back to a deliberate over-estimate, so the
+   symptom would be extra blank space rather than lost text.
 
 ### Verified overnight (no human needed)
 

@@ -13,9 +13,28 @@ import WebKit
 /// costs nothing.
 struct MathText: View {
     let text: String
-    var size: CGFloat = 19
+    var size: CGFloat
 
-    @State private var height: CGFloat = 24
+    @State private var height: CGFloat
+
+    init(text: String, size: CGFloat = 19) {
+        self.text = text
+        self.size = size
+        // Start from an estimate rather than a fixed small value: if the
+        // JavaScript measurement never lands, over-estimating costs blank
+        // space while under-estimating hides the question being asked.
+        _height = State(initialValue: Self.estimatedHeight(text, size: size))
+    }
+
+    /// Rough layout guess: wrapped lines at ~60 characters, plus room for each
+    /// display-math block, which sets on its own line and is taller than prose.
+    static func estimatedHeight(_ text: String, size: CGFloat) -> CGFloat {
+        let displayBlocks = text.components(separatedBy: "$$").count / 2
+        let lines = max(1, Int(ceil(Double(text.count) / 60.0)))
+        return CGFloat(lines) * size * 1.5
+            + CGFloat(displayBlocks) * size * 2.2
+            + 8
+    }
 
     var body: some View {
         if text.contains("$") {
