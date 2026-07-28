@@ -89,7 +89,7 @@ some family resemblance that is real (it demonstrably reduces loss) and
 mostly not nameable. It is a partition without a name for its parts.
 
 One more thing that kills the specialist picture on contact: an expert is not a
-small model. It is one-forty-eighth of the middle of one layer. There is no
+small model. It is one of 128 parallel fragments in the middle of one of forty-eight layers. There is no
 "code expert" you could extract and run, any more than there is a "verbs" chunk
 of your brain you could remove and interview. It is a fragment of a computation,
 not a participant in a committee.
@@ -134,7 +134,7 @@ keep only the popular experts in memory and fetch the rest from disk when
 needed. It does not work, and the reason is worth feeling rather than
 calculating. The eight experts you need change every single token, so a disk
 fetch is not a rare miss you can amortize; it is the steady state. You would be
-carrying the same short trip, but over a road a thirty times slower than the
+carrying the same short trip, but over a road thirty times slower than the
 one you were on. You would end up below where the dense model started.
 
 The deeper cost is during training, and the shape of it is a familiar one to

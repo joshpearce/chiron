@@ -233,7 +233,8 @@ about did exactly that.
 
 The prediction that fails: if prompt processing were sequential, an 8,192-token
 prompt would take 8,192 sequential steps, each with the same per-step latency as
-generating a token. Generation on this box runs at about 5.5 ms per token. That
+generating a token. Generation on this box starts at about 5.5 ms per token
+while the context is short (Stage 6 adds the cache-read term that grows). That
 would put time-to-first-token at 45 seconds. Measured time-to-first-token is
 just under one second. The model is not stepping through your prompt.
 
@@ -464,8 +465,9 @@ is the whole efficiency of the language-modeling objective. At inference, only
 the last one matters.)
 
 Final norm, then multiply by the unembedding matrix, shape
-$d_{model} \times V = 4096 \times 128000$ (often the transposed embedding
-matrix from Stage 2). Out comes a vector of 128,000 real numbers: the **logits**.
+$d_{model} \times V = 4096 \times 128000$ (this config reuses the transposed
+embedding matrix from Stage 2 - common in smaller models, rarer at frontier
+scale). Out comes a vector of 128,000 real numbers: the **logits**.
 One per vocabulary entry. They are unbounded, can be negative, and mean nothing
 in isolation - only their differences matter.
 

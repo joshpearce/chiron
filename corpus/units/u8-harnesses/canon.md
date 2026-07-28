@@ -393,8 +393,8 @@ rubric: |
   C answered as 7000 or as "the sum of the deltas only (1500)" indicates the
   learner has not grasped that the cached total equals the FINAL context length
   because n_0 is also prefilled exactly once - fail.
-  <!-- variant: blank n_3 and T_cached instead of n_2; or blank the formula
-       terms (k+1)*n_0 and d*k(k+1)/2 to force the closed form -->
+# variant: blank n_3 and T_cached instead of n_2; or blank the formula
+# terms (k+1)*n_0 and d*k(k+1)/2 to force the closed form
 check: llm
 ```
 
@@ -427,8 +427,8 @@ Take $L = 32$, $H_{kv} = 8$, $d_{\text{head}} = 128$, $b = 2$ (fp16). Per token:
 $$2 \cdot 32 \cdot 8 \cdot 128 \cdot 2 = 131{,}072 \text{ bytes} = 128 \text{ KiB}$$
 
 One token of context costs 128 KiB of accelerator memory. A 200,000-token
-session costs $200{,}000 \times 131{,}072 \approx 26$ GB - most of an H100, for
-one conversation. That is why context length and serving concurrency trade off
+session costs $200{,}000 \times 131{,}072 \approx 26$ GB - a third of an H100's
+80 GB, for one conversation. That is why context length and serving concurrency trade off
 against each other directly, and why long-idle sessions get their caches evicted
 and must be re-prefilled from scratch.
 

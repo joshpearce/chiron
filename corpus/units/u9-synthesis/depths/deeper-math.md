@@ -71,7 +71,8 @@ have poorly-trained embeddings, and why the "glitch tokens" phenomenon exists -
 token IDs that survived into the vocabulary but were filtered out of the
 pretraining corpus keep near-random embeddings and produce bizarre behavior.
 
-**Weight tying.** If the unembedding at Stage 5 is $W_E^\top$ (common), then a
+**Weight tying.** If the unembedding at Stage 5 is $W_E^\top$ (as in this
+config; common in smaller models, rare at frontier scale), then a
 single parameter block receives gradient from both ends of the network. The
 logit for token $j$ is $z_j = \langle x_{final},\ W_E[j] \rangle$, a dot product
 between the final residual vector and the *input* embedding of token $j$. This

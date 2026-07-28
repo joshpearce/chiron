@@ -137,7 +137,7 @@ $d$-digit number the chunk boundaries are at positions $3, 6, 9, \ldots$ from th
 left, so the boundary positions relative to the *units digit* depend on
 $d \bmod 3$. Adding a 4-digit and a 4-digit number aligns; adding a 4-digit and
 a 5-digit number does not. The model must learn a distinct alignment procedure
-for each residue class pair. Models that tokenize digits individually (Llama-3
+for each residue class pair. Models that tokenize digits individually (Llama-2
 does, PaLM did) show measurably better arithmetic for exactly this reason, at the
 cost of longer sequences.
 

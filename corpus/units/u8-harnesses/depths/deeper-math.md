@@ -78,29 +78,29 @@ formula), $L$ layers, and model width $d_{\text{model}}$, a standard estimate fo
 the forward cost of one token at context position $n$ is
 
 $$C_{\text{token}}(n) \approx \underbrace{2N}_{\text{matmuls}} +
-\underbrace{2\,L\,n\,d_{\text{model}}}_{\text{attention against } n \text{ keys}}$$
+\underbrace{4\,L\,n\,d_{\text{model}}}_{\text{attention against } n \text{ keys}}$$
 
 The first term is the "2 FLOPs per parameter per token" rule (one multiply, one
 add). The second is attention: each of $L$ layers computes $n$ query-key dot
-products and an $n$-weighted value sum, each over $d_{\text{model}}$ total
-head dimensions. Constants vary by a factor of two across sources; the scaling
+products and an $n$-weighted value sum - two matmuls of $n \cdot d_{\text{model}}$
+multiply-adds each, at 2 FLOPs apiece. Constants vary by a factor of two across sources; the scaling
 is what matters.
 
 Prefilling a fresh context of $n$ tokens sums this over positions:
 
-$$C_{\text{prefill}}(n) \approx \sum_{i=0}^{n-1}\left(2N + 2 L i\, d_{\text{model}}\right)
-= 2Nn + L n^2 d_{\text{model}}$$
+$$C_{\text{prefill}}(n) \approx \sum_{i=0}^{n-1}\left(2N + 4 L i\, d_{\text{model}}\right)
+= 2Nn + 2 L n^2 d_{\text{model}}$$
 
 which is the $O(n^2)$ of u3 with its constant made explicit. The two terms are
 equal when
 
-$$2N = 2 L n\, d_{\text{model}} \quad\Longrightarrow\quad n^{*} = \frac{N}{L\,d_{\text{model}}}$$
+$$2N = 4 L n\, d_{\text{model}} \quad\Longrightarrow\quad n^{*} = \frac{N}{2\,L\,d_{\text{model}}}$$
 
 For $N = 70 \times 10^9$, $L = 80$, $d_{\text{model}} = 8192$:
 
-$$n^{*} = \frac{70 \times 10^9}{80 \times 8192} = \frac{70 \times 10^9}{655{,}360} \approx 107{,}000$$
+$$n^{*} = \frac{70 \times 10^9}{2 \times 80 \times 8192} = \frac{70 \times 10^9}{1{,}310{,}720} \approx 53{,}000$$
 
-Below roughly 100k tokens, you are paying for weights. Above it, you are paying
+Below roughly 50k tokens, you are paying for weights. Above it, you are paying
 for attention, and the marginal token gets steadily more expensive. This is the
 quantitative version of "long context costs what it costs" (M10).
 

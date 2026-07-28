@@ -106,8 +106,8 @@ This is not a formality. Associativity is a compute-cost lever with no
 correctness cost. Take $A$ of shape $(n, d)$, $B$ of shape $(d, d)$, and $C$ of
 shape $(d, 1)$. A multiply of shapes $(p,q)$ by $(q,r)$ costs $pqr$
 multiply-adds, so $(AB)C$ costs $n d^2 + n d$ while $A(BC)$ costs $d^2 + nd$.
-For $n = 100{,}000$ and $d = 4096$ that is roughly a $10^5$-fold difference in
-the dominant term for a bit-identical result. Linear-attention variants are
+For $n = 100{,}000$ and $d = 4096$ that is roughly a $4{,}000$-fold difference
+in the dominant term for a bit-identical result. Linear-attention variants are
 essentially this observation applied to $QK^TV$.
 
 **Commutativity fails: $AB \neq BA$.** Usually the shapes forbid it outright.

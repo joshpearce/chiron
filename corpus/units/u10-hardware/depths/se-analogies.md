@@ -47,7 +47,7 @@ fetch feeding a whole tile of multiply-accumulates instead of one.
 *Where this breaks:* a covering index is a *choice among equivalent plans*; the
 database could always have done it the other way, more slowly. A tensor core is
 not a plan, it is a fixed-shape jig. Work that does not fit the shape does not
-get slowly - it gets done on entirely different, 15x slower hardware paths.
+get done slowly - it gets done on entirely different, 15x slower hardware paths.
 There is no gradual degradation, which is why "express it as a matmul" is a
 binary architectural constraint on the whole field rather than a performance
 tip.

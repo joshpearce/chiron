@@ -191,7 +191,7 @@ check:
         explain: "Attractive because 'similar' and 'nearby' are the same word in everyday use. Check it: $\\lVert q - k_1 \\rVert \\approx 2.53$ while $\\lVert q - k_2 \\rVert \\approx 8.54$, so $k_1$ really is much closer - and it scores ten times lower. The dot product is not a distance and is not even a decreasing function of distance."
       - text: "$k_2$, because a longer vector is a more confident match and the score is $\\lVert k \\rVert$ times the cosine of the angle, so length is the deciding factor."
         misconception: U0-M2
-        explain: "The arithmetic here is right - the formula given is correct and $k_2$ does score higher - but the reading is wrong on both sides. The score is $\\lVert q \\rVert \\lVert k \\rVert \\cos\\theta$, scaled by BOTH magnitudes, not the key's alone. And length is not the deciding factor in general: a long vector at 90 degrees still scores zero. Magnitude and alignment both matter, multiplicatively."
+        explain: "The arithmetic here is right - $k_2$ does score higher, and with $q$ fixed, ranking by $\\lVert k \\rVert \\cos\\theta$ agrees with the dot product's ranking - but the formula omits $\\lVert q \\rVert$, and the reading is wrong on both sides. The score is $\\lVert q \\rVert \\lVert k \\rVert \\cos\\theta$, scaled by BOTH magnitudes, not the key's alone. And length is not the deciding factor in general: a long vector at 90 degrees still scores zero. Magnitude and alignment both matter, multiplicatively."
     difficulty: warmup
 
   - id: u0-q4

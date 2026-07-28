@@ -446,5 +446,6 @@ their zero initialization removed, $1 - \beta^t$, which is why the corrected
 ratio at $t = 1$ is exactly $\mathrm{sign}(g)$. And the Chinchilla form
 $L = E + AN^{-\alpha} + BD^{-\beta}$ is separable in $N$ and $D$, so the
 compute-optimal allocation falls out of a single Lagrange condition and gives
-$D/N$ roughly constant - the 20-tokens-per-parameter rule is a derived
-consequence, not a measured coincidence.
+$D/N$ varying only weakly with compute ($\propto C^{0.097}$, as derived above) -
+the 20-tokens-per-parameter rule is a serviceable approximation near current
+budgets, not a constant of nature.

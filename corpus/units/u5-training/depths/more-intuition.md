@@ -100,10 +100,10 @@ why this composes across arbitrary architectures. It is also why you can bolt a
 new layer type into a framework by writing exactly two functions: what it
 computes, and how it splits blame.
 
-Two consequences worth internalizing. First, the backward pass costs about the
-same as the forward pass, because blame-splitting at each node is the same size
-of arithmetic as computing that node's output was. Training is roughly three
-times inference, not a thousand times. Second, blame-splitting needs to know
+Two consequences worth internalizing. First, the backward pass costs about
+twice the forward pass: blame flows to both the inputs and the weights of each
+node, two pieces of arithmetic where the forward pass did one. Training is
+roughly three times inference, not a thousand times. Second, blame-splitting needs to know
 what each node's inputs *were*, so the forward pass has to keep its intermediate
 results around until the backward pass collects them. That is the entire reason
 training a model needs so much more memory than running one, and why the standard

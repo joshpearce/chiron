@@ -451,9 +451,9 @@ rubric: |
   automatic fail regardless of (a)-(f), because it is the exact error the
   procedure exists to prevent.
   Pass = (d) and (g) correct AND at least three of (a), (b), (c), (e), (f).
-  Variant blanking: blank (a) and (e) in one variant, (c) and (f) in another.
-  (d) and (g) should be blank in every variant - naming the regime and knowing
-  which roof a change moves are the two transferable skills.
+# variant blanking: blank (a) and (e) in one variant, (c) and (f) in another.
+# (d) and (g) should be blank in every variant - naming the regime and knowing
+# which roof a change moves are the two transferable skills.
 check: llm
 ```
 
@@ -513,7 +513,7 @@ rubric: |
   forgot that fp16 is 2 bytes; 2097152 is the size of Q alone (n * d * 2),
   which means they sized the inputs rather than the score matrix - the whole
   point is that the intermediate is 64x larger than any of its operands;
-  16777216 means they used n * n but wrote it as 4096^2.
+  16777216 means they counted n * n elements and forgot the 2 bytes each.
   Context for feedback: the H100's entire on-chip SRAM is about 33 MB, so this
   one matrix, for one head of one layer, is roughly 4x larger than all the
   fast memory on the chip.
@@ -637,8 +637,8 @@ One more application, because it re-reads a result from u6 in a way that makes
 a design decision obvious.
 
 At decode step $n$, attention over the cache reads every cached key and value
-and does a dot product and a weighted sum with each. Per token of context, per
-layer, using u6's formulas: $4 \cdot d_{head} \cdot H_q \cdot L$ FLOPs against
+and does a dot product and a weighted sum with each. Per token of context, using
+u6's formulas: $4 \cdot d_{head} \cdot H_q \cdot L$ FLOPs against
 $2 \cdot L \cdot H_{kv} \cdot d_{head} \cdot b$ bytes, where $H_q$ is the number
 of query heads, $H_{kv}$ the number of key/value heads, $d_{head}$ the head
 width, $L$ the layer count, and $b$ the bytes per cached scalar. Divide:
@@ -701,9 +701,9 @@ should be roughly the same for both.
 **Here is the prediction that fails.** If the workloads had the same shape,
 then the hardware that wins at training would win at single-user inference, and
 a chip designed for one would be a reasonable buy for the other. Instead, the
-market has split in half. Groq and Cerebras sell inference parts whose selling
-point is enormous **SRAM** capacity and almost no HBM, and they beat H100s badly
-at low-batch decode while being useless for training. Apple silicon serves 35B
+market has split in half. Groq sells inference parts whose selling point is
+enormous **SRAM** capacity and almost no HBM, and they beat H100s badly at
+low-batch decode while being useless for training. Apple silicon serves 35B
 models on a laptop at conversational speed with 1% of an H100's FLOPs. And
 the H100 itself, the training part, spends 99.7% of its arithmetic idle when
 asked to decode one stream. Three products, three different optimal points, one
@@ -1169,7 +1169,7 @@ rubric: |
   Diagnostic wrong answers, all far outside tolerance:
     9.0  - ignored MFU and used peak throughput. The single most common error,
            and it is the difference between a plan that works and one that
-           misses by two and a half weeks.
+           misses by nearly two weeks.
     7.5  - used C = 2ND, counting only the forward pass and forgetting that
            backward costs roughly twice forward.
     30.0 - used C = 8ND, which is the figure WITH full activation
@@ -1202,8 +1202,9 @@ dead GPU stalls the collective it participates in, which stalls its tensor
 parallel group, which stalls its pipeline, which stalls the step. So the run is
 built around the assumption of failure:
 
-- **Checkpoint constantly.** Write weights and full optimizer state - the
-  1.12 TB from earlier, for a 70B - every few tens of minutes. Checkpoint
+- **Checkpoint constantly.** Write the fp32 master weights and both optimizer
+  moments - 12 bytes per parameter, 840 GB for a 70B; the bf16 working copy is
+  rebuilt from the master - every few tens of minutes. Checkpoint
   frequency is set by a straightforward expected-value calculation: you lose
   half a checkpoint interval on average per failure, so with a failure every
   3 hours, a 20-minute interval costs about 5.5% of throughput to lost work and

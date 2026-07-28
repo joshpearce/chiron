@@ -208,8 +208,8 @@ weight in a group of 64 nearly triples the step size for the other 63 - measured
 The fix is the same fix in all three domains, which is the point of the pair:
 *separate the outliers out*. Columnar formats keep exceptions in a side list
 (PFOR-delta and friends). Connection pools get a separate pool for long queries.
-GPTQ and AWQ identify outlier channels and either keep them at higher precision
-or rescale them into the activations. In every case you do not widen the common
+AWQ identifies outlier channels and rescales them into the activations;
+LLM.int8() keeps them in a higher-precision side path. In every case you do not widen the common
 path to accommodate the tail; you route the tail elsewhere.
 
 **Where this breaks.** Columnar exception lists are exact - the outlier value is

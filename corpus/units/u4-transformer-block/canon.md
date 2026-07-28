@@ -66,7 +66,7 @@ block of the same $d$ have byte-identical weight shapes.
 
 The model is appealing because "multi-head" sounds like replication, and
 because published head-attribution work (this head tracks subject-verb
-agreement, this one is a previous-token head) is real. But head specialisation
+agreement, this one is a previous-token head) is real. But head specialization
 is a *consequence*, not the mechanism, and heads are not copies.
 
 Here is what is actually true. $h$ heads *partition* the same fixed budget.
@@ -242,7 +242,7 @@ GQA at $g = 8$ removes 37.5% of the attention sublayer's parameters.
 
 Now the part that is routinely got wrong.
 
-You probably think GQA is a compute optimisation - fewer key heads, fewer
+You probably think GQA is a compute optimization - fewer key heads, fewer
 FLOPs, faster attention.
 
 Here is the prediction that fails. If GQA cut attention FLOPs by $h/g = 4$, a
@@ -256,7 +256,7 @@ MQA. The shared keys are broadcast, not skipped.
 The model is appealing because in every other systems context, "fewer of X"
 means "less work." Here fewer of X means less *state*.
 
-Here is what is actually true. GQA is a memory optimisation, and the resource
+Here is what is actually true. GQA is a memory optimization, and the resource
 it saves is KV-cache bytes and the bandwidth to stream them.
 
 <!-- fade: kv-cache-per-token -->
@@ -467,7 +467,7 @@ refusal, a shrug. Instead the model produces a fluent, specific, confident,
 wrong answer. That is not a failed lookup. It is the *same* mechanism
 succeeding: $u$ dots against every $k_i$, near-misses return nonzero
 coefficients, and you get a weighted blend of related values. Interpolation
-between stored patterns is exactly what generalisation is, and hallucination
+between stored patterns is exactly what generalization is, and hallucination
 is that mechanism running where no pattern was close. You cannot remove the
 second without removing the first.
 
@@ -509,15 +509,15 @@ answer: |
   score, near-misses return substantial ones, and the output is a weighted
   blend of the values of related patterns. That blending is the same
   operation that lets the model answer questions it never saw verbatim, so
-  generalisation and hallucination are one mechanism, not two. There is also
+  generalization and hallucination are one mechanism, not two. There is also
   no row to miss: superposition means features are stored as overlapping
   non-orthogonal directions across many polysemantic neurons.
 rubric: |
   Must contain: (1) the lookup model predicts a miss/empty result;
   (2) what actually happens is a confident wrong answer produced by soft
   matching / weighted blending of near-miss values; (3) an explicit
-  statement that this is the same mechanism as generalisation, so it cannot
-  be removed without removing generalisation. All three = pass. Missing (3)
+  statement that this is the same mechanism as generalization, so it cannot
+  be removed without removing generalization. All three = pass. Missing (3)
   = partial. An answer that treats hallucination as a lookup failure to be
   fixed with more parameters or better retrieval is M4 uncorrected - fail.
   Credit but do not require polysemanticity/superposition. An answer that

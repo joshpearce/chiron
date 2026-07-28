@@ -8,7 +8,7 @@ misconceptions:
     name: backprop-is-numerical-differentiation
     wrong_model: "Backprop estimates gradients by perturbing weights and measuring the change in loss, so gradients are approximate and the quality depends on the step size."
     why_appealing: "Finite differences is the derivative algorithm most engineers have actually implemented, and 'gradient estimate' language is everywhere in ML writing."
-    failing_prediction: "If backprop perturbed weights, cost would scale with parameter count - one extra forward pass per parameter, so 10^11 forward passes per step. Training a 70B model would take longer than the age of the universe per step. It takes about 2x the forward pass, total, for all parameters."
+    failing_prediction: "If backprop perturbed weights, cost would scale with parameter count - one extra forward pass per parameter, so 10^11 forward passes per step. Training a 70B model would take thousands of years per step. It takes about 2x the forward pass, total, for all parameters."
     correction: "Backprop is reverse-mode automatic differentiation: exact analytic derivatives, composed by the chain rule, computed in one backward sweep for all parameters at once. The only error is floating-point rounding. What is approximate about the gradient is that it is computed on a minibatch rather than the full dataset, which is a sampling issue, not a differentiation one."
     units: [u5]
 

@@ -18,7 +18,7 @@ downhill. Attention is those four. A transformer block is those four. Training i
 those four. If you own this unit, the remaining units are bookkeeping.
 
 You are not being asked to become a mathematician. You are being asked to hold
-six pieces of machinery precisely enough that you can predict what a change does
+each piece of machinery precisely enough that you can predict what a change does
 before running it. That is the same bar you already hold for a scheduler or an
 allocator.
 
@@ -325,6 +325,8 @@ Write down what you need:
 5. **Only differences should matter.** Adding a constant to every score should
    change nothing, because logits have no absolute zero. This one is the
    requirement people skip, and it is the one that forces the answer.
+
+<!-- refutes: U2-M1 -->
 
 Try the obvious cheap options and watch them break.
 
@@ -789,6 +791,8 @@ number of low-loss regions, and which one it finds depends on the seed, the data
 order, and the hardware nondeterminism. Nearly all of them are fine.
 
 ### Why high dimensions are kind rather than cruel
+
+<!-- refutes: U2-M4 -->
 
 The intuition that more dimensions means more local minima to get trapped in is
 exactly backwards, and the reason is worth carrying.

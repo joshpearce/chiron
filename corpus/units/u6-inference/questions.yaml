@@ -31,9 +31,10 @@ pretest:
   - id: u6-p2
     concept: c-kv-cache
     prompt: >
-      You are running a 35B-parameter model locally with a 32,000-token
-      conversation loaded. Roughly how much RAM does the KV cache consume, and
-      which of the model's architectural dimensions determine that number?
+      You are running a 35B-parameter model locally (48 layers, 32 query heads,
+      4 key/value heads of width 128, d_model 4096, fp16 cache) with a
+      32,000-token conversation loaded. Roughly how much RAM does the KV cache
+      consume, and which of those dimensions determine that number?
     answer: >
       Around 3 GiB, from bytes = 2 * L * H_kv * d_head * bytes_per_scalar * n.
       The factor of 2 is one key and one value vector. Only the layer count, the
@@ -508,10 +509,12 @@ check:
       transformers develop a few residual-stream channels with values 10-100x
       the rest. One such weight in a group stretches the group's range, tripling
       the step size for the other 63 and pushing 9% error to about 27% - worse
-      than 3-bit quality, at 4-bit storage cost. This is why GPTQ and AWQ, which handle outlier
-      channels separately, stay on the plateau where round-to-nearest does not.
+      than 3-bit quality, at 4-bit storage cost. This is why AWQ (which rescales
+      outlier channels into the activations) and GPTQ (which compensates each
+      rounding error using the not-yet-quantized weights) stay on the plateau
+      where round-to-nearest does not.
       Group size and which tensors you leave in higher precision (embeddings,
-      the output head, norm gains, MoE router logits) are the other structural
+      the output head, norm gains, MoE router weights) are the other structural
       knobs.
     check: llm
     rubric: >

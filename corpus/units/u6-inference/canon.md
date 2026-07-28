@@ -268,8 +268,8 @@ rubric: |
   (d) must be "none" or equivalent. Any answer naming a changed logit is M6 and
   fails the beat regardless of (a)-(c) being right.
   Pass = (d) correct AND at least two of (a), (b), (c) correct.
-  Variant blanking: for a second pass, blank steps 1 and 2 instead of 3 and 4,
-  keeping (c) and (d) blank in every variant - those two carry the concept.
+# variant blanking: for a second pass, blank steps 1 and 2 instead of 3 and 4,
+# keeping (c) and (d) blank in every variant - those two carry the concept.
 check: llm
 ```
 
@@ -503,8 +503,8 @@ linear in $n$, so:
 
 At 128k context, the cache is 12 GiB against a 19.1 GB weight file. **The
 scratch space is nearly as large as the model.** That is why long context costs
-what it costs on the memory axis, and it is why a laptop with 128 GB of unified
-memory is the thing that makes this book possible at all.
+what it costs on the memory axis, and it is why this book's 32 GB host runs the
+model at 32k context rather than the 262k the architecture supports.
 
 Now the counterfactual that explains grouped-query attention. Suppose this model
 used full multi-head attention, $H_{kv} = H_q = 32$ instead of 4:
@@ -512,8 +512,8 @@ used full multi-head attention, $H_{kv} = H_q = 32$ instead of 4:
 $$2 \times 48 \times 32 \times 128 \times 2 = 786{,}432 \text{ bytes per token} = 768 \text{ KiB per token}$$
 
 Eight times larger, exactly the ratio $H_q / H_{kv} = 32/4$. At 128k context
-that is 96 GiB of KV cache, on a 128 GB machine, for a model whose weights also
-need 19 GB. It does not fit. GQA - 32 query heads sharing 4 key/value heads, as
+that is 96 GiB of KV cache for a model whose weights also need 19 GB. No
+laptop holds that. GQA - 32 query heads sharing 4 key/value heads, as
 introduced in u4 - is not a quality optimization. It is the thing that makes
 long context fit in memory at all, and it is why every recent model has
 $H_{kv} \ll H_q$.
@@ -540,7 +540,7 @@ prompt: |
   Step 4, total at n = 8192:
       ____(d)____ KiB * 8192 = ____(e)____ MiB = ____(f)____ GiB
 
-  Step 5, this model has 8x the H_kv of the 35B model in this section but only
+  Step 5, this model has 2x the H_kv of the 35B model in this section but only
   1.33x the layers. Its per-token cache is how many times larger?
       ____(g)____
 answer: |
@@ -561,9 +561,9 @@ rubric: |
   output width. "d_model is unused because the formula does not have it" is
   circular - partial credit only.
   Pass = (a) and (b) correct AND at least three of (c)-(g) correct.
-  Variant blanking: blank (c) and (e) in one variant, (a)/(b) and (g) in
-  another. (a)/(b) should be blank in every variant - the transferable skill is
-  knowing which model dimensions the cache depends on.
+# variant blanking: blank (c) and (e) in one variant, (a)/(b) and (g) in
+# another. (a)/(b) should be blank in every variant - the transferable skill is
+# knowing which model dimensions the cache depends on.
 check: llm
 ```
 
@@ -579,8 +579,6 @@ from u3: within a forward pass there is no left-to-right anything. Every
 position's attention is computed in parallel; the causal mask is what makes
 position $i$ ignore positions $> i$, and a mask is applied to a matrix that was
 already fully computed.
-
-<!-- refutes: M9 -->
 
 **Decode** generates one token per forward pass. Each pass processes exactly one
 position, reads the cache for all previous positions, appends its own K and V,
@@ -816,16 +814,16 @@ rubric: |
   WITH the reason (half a grid step). Answering "it depends on the weights" or
   giving a number without the half-step justification is partial.
   Pass = (a), (b), (g) correct AND at least two of (c), (d), (e), (f).
-  Variant blanking: blank (a) and (b) in one variant, (f) and (g) in another.
-  (g) should be blank in every variant - the error bound is the transferable
-  idea, and it is what makes the M16 refutation quantitative.
+# variant blanking: blank (a) and (b) in one variant, (f) and (g) in another.
+# (g) should be blank in every variant - the error bound is the transferable
+# idea, and it is what makes the M16 refutation quantitative.
 check: llm
 ```
 
 ### Sizing the file on your disk
 
 The overhead is not free, and it is the reason the file is 19.1 GB rather than
-17.5 GB. Per group of $G = 64$ weights you store one fp16 scale (16 bits) and
+17.7 GB. Per group of $G = 64$ weights you store one fp16 scale (16 bits) and
 one 4-bit zero-point (4 bits): 20 extra bits amortized over 64 weights.
 
 $$\text{bits per weight} = 4 + \frac{20}{64} = 4 + 0.3125 = 4.3125$$
@@ -852,9 +850,9 @@ rubric: |
 check: numeric(0.05)
 ```
 
-Against the fp16 original at 70.7 GB, that is a 3.7x reduction. It is what turns
-a model that does not fit on the machine into one that leaves 100 GB of headroom
-for the KV cache. Which is the actual reason 4-bit matters on your tray table -
+Against the fp16 original at 70.7 GB, that is a 3.7x reduction. On this book's
+32 GB host it is the difference between a model that cannot load at all and one
+that runs with room left over for the KV cache. Which is the actual reason 4-bit matters on your tray table -
 not that it saves disk, but that it moves 3.7x fewer bytes per decoded token
 across a memory bus that is the binding constraint.
 
@@ -917,9 +915,10 @@ develop a small number of feature dimensions carrying activations 10-100x larger
 than the rest, concentrated in specific residual-stream channels. Those
 dimensions dominate the range of any group they land in, which stretches $s$ and
 pushes every other weight in that group into a handful of codes. This is why
-naive round-to-nearest 4-bit degrades noticeably while GPTQ and AWQ do not: both
-detect the outlier channels and handle them separately (higher precision, or
-rescaling the activation into the weight). The cliff is not really about bit
+naive round-to-nearest 4-bit degrades noticeably while modern quantizers do
+not: AWQ rescales the outlier channels' range into the activations before
+rounding, and GPTQ compensates each column's rounding error by adjusting the
+not-yet-quantized weights. Both respect the outlier structure. The cliff is not really about bit
 width; it is about whether the quantizer respects the outlier structure.
 
 **Group size.** A single scale shared across 1,024 weights must span the widest
@@ -929,7 +928,7 @@ a much tighter range per group. Group size is the knob people forget: a
 models.
 
 **Which tensors you quantize.** Embeddings, the output head, LayerNorm/RMSNorm
-gains, and the router logits in an MoE (u7) are usually kept at higher precision
+gains, and the router weights in an MoE (u7) are usually kept at higher precision
 in a good 4-bit build. They are a small fraction of the parameters and a large
 fraction of the sensitivity - the router in particular, where a small logit
 perturbation flips which experts fire, which is a discrete change, not a smooth

@@ -109,11 +109,9 @@ factor of at most $1/p$. That bound is what makes top-p safe in a way top-k is
 not: no surviving token can be inflated by more than $1/p$, whereas top-k with
 small $k$ on a flat distribution can inflate a token arbitrarily.
 
-The relationship to entropy is what makes it adaptive. $|S_p|$ is bounded below
-by a function of the entropy: since the maximum probability satisfies
-$p_{\pi(1)} \ge e^{-H}$ is false in general but $\sum_{i \le m} p_{\pi(i)} \ge p$
-requires $m \ge p / p_{\pi(1)}$, and $p_{\pi(1)}$ falls as $H$ rises, the nucleus
-grows with entropy. That is the property the canon section demonstrated
+The relationship to entropy is what makes it adaptive. $|S_p|$ grows with the entropy: $\sum_{i \le m} p_{\pi(i)} \ge p$
+requires $m \ge p / p_{\pi(1)}$, and $p_{\pi(1)}$ falls as $H$ rises, so the
+nucleus widens as the distribution flattens. That is the property the canon section demonstrated
 numerically: $|S_{0.9}| = 1, 2, 4$ at $T = 0.5, 1, 2$.
 
 ### Why the composition order matters

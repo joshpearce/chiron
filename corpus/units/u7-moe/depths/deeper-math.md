@@ -49,7 +49,8 @@ are paying FLOPs. Two corollaries the canon only gestures at:
 ## The router: replacing one MLP block with N of them
 
 The canon asserts the router is trained by ordinary backprop. Here is the
-actual gradient, because it explains the exploration problem in section 5.
+actual gradient, because it explains the exploration problem in the "What MoE
+costs you" section.
 
 Let $T$ be the selected top-$k$ index set, $\ell \in \mathbb{R}^{N}$ the router
 logits, $g = \text{softmax}(\ell_T)$ the gates over the selected set, and

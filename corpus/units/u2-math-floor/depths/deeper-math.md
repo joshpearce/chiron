@@ -53,7 +53,8 @@ subspace it keeps, 0 on the subspace it kills.
 ### Why this matters for transformer shapes
 
 A transformer's per-head projections $W_Q, W_K \in \mathbb{R}^{d_{\text{model}}
-\times d_k}$ with $d_k \ll d_{\text{model}}$ are deliberately rank-limited maps
+\times d_k}$ with $d_k \ll d_{\text{model}}$ - row-form shapes, the $xW$
+convention u3 onward uses - are deliberately rank-limited maps
 into a small subspace. The low rank is the point: each head is forced to read a
 low-dimensional slice of the residual stream rather than all of it. Unit u4's
 "the residual stream is a shared workspace" claim is a statement about many

@@ -214,7 +214,7 @@ check:
       Prediction: error rates should be lowest when both operands have the same
       length mod 3, higher when they differ, and should rise with operand
       magnitude generally as those combinations become rarer in the corpus.
-      Models that tokenize each digit separately (Llama-3 does) should show
+      Models that tokenize each digit separately (Llama-2 does) should show
       markedly better arithmetic at the cost of longer sequences.
     check: llm
     rubric: |

@@ -100,7 +100,7 @@ The second is desk space. Those "notes" the model keeps so it can start at the
 bookmark are not free - they are physical, they live in the accelerator's
 memory, and they are surprisingly bulky. A rough feel for the scale: roughly one
 hundred kilobytes of notes per token of strip. That is a hundred kilobytes to
-remember one word. A very long session's notes are tens of gigabytes - most of a
+remember one word. A very long session's notes are tens of gigabytes - a sizeable slice of a
 very expensive card, occupied by one conversation. This is the real reason
 context limits exist and the real reason an idle session's cache gets thrown
 away.

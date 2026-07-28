@@ -252,7 +252,7 @@ check:
         explain: "Correct. With variance $d_k = 128$, scores are spread over roughly $\\pm 11$ at initialization, which softmax turns into a near-hard argmax. The layer is saturated before it has learned anything."
       - text: "It trains fine in float32; the scaling only matters in float16, where the exponentials would overflow."
         misconception: M7
-        explain: "This is the normalization-as-numerical-stability reflex. Nothing overflows: $e^{11}$ is unremarkable in float16, and real implementations subtract the row max before exponentiating, which removes the overflow question entirely. The problem is the shape of the resulting distribution in exact arithmetic, not its representation."
+        explain: "This is the normalization-as-numerical-stability reflex. Real implementations subtract the row max before exponentiating, so nothing overflows at any scale (raw $e^{11} \\approx 60{,}000$ would in fact sit just under float16's 65,504 ceiling). And the problem would survive float64: it is the shape of the resulting distribution in exact arithmetic, not its representation."
       - text: "Nothing changes, because softmax normalizes its input anyway - scaling every score by a constant leaves the output distribution unchanged."
         misconception: U3-M2
         explain: "Softmax is invariant to ADDING a constant to a row, not to MULTIPLYING by one. Scaling changes every pairwise difference, and differences are exactly what softmax exponentiates. This confuses the shift-invariance property with scale-invariance, which softmax does not have."

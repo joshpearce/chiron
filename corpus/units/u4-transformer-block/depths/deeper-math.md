@@ -368,7 +368,7 @@ adds a stage.
 **Depth versus width, as a scaling question.** At fixed parameter budget
 $N \approx 12 L d^2$, choosing $L$ and $d$ trades stages against per-stage
 capacity. The empirically observed optimum sits at an aspect ratio
-$d/L \approx 100$ over a wide range of scales (GPT-3: $12288/96 = 128$;
+$d/L \approx 128$ over a wide range of scales (GPT-3: $12288/96 = 128$;
 Llama-3-8B: $4096/32 = 128$), and loss is flat within roughly a factor of 2
 either side and degrades outside it. Too deep-and-thin: each stage is too
 narrow to hold enough features, and gradient signal per layer thins. Too

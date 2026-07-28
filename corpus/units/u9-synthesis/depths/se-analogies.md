@@ -194,8 +194,8 @@ wasted cycles. A rejected speculative token costs you essentially nothing on the
 target model, because the verification pass would have happened anyway and
 checking five tokens costs the same as checking one in a memory-bound regime. The
 only waste is the draft model's time. So the risk profile is inverted from CPU
-speculation: bad prediction rates degrade you toward baseline rather than below
-it. Also note the guarantee is stronger than OCC's - with the standard rejection
+speculation: bad prediction rates degrade you toward baseline - and, counting
+the draft model's own latency, slightly below it - never to catastrophe. Also note the guarantee is stronger than OCC's - with the standard rejection
 sampling scheme the output distribution is provably identical to non-speculative
 sampling, which is not something OCC promises about transaction interleavings.
 

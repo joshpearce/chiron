@@ -41,7 +41,7 @@ conditional distribution over $V$ options, and apply it $T$ times."
 A neural network with parameters $\theta$ (a big pile of real numbers, roughly
 $10^{10}$ of them) approximates that one conditional:
 
-$$P_\theta(x_t \mid x_{<t}) \in \mathbb{R}^V, \qquad \sum_{v=1}^{V} P_\theta(v \mid x_{<t}) = 1$$
+$$P_\theta(\cdot \mid x_{<t}) \in \mathbb{R}^V, \qquad \sum_{v=1}^{V} P_\theta(v \mid x_{<t}) = 1$$
 
 Training minimizes the average negative log probability that the model assigned
 to the symbols that actually occurred:
@@ -614,7 +614,7 @@ prompt: |
   Step 2. Parameters in $E$:       $50{,}257 \times 768 =$ ____
   Step 3. Fraction of the model:   ____ $/\ 124{,}000{,}000 \approx$ ____ %
 
-  Fill the four blanks, then answer in one sentence: why is this percentage so
+  Fill the blanks, then answer in one sentence: why is this percentage so
   much larger than Llama-2-7B's 2% (input side only), given that GPT-2's
   vocabulary is *larger*?
 answer: |

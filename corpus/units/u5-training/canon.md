@@ -286,8 +286,9 @@ The reason it runs backward rather than forward is a shape argument. You have
 $10^{11}$ inputs (weights) and 1 output (the loss). Sweeping forward gives you
 the sensitivity of everything to *one input*, so you would need $10^{11}$ passes.
 Sweeping backward gives you the sensitivity of *one output* to everything, so
-you need one. Backprop costs roughly the same as the forward pass, and that fact
-is the only reason training large models is affordable.
+you need one. Backprop costs about twice the forward pass - a constant, not a
+function of parameter count - and that fact is the only reason training large
+models is affordable.
 
 There is one bill: to compute local derivatives on the way back, you need the
 activations from the way forward. So the forward pass stores its intermediates,

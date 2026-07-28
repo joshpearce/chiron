@@ -8,8 +8,8 @@ depth: more-intuition
 Picture the whole thing as a factory floor rather than a program.
 
 At one end, a loading dock: a truck arrives with a long paper tape, one word
-fragment per inch. At the other end, a single machine that prints one word
-fragment per second onto a receipt. In between, sixty-four identical work
+fragment per inch. At the other end, a single machine that prints the receipt
+one word fragment at a time. In between, sixty-four identical work
 stations arranged in a line.
 
 The counter-intuitive part, and the thing this unit exists to fix, is that the
@@ -19,8 +19,8 @@ every inch of it simultaneously. The stations are the pipeline; the tape is not.
 
 The second counter-intuitive part is where the time goes. Getting the whole
 8,000-inch tape through all sixty-four stations takes about a second. Printing
-each subsequent inch of receipt also takes a meaningful fraction of a second
-apiece, even though it is one inch. If that seems backwards, you have found the
+each subsequent inch of receipt costs nearly as much time as the whole tape
+did, even though it is one inch. If that seems backwards, you have found the
 exact place where intuition fails and the rest of the unit is worth reading
 slowly.
 
