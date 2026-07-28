@@ -329,6 +329,10 @@ final class AppModel: ObservableObject {
     }
 
     private func run(_ req: ExchangeRequest, keepReadingOnNil: Bool = false) async {
+        // One exchange at a time. The buttons that trigger exchanges stay on
+        // screen while one is in flight, and a second tap would grade the same
+        // check twice - real model cost and duplicate learner-state events.
+        guard !sync.busy else { return }
         errorMessage = nil
         do {
             let resp = try await sync.exchange(req)
