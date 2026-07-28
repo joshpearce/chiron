@@ -34,6 +34,13 @@ final class Sync: ObservableObject {
         // saved entry, so upgrading does not read as losing the setup.
         servers.migrateIfNeeded(currentURL: baseURL)
         if let selected = servers.selected { baseURL = selected.url }
+        // Development override: point the app at a server for this launch only,
+        // without touching saved servers. Simulator runs use
+        //   SIMCTL_CHILD_CHIRON_SERVER=http://localhost:8080 xcrun simctl launch ...
+        if let override = ProcessInfo.processInfo.environment["CHIRON_SERVER"],
+           !override.isEmpty {
+            baseURL = override
+        }
         startUSBListener()
         Task { await probe() }
     }
