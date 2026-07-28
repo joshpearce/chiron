@@ -21,7 +21,7 @@ func main() {
 	// makes the iPad's request time out, which presents as the app hanging on
 	// "Thinking about what you need next" - a failure that cost real debugging
 	// time once and looked like an app bug.
-	addr := flag.String("addr", "0.0.0.0:8080", "listen address")
+	addr := flag.String("addr", ":8080", "listen address")
 	configPath := flag.String("config", "config.yaml", "path to config.yaml")
 	flag.Parse()
 

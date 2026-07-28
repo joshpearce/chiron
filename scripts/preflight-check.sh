@@ -53,7 +53,10 @@ try:
     with open("/Library/Preferences/SystemConfiguration/com.apple.nat.plist", "rb") as f:
         nat = plistlib.load(f)["NAT"]
     ap = nat.get("AirPort", {})
-    print(f'{int(ap.get("Enabled", 0))}|{ap.get("NetworkName", "")}')
+    sd = nat.get("SharingDevices", [])
+    ap_on = 1 if 'en0' in sd else 0
+    print(f'{ap_on}|{ap.get("NetworkName", "")}')
+
 except Exception:
     print("?|")
 PYEOF
