@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/mjbraun/chiron/server/corpus"
 	"github.com/mjbraun/chiron/server/render"
@@ -30,7 +31,7 @@ const (
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v1"
+const styleVersion = "v2"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -188,9 +189,49 @@ func injectBeats(doc string, beats []corpus.Beat) string {
 	})
 }
 
+// itemsSection renders pretest or check items as workable paper pages:
+// prompt, ink room, and a confidence scale to circle. Reveals (reference
+// answers, rubrics) deliberately never reach the page - the check is
+// closed-book, and answers come back with the next exchange.
+func itemsSection(title, note string, items []render.ClientItem) string {
+	if len(items) == 0 {
+		return ""
+	}
+	var b []string
+	b = append(b, `<section class="items-section"><h1>`+html.EscapeString(title)+`</h1>`)
+	b = append(b, `<p class="items-note">`+html.EscapeString(note)+`</p>`)
+	for i, it := range items {
+		b = append(b, fmt.Sprintf(
+			`<div class="item-box" data-item-id=%q><div class="item-number">%d</div>`,
+			it.ID, i+1))
+		b = append(b, `<div class="item-prompt">`+html.EscapeString(it.Prompt)+`</div>`)
+		if it.Kind == "mcq" {
+			b = append(b, `<ul class="mcq">`)
+			for _, o := range it.Options {
+				b = append(b, `<li><span class="mcq-tick"></span>`+html.EscapeString(o.Text)+`</li>`)
+			}
+			b = append(b, `</ul>`)
+		} else {
+			b = append(b, `<div class="item-ink"></div>`)
+		}
+		b = append(b, `<div class="confidence">How confident are you?`+
+			`<span class="conf-opt">unsure</span><span class="conf-opt">shaky</span>`+
+			`<span class="conf-opt">confident</span><span class="conf-opt">sure</span></div>`)
+		b = append(b, `</div>`)
+	}
+	b = append(b, `</section>`)
+	return strings.Join(b, "\n")
+}
+
 func (r *Renderer) wrap(ch *render.Chapter) string {
 	katex := "file://" + mustAbs(r.KatexDir)
-	body := injectBeats(ch.HTML, ch.Beats)
+	body := itemsSection("Before you read",
+		"You are not supposed to know these yet - answering wrong here is part of how the chapter calibrates. Write your answer, then circle a confidence.",
+		ch.Pretest) +
+		injectBeats(ch.HTML, ch.Beats) +
+		itemsSection("Comprehension check",
+			"Closed book. Answer every item in ink and circle a confidence before moving on.",
+			ch.Check)
 	return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="` + katex + `/katex.min.css">
 <script src="` + katex + `/katex.min.js"></script>
@@ -217,6 +258,17 @@ blockquote, .planner-note { border-left: 6px solid #000; margin: 24px 0; padding
 .beat-box { border: 3px solid #000; margin: 30px 0; padding: 20px 24px; page-break-inside: avoid; }
 .beat-label { font-size: 24px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
 .beat-ink { height: 340px; }
+.items-section { page-break-before: always; }
+.items-section:first-child { page-break-before: avoid; }
+.items-note { font-style: italic; color: #333; }
+.item-box { border: 3px solid #000; margin: 34px 0; padding: 20px 24px; page-break-inside: avoid; position: relative; }
+.item-number { position: absolute; top: -20px; left: 18px; background: #fff; padding: 0 12px; font-weight: bold; }
+.item-ink { height: 420px; border-top: 2px dashed #999; margin-top: 18px; }
+.mcq { list-style: none; padding: 0; margin: 16px 0 0 0; }
+.mcq li { margin: 14px 0; }
+.mcq-tick { display: inline-block; width: 34px; height: 34px; border: 3px solid #000; margin-right: 16px; vertical-align: middle; }
+.confidence { margin-top: 16px; font-size: 26px; }
+.conf-opt { border: 2px solid #000; border-radius: 24px; padding: 4px 18px; margin-left: 14px; }
 </style></head><body>` + body + `
 <script>
 document.addEventListener("DOMContentLoaded", function() {

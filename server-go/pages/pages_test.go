@@ -69,6 +69,45 @@ $$H(P^*, P_\theta) = H(P^*) + D_{KL}(P^* \| P_\theta)$$`,
 	}
 }
 
+func TestWrapOrdersPretestBodyCheck(t *testing.T) {
+	r := &Renderer{KatexDir: "k", CacheDir: "c"}
+	ch := &render.Chapter{
+		Unit:  "u9",
+		Title: "Ordering",
+		HTML:  `<p>BODY-MARKER</p>`,
+		Pretest: []render.ClientItem{{
+			ID: "u9-p1", Kind: "constructed",
+			Prompt: "Compute $2+2$. <script> must be escaped.",
+		}},
+		Check: []render.ClientItem{
+			{ID: "u9-q1", Kind: "constructed", Prompt: "Free text one."},
+			{ID: "u9-q2", Kind: "mcq", Prompt: "Pick one.",
+				Options: []render.ClientOption{{Text: "first"}, {Text: "second"}}},
+		},
+	}
+	doc := r.wrap(ch)
+
+	pre := strings.Index(doc, "Before you read")
+	body := strings.Index(doc, "BODY-MARKER")
+	chk := strings.Index(doc, "Comprehension check")
+	if pre < 0 || body < 0 || chk < 0 || !(pre < body && body < chk) {
+		t.Fatalf("order wrong: pretest@%d body@%d check@%d", pre, body, chk)
+	}
+	if !strings.Contains(doc, "&lt;script&gt;") || strings.Contains(doc, "<script> must") {
+		t.Fatal("prompt not HTML-escaped")
+	}
+	for _, want := range []string{`data-item-id="u9-p1"`, `data-item-id="u9-q1"`,
+		`data-item-id="u9-q2"`, "first", "second", "How confident are you?"} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("missing %q", want)
+		}
+	}
+	// Reference answers and rubrics must never reach paper.
+	if strings.Contains(doc, "Reference answer") {
+		t.Fatal("reveal leaked into pages")
+	}
+}
+
 func TestBeatInjection(t *testing.T) {
 	html := injectBeats(
 		`<p>before</p><div class="beat" data-beat-id="x1"></div><p>after</p>`,
