@@ -208,7 +208,7 @@ func checkSpecConformance(u *corpus.Unit, r *Report) {
 			"to draw on for cumulative checks")
 	}
 	beats := u.Beats()
-	if len(beats) < 6 {
+	if len(beats) < 6 && !u.IsCalibration() {
 		r.warnf(where, "%d interaction beats, spec asks for 6-10 (step-based interaction "+
 			"is where the tutoring effect lives)", len(beats))
 	}

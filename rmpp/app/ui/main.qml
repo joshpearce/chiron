@@ -51,6 +51,16 @@ Rectangle {
 
     Component.onCompleted: loadMeta()
 
+    // Ink, kept per page in page-image coordinates (0..1 normalized), so
+    // strokes survive window resizes and can later be shipped to the server
+    // against the answer-region geometry.
+    property var inkByPage: ({})
+
+    function strokesForPage(p) {
+        if (!inkByPage[p]) inkByPage[p] = []
+        return inkByPage[p]
+    }
+
     // Reading view
     Image {
         id: pageImage
@@ -67,18 +77,75 @@ Rectangle {
         cache: true
     }
 
-    // Page-turn tap zones
-    MouseArea {
+    Canvas {
+        id: ink
+        anchors.fill: pageImage
         visible: root.mode === "reading"
-        anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-        width: parent.width * 0.25
-        onClicked: if (root.page > 0) root.page--
+
+        property var liveStroke: null
+
+        onPaint: {
+            const ctx = getContext("2d")
+            ctx.clearRect(0, 0, width, height)
+            ctx.strokeStyle = "black"
+            ctx.lineWidth = 3
+            ctx.lineCap = "round"
+            ctx.lineJoin = "round"
+            const all = root.strokesForPage(root.page)
+            const drawStroke = function(s) {
+                if (s.length < 2) return
+                ctx.beginPath()
+                ctx.moveTo(s[0].x * width, s[0].y * height)
+                for (var i = 1; i < s.length; i++)
+                    ctx.lineTo(s[i].x * width, s[i].y * height)
+                ctx.stroke()
+            }
+            for (var j = 0; j < all.length; j++) drawStroke(all[j])
+            if (liveStroke) drawStroke(liveStroke)
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            onPressed: (e) => {
+                ink.liveStroke = [{x: e.x / ink.width, y: e.y / ink.height}]
+                ink.requestPaint()
+            }
+            onPositionChanged: (e) => {
+                if (!ink.liveStroke) return
+                ink.liveStroke.push({x: e.x / ink.width, y: e.y / ink.height})
+                ink.requestPaint()
+            }
+            onReleased: {
+                if (ink.liveStroke && ink.liveStroke.length > 1)
+                    root.strokesForPage(root.page).push(ink.liveStroke)
+                ink.liveStroke = null
+                ink.requestPaint()
+            }
+        }
     }
-    MouseArea {
+
+    onPageChanged: ink.requestPaint()
+
+    // Page turning moved to explicit corner controls: the whole page
+    // surface belongs to ink now.
+    Row {
         visible: root.mode === "reading"
-        anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
-        width: parent.width * 0.25
-        onClicked: if (root.page < root.pageCount - 1) root.page++
+        spacing: 12
+        anchors { left: parent.left; bottom: parent.bottom; margins: 10 }
+        Button {
+            text: "‹"
+            font.pixelSize: 28
+            width: 56
+            enabled: root.page > 0
+            onClicked: root.page--
+        }
+        Button {
+            text: "›"
+            font.pixelSize: 28
+            width: 56
+            enabled: root.page < root.pageCount - 1
+            onClicked: root.page++
+        }
     }
 
     // Progress footer, deliberately tiny

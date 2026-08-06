@@ -119,7 +119,7 @@ func TestWholeCorpusRendersWithoutCorruption(t *testing.T) {
 			}
 		}
 		totalBeats += len(ch.Beats)
-		if len(ch.Beats) == 0 {
+		if len(ch.Beats) == 0 && !u.IsCalibration() {
 			t.Errorf("%s: no beats extracted - step-based interaction is the point", id)
 		}
 		for _, b := range ch.Beats {

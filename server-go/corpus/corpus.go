@@ -286,6 +286,14 @@ func sectionsByHeading(text string) map[string]string {
 
 // ---------- queries ----------
 
+// IsCalibration marks a unit that only measures: its whole check bank is
+// delivered in authored order, and its gate always passes - the score is
+// calibration data, not a barrier.
+func (u *Unit) IsCalibration() bool {
+	b, _ := u.Front["calibration"].(bool)
+	return b
+}
+
 func (c *Corpus) UnitOrder() []string {
 	out := make([]string, 0, len(c.Syllabus.Units))
 	for _, u := range c.Syllabus.Units {

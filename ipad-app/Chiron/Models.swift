@@ -172,9 +172,11 @@ struct Gate: Codable {
     let passed: Bool
     let gate: Double
     let extensionUnlocked: Bool
+    // A calibration result: always passed, the score is measurement.
+    var calibration: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case score, passed, gate
+        case score, passed, gate, calibration
         case extensionUnlocked = "extension_unlocked"
     }
 }

@@ -42,7 +42,7 @@ func TestSectionsAndBeatsParse(t *testing.T) {
 	totalBeats, totalSections := 0, 0
 	for _, id := range c.UnitOrder() {
 		u := c.Units[id]
-		if len(u.Sections) == 0 {
+		if len(u.Sections) == 0 && !u.IsCalibration() {
 			t.Errorf("%s parsed no sections", id)
 		}
 		totalSections += len(u.Sections)

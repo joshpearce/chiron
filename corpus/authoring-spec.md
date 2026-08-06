@@ -88,8 +88,10 @@ sections wholesale). Content rules:
 
 ```yaml
 pretest:            # 2-3 items, EXPECTED to fail, calibration + pretesting effect
-                    # (exception: u0's pretest IS the calibration instrument and
-                    # spans the whole math floor, so it runs 8 items)
+                    # (exception: a unit with `calibration: true` in canon front
+                    # matter has NO pretest and no body sections - its whole
+                    # check bank is one progressive series, delivered complete
+                    # and in authored order, and its gate always passes)
   - id: u3-p1
     concept: c-sdpa
     prompt: "..."

@@ -63,6 +63,9 @@ type Gate struct {
 	Passed            bool     `json:"passed"`
 	Gate              float64  `json:"gate"`
 	ExtensionUnlocked bool     `json:"extension_unlocked"`
+	// Calibration marks a measuring unit: the gate always passes and the
+	// score is information for the planner, not a verdict on the learner.
+	Calibration bool `json:"calibration,omitempty"`
 }
 
 type BreakSuggestion struct {
@@ -220,10 +223,20 @@ func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*rende
 	d := roles.PlanDirectives(s.chain, sub.Learner, unit, checkSummary)
 	sections, _ := roles.AuthorChapter(s.chain, unit, d, sub.Corpus)
 
-	s.rngMu.Lock()
-	items := roles.ComposeCheck(unit, sub.Learner, sub.Corpus,
-		s.cfg.Session.CheckItems, s.cfg.Session.CallbackFraction, s.rng)
-	s.rngMu.Unlock()
+	var items []corpus.Question
+	if unit.IsCalibration() {
+		// The progression through the bank IS the instrument; no shuffle,
+		// no cap, no callbacks.
+		for _, q := range unit.Questions.Check {
+			q.Unit = unit.ID
+			items = append(items, q)
+		}
+	} else {
+		s.rngMu.Lock()
+		items = roles.ComposeCheck(unit, sub.Learner, sub.Corpus,
+			s.cfg.Session.CheckItems, s.cfg.Session.CallbackFraction, s.rng)
+		s.rngMu.Unlock()
+	}
 
 	if _, err := sub.Learner.Apply(state.Event{Kind: "unit_started", Unit: unitID}); err != nil {
 		return nil, err
@@ -395,10 +408,11 @@ func (s *Server) handleExchange(w http.ResponseWriter, r *http.Request) {
 		if t > 0 {
 			score = float64(p) / float64(t)
 		}
-		passed := score >= sess.MasteryGate
 		unit, haveUnit := sub.Corpus.Units[ex.Unit]
+		calibration := haveUnit && unit.IsCalibration()
+		passed := score >= sess.MasteryGate || calibration
 		var mastered []string
-		if haveUnit && passed {
+		if haveUnit && passed && !calibration {
 			mastered = unit.ConceptIDs()
 		}
 		sub.Learner.Apply(state.Event{Kind: "check_result", Unit: ex.Unit,
@@ -417,12 +431,17 @@ func (s *Server) handleExchange(w http.ResponseWriter, r *http.Request) {
 		}
 		sc := score
 		gate = &Gate{Score: &sc, Passed: passed, Gate: sess.MasteryGate,
-			ExtensionUnlocked: score >= sess.ExtensionTrigger}
-		verdict := "below gate"
-		if passed {
-			verdict = "passed"
+			ExtensionUnlocked: !calibration && score >= sess.ExtensionTrigger,
+			Calibration:       calibration}
+		if calibration {
+			fmt.Fprintf(&summary, "Calibration %s: %.0f%% overall; per-concept levels are in the state. ", ex.Unit, score*100)
+		} else {
+			verdict := "below gate"
+			if passed {
+				verdict = "passed"
+			}
+			fmt.Fprintf(&summary, "Check %s: %.0f%% (%s). ", ex.Unit, score*100, verdict)
 		}
-		fmt.Fprintf(&summary, "Check %s: %.0f%% (%s). ", ex.Unit, score*100, verdict)
 
 		if !passed && ex.Override && haveUnit {
 			var unmastered []string

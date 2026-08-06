@@ -181,9 +181,13 @@ struct GateView: View {
     var body: some View {
         VStack(spacing: 20) {
             if let score = gate.score {
-                Text(gate.passed ? "Gate cleared" : "Below the gate")
+                let isCalibration = gate.calibration == true
+                Text(isCalibration ? "Calibration complete"
+                     : gate.passed ? "Gate cleared" : "Below the gate")
                     .font(.largeTitle.weight(.semibold))
-                Text("\(Int(score * 100))% - gate is \(Int(gate.gate * 100))%")
+                Text(isCalibration
+                     ? "\(Int(score * 100))% sure-footed - the next chapter is tuned to it"
+                     : "\(Int(score * 100))% - gate is \(Int(gate.gate * 100))%")
                     .font(.title3).foregroundStyle(.secondary)
                 if gate.extensionUnlocked {
                     Label("Extension material unlocked", systemImage: "sparkles")

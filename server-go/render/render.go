@@ -134,14 +134,15 @@ type ClientOption struct {
 }
 
 type Chapter struct {
-	Unit       string        `json:"unit"`
-	Title      string        `json:"title"`
-	Minutes    int           `json:"minutes"`
-	HTML       string        `json:"html"`
-	Beats      []corpus.Beat `json:"beats"`
-	Pretest    []ClientItem  `json:"pretest"`
-	Check      []ClientItem  `json:"check"`
-	NextAction string        `json:"next_action"`
+	Unit        string        `json:"unit"`
+	Title       string        `json:"title"`
+	Minutes     int           `json:"minutes"`
+	HTML        string        `json:"html"`
+	Beats       []corpus.Beat `json:"beats"`
+	Pretest     []ClientItem  `json:"pretest"`
+	Check       []ClientItem  `json:"check"`
+	Calibration bool          `json:"calibration,omitempty"`
+	NextAction  string        `json:"next_action"`
 }
 
 func RenderChapter(u *corpus.Unit, sections []AssembledSection, d Directives,
@@ -183,7 +184,8 @@ func RenderChapter(u *corpus.Unit, sections []AssembledSection, d Directives,
 		Unit: u.ID, Title: u.Title, Minutes: u.Minutes,
 		HTML: strings.Join(parts, "\n"), Beats: beats,
 		Pretest: clientItems(pretest), Check: clientItems(check),
-		NextAction: d.NextAction,
+		Calibration: u.IsCalibration(),
+		NextAction:  d.NextAction,
 	}
 	return ch, nil
 }

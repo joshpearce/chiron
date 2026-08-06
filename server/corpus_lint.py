@@ -151,7 +151,7 @@ def check_spec_conformance(unit, report: Report) -> None:
         report.warn(where, "fewer than 2 callback_eligible items - later units "
                            "have little to draw on for cumulative checks")
     beats = list(unit.beats())
-    if len(beats) < 6:
+    if len(beats) < 6 and not unit.front.get("calibration"):
         report.warn(where, f"{len(beats)} interaction beats, spec asks for 6-10 "
                            "(step-based interaction is where the tutoring effect lives)")
     for b in beats:

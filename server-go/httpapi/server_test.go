@@ -130,11 +130,16 @@ func TestStartExchangeDeliversAChapter(t *testing.T) {
 	if resp.Chapter.Unit != "u0" {
 		t.Errorf("first chapter is %s, want u0", resp.Chapter.Unit)
 	}
-	if len(resp.Chapter.Beats) == 0 {
-		t.Error("chapter has no beats - step-based interaction is the point")
+	// u0 is the calibration unit: a bare progressive question series - no
+	// beats, no pretest, the whole bank as the check.
+	if len(resp.Chapter.Beats) != 0 {
+		t.Errorf("calibration chapter has %d beats, want none", len(resp.Chapter.Beats))
 	}
-	if len(resp.Chapter.Check) != 9 {
-		t.Errorf("%d check items, config asks for 9", len(resp.Chapter.Check))
+	if len(resp.Chapter.Pretest) != 0 {
+		t.Errorf("calibration chapter has %d pretest items, want none", len(resp.Chapter.Pretest))
+	}
+	if len(resp.Chapter.Check) != 15 {
+		t.Errorf("%d check items, want the full 15-item series", len(resp.Chapter.Check))
 	}
 	if strings.Contains(resp.Chapter.HTML, "MATHPLACEHOLDER") {
 		t.Error("math placeholder leaked into the delivered html")
@@ -158,29 +163,22 @@ func TestStartExchangeDeliversAChapter(t *testing.T) {
 }
 
 // Failing the gate must hold the learner, and overriding must let them past
-// while recording the debt.
+// while recording the debt. u0 is a calibration unit and never gates, so
+// the gate mechanics are exercised on u1's bank directly - grading needs
+// only the corpus, not a delivered chapter.
 func TestGateHoldsAndOverrideAccruesDebt(t *testing.T) {
 	s := newServer(t, "")
 	sub, _ := s.subject("ai")
 
-	start := do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start"}`, "")
-	var first struct {
-		Chapter struct {
-			Check []struct {
-				ID string `json:"id"`
-			} `json:"check"`
-		} `json:"chapter"`
-	}
-	if err := json.Unmarshal(start.Body.Bytes(), &first); err != nil {
-		t.Fatal(err)
-	}
-
-	// Answer every item wrong, mechanically, so no model is involved.
+	// Answer mechanically checkable u1 items wrong, so no model is involved.
 	var answers []string
-	for _, item := range first.Chapter.Check {
-		answers = append(answers, `{"item_id":"`+item.ID+`","response":"definitely wrong","selected_index":99,"confidence":4}`)
+	for _, q := range sub.Corpus.Units["u1"].Questions.Check {
+		answers = append(answers, `{"item_id":"`+q.ID+`","response":"definitely wrong","selected_index":99,"confidence":4}`)
 	}
-	body := `{"subject":"ai","phase":"boundary","unit":"u0","check_responses":[` +
+	if len(answers) == 0 {
+		t.Fatal("u1 has no check items")
+	}
+	body := `{"subject":"ai","phase":"boundary","unit":"u1","check_responses":[` +
 		strings.Join(answers, ",") + `]}`
 	w := do(t, s, "POST", "/exchange", body, "")
 	if w.Code != http.StatusOK {
@@ -202,7 +200,7 @@ func TestGateHoldsAndOverrideAccruesDebt(t *testing.T) {
 		t.Error("failing without overriding should not accrue debt on its own")
 	}
 
-	override := `{"subject":"ai","phase":"boundary","unit":"u0","override":true,"check_responses":[` +
+	override := `{"subject":"ai","phase":"boundary","unit":"u1","override":true,"check_responses":[` +
 		strings.Join(answers, ",") + `]}`
 	if w := do(t, s, "POST", "/exchange", override, ""); w.Code != http.StatusOK {
 		t.Fatalf("override exchange -> %d", w.Code)
@@ -210,8 +208,65 @@ func TestGateHoldsAndOverrideAccruesDebt(t *testing.T) {
 	if len(sub.Learner.OpenDebt()) == 0 {
 		t.Error("override must record the debt - that is the bargain")
 	}
-	if sub.Learner.UnitStatus("u0") != "overridden" {
-		t.Errorf("unit status after override: %s", sub.Learner.UnitStatus("u0"))
+	if sub.Learner.UnitStatus("u1") != "overridden" {
+		t.Errorf("unit status after override: %s", sub.Learner.UnitStatus("u1"))
+	}
+}
+
+// The calibration unit is the opposite contract: the full bank arrives in
+// authored order, and even an all-"I don't know" run clears the gate - the
+// score is measurement, not a verdict.
+func TestCalibrationDeliversFullBankAndNeverGates(t *testing.T) {
+	s := newServer(t, "")
+	sub, _ := s.subject("ai")
+
+	start := do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start"}`, "")
+	var first struct {
+		Chapter struct {
+			Unit  string `json:"unit"`
+			Check []struct {
+				ID string `json:"id"`
+			} `json:"check"`
+		} `json:"chapter"`
+	}
+	if err := json.Unmarshal(start.Body.Bytes(), &first); err != nil {
+		t.Fatal(err)
+	}
+	if first.Chapter.Unit != "u0" {
+		t.Fatalf("first unit = %s, want u0", first.Chapter.Unit)
+	}
+	bank := sub.Corpus.Units["u0"].Questions.Check
+	if len(first.Chapter.Check) != len(bank) {
+		t.Fatalf("delivered %d items, want the whole bank (%d)",
+			len(first.Chapter.Check), len(bank))
+	}
+	for i, item := range first.Chapter.Check {
+		if item.ID != bank[i].ID {
+			t.Fatalf("item %d is %s, want authored order (%s)", i, item.ID, bank[i].ID)
+		}
+	}
+
+	var answers []string
+	for _, item := range first.Chapter.Check {
+		answers = append(answers, `{"item_id":"`+item.ID+`","idk":true,"confidence":1}`)
+	}
+	body := `{"subject":"ai","phase":"boundary","unit":"u0","check_responses":[` +
+		strings.Join(answers, ",") + `]}`
+	w := do(t, s, "POST", "/exchange", body, "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("calibration exchange -> %d: %s", w.Code, w.Body.String())
+	}
+	var graded struct {
+		Gate *Gate `json:"gate"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &graded); err != nil {
+		t.Fatal(err)
+	}
+	if graded.Gate == nil || !graded.Gate.Passed || !graded.Gate.Calibration {
+		t.Fatalf("calibration gate = %+v, want passed calibration", graded.Gate)
+	}
+	if lvl := sub.Learner.ConceptLevel("c-dotprod"); lvl == "mastered" {
+		t.Error("all-IDK calibration must not master concepts")
 	}
 }
 

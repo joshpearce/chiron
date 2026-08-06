@@ -31,7 +31,7 @@ const (
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v3"
+const styleVersion = "v5"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -201,10 +201,10 @@ func itemsSection(title, note string, items []render.ClientItem) string {
 	b = append(b, `<section class="items-section"><h1>`+html.EscapeString(title)+`</h1>`)
 	b = append(b, `<p class="items-note">`+html.EscapeString(note)+`</p>`)
 	for i, it := range items {
+		b = append(b, fmt.Sprintf(`<div class="item-box" data-item-id=%q>`, it.ID))
 		b = append(b, fmt.Sprintf(
-			`<div class="item-box" data-item-id=%q><div class="item-number">%d</div>`,
-			it.ID, i+1))
-		b = append(b, `<div class="item-prompt">`+html.EscapeString(it.Prompt)+`</div>`)
+			`<div class="item-prompt"><span class="item-num">%d.</span>`, i+1)+
+			html.EscapeString(it.Prompt)+`</div>`)
 		if it.Kind == "mcq" {
 			b = append(b, `<ul class="mcq">`)
 			for _, o := range it.Options {
@@ -226,13 +226,17 @@ func itemsSection(title, note string, items []render.ClientItem) string {
 
 func (r *Renderer) wrap(ch *render.Chapter) string {
 	katex := "file://" + mustAbs(r.KatexDir)
+	checkTitle, checkNote := "Comprehension check",
+		"Closed book. Answer every item in ink and circle a confidence before moving on."
+	if ch.Calibration {
+		checkTitle, checkNote = "The series",
+			"Easy to hard. Answer in ink, circle a confidence, and mark \"I don't know\" freely - running out of sure answers is the point."
+	}
 	body := itemsSection("Before you read",
 		"You are not supposed to know these yet - answering wrong here is part of how the chapter calibrates. Write your answer, then circle a confidence.",
 		ch.Pretest) +
 		injectBeats(ch.HTML, ch.Beats) +
-		itemsSection("Comprehension check",
-			"Closed book. Answer every item in ink and circle a confidence before moving on.",
-			ch.Check)
+		itemsSection(checkTitle, checkNote, ch.Check)
 	return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="` + katex + `/katex.min.css">
 <script src="` + katex + `/katex.min.js"></script>
@@ -262,8 +266,8 @@ blockquote, .planner-note { border-left: 6px solid #000; margin: 24px 0; padding
 .items-section { page-break-before: always; }
 .items-section:first-child { page-break-before: avoid; }
 .items-note { font-style: italic; color: #333; }
-.item-box { border: 3px solid #000; margin: 34px 0; padding: 20px 24px; page-break-inside: avoid; position: relative; }
-.item-number { position: absolute; top: -20px; left: 18px; background: #fff; padding: 0 12px; font-weight: bold; }
+.item-box { border: 3px solid #000; margin: 34px 0; padding: 20px 24px; page-break-inside: avoid; }
+.item-num { font-weight: bold; margin-right: 14px; }
 .item-ink { height: 420px; border-top: 2px dashed #999; margin-top: 18px; }
 .mcq { list-style: none; padding: 0; margin: 16px 0 0 0; }
 .mcq li { margin: 14px 0; }
