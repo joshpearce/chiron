@@ -60,12 +60,16 @@ struct ItemResponse: Codable {
     var response: String?
     var selectedIndex: Int?
     var confidence: Int
+    // An explicit "I don't know - move on". The server grades it as a fail
+    // without a model call.
+    var idk: Bool?
 
     enum CodingKeys: String, CodingKey {
         case itemId = "item_id"
         case response
         case selectedIndex = "selected_index"
         case confidence
+        case idk
     }
 }
 

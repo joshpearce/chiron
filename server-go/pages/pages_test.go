@@ -97,7 +97,8 @@ func TestWrapOrdersPretestBodyCheck(t *testing.T) {
 		t.Fatal("prompt not HTML-escaped")
 	}
 	for _, want := range []string{`data-item-id="u9-p1"`, `data-item-id="u9-q1"`,
-		`data-item-id="u9-q2"`, "first", "second", "How confident are you?"} {
+		`data-item-id="u9-q2"`, "first", "second", "How confident are you?",
+		"I don't know - moving on"} {
 		if !strings.Contains(doc, want) {
 			t.Fatalf("missing %q", want)
 		}

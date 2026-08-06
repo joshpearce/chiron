@@ -31,7 +31,7 @@ const (
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v2"
+const styleVersion = "v3"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -214,6 +214,7 @@ func itemsSection(title, note string, items []render.ClientItem) string {
 		} else {
 			b = append(b, `<div class="item-ink"></div>`)
 		}
+		b = append(b, `<div class="idk-row"><span class="mcq-tick"></span>I don't know - moving on</div>`)
 		b = append(b, `<div class="confidence">How confident are you?`+
 			`<span class="conf-opt">unsure</span><span class="conf-opt">shaky</span>`+
 			`<span class="conf-opt">confident</span><span class="conf-opt">sure</span></div>`)
@@ -267,6 +268,7 @@ blockquote, .planner-note { border-left: 6px solid #000; margin: 24px 0; padding
 .mcq { list-style: none; padding: 0; margin: 16px 0 0 0; }
 .mcq li { margin: 14px 0; }
 .mcq-tick { display: inline-block; width: 34px; height: 34px; border: 3px solid #000; margin-right: 16px; vertical-align: middle; }
+.idk-row { margin-top: 14px; font-size: 26px; color: #333; }
 .confidence { margin-top: 16px; font-size: 26px; }
 .conf-opt { border: 2px solid #000; border-radius: 24px; padding: 4px 18px; margin-left: 14px; }
 </style></head><body>` + body + `

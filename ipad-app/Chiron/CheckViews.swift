@@ -105,16 +105,32 @@ struct ItemFlowView: View {
                     Slider(value: $confidence, in: 1...4, step: 1)
                         .frame(maxWidth: 320)
                 }
-                Button("Commit answer") {
-                    responses.append(ItemResponse(
-                        itemId: item.id,
-                        response: item.kind == "mcq" ? nil : text,
-                        selectedIndex: selected,
-                        confidence: Int(confidence)))
-                    withAnimation { revealed = true }
+                HStack(spacing: 16) {
+                    Button("Commit answer") {
+                        responses.append(ItemResponse(
+                            itemId: item.id,
+                            response: item.kind == "mcq" ? nil : text,
+                            selectedIndex: selected,
+                            confidence: Int(confidence)))
+                        withAnimation { revealed = true }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(item.kind == "mcq" ? selected == nil : text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    // Not knowing is expected - especially on pretests - and
+                    // saying so is better signal than typing filler to get
+                    // past a required field.
+                    Button("I don't know") {
+                        responses.append(ItemResponse(
+                            itemId: item.id,
+                            response: nil,
+                            selectedIndex: nil,
+                            confidence: 1,
+                            idk: true))
+                        withAnimation { revealed = true }
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(item.kind == "mcq" ? selected == nil : text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             } else {
                 Button(index == items.count - 1 ? submitLabel : "Next") {
                     if index == items.count - 1 {

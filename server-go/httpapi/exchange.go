@@ -30,6 +30,10 @@ type ItemResponse struct {
 	Response      string `json:"response,omitempty"`
 	SelectedIndex *int   `json:"selected_index,omitempty"`
 	Confidence    int    `json:"confidence"` // 1-4, captured BEFORE the reveal
+	// IDK is an explicit "I don't know - move on". It grades as a fail
+	// without a model call: pretests expect misses, and typing filler to
+	// satisfy a required answer field is worse signal than saying so.
+	IDK bool `json:"idk,omitempty"`
 }
 
 type Exchange struct {
@@ -91,6 +95,9 @@ func (s *Server) gradeItems(sub *Subject, responses []ItemResponse, results *[]R
 
 	var freeText []roles.BatchItem
 	for _, it := range items {
+		if it.r.IDK {
+			continue // graded without a model call below
+		}
 		if it.q.Kind != "mcq" && !checkers.IsMechanical(it.q.Check) {
 			freeText = append(freeText, roles.BatchItem{
 				ItemID: it.r.ItemID, Question: it.q, Answer: it.r.Response,
@@ -106,6 +113,12 @@ func (s *Server) gradeItems(sub *Subject, responses []ItemResponse, results *[]R
 	for _, it := range items {
 		var g roles.Grade
 		switch {
+		case it.r.IDK:
+			fb := "Marked \"I don't know\"."
+			if it.q.Kind != "mcq" && it.q.Answer.String() != "" {
+				fb += " Reference: " + it.q.Answer.String()
+			}
+			g = roles.Grade{Verdict: "fail", Misconceptions: []string{}, FeedbackMD: fb}
 		case it.q.Kind == "mcq":
 			idx := -1
 			if it.r.SelectedIndex != nil {

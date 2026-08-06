@@ -57,3 +57,48 @@ func TestPagesEndpoints(t *testing.T) {
 		t.Fatalf("out of range page: %d", w.Code)
 	}
 }
+
+// An explicit "I don't know" must grade as a fail without touching a model -
+// the test server has no working LLM, so a model call would surface as an
+// ungraded or error verdict.
+func TestIDKGradesAsFailWithoutModel(t *testing.T) {
+	s := newServer(t, "tok")
+
+	start := do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start"}`, "tok")
+	var first struct {
+		Chapter struct {
+			Check []struct {
+				ID string `json:"id"`
+			} `json:"check"`
+		} `json:"chapter"`
+	}
+	if err := json.Unmarshal(start.Body.Bytes(), &first); err != nil {
+		t.Fatal(err)
+	}
+	if len(first.Chapter.Check) == 0 {
+		t.Fatal("no check items delivered")
+	}
+
+	id := first.Chapter.Check[0].ID
+	body := `{"subject":"ai","phase":"boundary","unit":"u0","check_responses":[` +
+		`{"item_id":"` + id + `","idk":true,"confidence":1}]}`
+	w := do(t, s, "POST", "/exchange", body, "tok")
+	if w.Code != 200 {
+		t.Fatalf("exchange: %d %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Results []struct {
+			ItemID  string `json:"item_id"`
+			Verdict string `json:"verdict"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Results) == 0 {
+		t.Fatal("no results")
+	}
+	if resp.Results[0].Verdict != "fail" {
+		t.Fatalf("IDK verdict = %q, want fail", resp.Results[0].Verdict)
+	}
+}
