@@ -9,3 +9,5 @@ server-go/chiron-server
 server-go/dist/
 bin/
 .DS_Store
+rmpp/vendor/
+rmpp/app/output/

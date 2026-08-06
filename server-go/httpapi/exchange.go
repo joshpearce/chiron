@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -463,6 +464,11 @@ func (s *Server) handleExchange(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if chapter != nil {
+		if err := persistChapter(sub, chapter); err != nil {
+			log.Printf("persist chapter %s: %v", chapter.Unit, err)
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"results":          results,
 		"gate":             gate,

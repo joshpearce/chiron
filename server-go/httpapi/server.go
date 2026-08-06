@@ -26,6 +26,7 @@ import (
 
 	"github.com/mjbraun/chiron/server/corpus"
 	"github.com/mjbraun/chiron/server/llm"
+	"github.com/mjbraun/chiron/server/pages"
 	"github.com/mjbraun/chiron/server/state"
 )
 
@@ -49,6 +50,9 @@ type SessionConfig struct {
 type Config struct {
 	Subjects  []SubjectSpec `yaml:"subjects"`
 	StaticDir string        `yaml:"static_dir"`
+	// KatexDir points at the KaTeX assets used when rendering chapters to
+	// page images for e-ink clients (the same files the iPad bundles).
+	KatexDir  string        `yaml:"katex_dir"`
 	Session   SessionConfig `yaml:"session"`
 	AuthToken string        `yaml:"auth_token"`
 	// Grade all free-text items of a check in one model call. Off by default:
@@ -77,10 +81,12 @@ func LoadConfig(path string) (*Config, error) {
 
 // Subject pairs a corpus with the learner state for it.
 type Subject struct {
-	ID      string
-	Title   string
-	Corpus  *corpus.Corpus
-	Learner *state.Learner
+	ID       string
+	Title    string
+	Corpus   *corpus.Corpus
+	Learner  *state.Learner
+	StateDir string
+	Pages    *pages.Renderer
 }
 
 type Server struct {
@@ -147,7 +153,12 @@ func (s *Server) register(id, title, corpusDir, stateDir string) error {
 		return err
 	}
 	s.mu.Lock()
-	s.subjects[id] = &Subject{ID: id, Title: title, Corpus: c, Learner: l}
+	s.subjects[id] = &Subject{ID: id, Title: title, Corpus: c, Learner: l,
+		StateDir: stateDir,
+		Pages: &pages.Renderer{
+			KatexDir: resolve(s.root, s.cfg.KatexDir),
+			CacheDir: filepath.Join(stateDir, "pages"),
+		}}
 	s.mu.Unlock()
 	return nil
 }
@@ -239,6 +250,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /subjects", s.handleSubjects)
 	mux.HandleFunc("GET /state", s.handleState)
 	mux.HandleFunc("GET /review-schedule", s.handleReviewSchedule)
+	mux.HandleFunc("GET /pages/{subject}", s.handlePagesMeta)
+	mux.HandleFunc("GET /pages/{subject}/{page}", s.handlePage)
 	mux.HandleFunc("POST /exchange", s.handleExchange)
 	mux.HandleFunc("POST /reset", s.handleReset)
 	mux.HandleFunc("POST /teach/turn", s.handleTeachTurn)

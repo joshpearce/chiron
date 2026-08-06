@@ -1,0 +1,8 @@
+{
+    "name": "Chiron",
+    "loadsBackend": false,
+    "entry": "/ui/main.qml",
+    "id": "dev.mjbraun.chiron",
+    "supportsScaling": true,
+    "canHaveMultipleFrontends": false
+}
