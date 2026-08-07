@@ -159,3 +159,27 @@ func pngSize(path string) (int, int, error) {
 	h := int(hdr[20])<<24 | int(hdr[21])<<16 | int(hdr[22])<<8 | int(hdr[23])
 	return w, h, nil
 }
+
+// The placement step is one question: same page as the intro, no series
+// header, and the item map still points at it.
+func TestScreenerChapterIsOnePage(t *testing.T) {
+	r := &Renderer{KatexDir: "k", CacheDir: "c"}
+	ch := &render.Chapter{
+		Unit: "u0", Title: "Calibration", Calibration: true,
+		HTML: `<p>One placement question.</p>`,
+		Check: []render.ClientItem{{
+			ID: "u0-s1", Kind: "constructed", Check: "screener",
+			Prompt: "Rate yourself 1-5."}},
+	}
+	doc := r.wrap(ch)
+	if !strings.Contains(doc, "items-inline") {
+		t.Error("screener section not inlined with the intro")
+	}
+	if strings.Contains(doc, "The series") {
+		t.Error("series framing shown over the screener")
+	}
+	ip := ItemPages(ch, 1)
+	if len(ip) != 1 || ip[0].Page != 0 || ip[0].Check != "screener" {
+		t.Fatalf("item map = %+v", ip)
+	}
+}

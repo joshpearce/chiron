@@ -32,7 +32,7 @@ const (
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v7"
+const styleVersion = "v8"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -232,13 +232,22 @@ func injectBeats(doc string, beats []corpus.Beat) string {
 // prompt, ink room, and a confidence scale to circle. Reveals (reference
 // answers, rubrics) deliberately never reach the page - the check is
 // closed-book, and answers come back with the next exchange.
-func itemsSection(title, note string, items []render.ClientItem, printLayout bool) string {
+func itemsSection(title, note string, items []render.ClientItem, printLayout, inline bool) string {
 	if len(items) == 0 {
 		return ""
 	}
 	var b []string
-	b = append(b, `<section class="items-section"><h1>`+html.EscapeString(title)+`</h1>`)
-	b = append(b, `<p class="items-note">`+html.EscapeString(note)+`</p>`)
+	class := "items-section"
+	if inline {
+		class += " items-inline"
+	}
+	b = append(b, `<section class="`+class+`">`)
+	if title != "" {
+		b = append(b, `<h1>`+html.EscapeString(title)+`</h1>`)
+	}
+	if note != "" {
+		b = append(b, `<p class="items-note">`+html.EscapeString(note)+`</p>`)
+	}
 	for i, it := range items {
 		b = append(b, fmt.Sprintf(`<div class="item-box" data-item-id=%q>`, it.ID))
 		b = append(b, fmt.Sprintf(
@@ -284,11 +293,18 @@ func (r *Renderer) wrap(ch *render.Chapter) string {
 		checkTitle, checkNote = "The series",
 			"Easy to hard. Marking \"I don't know\" freely is part of the design - running out of sure answers is the point."
 	}
+	// A screener-only chapter is one question: it belongs on the intro
+	// page, under the intro, with no series framing above it.
+	screenerOnly := ch.Calibration && len(ch.Pretest) == 0 &&
+		len(ch.Check) == 1 && ch.Check[0].Check == "screener"
+	if screenerOnly {
+		checkTitle, checkNote = "", ""
+	}
 	body := itemsSection("Before you read",
 		"You are not supposed to know these yet - answering wrong here is part of how the chapter calibrates.",
-		ch.Pretest, r.PrintLayout) +
+		ch.Pretest, r.PrintLayout, false) +
 		injectBeats(ch.HTML, ch.Beats) +
-		itemsSection(checkTitle, checkNote, ch.Check, r.PrintLayout)
+		itemsSection(checkTitle, checkNote, ch.Check, r.PrintLayout, screenerOnly)
 	return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="` + katex + `/katex.min.css">
 <script src="` + katex + `/katex.min.js"></script>
@@ -316,6 +332,7 @@ blockquote, .planner-note { border-left: 6px solid #000; margin: 24px 0; padding
 .beat-label { font-size: 24px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
 .beat-ink { height: 340px; }
 .items-section { page-break-before: always; }
+.items-inline { page-break-before: avoid; }
 .items-section:first-child { page-break-before: avoid; }
 .items-note { font-style: italic; color: #333; }
 .item-box { border: 3px solid #000; margin: 34px 0; padding: 20px 24px; page-break-inside: avoid; page-break-before: always; }
