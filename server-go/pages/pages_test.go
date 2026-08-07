@@ -97,10 +97,23 @@ func TestWrapOrdersPretestBodyCheck(t *testing.T) {
 		t.Fatal("prompt not HTML-escaped")
 	}
 	for _, want := range []string{`data-item-id="u9-p1"`, `data-item-id="u9-q1"`,
-		`data-item-id="u9-q2"`, "first", "second", "How confident are you?",
-		"I don't know - moving on"} {
+		`data-item-id="u9-q2"`, "first", "second", "mcq-letter"} {
 		if !strings.Contains(doc, want) {
 			t.Fatalf("missing %q", want)
+		}
+	}
+	// Interactive layout leaves confidence/IDK to the client's controls.
+	for _, banned := range []string{"How confident are you?", "I don't know - moving on"} {
+		if strings.Contains(doc, banned) {
+			t.Fatalf("interactive layout printed %q", banned)
+		}
+	}
+	// The print layout keeps them on the page for the real-paper flow.
+	rp := &Renderer{KatexDir: "k", CacheDir: "c", PrintLayout: true}
+	pdoc := rp.wrap(ch)
+	for _, want := range []string{"How confident are you?", "I don't know - moving on", "mcq-tick"} {
+		if !strings.Contains(pdoc, want) {
+			t.Fatalf("print layout missing %q", want)
 		}
 	}
 	// Reference answers and rubrics must never reach paper.

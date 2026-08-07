@@ -30,6 +30,16 @@ Rectangle {
     property var checkinResult: null
     // Pages the learner explicitly marked "I don't know" - wins over ink.
     property var idkPages: ({})
+    // Structured selections (screener rating, MCQ option) per page.
+    property var selByPage: ({})
+    // Confidence per page, 1-4; unset means shaky.
+    property var confByPage: ({})
+
+    function setMap(name, p, v) {
+        var m = root[name]
+        m[p] = v
+        root[name] = m
+    }
 
     function itemForPage(p) {
         for (var i = 0; i < itemPages.length; i++)
@@ -177,16 +187,29 @@ Rectangle {
         const items = []
         for (var i = 0; i < itemPages.length; i++) {
             const it = itemPages[i]
-            items.push({ item_id: it.id,
-                         idk: idkPages[it.page] === true,
-                         strokes: strokesForPage(it.page) })
+            const entry = { item_id: it.id,
+                            idk: idkPages[it.page] === true,
+                            strokes: strokesForPage(it.page) }
+            if (selByPage[it.page] !== undefined && selByPage[it.page] !== null)
+                entry.selected_index = selByPage[it.page]
+            if (confByPage[it.page])
+                entry.confidence = confByPage[it.page]
+            items.push(entry)
         }
         const xhr = new XMLHttpRequest()
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== XMLHttpRequest.DONE) return
             if (xhr.status === 200) {
                 checkinResult = JSON.parse(xhr.responseText)
-                mode = "results"
+                if (!checkinResult.gate) {
+                    // Nothing was gated (the screener step): go straight to
+                    // the freshly delivered pages.
+                    inkByPage = ({}); idkPages = ({}); selByPage = ({}); confByPage = ({})
+                    checkinResult = null
+                    loadMeta()
+                } else {
+                    mode = "results"
+                }
             } else {
                 errorText = "Check-in failed (" + xhr.status + "): "
                           + xhr.responseText.substring(0, 200)
@@ -196,6 +219,55 @@ Rectangle {
         xhr.open("POST", serverBase + "/ink/" + subject)
         xhr.setRequestHeader("Content-Type", "application/json")
         xhr.send(JSON.stringify({ unit: chapterUnit, items: items }))
+    }
+
+    // Structured answer controls, docked above the footer on answer pages.
+    Row {
+        id: controlBar
+        visible: root.mode === "reading" && root.itemForPage(root.page) !== null
+        spacing: 10
+        anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: 44 }
+
+        property var item: root.itemForPage(root.page)
+
+        // Screener: rate yourself 1-5.
+        Repeater {
+            model: controlBar.item && controlBar.item.check === "screener" ? 5 : 0
+            delegate: Button {
+                text: (index + 1)
+                width: 64
+                font.pixelSize: 24
+                checkable: true
+                checked: root.selByPage[root.page] === index
+                onClicked: root.setMap("selByPage", root.page, index)
+            }
+        }
+        // MCQ: one lettered button per printed option.
+        Repeater {
+            model: controlBar.item && controlBar.item.kind === "mcq"
+                   ? controlBar.item.options : 0
+            delegate: Button {
+                text: String.fromCharCode(65 + index)
+                width: 64
+                font.pixelSize: 24
+                checkable: true
+                checked: root.selByPage[root.page] === index
+                onClicked: root.setMap("selByPage", root.page, index)
+            }
+        }
+        // Constructed items: confidence in the ink answer.
+        Repeater {
+            model: controlBar.item && controlBar.item.kind !== "mcq"
+                   && controlBar.item.check !== "screener"
+                   ? ["unsure", "shaky", "confident", "sure"] : 0
+            delegate: Button {
+                text: modelData
+                font.pixelSize: 18
+                checkable: true
+                checked: root.confByPage[root.page] === index + 1
+                onClicked: root.setMap("confByPage", root.page, index + 1)
+            }
+        }
     }
 
     // "I don't know" toggle, shown only on answer pages. Explicit beats
@@ -282,6 +354,8 @@ Rectangle {
                 onClicked: {
                     root.inkByPage = ({})
                     root.idkPages = ({})
+                    root.selByPage = ({})
+                    root.confByPage = ({})
                     root.checkinResult = null
                     root.loadMeta()
                 }

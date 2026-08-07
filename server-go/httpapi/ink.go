@@ -22,6 +22,9 @@ import (
 type InkItem struct {
 	ItemID  string        `json:"item_id"`
 	Strokes [][]ink.Point `json:"strokes"`
+	// SelectedIndex answers structured items (MCQ options, the screener
+	// rating) from the client's own controls - no ink, no transcription.
+	SelectedIndex *int `json:"selected_index,omitempty"`
 	// IDK is the client-side "I don't know" toggle. It wins over any ink on
 	// the page - a tick mark is not an answer.
 	IDK bool `json:"idk,omitempty"`
@@ -93,6 +96,13 @@ func (s *Server) handleInk(w http.ResponseWriter, r *http.Request) {
 		conf := item.Confidence
 		if conf == 0 {
 			conf = 2
+		}
+		if item.SelectedIndex != nil {
+			responses = append(responses, ItemResponse{
+				ItemID: item.ItemID, SelectedIndex: item.SelectedIndex,
+				Confidence: conf})
+			transcripts[item.ItemID] = fmt.Sprintf("[option %d]", *item.SelectedIndex+1)
+			continue
 		}
 		png, err := ink.Rasterize(item.Strokes, pages.PageW/2, pages.PageH/2)
 		if err != nil {

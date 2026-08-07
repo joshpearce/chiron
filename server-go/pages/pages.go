@@ -32,7 +32,7 @@ const (
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v6"
+const styleVersion = "v7"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -48,6 +48,11 @@ type Renderer struct {
 	// CacheDir receives one subdirectory per rendered chapter, keyed by
 	// content hash.
 	CacheDir string
+	// PrintLayout renders answer scaffolding ON the page - confidence
+	// pills, IDK tick rows, MCQ tick squares - for clients that are real
+	// paper (the rmapi flow). The default interactive layout leaves those
+	// to the client's own controls and letters the MCQ options instead.
+	PrintLayout bool
 }
 
 type Result struct {
@@ -65,19 +70,24 @@ func (r Result) PagePath(n int) string {
 // every box starts its own page, so the mapping is arithmetic. Ink drawn on
 // an item's page belongs to that item.
 type ItemPage struct {
-	ID   string `json:"id"`
-	Kind string `json:"kind"`
-	Page int    `json:"page"`
+	ID      string `json:"id"`
+	Kind    string `json:"kind"`
+	Check   string `json:"check"`
+	Options int    `json:"options,omitempty"`
+	Page    int    `json:"page"`
 }
 
 func ItemPages(ch *render.Chapter, pageCount int) []ItemPage {
+	row := func(it render.ClientItem, page int) ItemPage {
+		return ItemPage{ID: it.ID, Kind: it.Kind, Check: it.Check,
+			Options: len(it.Options), Page: page}
+	}
 	var out []ItemPage
 	for i, it := range ch.Pretest {
-		out = append(out, ItemPage{ID: it.ID, Kind: it.Kind, Page: i})
+		out = append(out, row(it, i))
 	}
 	for j, it := range ch.Check {
-		out = append(out, ItemPage{ID: it.ID, Kind: it.Kind,
-			Page: pageCount - len(ch.Check) + j})
+		out = append(out, row(it, pageCount-len(ch.Check)+j))
 	}
 	return out
 }
@@ -222,7 +232,7 @@ func injectBeats(doc string, beats []corpus.Beat) string {
 // prompt, ink room, and a confidence scale to circle. Reveals (reference
 // answers, rubrics) deliberately never reach the page - the check is
 // closed-book, and answers come back with the next exchange.
-func itemsSection(title, note string, items []render.ClientItem) string {
+func itemsSection(title, note string, items []render.ClientItem, printLayout bool) string {
 	if len(items) == 0 {
 		return ""
 	}
@@ -234,19 +244,32 @@ func itemsSection(title, note string, items []render.ClientItem) string {
 		b = append(b, fmt.Sprintf(
 			`<div class="item-prompt"><span class="item-num">%d.</span>`, i+1)+
 			html.EscapeString(it.Prompt)+`</div>`)
-		if it.Kind == "mcq" {
+		switch {
+		case it.Kind == "mcq" && printLayout:
 			b = append(b, `<ul class="mcq">`)
 			for _, o := range it.Options {
 				b = append(b, `<li><span class="mcq-tick"></span>`+html.EscapeString(o.Text)+`</li>`)
 			}
 			b = append(b, `</ul>`)
-		} else {
+		case it.Kind == "mcq":
+			// The client renders matching lettered buttons.
+			b = append(b, `<ul class="mcq">`)
+			for oi, o := range it.Options {
+				b = append(b, fmt.Sprintf(`<li><span class="mcq-letter">%c.</span>`, 'A'+oi)+
+					html.EscapeString(o.Text)+`</li>`)
+			}
+			b = append(b, `</ul>`)
+		case it.Check == "screener" && !printLayout:
+			// The client renders the 1-5 rating control; nothing to write.
+		default:
 			b = append(b, `<div class="item-ink"></div>`)
 		}
-		b = append(b, `<div class="idk-row"><span class="mcq-tick"></span>I don't know - moving on</div>`)
-		b = append(b, `<div class="confidence">How confident are you?`+
-			`<span class="conf-opt">unsure</span><span class="conf-opt">shaky</span>`+
-			`<span class="conf-opt">confident</span><span class="conf-opt">sure</span></div>`)
+		if printLayout {
+			b = append(b, `<div class="idk-row"><span class="mcq-tick"></span>I don't know - moving on</div>`)
+			b = append(b, `<div class="confidence">How confident are you?`+
+				`<span class="conf-opt">unsure</span><span class="conf-opt">shaky</span>`+
+				`<span class="conf-opt">confident</span><span class="conf-opt">sure</span></div>`)
+		}
 		b = append(b, `</div>`)
 	}
 	b = append(b, `</section>`)
@@ -256,22 +279,22 @@ func itemsSection(title, note string, items []render.ClientItem) string {
 func (r *Renderer) wrap(ch *render.Chapter) string {
 	katex := "file://" + mustAbs(r.KatexDir)
 	checkTitle, checkNote := "Comprehension check",
-		"Closed book. Answer every item in ink and circle a confidence before moving on."
+		"Closed book. Answer every item before moving on."
 	if ch.Calibration {
 		checkTitle, checkNote = "The series",
-			"Easy to hard. Answer in ink, circle a confidence, and mark \"I don't know\" freely - running out of sure answers is the point."
+			"Easy to hard. Marking \"I don't know\" freely is part of the design - running out of sure answers is the point."
 	}
 	body := itemsSection("Before you read",
-		"You are not supposed to know these yet - answering wrong here is part of how the chapter calibrates. Write your answer, then circle a confidence.",
-		ch.Pretest) +
+		"You are not supposed to know these yet - answering wrong here is part of how the chapter calibrates.",
+		ch.Pretest, r.PrintLayout) +
 		injectBeats(ch.HTML, ch.Beats) +
-		itemsSection(checkTitle, checkNote, ch.Check)
+		itemsSection(checkTitle, checkNote, ch.Check, r.PrintLayout)
 	return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="` + katex + `/katex.min.css">
 <script src="` + katex + `/katex.min.js"></script>
 <script src="` + katex + `/contrib/auto-render.min.js"></script>
 <style>
-/* ` + styleVersion + ` */
+/* ` + fmt.Sprintf("%s-print=%v", styleVersion, r.PrintLayout) + ` */
 @page { size: ` + fmt.Sprint(PageW) + `px ` + fmt.Sprint(PageH) + `px; margin: 0; }
 html, body { margin: 0; padding: 0; background: white; color: black; }
 body {
@@ -302,6 +325,7 @@ blockquote, .planner-note { border-left: 6px solid #000; margin: 24px 0; padding
 .mcq { list-style: none; padding: 0; margin: 16px 0 0 0; }
 .mcq li { margin: 14px 0; }
 .mcq-tick { display: inline-block; width: 34px; height: 34px; border: 3px solid #000; margin-right: 16px; vertical-align: middle; }
+.mcq-letter { font-weight: bold; margin-right: 14px; }
 .idk-row { margin-top: 14px; font-size: 26px; color: #333; }
 .confidence { margin-top: 16px; font-size: 26px; }
 .conf-opt { border: 2px solid #000; border-radius: 24px; padding: 4px 18px; margin-left: 14px; }

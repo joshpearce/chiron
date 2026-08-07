@@ -362,9 +362,9 @@ screener:
   prompt: >
     Before the questions: how would you rate your current understanding of the
     math inside modern AI models - dot products, matrix shapes, softmax,
-    gradients? Answer with a single number. 1: absolute novice. 2: seen the
+    gradients? 1: absolute novice. 2: seen the
     words, could not compute. 3: could work through it slowly. 4: comfortable.
-    5: expert - I could teach it.
+    5: expert - I could teach it. Pick the level that fits.
 
 # Pre-computed series per self-rating: novices skip the hardest tail,
 # experts skip the warmups. Each list is delivered complete, in order.
