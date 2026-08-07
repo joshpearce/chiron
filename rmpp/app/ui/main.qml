@@ -38,8 +38,13 @@ Rectangle {
     // Confidence per page, 1-4; unset means shaky.
     property var confByPage: ({})
 
+    // Copy-on-write: assigning the SAME object reference back to a var
+    // property does not signal a change, so bindings (button checked state,
+    // Check in enabled) never re-evaluate. A fresh object every write does.
     function setMap(name, p, v) {
-        var m = root[name]
+        var old = root[name]
+        var m = {}
+        for (var k in old) m[k] = old[k]
         m[p] = v
         root[name] = m
     }

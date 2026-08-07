@@ -46,6 +46,9 @@ updates, the prerequisite graph, gating, debt and check composition are
 deterministic. What gets asked decides what you retain; it should not vary with
 a model's mood.
 
+UI construction principles - each learned from a real failure - live in
+[DESIGN-ui.md](DESIGN-ui.md).
+
 ## Shape
 
 ```mermaid
