@@ -183,3 +183,27 @@ func TestScreenerChapterIsOnePage(t *testing.T) {
 		t.Fatalf("item map = %+v", ip)
 	}
 }
+
+func TestScreenerLevelsRenderAsVerticalList(t *testing.T) {
+	r := &Renderer{KatexDir: "k", CacheDir: "c"}
+	ch := &render.Chapter{
+		Unit: "u0", Calibration: true,
+		HTML: `<p>intro</p>`,
+		Check: []render.ClientItem{{
+			ID: "u0-s1", Kind: "constructed", Check: "screener",
+			Prompt: "Rate yourself.",
+			Options: []render.ClientOption{
+				{Text: "Absolute novice"}, {Text: "Expert"}},
+		}},
+	}
+	doc := r.wrap(ch)
+	if !strings.Contains(doc, `<ul class="screener-list">`) {
+		t.Fatal("no screener list")
+	}
+	for _, want := range []string{`<span class="item-num">1.</span>Absolute novice`,
+		`<span class="item-num">2.</span>Expert`} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("missing %q", want)
+		}
+	}
+}

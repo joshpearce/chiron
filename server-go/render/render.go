@@ -215,10 +215,12 @@ func clientItem(q corpus.Question) ClientItem {
 		ID: q.ID, Unit: q.Unit, Concept: q.Concept, Kind: kind,
 		Prompt: q.Prompt, Check: check, Difficulty: difficulty,
 	}
-	if kind == "mcq" {
+	if kind == "mcq" || check == "screener" {
 		for _, o := range q.Options {
 			item.Options = append(item.Options, ClientOption{Text: o.Text})
 		}
+	}
+	if kind == "mcq" {
 		// Per-option explanations are revealed only after the answer, together
 		// with which one was correct.
 		rev := &corpus.Reveal{}

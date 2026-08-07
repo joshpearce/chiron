@@ -32,7 +32,7 @@ const (
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v8"
+const styleVersion = "v9"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -268,8 +268,17 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 					html.EscapeString(o.Text)+`</li>`)
 			}
 			b = append(b, `</ul>`)
-		case it.Check == "screener" && !printLayout:
-			// The client renders the 1-5 rating control; nothing to write.
+		case it.Check == "screener":
+			b = append(b, `<ul class="screener-list">`)
+			for oi, o := range it.Options {
+				tick := ""
+				if printLayout {
+					tick = `<span class="mcq-tick"></span>`
+				}
+				b = append(b, fmt.Sprintf(`<li>%s<span class="item-num">%d.</span>`, tick, oi+1)+
+					html.EscapeString(o.Text)+`</li>`)
+			}
+			b = append(b, `</ul>`)
 		default:
 			b = append(b, `<div class="item-ink"></div>`)
 		}
@@ -343,6 +352,8 @@ blockquote, .planner-note { border-left: 6px solid #000; margin: 24px 0; padding
 .mcq li { margin: 14px 0; }
 .mcq-tick { display: inline-block; width: 34px; height: 34px; border: 3px solid #000; margin-right: 16px; vertical-align: middle; }
 .mcq-letter { font-weight: bold; margin-right: 14px; }
+.screener-list { list-style: none; padding: 0; margin: 18px 0 0 0; }
+.screener-list li { margin: 14px 0; }
 .idk-row { margin-top: 14px; font-size: 26px; color: #333; }
 .confidence { margin-top: 16px; font-size: 26px; }
 .conf-opt { border: 2px solid #000; border-radius: 24px; padding: 4px 18px; margin-left: 14px; }
