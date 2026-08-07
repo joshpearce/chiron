@@ -271,7 +271,9 @@ func (s *Server) prerenderCalibrationSets(sub *Subject, unit *corpus.Unit, check
 		if len(unit.Questions.CalibrationSets[rating]) == 0 {
 			continue
 		}
-		ch, err := render.RenderChapter(unit, sections,
+		cp := *unit
+		cp.IntroMD = "" // must match buildChapter's series composition
+		ch, err := render.RenderChapter(&cp, sections,
 			render.Directives{OpeningNoteMD: d.OpeningNoteMD, NextAction: d.NextAction},
 			unit.Questions.Pretest, calibrationItems(unit, rating))
 		if err != nil {
@@ -352,7 +354,15 @@ func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*rende
 			}
 		}
 	}
-	return render.RenderChapter(unit, sections,
+	ru := unit
+	if unit.IsCalibration() && sub.Learner.Data.Profile.SelfRating > 0 {
+		// The intro frames the placement step; once placed, the series
+		// opens on its first question, not on stale framing.
+		cp := *unit
+		cp.IntroMD = ""
+		ru = &cp
+	}
+	return render.RenderChapter(ru, sections,
 		render.Directives{OpeningNoteMD: d.OpeningNoteMD, NextAction: d.NextAction},
 		unit.Questions.Pretest, items)
 }
