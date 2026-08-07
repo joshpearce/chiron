@@ -27,6 +27,7 @@ Rectangle {
     property int page: 0
     // Item -> page map from the server; ink on an item's page belongs to it.
     property var itemPages: []
+    property bool bootstrapTried: false
     // Non-null when the chapter is the placement screener: rendered natively,
     // the question box is the UI.
     property var screener: null
@@ -72,6 +73,24 @@ Rectangle {
                 mode = screener ? "screener" : "reading"
                 console.log("[chiron] chapter:", m.unit, m.count, "pages,",
                             itemPages.length, "answer pages")
+            } else if (xhr.status === 404 && !root.bootstrapTried) {
+                // Fresh learner: no chapter exists yet. Start the book and
+                // retry once - the start exchange delivers the first chapter
+                // without any model call.
+                root.bootstrapTried = true
+                const boot = new XMLHttpRequest()
+                boot.onreadystatechange = function() {
+                    if (boot.readyState !== XMLHttpRequest.DONE) return
+                    if (boot.status === 200) {
+                        loadMeta()
+                    } else {
+                        errorText = "Could not start the book (" + boot.status + ")"
+                        mode = "error"
+                    }
+                }
+                boot.open("POST", serverBase + "/exchange")
+                boot.setRequestHeader("Content-Type", "application/json")
+                boot.send(JSON.stringify({ subject: subject, phase: "start" }))
             } else {
                 errorText = "No chapter available (" + xhr.status + ").\n"
                           + "Server: " + serverBase
