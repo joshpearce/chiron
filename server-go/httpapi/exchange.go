@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -303,10 +305,34 @@ func (s *Server) nextUnit(sub *Subject, choice string) string {
 	return fringe[0]
 }
 
+// authorCachePath keys test-mode chapter caching. The cache trades
+// adaptivity for speed - UI runs replay a previously authored chapter
+// instantly instead of waiting on the model - so it exists only in drive
+// (test) mode and never on a real learner's server.
+func authorCachePath(subjectID, unitID string) string {
+	return filepath.Join(os.TempDir(), "chiron-author-cache",
+		subjectID+"-"+unitID+".json")
+}
+
+type authorCacheEntry struct {
+	Chapter *render.Chapter `json:"chapter"`
+	Summary string          `json:"summary"`
+}
+
 func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*render.Chapter, error) {
 	unit, ok := sub.Corpus.Units[unitID]
 	if !ok {
 		return nil, fmt.Errorf("unit %s not authored", unitID)
+	}
+	if driveEnabled() && !unit.IsCalibration() {
+		if data, err := os.ReadFile(authorCachePath(sub.ID, unitID)); err == nil {
+			var entry authorCacheEntry
+			if json.Unmarshal(data, &entry) == nil && entry.Chapter != nil {
+				log.Printf("author cache hit: %s/%s", sub.ID, unitID)
+				s.markUnitStarted(sub, unit, entry.Summary)
+				return entry.Chapter, nil
+			}
+		}
 	}
 	d := roles.PlanDirectives(s.chain, sub.Learner, unit, checkSummary)
 	sections, _ := roles.AuthorChapter(s.chain, unit, d, sub.Corpus)
@@ -330,15 +356,40 @@ func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*rende
 		s.rngMu.Unlock()
 	}
 
-	if _, err := sub.Learner.Apply(state.Event{Kind: "unit_started", Unit: unitID}); err != nil {
+	if err := s.markUnitStarted(sub, unit, d.Summary); err != nil {
 		return nil, err
 	}
-	if _, err := sub.Learner.Apply(state.Event{Kind: "exposed", Unit: unitID,
+	ru := unit
+	if unit.IsCalibration() && sub.Learner.Data.Profile.SelfRating > 0 {
+		// The intro frames the placement step; once placed, the series
+		// opens on its first question, not on stale framing.
+		cp := *unit
+		cp.IntroMD = ""
+		ru = &cp
+	}
+	ch, err := render.RenderChapter(ru, sections,
+		render.Directives{OpeningNoteMD: d.OpeningNoteMD, NextAction: d.NextAction},
+		unit.Questions.Pretest, items)
+	if err == nil && driveEnabled() && !unit.IsCalibration() {
+		if data, merr := json.Marshal(authorCacheEntry{Chapter: ch, Summary: d.Summary}); merr == nil {
+			_ = os.MkdirAll(filepath.Dir(authorCachePath(sub.ID, unitID)), 0o755)
+			_ = os.WriteFile(authorCachePath(sub.ID, unitID), data, 0o644)
+		}
+	}
+	return ch, err
+}
+
+// markUnitStarted applies the delivery events for a unit build.
+func (s *Server) markUnitStarted(sub *Subject, unit *corpus.Unit, summary string) error {
+	if _, err := sub.Learner.Apply(state.Event{Kind: "unit_started", Unit: unit.ID}); err != nil {
+		return err
+	}
+	if _, err := sub.Learner.Apply(state.Event{Kind: "exposed", Unit: unit.ID,
 		Concepts: unit.ConceptIDs()}); err != nil {
-		return nil, err
+		return err
 	}
-	if _, err := sub.Learner.Apply(state.Event{Kind: "summary", Text: d.Summary}); err != nil {
-		return nil, err
+	if _, err := sub.Learner.Apply(state.Event{Kind: "summary", Text: summary}); err != nil {
+		return err
 	}
 	if assumes, ok := unit.Front["assumes"].([]any); ok && len(assumes) > 0 {
 		var concepts []string
@@ -350,21 +401,11 @@ func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*rende
 		if len(concepts) > 0 {
 			if _, err := sub.Learner.Apply(state.Event{Kind: "assumed_known",
 				Concepts: concepts}); err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
-	ru := unit
-	if unit.IsCalibration() && sub.Learner.Data.Profile.SelfRating > 0 {
-		// The intro frames the placement step; once placed, the series
-		// opens on its first question, not on stale framing.
-		cp := *unit
-		cp.IntroMD = ""
-		ru = &cp
-	}
-	return render.RenderChapter(ru, sections,
-		render.Directives{OpeningNoteMD: d.OpeningNoteMD, NextAction: d.NextAction},
-		unit.Questions.Pretest, items)
+	return nil
 }
 
 // buildCatchup is the comprehensive backfill from the whole debt ledger:
@@ -476,12 +517,16 @@ func (s *Server) handleExchange(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "unknown subject: %s", ex.Subject)
 		return
 	}
-	writeJSON(w, http.StatusOK, s.processExchange(sub, ex))
+	writeJSON(w, http.StatusOK, s.processExchange(sub, ex, false))
 }
 
 // processExchange is the whole boundary contract - grade, gate, plan, author,
 // persist - shared by the JSON exchange endpoint and the ink check-in.
-func (s *Server) processExchange(sub *Subject, ex Exchange) map[string]any {
+// asyncAuthor returns the graded exchange immediately and authors the next
+// chapter in the background - the learner reads their results while the
+// model writes. The chapter then arrives via the pages meta. Only graded
+// submissions (a gate exists) go async: everything else is fast already.
+func (s *Server) processExchange(sub *Subject, ex Exchange, asyncAuthor bool) map[string]any {
 	results := []Result{}
 	var gate *Gate
 	var chapter *render.Chapter
@@ -599,17 +644,25 @@ func (s *Server) processExchange(sub *Subject, ex Exchange) map[string]any {
 			chapter = ch
 		}
 	}
+	authoring := ""
 	if chapter == nil && (ex.Phase == "boundary" || ex.Phase == "start") && advanceAllowed {
 		if next := s.nextUnit(sub, ex.Choice); next != "" {
-			if ch, err := s.buildChapter(sub, next, summary.String()); err == nil {
+			if asyncAuthor && gate != nil {
+				s.buildAsync(sub, next, summary.String())
+				authoring = next
+			} else if ch, err := s.buildChapter(sub, next, summary.String()); err == nil {
 				chapter = ch
 			}
 		}
 	} else if chapter == nil && gate != nil && !gate.Passed && !ex.Override && ex.Unit != "" {
 		// Remediation loop: rebuild the SAME unit. The planner sees the failed
 		// check in the summary and must switch representation.
-		if ch, err := s.buildChapter(sub, ex.Unit, summary.String()+
-			"REMEDIATE: switch representation, do not re-explain the same way."); err == nil {
+		remSummary := summary.String() +
+			"REMEDIATE: switch representation, do not re-explain the same way."
+		if asyncAuthor {
+			s.buildAsync(sub, ex.Unit, remSummary)
+			authoring = ex.Unit
+		} else if ch, err := s.buildChapter(sub, ex.Unit, remSummary); err == nil {
 			chapter = ch
 		}
 	}
@@ -627,13 +680,43 @@ func (s *Server) processExchange(sub *Subject, ex Exchange) map[string]any {
 			}
 		}(chapter)
 	}
-	return map[string]any{
+	out := map[string]any{
 		"results":          results,
 		"gate":             gate,
 		"chapter":          chapter,
 		"state":            s.statePayload(sub),
 		"break_suggestion": breakSuggestion,
 	}
+	if authoring != "" {
+		out["authoring"] = authoring
+	}
+	return out
+}
+
+// buildAsync authors a chapter in the background and delivers it through
+// persistence + eager page render. Failures land in the subject's build
+// status for the pages meta to surface.
+func (s *Server) buildAsync(sub *Subject, unitID, checkSummary string) {
+	if !sub.beginBuild() {
+		return
+	}
+	go func() {
+		ch, err := s.buildChapter(sub, unitID, checkSummary)
+		if err != nil {
+			log.Printf("async build %s: %v", unitID, err)
+			sub.endBuild(err.Error())
+			return
+		}
+		if err := persistChapter(sub, ch); err != nil {
+			log.Printf("persist chapter %s: %v", ch.Unit, err)
+			sub.endBuild(err.Error())
+			return
+		}
+		if _, err := sub.Pages.Render(ch); err != nil {
+			log.Printf("eager page render %s: %v", ch.Unit, err)
+		}
+		sub.endBuild("")
+	}()
 }
 
 func (s *Server) statePayload(sub *Subject) map[string]any {

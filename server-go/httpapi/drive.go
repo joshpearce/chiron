@@ -15,6 +15,7 @@ import (
 var (
 	driveMu      sync.Mutex
 	drivePending []byte
+	driveAck     []byte
 )
 
 func driveEnabled() bool { return os.Getenv("CHIRON_DRIVE") == "1" }
@@ -33,6 +34,31 @@ func (s *Server) handleDriveCmd(w http.ResponseWriter, r *http.Request) {
 	drivePending = body
 	driveMu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleDriveAck(w http.ResponseWriter, r *http.Request) {
+	if !driveEnabled() {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method == http.MethodPost {
+		body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		driveMu.Lock()
+		driveAck = body
+		driveMu.Unlock()
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	driveMu.Lock()
+	ack := driveAck
+	driveMu.Unlock()
+	w.Header().Set("Cache-Control", "no-store")
+	if ack == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(ack)
 }
 
 func (s *Server) handleDriveNext(w http.ResponseWriter, r *http.Request) {

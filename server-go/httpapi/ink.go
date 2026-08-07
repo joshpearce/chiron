@@ -141,7 +141,7 @@ func (s *Server) handleInk(w http.ResponseWriter, r *http.Request) {
 		Unit:           in.Unit,
 		CheckResponses: responses,
 		ChunkMinutes:   in.ChunkMinutes,
-	})
+	}, true)
 	out["transcripts"] = transcripts
 	writeJSON(w, http.StatusOK, out)
 }

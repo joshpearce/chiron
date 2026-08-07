@@ -59,6 +59,14 @@ Rectangle {
         return null
     }
 
+    property string loadingWhy: "fetching chapter..."
+
+    Timer {
+        id: retryMeta
+        interval: 3000
+        onTriggered: root.loadMeta()
+    }
+
     function loadMeta() {
         mode = "loading"
         const xhr = new XMLHttpRequest()
@@ -66,6 +74,19 @@ Rectangle {
             if (xhr.readyState !== XMLHttpRequest.DONE) return
             if (xhr.status === 200) {
                 const m = JSON.parse(xhr.responseText)
+                if (m.authoring) {
+                    // Grades came back instantly; the chapter is still being
+                    // written. Keep the learner informed and poll.
+                    loadingWhy = "The next chapter is being written..."
+                    retryMeta.restart()
+                    return
+                }
+                if (m.authoring_error) {
+                    errorText = "Chapter authoring failed:\n" + m.authoring_error
+                    mode = "error"
+                    return
+                }
+                loadingWhy = "fetching chapter..."
                 chapterTitle = m.title
                 chapterUnit = m.unit
                 pageCount = m.count
@@ -301,6 +322,9 @@ Rectangle {
     }
 
     function checkIn() {
+        // Only answerable states may submit: a check-in during loading or
+        // error would ship stale item pages from a previous chapter.
+        if (mode !== "reading" && mode !== "screener") return
         mode = "submitting"
         const items = []
         if (screener) {
@@ -418,11 +442,20 @@ Rectangle {
             xhr.send()
         }
         function exec(c) {
+            var err = ""
             try {
                 execInner(c)
             } catch (e) {
-                console.log("[drive] error on", c.cmd, ":", e.toString())
+                err = e.toString()
+                console.log("[drive] error on", c.cmd, ":", err)
             }
+            // Ack through the server - completion must not depend on the
+            // screenshot pipeline, which is best-effort evidence.
+            const ack = new XMLHttpRequest()
+            ack.open("POST", root.serverBase + "/drive/ack")
+            ack.setRequestHeader("Content-Type", "application/json")
+            ack.send(JSON.stringify({seq: c.seq, cmd: c.cmd, mode: root.mode,
+                                     page: root.page, error: err}))
             ackTimer.seq = c.seq
             ackTimer.restart()
         }
@@ -546,8 +579,8 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
         }
         Text {
-            text: root.mode === "loading" ? "fetching chapter..."
-                : root.mode === "submitting" ? "Grading your answers - the next chapter is being written..."
+            text: root.mode === "loading" ? root.loadingWhy
+                : root.mode === "submitting" ? "Grading your answers..."
                 : root.errorText
             font.pixelSize: 24
             horizontalAlignment: Text.AlignHCenter

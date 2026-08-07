@@ -90,6 +90,36 @@ type Subject struct {
 	Learner  *state.Learner
 	StateDir string
 	Pages    *pages.Renderer
+
+	// Background authoring state: one build at a time per subject, with the
+	// failure kept for the pages meta to surface.
+	buildMu  sync.Mutex
+	building bool
+	buildErr string
+}
+
+func (sub *Subject) beginBuild() bool {
+	sub.buildMu.Lock()
+	defer sub.buildMu.Unlock()
+	if sub.building {
+		return false
+	}
+	sub.building = true
+	sub.buildErr = ""
+	return true
+}
+
+func (sub *Subject) endBuild(err string) {
+	sub.buildMu.Lock()
+	sub.building = false
+	sub.buildErr = err
+	sub.buildMu.Unlock()
+}
+
+func (sub *Subject) buildStatus() (bool, string) {
+	sub.buildMu.Lock()
+	defer sub.buildMu.Unlock()
+	return sub.building, sub.buildErr
 }
 
 type Server struct {
@@ -260,6 +290,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /ink/{subject}", s.handleInk)
 	mux.HandleFunc("POST /drive/cmd", s.handleDriveCmd)
 	mux.HandleFunc("GET /drive/next", s.handleDriveNext)
+	mux.HandleFunc("POST /drive/ack", s.handleDriveAck)
+	mux.HandleFunc("GET /drive/ack", s.handleDriveAck)
 	mux.HandleFunc("POST /exchange", s.handleExchange)
 	mux.HandleFunc("POST /reset", s.handleReset)
 	mux.HandleFunc("POST /teach/turn", s.handleTeachTurn)

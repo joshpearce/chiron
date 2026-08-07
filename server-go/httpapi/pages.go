@@ -71,6 +71,13 @@ func (s *Server) handlePagesMeta(w http.ResponseWriter, r *http.Request) {
 	}
 	ch, err := currentChapter(sub)
 	if err != nil {
+		if building, buildErr := sub.buildStatus(); building || buildErr != "" {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"authoring":       building,
+				"authoring_error": buildErr,
+			})
+			return
+		}
 		http.Error(w, "no chapter available: "+err.Error(), http.StatusNotFound)
 		return
 	}
