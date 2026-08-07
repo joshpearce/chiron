@@ -115,6 +115,32 @@ depend on fast redraws.
   share one transport.
 - MathText-style web views are invisible to the accessibility tree; anything
   that must be automatable or readable belongs in native elements.
+- `file://` XMLHttpRequests need `QML_XHR_ALLOW_FILE_READ=1` and get cached
+  by the engine after a couple of reads - do not build a polling channel on
+  them. Poll HTTP instead.
+- The native macOS control style refuses `contentItem` customization and
+  renders such buttons blank; the emulator launches with
+  `QT_QUICK_CONTROLS_STYLE=Basic`.
+- Text that reaches native elements from server HTML must have entities
+  unescaped; `&quot;` on screen is a class of bug the renderer path never
+  shows (KaTeX pages go through a real HTML engine, native Text does not).
+
+## The design must be verifiable without a human
+
+The emulator is driven end to end by the dev harness, not by asking a person
+to click: the app polls `GET /drive/next` on its server for semantic commands
+(select a level, ink a stroke, check in, dump state) and acks each with a
+`grabToImage` screenshot to `/tmp/chiron-drive/`. The queue only exists on a
+server started with `CHIRON_DRIVE=1`, and the client only polls when
+`/tmp/chiron-drive/enable` names a drive server - so none of it is reachable
+in real use. Commands are semantic rather than raw taps on purpose: the
+harness tests the design ("select level 2") rather than pixel coordinates,
+and the same channel can drive the physical tablet later.
+
+Verification runs use a disposable server and state dir - never the state a
+human is working through. Being able to see the screen ("the pills are at
+the bottom, not in the box") is the difference between confirming a design
+and hoping about it.
 
 ## The audit trail is part of the UI
 

@@ -31,8 +31,18 @@ const (
 	PageH = 2160
 )
 
+// The interactive item-page geometry contract: every answer box spans the
+// page from BoxTop to BoxBottom (page pixels), with the bottom StripH
+// reserved for the client's controls - which is what lets the client place
+// them INSIDE the box without extracting geometry from the render.
+const (
+	BoxTop    = 100
+	BoxBottom = 2060
+	StripH    = 200
+)
+
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v10"
+const styleVersion = "v12"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -250,9 +260,17 @@ func Screener(ch *render.Chapter) *ScreenerInfo {
 		return nil
 	}
 	it := ch.Check[0]
+	intro := strings.TrimSpace(tagStrip.ReplaceAllString(ch.HTML, ""))
+	// The HTML came through markdown escaping; the native client renders
+	// plain text, so entities must come back out.
+	for ent, lit := range map[string]string{
+		"&quot;": "\"", "&#39;": "'", "&lt;": "<", "&gt;": ">", "&amp;": "&",
+	} {
+		intro = strings.ReplaceAll(intro, ent, lit)
+	}
 	info := &ScreenerInfo{
 		ItemID: it.ID,
-		Intro:  strings.TrimSpace(tagStrip.ReplaceAllString(ch.HTML, "")),
+		Intro:  intro,
 		Prompt: it.Prompt,
 	}
 	for _, o := range it.Options {
@@ -301,11 +319,16 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 		class += " items-inline"
 	}
 	b = append(b, `<section class="`+class+`">`)
-	if title != "" {
-		b = append(b, `<h1>`+html.EscapeString(title)+`</h1>`)
-	}
-	if note != "" {
-		b = append(b, `<p class="items-note">`+html.EscapeString(note)+`</p>`)
+	// Interactive item pages are headerless: uniform box geometry is the
+	// contract that lets the client place controls INSIDE the box. Print
+	// keeps the section framing - paper has no client to explain it.
+	if printLayout {
+		if title != "" {
+			b = append(b, `<h1>`+html.EscapeString(title)+`</h1>`)
+		}
+		if note != "" {
+			b = append(b, `<p class="items-note">`+html.EscapeString(note)+`</p>`)
+		}
 	}
 	for i, it := range items {
 		b = append(b, fmt.Sprintf(`<div class="item-box" data-item-id=%q>`, it.ID))
@@ -349,6 +372,8 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 			b = append(b, `<div class="confidence">How confident are you?`+
 				`<span class="conf-opt">unsure</span><span class="conf-opt">shaky</span>`+
 				`<span class="conf-opt">confident</span><span class="conf-opt">sure</span></div>`)
+		} else if it.Check != "screener" {
+			b = append(b, `<div class="control-strip"></div>`)
 		}
 		b = append(b, `</div>`)
 	}
@@ -408,6 +433,7 @@ blockquote, .planner-note { border-left: 6px solid #000; margin: 24px 0; padding
 .items-note { font-style: italic; color: #333; }
 .item-box { border: 3px solid #000; margin: 34px 0; padding: 20px 24px; page-break-inside: avoid; page-break-before: always; }
 .item-box:first-of-type { page-break-before: avoid; }
+` + interactiveItemCSS(r.PrintLayout) + `
 .item-num { font-weight: bold; margin-right: 14px; }
 .item-ink { height: 420px; border-top: 2px dashed #999; margin-top: 18px; }
 .mcq { list-style: none; padding: 0; margin: 16px 0 0 0; }
@@ -429,6 +455,18 @@ document.addEventListener("DOMContentLoaded", function() {
   });
 });
 </script></body></html>`
+}
+
+// interactiveItemCSS pins every interactive answer box to the geometry
+// contract (BoxTop..BoxBottom with a reserved control strip). Print keeps
+// natural flow - paper needs no reserved zone.
+func interactiveItemCSS(printLayout bool) string {
+	if printLayout {
+		return ""
+	}
+	return fmt.Sprintf(`.items-section:not(.items-inline) .item-box { margin: 0; box-sizing: border-box; min-height: %dpx; position: relative; padding-bottom: %dpx; }
+.control-strip { position: absolute; left: 24px; right: 24px; bottom: 0; height: %dpx; border-top: 2px dashed #999; }`,
+		BoxBottom-BoxTop, StripH+20, StripH)
 }
 
 func mustAbs(p string) string {

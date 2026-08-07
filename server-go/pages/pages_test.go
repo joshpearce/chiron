@@ -87,11 +87,17 @@ func TestWrapOrdersPretestBodyCheck(t *testing.T) {
 	}
 	doc := r.wrap(ch)
 
-	pre := strings.Index(doc, "Before you read")
+	pre := strings.Index(doc, `data-item-id="u9-p1"`)
 	body := strings.Index(doc, "BODY-MARKER")
-	chk := strings.Index(doc, "Comprehension check")
+	chk := strings.Index(doc, `data-item-id="u9-q1"`)
 	if pre < 0 || body < 0 || chk < 0 || !(pre < body && body < chk) {
 		t.Fatalf("order wrong: pretest@%d body@%d check@%d", pre, body, chk)
+	}
+	if strings.Contains(doc, "Comprehension check") {
+		t.Error("interactive layout should be headerless on item pages")
+	}
+	if !strings.Contains(doc, "control-strip") {
+		t.Error("interactive answer boxes must reserve the control strip")
 	}
 	if !strings.Contains(doc, "&lt;script&gt;") || strings.Contains(doc, "<script> must") {
 		t.Fatal("prompt not HTML-escaped")
@@ -111,10 +117,14 @@ func TestWrapOrdersPretestBodyCheck(t *testing.T) {
 	// The print layout keeps them on the page for the real-paper flow.
 	rp := &Renderer{KatexDir: "k", CacheDir: "c", PrintLayout: true}
 	pdoc := rp.wrap(ch)
-	for _, want := range []string{"How confident are you?", "I don't know - moving on", "mcq-tick"} {
+	for _, want := range []string{"How confident are you?", "I don't know - moving on",
+		"mcq-tick", "Comprehension check"} {
 		if !strings.Contains(pdoc, want) {
 			t.Fatalf("print layout missing %q", want)
 		}
+	}
+	if strings.Contains(pdoc, "control-strip") {
+		t.Error("print layout must not reserve a control strip")
 	}
 	// Reference answers and rubrics must never reach paper.
 	if strings.Contains(doc, "Reference answer") {

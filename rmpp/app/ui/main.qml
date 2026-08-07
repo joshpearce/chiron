@@ -28,6 +28,9 @@ Rectangle {
     // Item -> page map from the server; ink on an item's page belongs to it.
     property var itemPages: []
     property bool bootstrapTried: false
+    // The interactive page geometry contract from the server: every answer
+    // box reserves a bottom strip for these controls.
+    property var layoutC: null
     // Non-null when the chapter is the placement screener: rendered natively,
     // the question box is the UI.
     property var screener: null
@@ -69,6 +72,7 @@ Rectangle {
                 pagesHash = m.hash
                 itemPages = m.items || []
                 screener = m.screener || null
+                layoutC = m.layout || null
                 page = 0
                 mode = screener ? "screener" : "reading"
                 console.log("[chiron] chapter:", m.unit, m.count, "pages,",
@@ -102,7 +106,24 @@ Rectangle {
         xhr.send()
     }
 
-    Component.onCompleted: loadMeta()
+    Component.onCompleted: {
+        loadMeta()
+        const en = new XMLHttpRequest()
+        en.onreadystatechange = function() {
+            if (en.readyState !== XMLHttpRequest.DONE || !en.responseText) return
+            const val = en.responseText.trim()
+            // The enable file names the drive server, which also becomes the
+            // book server for the session - the harness owns both.
+            if (val.indexOf("http") === 0) {
+                serverBase = val
+                bootstrapTried = false
+                loadMeta()
+            }
+            drive.running = true
+        }
+        en.open("GET", "file:///tmp/chiron-drive/enable")
+        en.send()
+    }
 
     // Ink, kept per page in page-image coordinates (0..1 normalized), so
     // strokes survive window resizes and can later be shipped to the server
@@ -323,48 +344,51 @@ Rectangle {
         xhr.send(JSON.stringify({ unit: chapterUnit, items: items }))
     }
 
-    // Structured answer controls, docked above the footer on answer pages.
+    // Answer controls live INSIDE the question box: the server reserves a
+    // strip at the bottom of every interactive answer box (the layout
+    // contract in the pages meta), and this bar maps itself into that strip
+    // through the fitted page image.
     Row {
         id: controlBar
         visible: root.mode === "reading" && root.itemForPage(root.page) !== null
-        spacing: 10
-        anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: 44 }
+                 && root.layoutC !== null
+        spacing: 14
 
         property var item: root.itemForPage(root.page)
+        property real stripCenterY: root.layoutC
+            ? (root.layoutC.box_bottom - root.layoutC.strip_h / 2) / root.layoutC.page_h
+            : 0.9
 
-        // Screener: rate yourself 1-5.
-        Repeater {
-            model: controlBar.item && controlBar.item.check === "screener" ? 5 : 0
-            delegate: Button {
-                text: (index + 1)
-                width: 64
-                font.pixelSize: 24
-                checkable: true
-                checked: root.selByPage[root.page] === index
-                onClicked: root.setMap("selByPage", root.page, index)
-            }
+        x: pageImage.x + (pageImage.width - pageImage.paintedWidth) / 2
+           + pageImage.paintedWidth / 2 - width / 2
+        y: pageImage.y + (pageImage.height - pageImage.paintedHeight) / 2
+           + stripCenterY * pageImage.paintedHeight - height / 2
+
+        Button {
+            checkable: true
+            checked: root.idkPages[root.page] === true
+            text: checked ? "✓ I don't know" : "I don't know"
+            font.pixelSize: 18
+            onToggled: root.setMap("idkPages", root.page, checked)
         }
-        // MCQ: one lettered button per printed option.
         Repeater {
             model: controlBar.item && controlBar.item.kind === "mcq"
                    ? controlBar.item.options : 0
             delegate: Button {
                 text: String.fromCharCode(65 + index)
-                width: 64
-                font.pixelSize: 24
+                width: 56
+                font.pixelSize: 20
                 checkable: true
                 checked: root.selByPage[root.page] === index
                 onClicked: root.setMap("selByPage", root.page, index)
             }
         }
-        // Constructed items: confidence in the ink answer.
         Repeater {
             model: controlBar.item && controlBar.item.kind !== "mcq"
-                   && controlBar.item.check !== "screener"
                    ? ["unsure", "shaky", "confident", "sure"] : 0
             delegate: Button {
                 text: modelData
-                font.pixelSize: 18
+                font.pixelSize: 16
                 checkable: true
                 checked: root.confByPage[root.page] === index + 1
                 onClicked: root.setMap("confByPage", root.page, index + 1)
@@ -372,20 +396,64 @@ Rectangle {
         }
     }
 
-    // "I don't know" toggle, shown only on answer pages. Explicit beats
-    // inferred: a tick drawn in ink once came back graded correct because
-    // the vision model answered the question itself.
-    Button {
-        visible: root.mode === "reading" && root.itemForPage(root.page) !== null
-        checkable: true
-        checked: root.idkPages[root.page] === true
-        text: checked ? "✓ I don't know" : "I don't know"
-        font.pixelSize: 20
-        anchors { right: parent.right; top: parent.top; margins: 10 }
-        onToggled: {
-            var m = root.idkPages
-            m[root.page] = checked
-            root.idkPages = m
+    // Dev drive bridge: file-based semantic commands with screenshot acks,
+    // so design gets verified without a human driving the emulator. Runs
+    // only when /tmp/chiron-drive/enable exists - never on the tablet.
+    Timer {
+        id: drive
+        interval: 300; repeat: true; running: false
+        property int lastSeq: 0
+        onTriggered: {
+            // HTTP, not file polling: Qt caches file XHRs after a couple of
+            // reads, and the same channel can drive the real tablet later.
+            const xhr = new XMLHttpRequest()
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== XMLHttpRequest.DONE) return
+                if (xhr.status !== 200 || !xhr.responseText) return
+                try {
+                    drive.exec(JSON.parse(xhr.responseText))
+                } catch (e) {}
+            }
+            xhr.open("GET", root.serverBase + "/drive/next")
+            xhr.send()
+        }
+        function exec(c) {
+            try {
+                execInner(c)
+            } catch (e) {
+                console.log("[drive] error on", c.cmd, ":", e.toString())
+            }
+            ackTimer.seq = c.seq
+            ackTimer.restart()
+        }
+        function execInner(c) {
+            if (c.cmd === "dump")
+                console.log("[drive]", JSON.stringify({mode: root.mode, page: root.page,
+                    sel: root.selByPage, idk: root.idkPages, conf: root.confByPage,
+                    items: root.itemPages.length, server: root.serverBase}))
+            else if (c.cmd === "level") root.setMap("selByPage", 0, c.i)
+            else if (c.cmd === "select") root.setMap("selByPage", root.page, c.i)
+            else if (c.cmd === "conf") root.setMap("confByPage", root.page, c.v)
+            else if (c.cmd === "idk") root.setMap("idkPages", root.page, c.on === false ? false : true)
+            else if (c.cmd === "page") root.page = c.n
+            else if (c.cmd === "checkin") root.checkIn()
+            else if (c.cmd === "ink" && c.stroke) { root.strokesForPage(root.page).push(c.stroke); ink.requestPaint() }
+            else if (c.cmd === "next") { root.inkByPage = ({}); root.idkPages = ({}); root.selByPage = ({}); root.confByPage = ({}); root.checkinResult = null; root.loadMeta() }
+            else if (c.cmd === "server") { root.serverBase = c.url; root.bootstrapTried = false; root.loadMeta() }
+            else if (c.cmd === "reload") { root.bootstrapTried = false; root.loadMeta() }
+            // "shot" and unknown commands just ack with a screenshot
+        }
+    }
+    Timer {
+        id: ackTimer
+        interval: 700
+        property int seq: 0
+        onTriggered: {
+            const ok = root.grabToImage(function(res) {
+                const saved = res.saveToFile("/tmp/chiron-drive/state-" + ackTimer.seq + ".png")
+                console.log("[drive] ack", ackTimer.seq, "saved:", saved)
+            })
+            if (!ok) console.log("[drive] grabToImage refused for seq", ackTimer.seq)
         }
     }
 

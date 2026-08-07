@@ -87,6 +87,11 @@ func (s *Server) handlePagesMeta(w http.ResponseWriter, r *http.Request) {
 		"calibration": ch.Calibration,
 		"items":       pages.ItemPages(ch, res.Count),
 		"screener":    pages.Screener(ch),
+		"layout": map[string]int{
+			"page_w": pages.PageW, "page_h": pages.PageH,
+			"box_top": pages.BoxTop, "box_bottom": pages.BoxBottom,
+			"strip_h": pages.StripH,
+		},
 	})
 }
 
