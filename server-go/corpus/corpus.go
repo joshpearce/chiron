@@ -340,6 +340,9 @@ func (c *Corpus) FindQuestion(qid string) (*Question, string) {
 				}
 			}
 		}
+		if s := u.Questions.Screener; s != nil && s.ID == qid {
+			return s, u.ID
+		}
 	}
 	return nil, ""
 }

@@ -152,4 +152,10 @@ type Syllabus struct {
 type QuestionFile struct {
 	Pretest []Question `yaml:"pretest"`
 	Check   []Question `yaml:"check"`
+	// Screener is a single self-placement question a calibration unit asks
+	// first; the answer picks one of the CalibrationSets.
+	Screener *Question `yaml:"screener"`
+	// CalibrationSets maps a self-rating (1..5) to the ordered item ids of
+	// the series for that level - pre-computed, not derived at runtime.
+	CalibrationSets map[int][]string `yaml:"calibration_sets"`
 }

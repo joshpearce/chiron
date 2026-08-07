@@ -16,8 +16,13 @@ func TestInkCheckInGradesTranscriptions(t *testing.T) {
 	s := newServer(t, "")
 	sub, _ := s.subject("ai")
 
-	// Calibration chapter first, so the unit is active and item ids are known.
-	start := do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start"}`, "")
+	// Screener first (through ink, as the paper client would), then the
+	// series arrives and the unit is active with known item ids.
+	do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start"}`, "")
+	s.transcribe = func(tag string, png []byte) (string, error) { return "3", nil }
+	stroke0 := `[[{"x":0.5,"y":0.5},{"x":0.6,"y":0.6}]]`
+	screen := do(t, s, "POST", "/ink/ai",
+		`{"unit":"u0","items":[{"item_id":"u0-s1","strokes":`+stroke0+`}]}`, "")
 	var first struct {
 		Chapter struct {
 			Check []struct {
@@ -25,8 +30,11 @@ func TestInkCheckInGradesTranscriptions(t *testing.T) {
 			} `json:"check"`
 		} `json:"chapter"`
 	}
-	if err := json.Unmarshal(start.Body.Bytes(), &first); err != nil {
+	if err := json.Unmarshal(screen.Body.Bytes(), &first); err != nil {
 		t.Fatal(err)
+	}
+	if len(first.Chapter.Check) < 3 {
+		t.Fatalf("series not delivered after screener: %v", first.Chapter.Check)
 	}
 
 	// The "handwriting" answers the transcriber will return, keyed by the

@@ -350,3 +350,27 @@ check:
     This item is stretch: a learner who has never read an attention equation
     can still derive all three answers from shapes alone, which is the point.
   difficulty: stretch
+
+# Self-placement, asked before the series. The answer selects a
+# calibration_sets entry; it is never graded for correctness.
+screener:
+  id: u0-s1
+  concept: c-notation
+  kind: constructed
+  check: screener
+  difficulty: warmup
+  prompt: >
+    Before the questions: how would you rate your current understanding of the
+    math inside modern AI models - dot products, matrix shapes, softmax,
+    gradients? Answer with a single number. 1: absolute novice. 2: seen the
+    words, could not compute. 3: could work through it slowly. 4: comfortable.
+    5: expert - I could teach it.
+
+# Pre-computed series per self-rating: novices skip the hardest tail,
+# experts skip the warmups. Each list is delivered complete, in order.
+calibration_sets:
+  1: [u0-q1, u0-p2, u0-q9, u0-q3, u0-q5, u0-q12, u0-p7, u0-q7, u0-p3, u0-p4]
+  2: [u0-q1, u0-p2, u0-q9, u0-q3, u0-q5, u0-q12, u0-p7, u0-q7, u0-p3, u0-p4, u0-p6, u0-q2]
+  3: [u0-q1, u0-p2, u0-q9, u0-q3, u0-q5, u0-q12, u0-p7, u0-q7, u0-p3, u0-p4, u0-p6, u0-q2, u0-p8, u0-q8, u0-q11]
+  4: [u0-q3, u0-q5, u0-q12, u0-p7, u0-q7, u0-p3, u0-p4, u0-p6, u0-q2, u0-p8, u0-q8, u0-q11]
+  5: [u0-q12, u0-p7, u0-q7, u0-p3, u0-p4, u0-p6, u0-q2, u0-p8, u0-q8, u0-q11]

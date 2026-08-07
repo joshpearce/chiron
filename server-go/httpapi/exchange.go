@@ -115,6 +115,16 @@ func (s *Server) gradeItems(sub *Subject, responses []ItemResponse, results *[]R
 	passed := 0
 	for _, it := range items {
 		var g roles.Grade
+		if it.q.Check == "screener" {
+			rating := parseRating(it.r)
+			sc := float64(rating)
+			sub.Learner.Apply(state.Event{Kind: "self_rating", Score: &sc})
+			g = roles.Grade{Verdict: "pass",
+				FeedbackMD: fmt.Sprintf("Placed at level %d.", rating)}
+			*results = append(*results, Result{ItemID: it.r.ItemID, Grade: g})
+			passed++
+			continue
+		}
 		switch {
 		case it.r.IDK:
 			fb := "Marked \"I don't know\"."
@@ -202,6 +212,22 @@ func (s *Server) gradeBeats(sub *Subject, responses []BeatResponse, results *[]R
 	}
 }
 
+// parseRating reads a 1-5 self-placement from a screener response. Anything
+// unreadable (including "I don't know") lands in the middle.
+func parseRating(r ItemResponse) int {
+	if r.SelectedIndex != nil {
+		if n := *r.SelectedIndex + 1; n >= 1 && n <= 5 {
+			return n
+		}
+	}
+	for _, c := range r.Response {
+		if c >= '1' && c <= '5' {
+			return int(c - '0')
+		}
+	}
+	return 3
+}
+
 func (s *Server) nextUnit(sub *Subject, choice string) string {
 	fringe := sub.Learner.Fringe()
 	if len(fringe) == 0 {
@@ -225,11 +251,29 @@ func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*rende
 
 	var items []corpus.Question
 	if unit.IsCalibration() {
-		// The progression through the bank IS the instrument; no shuffle,
-		// no cap, no callbacks.
-		for _, q := range unit.Questions.Check {
+		// Self-placement first; then the pre-computed series for that
+		// level, complete and in authored order - no shuffle, no cap.
+		rating := sub.Learner.Data.Profile.SelfRating
+		if rating == 0 && unit.Questions.Screener != nil {
+			q := *unit.Questions.Screener
 			q.Unit = unit.ID
-			items = append(items, q)
+			items = []corpus.Question{q}
+		} else if ids := unit.Questions.CalibrationSets[rating]; len(ids) > 0 {
+			byID := map[string]corpus.Question{}
+			for _, q := range unit.Questions.Check {
+				byID[q.ID] = q
+			}
+			for _, id := range ids {
+				if q, ok := byID[id]; ok {
+					q.Unit = unit.ID
+					items = append(items, q)
+				}
+			}
+		} else {
+			for _, q := range unit.Questions.Check {
+				q.Unit = unit.ID
+				items = append(items, q)
+			}
 		}
 	} else {
 		s.rngMu.Lock()
@@ -406,7 +450,20 @@ func (s *Server) processExchange(sub *Subject, ex Exchange) map[string]any {
 		fmt.Fprintf(&summary, "Pretest: %d/%d. ", p, t)
 	}
 
+	screenerOnly := len(ex.CheckResponses) > 0
+	for _, r := range ex.CheckResponses {
+		if q, _ := sub.Corpus.FindQuestion(r.ItemID); q == nil || q.Check != "screener" {
+			screenerOnly = false
+			break
+		}
+	}
+
 	switch {
+	case screenerOnly:
+		// Self-placement recorded; no gate, no check_result. The chapter
+		// build below re-delivers the calibration unit, now carrying the
+		// series for the chosen level.
+		s.gradeItems(sub, ex.CheckResponses, &results)
 	case len(ex.CheckResponses) > 0:
 		p, t := s.gradeItems(sub, ex.CheckResponses, &results)
 		score := 0.0

@@ -64,22 +64,9 @@ func TestPagesEndpoints(t *testing.T) {
 func TestIDKGradesAsFailWithoutModel(t *testing.T) {
 	s := newServer(t, "tok")
 
-	start := do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start"}`, "tok")
-	var first struct {
-		Chapter struct {
-			Check []struct {
-				ID string `json:"id"`
-			} `json:"check"`
-		} `json:"chapter"`
-	}
-	if err := json.Unmarshal(start.Body.Bytes(), &first); err != nil {
-		t.Fatal(err)
-	}
-	if len(first.Chapter.Check) == 0 {
-		t.Fatal("no check items delivered")
-	}
-
-	id := first.Chapter.Check[0].ID
+	do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start"}`, "tok")
+	// A real series item, not the screener - the screener never fails.
+	id := "u0-q1"
 	body := `{"subject":"ai","phase":"boundary","unit":"u0","check_responses":[` +
 		`{"item_id":"` + id + `","idk":true,"confidence":1}]}`
 	w := do(t, s, "POST", "/exchange", body, "tok")

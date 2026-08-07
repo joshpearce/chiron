@@ -66,6 +66,9 @@ type Profile struct {
 	ExpertAxes   []string `json:"expert_axes"`
 	NoviceAxes   []string `json:"novice_axes"`
 	AssumedKnown []string `json:"assumed_known"`
+	// SelfRating is the learner's own placement from the calibration
+	// screener: 1 (absolute novice) to 5 (expert). 0 = not asked yet.
+	SelfRating int `json:"self_rating,omitempty"`
 }
 
 type Chunk struct {
@@ -317,6 +320,10 @@ func (l *Learner) handle(ev Event) {
 		}
 	case "chapter_cached":
 		l.Data.ChapterCache[ev.Unit] = ev.Ref
+	case "self_rating":
+		if ev.Score != nil {
+			l.Data.Profile.SelfRating = int(*ev.Score)
+		}
 	case "assumed_known":
 		seen := map[string]bool{}
 		for _, c := range l.Data.Profile.AssumedKnown {

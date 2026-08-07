@@ -130,16 +130,16 @@ func TestStartExchangeDeliversAChapter(t *testing.T) {
 	if resp.Chapter.Unit != "u0" {
 		t.Errorf("first chapter is %s, want u0", resp.Chapter.Unit)
 	}
-	// u0 is the calibration unit: a bare progressive question series - no
-	// beats, no pretest, the whole bank as the check.
+	// u0 is the calibration unit: it opens with the self-placement screener
+	// alone - no beats, no pretest, the series follows the answer.
 	if len(resp.Chapter.Beats) != 0 {
 		t.Errorf("calibration chapter has %d beats, want none", len(resp.Chapter.Beats))
 	}
 	if len(resp.Chapter.Pretest) != 0 {
 		t.Errorf("calibration chapter has %d pretest items, want none", len(resp.Chapter.Pretest))
 	}
-	if len(resp.Chapter.Check) != 15 {
-		t.Errorf("%d check items, want the full 15-item series", len(resp.Chapter.Check))
+	if len(resp.Chapter.Check) != 1 {
+		t.Errorf("%d check items, want the screener alone", len(resp.Chapter.Check))
 	}
 	if strings.Contains(resp.Chapter.HTML, "MATHPLACEHOLDER") {
 		t.Error("math placeholder leaked into the delivered html")
@@ -235,16 +235,41 @@ func TestCalibrationDeliversFullBankAndNeverGates(t *testing.T) {
 	if first.Chapter.Unit != "u0" {
 		t.Fatalf("first unit = %s, want u0", first.Chapter.Unit)
 	}
-	bank := sub.Corpus.Units["u0"].Questions.Check
-	if len(first.Chapter.Check) != len(bank) {
-		t.Fatalf("delivered %d items, want the whole bank (%d)",
-			len(first.Chapter.Check), len(bank))
+	if len(first.Chapter.Check) != 1 || first.Chapter.Check[0].ID != "u0-s1" {
+		t.Fatalf("first calibration chapter = %v, want the screener alone", first.Chapter.Check)
 	}
-	for i, item := range first.Chapter.Check {
-		if item.ID != bank[i].ID {
-			t.Fatalf("item %d is %s, want authored order (%s)", i, item.ID, bank[i].ID)
+
+	// Rating 4 selects the level-4 pre-computed set - no gate on the way.
+	screen := do(t, s, "POST", "/exchange",
+		`{"subject":"ai","phase":"boundary","unit":"u0","check_responses":[{"item_id":"u0-s1","response":"4","confidence":3}]}`, "")
+	var second struct {
+		Gate    *Gate `json:"gate"`
+		Chapter struct {
+			Unit  string `json:"unit"`
+			Check []struct {
+				ID string `json:"id"`
+			} `json:"check"`
+		} `json:"chapter"`
+	}
+	if err := json.Unmarshal(screen.Body.Bytes(), &second); err != nil {
+		t.Fatal(err)
+	}
+	if second.Gate != nil {
+		t.Fatalf("screener answer produced a gate: %+v", second.Gate)
+	}
+	if second.Chapter.Unit != "u0" {
+		t.Fatalf("after screener got unit %s, want u0 again", second.Chapter.Unit)
+	}
+	want := sub.Corpus.Units["u0"].Questions.CalibrationSets[4]
+	if len(second.Chapter.Check) != len(want) {
+		t.Fatalf("level-4 series has %d items, want %d", len(second.Chapter.Check), len(want))
+	}
+	for i, item := range second.Chapter.Check {
+		if item.ID != want[i] {
+			t.Fatalf("item %d is %s, want %s (pre-computed order)", i, item.ID, want[i])
 		}
 	}
+	first.Chapter.Check = second.Chapter.Check
 
 	var answers []string
 	for _, item := range first.Chapter.Check {
