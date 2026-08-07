@@ -30,6 +30,10 @@ type InkItem struct {
 	IDK bool `json:"idk,omitempty"`
 	// Confidence is optional; paper has no slider, so absent means "shaky".
 	Confidence int `json:"confidence,omitempty"`
+	// Aspect is the width/height ratio of the region the strokes were
+	// captured in; the raster canvas matches it so handwriting is not
+	// distorted for the transcriber.
+	Aspect float64 `json:"aspect,omitempty"`
 }
 
 type InkSubmission struct {
@@ -104,7 +108,11 @@ func (s *Server) handleInk(w http.ResponseWriter, r *http.Request) {
 			transcripts[item.ItemID] = fmt.Sprintf("[option %d]", *item.SelectedIndex+1)
 			continue
 		}
-		png, err := ink.Rasterize(item.Strokes, pages.PageW/2, pages.PageH/2)
+		rw, rh := pages.PageW/2, pages.PageH/2
+		if item.Aspect > 0.1 && item.Aspect < 20 {
+			rh = int(float64(rw) / item.Aspect)
+		}
+		png, err := ink.Rasterize(item.Strokes, rw, rh)
 		if err != nil {
 			// No ink on the page: an explicit pass on the question.
 			responses = append(responses, ItemResponse{

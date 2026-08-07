@@ -35,28 +35,27 @@ Rectangle {
     // the question box is the UI.
     property var screener: null
     property var checkinResult: null
-    // Pages the learner explicitly marked "I don't know" - wins over ink.
-    property var idkPages: ({})
-    // Structured selections (screener rating, MCQ option) per page.
-    property var selByPage: ({})
-    // Confidence per page, 1-4; unset means shaky.
-    property var confByPage: ({})
+    // Answer state keyed by item id - pages hold several items now.
+    property var idkByItem: ({})
+    property var selByItem: ({})
+    property var confByItem: ({})
 
     // Copy-on-write: assigning the SAME object reference back to a var
     // property does not signal a change, so bindings (button checked state,
     // Check in enabled) never re-evaluate. A fresh object every write does.
-    function setMap(name, p, v) {
+    function setMap(name, key, v) {
         var old = root[name]
         var m = {}
         for (var k in old) m[k] = old[k]
-        m[p] = v
+        m[key] = v
         root[name] = m
     }
 
-    function itemForPage(p) {
+    function itemsForPage(p) {
+        var out = []
         for (var i = 0; i < itemPages.length; i++)
-            if (itemPages[i].page === p) return itemPages[i]
-        return null
+            if (itemPages[i].page === p) out.push(itemPages[i])
+        return out
     }
 
     property string loadingWhy: "fetching chapter..."
@@ -291,8 +290,8 @@ Rectangle {
                         width: screenerBox.width
                         height: 56
                         checkable: true
-                        checked: root.selByPage[0] === index
-                        onClicked: root.setMap("selByPage", 0, index)
+                        checked: root.screener && root.selByItem[root.screener.item_id] === index
+                        onClicked: root.setMap("selByItem", root.screener.item_id, index)
                         contentItem: Row {
                             spacing: 16
                             leftPadding: 12
@@ -315,10 +314,28 @@ Rectangle {
         Button {
             text: "Check in"
             font.pixelSize: 24
-            enabled: root.selByPage[0] !== undefined && root.selByPage[0] !== null
+            enabled: root.screener && root.selByItem[root.screener.item_id] !== undefined
             anchors.horizontalCenter: parent.horizontalCenter
             onClicked: root.checkIn()
         }
+    }
+
+    // Strokes on a page belong to the item whose region contains their
+    // first point, renormalized to the region so the transcriber gets a
+    // tight crop instead of a mostly empty page.
+    function strokesForItem(it) {
+        const page = strokesForPage(it.page)
+        const out = []
+        for (var i = 0; i < page.length; i++) {
+            const s = page[i]
+            if (s.length === 0) continue
+            if (s[0].y < it.top || s[0].y > it.top + it.h) continue
+            const rs = []
+            for (var j = 0; j < s.length; j++)
+                rs.push({ x: s[j].x, y: (s[j].y - it.top) / it.h })
+            out.push(rs)
+        }
+        return out
     }
 
     function checkIn() {
@@ -329,18 +346,19 @@ Rectangle {
         const items = []
         if (screener) {
             items.push({ item_id: screener.item_id,
-                         selected_index: selByPage[0],
+                         selected_index: selByItem[screener.item_id],
                          strokes: [] })
         } else
         for (var i = 0; i < itemPages.length; i++) {
             const it = itemPages[i]
             const entry = { item_id: it.id,
-                            idk: idkPages[it.page] === true,
-                            strokes: strokesForPage(it.page) }
-            if (selByPage[it.page] !== undefined && selByPage[it.page] !== null)
-                entry.selected_index = selByPage[it.page]
-            if (confByPage[it.page])
-                entry.confidence = confByPage[it.page]
+                            idk: idkByItem[it.id] === true,
+                            aspect: it.h > 0 ? 0.75 / it.h : 0.75,
+                            strokes: strokesForItem(it) }
+            if (selByItem[it.id] !== undefined && selByItem[it.id] !== null)
+                entry.selected_index = selByItem[it.id]
+            if (confByItem[it.id])
+                entry.confidence = confByItem[it.id]
             items.push(entry)
         }
         const xhr = new XMLHttpRequest()
@@ -351,7 +369,7 @@ Rectangle {
                 if (!checkinResult.gate) {
                     // Nothing was gated (the screener step): go straight to
                     // the freshly delivered pages.
-                    inkByPage = ({}); idkPages = ({}); selByPage = ({}); confByPage = ({})
+                    inkByPage = ({}); idkByItem = ({}); selByItem = ({}); confByItem = ({})
                     checkinResult = null
                     loadMeta()
                 } else {
@@ -368,54 +386,48 @@ Rectangle {
         xhr.send(JSON.stringify({ unit: chapterUnit, items: items }))
     }
 
-    // Answer controls live INSIDE the question box: the server reserves a
-    // strip at the bottom of every interactive answer box (the layout
-    // contract in the pages meta), and this bar maps itself into that strip
-    // through the fitted page image.
-    Row {
-        id: controlBar
-        visible: root.mode === "reading" && root.itemForPage(root.page) !== null
-                 && root.layoutC !== null
-        spacing: 14
+    // Per-item controls, one row mapped into each answer box's reserved
+    // strip (regions come from the pages meta - the server enforces the
+    // same geometry it publishes).
+    Repeater {
+        model: root.mode === "reading" && root.layoutC !== null
+               ? root.itemsForPage(root.page) : []
+        delegate: Row {
+            spacing: 10
+            property var it: modelData
+            x: pageImage.x + (pageImage.width - pageImage.paintedWidth) / 2
+               + pageImage.paintedWidth / 2 - width / 2
+            y: pageImage.y + (pageImage.height - pageImage.paintedHeight) / 2
+               + (it.top + it.h - (root.layoutC.strip_h / root.layoutC.page_h) / 2)
+                 * pageImage.paintedHeight - height / 2
 
-        property var item: root.itemForPage(root.page)
-        property real stripCenterY: root.layoutC
-            ? (root.layoutC.box_bottom - root.layoutC.strip_h / 2) / root.layoutC.page_h
-            : 0.9
-
-        x: pageImage.x + (pageImage.width - pageImage.paintedWidth) / 2
-           + pageImage.paintedWidth / 2 - width / 2
-        y: pageImage.y + (pageImage.height - pageImage.paintedHeight) / 2
-           + stripCenterY * pageImage.paintedHeight - height / 2
-
-        Button {
-            checkable: true
-            checked: root.idkPages[root.page] === true
-            text: checked ? "✓ I don't know" : "I don't know"
-            font.pixelSize: 18
-            onToggled: root.setMap("idkPages", root.page, checked)
-        }
-        Repeater {
-            model: controlBar.item && controlBar.item.kind === "mcq"
-                   ? controlBar.item.options : 0
-            delegate: Button {
-                text: String.fromCharCode(65 + index)
-                width: 56
-                font.pixelSize: 20
+            Button {
                 checkable: true
-                checked: root.selByPage[root.page] === index
-                onClicked: root.setMap("selByPage", root.page, index)
+                checked: root.idkByItem[it.id] === true
+                text: checked ? "✓ I don't know" : "I don't know"
+                font.pixelSize: 14
+                onToggled: root.setMap("idkByItem", it.id, checked)
             }
-        }
-        Repeater {
-            model: controlBar.item && controlBar.item.kind !== "mcq"
-                   ? ["unsure", "shaky", "confident", "sure"] : 0
-            delegate: Button {
-                text: modelData
-                font.pixelSize: 16
-                checkable: true
-                checked: root.confByPage[root.page] === index + 1
-                onClicked: root.setMap("confByPage", root.page, index + 1)
+            Repeater {
+                model: it.kind === "mcq" ? it.options : 0
+                delegate: Button {
+                    text: String.fromCharCode(65 + index)
+                    width: 44
+                    font.pixelSize: 15
+                    checkable: true
+                    checked: root.selByItem[it.id] === index
+                    onClicked: root.setMap("selByItem", it.id, index)
+                }
+            }
+            Repeater {
+                model: it.kind !== "mcq" ? ["unsure", "shaky", "confident", "sure"] : 0
+                delegate: Button {
+                    text: modelData
+                    font.pixelSize: 13
+                    checkable: true
+                    checked: root.confByItem[it.id] === index + 1
+                    onClicked: root.setMap("confByItem", it.id, index + 1)
+                }
             }
         }
     }
@@ -459,19 +471,24 @@ Rectangle {
             ackTimer.seq = c.seq
             ackTimer.restart()
         }
+        // The n-th item on the current page, for commands that omit ids.
+        function driveItem(n) {
+            const list = root.itemsForPage(root.page)
+            return list.length > n ? list[n].id : ""
+        }
         function execInner(c) {
             if (c.cmd === "dump")
                 console.log("[drive]", JSON.stringify({mode: root.mode, page: root.page,
-                    sel: root.selByPage, idk: root.idkPages, conf: root.confByPage,
+                    sel: root.selByItem, idk: root.idkByItem, conf: root.confByItem,
                     items: root.itemPages.length, server: root.serverBase}))
-            else if (c.cmd === "level") root.setMap("selByPage", 0, c.i)
-            else if (c.cmd === "select") root.setMap("selByPage", root.page, c.i)
-            else if (c.cmd === "conf") root.setMap("confByPage", root.page, c.v)
-            else if (c.cmd === "idk") root.setMap("idkPages", root.page, c.on === false ? false : true)
+            else if (c.cmd === "level") root.setMap("selByItem", root.screener ? root.screener.item_id : "", c.i)
+            else if (c.cmd === "select") root.setMap("selByItem", c.item || driveItem(0), c.i)
+            else if (c.cmd === "conf") root.setMap("confByItem", c.item || driveItem(0), c.v)
+            else if (c.cmd === "idk") root.setMap("idkByItem", c.item || driveItem(c.slot || 0), c.on === false ? false : true)
             else if (c.cmd === "page") root.page = c.n
             else if (c.cmd === "checkin") root.checkIn()
             else if (c.cmd === "ink" && c.stroke) { root.strokesForPage(root.page).push(c.stroke); ink.requestPaint() }
-            else if (c.cmd === "next") { root.inkByPage = ({}); root.idkPages = ({}); root.selByPage = ({}); root.confByPage = ({}); root.checkinResult = null; root.loadMeta() }
+            else if (c.cmd === "next") { root.inkByPage = ({}); root.idkByItem = ({}); root.selByItem = ({}); root.confByItem = ({}); root.checkinResult = null; root.loadMeta() }
             else if (c.cmd === "server") { root.serverBase = c.url; root.bootstrapTried = false; root.loadMeta() }
             else if (c.cmd === "reload") { root.bootstrapTried = false; root.loadMeta() }
             // "shot" and unknown commands just ack with a screenshot
@@ -556,9 +573,9 @@ Rectangle {
                 font.pixelSize: 24
                 onClicked: {
                     root.inkByPage = ({})
-                    root.idkPages = ({})
-                    root.selByPage = ({})
-                    root.confByPage = ({})
+                    root.idkByItem = ({})
+                    root.selByItem = ({})
+                    root.confByItem = ({})
                     root.checkinResult = null
                     root.loadMeta()
                 }

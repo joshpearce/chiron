@@ -31,18 +31,22 @@ const (
 	PageH = 2160
 )
 
-// The interactive item-page geometry contract: every answer box spans the
-// page from BoxTop to BoxBottom (page pixels), with the bottom StripH
-// reserved for the client's controls - which is what lets the client place
-// them INSIDE the box without extracting geometry from the render.
+// The interactive item-page geometry contract. Items are packed 1-3 to a
+// page into fixed-height slots measured in sixths of the content area; the
+// server both enforces the geometry (explicit page containers and box
+// heights) and publishes it (per-item regions in the pages meta), which is
+// what lets the client place controls INSIDE each box and assign ink to
+// items without extracting anything from the render.
 const (
-	BoxTop    = 100
-	BoxBottom = 2060
-	StripH    = 200
+	BoxTop     = 100 // content top, page px
+	SlotUnit   = 326 // one sixth of the content area, page px
+	SlotsTotal = 6
+	BoxGap     = 14  // margin between stacked boxes, inside the slot height
+	StripH     = 130 // control strip reserved inside each box bottom
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v12"
+const styleVersion = "v13"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -88,20 +92,80 @@ type ItemPage struct {
 	Check   string `json:"check"`
 	Options int    `json:"options,omitempty"`
 	Page    int    `json:"page"`
+	// Region on the page, normalized 0..1 of page height.
+	Top float64 `json:"top"`
+	H   float64 `json:"h"`
+}
+
+// slotSixths estimates how much of a page an item needs: prompt length,
+// options for MCQs, writing room for constructed answers (more for prose
+// answers than for numbers), plus the control strip.
+func slotSixths(it render.ClientItem) int {
+	lines := 1 + len(it.Prompt)/75
+	h := 170 + lines*44 + StripH
+	if it.Kind == "mcq" {
+		h += len(it.Options) * 70
+	} else if it.Check == "llm" {
+		h += 460
+	} else {
+		h += 250
+	}
+	s := (h + SlotUnit - 1) / SlotUnit
+	if s < 2 {
+		s = 2
+	}
+	if s > SlotsTotal {
+		s = SlotsTotal
+	}
+	return s
+}
+
+// packItems fills pages in order: a new page starts when the next item
+// does not fit.
+func packItems(items []render.ClientItem) [][]render.ClientItem {
+	var pages [][]render.ClientItem
+	var cur []render.ClientItem
+	used := 0
+	for _, it := range items {
+		s := slotSixths(it)
+		if used+s > SlotsTotal && len(cur) > 0 {
+			pages = append(pages, cur)
+			cur, used = nil, 0
+		}
+		cur = append(cur, it)
+		used += s
+	}
+	if len(cur) > 0 {
+		pages = append(pages, cur)
+	}
+	return pages
 }
 
 func ItemPages(ch *render.Chapter, pageCount int) []ItemPage {
-	row := func(it render.ClientItem, page int) ItemPage {
-		return ItemPage{ID: it.ID, Kind: it.Kind, Check: it.Check,
-			Options: len(it.Options), Page: page}
+	regions := func(groups [][]render.ClientItem, firstPage int, fromEnd bool) []ItemPage {
+		var out []ItemPage
+		base := firstPage
+		if fromEnd {
+			base = pageCount - len(groups)
+		}
+		for p, group := range groups {
+			off := BoxTop
+			for _, it := range group {
+				hPx := slotSixths(it)*SlotUnit - BoxGap
+				out = append(out, ItemPage{
+					ID: it.ID, Kind: it.Kind, Check: it.Check,
+					Options: len(it.Options), Page: base + p,
+					Top: float64(off) / float64(PageH),
+					H:   float64(hPx) / float64(PageH),
+				})
+				off += hPx + BoxGap
+			}
+		}
+		return out
 	}
 	var out []ItemPage
-	for i, it := range ch.Pretest {
-		out = append(out, row(it, i))
-	}
-	for j, it := range ch.Check {
-		out = append(out, row(it, pageCount-len(ch.Check)+j))
-	}
+	out = append(out, regions(packItems(ch.Pretest), 0, false)...)
+	out = append(out, regions(packItems(ch.Check), 0, true)...)
 	return out
 }
 
@@ -319,8 +383,8 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 		class += " items-inline"
 	}
 	b = append(b, `<section class="`+class+`">`)
-	// Interactive item pages are headerless: uniform box geometry is the
-	// contract that lets the client place controls INSIDE the box. Print
+	// Interactive item pages are headerless: the slot geometry is the
+	// contract that lets the client place controls INSIDE each box. Print
 	// keeps the section framing - paper has no client to explain it.
 	if printLayout {
 		if title != "" {
@@ -330,13 +394,17 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 			b = append(b, `<p class="items-note">`+html.EscapeString(note)+`</p>`)
 		}
 	}
-	for i, it := range items {
-		b = append(b, fmt.Sprintf(`<div class="item-box" data-item-id=%q>`, it.ID))
-		num := fmt.Sprintf(`<span class="item-num">%d.</span>`, i+1)
+	num := 0
+	renderItem := func(it render.ClientItem, style string) []string {
+		num++
+		i := num - 1
+		var b []string
+		b = append(b, fmt.Sprintf(`<div class="item-box" data-item-id=%q%s>`, it.ID, style))
+		numSpan := fmt.Sprintf(`<span class="item-num">%d.</span>`, i+1)
 		if it.Check == "screener" {
-			num = ""
+			numSpan = ""
 		}
-		b = append(b, `<div class="item-prompt">`+num+
+		b = append(b, `<div class="item-prompt">`+numSpan+
 			html.EscapeString(it.Prompt)+`</div>`)
 		switch {
 		case it.Kind == "mcq" && printLayout:
@@ -376,6 +444,26 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 			b = append(b, `<div class="control-strip"></div>`)
 		}
 		b = append(b, `</div>`)
+		return b
+	}
+
+	if printLayout || inline {
+		// Natural flow: paper pages and the inline screener box.
+		for _, it := range items {
+			b = append(b, renderItem(it, "")...)
+		}
+	} else {
+		// Slot-packed pages: explicit page containers with fixed-height
+		// boxes, exactly mirroring the regions published in the meta.
+		for _, group := range packItems(items) {
+			b = append(b, `<div class="qpage">`)
+			for _, it := range group {
+				hPx := slotSixths(it)*SlotUnit - BoxGap
+				b = append(b, renderItem(it,
+					fmt.Sprintf(` style="height: %dpx"`, hPx))...)
+			}
+			b = append(b, `</div>`)
+		}
 	}
 	b = append(b, `</section>`)
 	return strings.Join(b, "\n")
@@ -464,9 +552,10 @@ func interactiveItemCSS(printLayout bool) string {
 	if printLayout {
 		return ""
 	}
-	return fmt.Sprintf(`.items-section:not(.items-inline) .item-box { margin: 0; box-sizing: border-box; min-height: %dpx; position: relative; padding-bottom: %dpx; }
+	return fmt.Sprintf(`.qpage { page-break-before: always; page-break-inside: avoid; height: %dpx; overflow: hidden; }
+.qpage .item-box { margin: 0 0 %dpx 0; box-sizing: border-box; position: relative; padding-bottom: %dpx; overflow: hidden; }
 .control-strip { position: absolute; left: 24px; right: 24px; bottom: 0; height: %dpx; border-top: 2px dashed #999; }`,
-		BoxBottom-BoxTop, StripH+20, StripH)
+		SlotsTotal*SlotUnit-BoxGap, BoxGap, StripH+16, StripH)
 }
 
 func mustAbs(p string) string {

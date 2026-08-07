@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The paper check-in: strokes go in, transcriptions are graded through the
@@ -103,6 +104,14 @@ func TestInkCheckInGradesTranscriptions(t *testing.T) {
 	}
 	if transcribed[idkID] {
 		t.Error("IDK item was sent to the transcriber - the toggle must win")
+	}
+
+	// The async build must settle before the test's temp dir is cleaned.
+	for range 100 {
+		if building, _ := sub.buildStatus(); !building {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 
 	// The graded artifacts are kept for audit.

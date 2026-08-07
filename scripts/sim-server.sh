@@ -44,7 +44,9 @@ sed -e "s|corpus_dir: ../corpus|corpus_dir: $ROOT/corpus|" \
 
 (cd "$ROOT/server-go" && go build -o "$STATE/chiron-server" ./cmd/chiron-server)
 
-"$STATE/chiron-server" -addr "$ADDR" -config "$CONF" >>"$LOG" 2>&1 &
+# Drive/test mode: enables the dev-drive command queue and the authored-
+# chapter cache - this server exists for UI iteration, never real learning.
+CHIRON_DRIVE=1 "$STATE/chiron-server" -addr "$ADDR" -config "$CONF" >>"$LOG" 2>&1 &
 echo $! > "$PIDFILE"
 
 for _ in $(seq 1 20); do

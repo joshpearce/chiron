@@ -48,16 +48,22 @@ one to move on. Pretests are *designed* to be failed; forcing filler poisons
 the signal. Every answer surface carries an explicit "I don't know" that is
 one action, never punished, and recorded as itself.
 
-## Deterministic beats clever: one answer, one page
+## Deterministic beats clever: the server enforces the geometry it publishes
 
 Mapping ink to answer regions by extracting element geometry from the
-rendered HTML was the obvious design. Instead, every question box gets its
-own page, so the mapping is arithmetic: pretest items open the page stack,
-check items close it, strokes on a page belong to its item. No geometry
-extraction, no coordinate contract to drift.
+rendered HTML was the obvious design and stayed rejected. The first cut gave
+every question its own page (mapping by arithmetic), which burned screen
+real estate; the current design packs 2-3 questions per page into
+fixed-height slots the SERVER assigns - estimated from prompt length, answer
+type, and option count - and publishes each item's page + region in the
+pages meta. The renderer emits explicit page containers with those exact
+box heights, so the published regions cannot drift from the pixels: the
+server enforces the geometry it declares. Clients place per-item controls
+into each region and assign strokes to items by containment, renormalized
+to the region so transcription sees a tight, undistorted crop.
 
-When a layout invariant carries semantics (like "one item per page"), it
-must hold structurally (page-break CSS), not by hoping content fits.
+When a layout invariant carries semantics, it must hold structurally
+(explicit containers, fixed heights), not by hoping content fits.
 
 ## One corpus, per-medium affordances
 
