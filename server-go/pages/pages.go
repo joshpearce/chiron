@@ -38,10 +38,13 @@ type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
 	// usual places.
 	ChromePath string
-	// mu serializes renders: chapters are rendered eagerly at delivery AND
-	// on demand by the pages endpoints, and two identical renders racing
-	// into the same cache directory would trample each other.
-	mu sync.Mutex
+	// Renders of DISTINCT chapters run concurrently (the calibration
+	// prerender walks five level variants while the learner reads the
+	// screener), but identical renders - eager plus on-demand for the same
+	// chapter - collapse onto one in-flight job so they cannot trample the
+	// same cache directory.
+	mu       sync.Mutex
+	inflight map[string]*renderJob
 	// KatexDir holds katex.min.css/js and contrib/auto-render.min.js
 	// (the same assets the iPad bundles).
 	KatexDir string
@@ -112,14 +115,41 @@ func (r *Renderer) chrome() string {
 	return ""
 }
 
+type renderJob struct {
+	done chan struct{}
+	res  Result
+	err  error
+}
+
 // Render produces the page stack for a chapter, reusing a previous render
-// of identical content.
+// of identical content and joining an in-flight render of the same content.
 func (r *Renderer) Render(ch *render.Chapter) (Result, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	doc := r.wrap(ch)
 	sum := sha256.Sum256([]byte(doc))
-	hash := hex.EncodeToString(sum[:8])
+	key := hex.EncodeToString(sum[:8])
+
+	r.mu.Lock()
+	if r.inflight == nil {
+		r.inflight = map[string]*renderJob{}
+	}
+	if job, ok := r.inflight[key]; ok {
+		r.mu.Unlock()
+		<-job.done
+		return job.res, job.err
+	}
+	job := &renderJob{done: make(chan struct{})}
+	r.inflight[key] = job
+	r.mu.Unlock()
+
+	job.res, job.err = r.renderDoc(ch, doc, key)
+	close(job.done)
+	r.mu.Lock()
+	delete(r.inflight, key)
+	r.mu.Unlock()
+	return job.res, job.err
+}
+
+func (r *Renderer) renderDoc(ch *render.Chapter, doc, hash string) (Result, error) {
 	dir := filepath.Join(r.CacheDir, ch.Unit+"-"+hash)
 	res := Result{Dir: dir, Hash: hash}
 

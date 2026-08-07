@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/mjbraun/chiron/server/checkers"
 	"github.com/mjbraun/chiron/server/corpus"
@@ -228,6 +229,65 @@ func parseRating(r ItemResponse) int {
 	return 3
 }
 
+// calibrationItems selects a calibration unit's delivery for a self-rating:
+// the screener alone before a rating exists, the level's pre-computed series
+// after, the whole bank if no set is defined for the level.
+func calibrationItems(unit *corpus.Unit, rating int) []corpus.Question {
+	if rating == 0 && unit.Questions.Screener != nil {
+		q := *unit.Questions.Screener
+		q.Unit = unit.ID
+		return []corpus.Question{q}
+	}
+	var items []corpus.Question
+	if ids := unit.Questions.CalibrationSets[rating]; len(ids) > 0 {
+		byID := map[string]corpus.Question{}
+		for _, q := range unit.Questions.Check {
+			byID[q.ID] = q
+		}
+		for _, id := range ids {
+			if q, ok := byID[id]; ok {
+				q.Unit = unit.ID
+				items = append(items, q)
+			}
+		}
+		return items
+	}
+	for _, q := range unit.Questions.Check {
+		q.Unit = unit.ID
+		items = append(items, q)
+	}
+	return items
+}
+
+// prerenderCalibrationSets renders the page stack for every level, middle
+// levels first (they are the most likely picks). Chapter composition here
+// must stay byte-identical to what buildChapter will produce once the
+// rating is recorded, or the cache keys will not line up.
+func (s *Server) prerenderCalibrationSets(sub *Subject, unit *corpus.Unit, checkSummary string) {
+	d := roles.PlanDirectives(s.chain, sub.Learner, unit, checkSummary)
+	sections, _ := roles.AuthorChapter(s.chain, unit, d, sub.Corpus)
+	var wg sync.WaitGroup
+	for rating := 1; rating <= 5; rating++ {
+		if len(unit.Questions.CalibrationSets[rating]) == 0 {
+			continue
+		}
+		ch, err := render.RenderChapter(unit, sections,
+			render.Directives{OpeningNoteMD: d.OpeningNoteMD, NextAction: d.NextAction},
+			unit.Questions.Pretest, calibrationItems(unit, rating))
+		if err != nil {
+			continue
+		}
+		wg.Add(1)
+		go func(rating int, ch *render.Chapter) {
+			defer wg.Done()
+			if _, err := sub.Pages.Render(ch); err != nil {
+				log.Printf("prerender calibration level %d: %v", rating, err)
+			}
+		}(rating, ch)
+	}
+	wg.Wait()
+}
+
 func (s *Server) nextUnit(sub *Subject, choice string) string {
 	fringe := sub.Learner.Fringe()
 	if len(fringe) == 0 {
@@ -254,26 +314,12 @@ func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*rende
 		// Self-placement first; then the pre-computed series for that
 		// level, complete and in authored order - no shuffle, no cap.
 		rating := sub.Learner.Data.Profile.SelfRating
-		if rating == 0 && unit.Questions.Screener != nil {
-			q := *unit.Questions.Screener
-			q.Unit = unit.ID
-			items = []corpus.Question{q}
-		} else if ids := unit.Questions.CalibrationSets[rating]; len(ids) > 0 {
-			byID := map[string]corpus.Question{}
-			for _, q := range unit.Questions.Check {
-				byID[q.ID] = q
-			}
-			for _, id := range ids {
-				if q, ok := byID[id]; ok {
-					q.Unit = unit.ID
-					items = append(items, q)
-				}
-			}
-		} else {
-			for _, q := range unit.Questions.Check {
-				q.Unit = unit.ID
-				items = append(items, q)
-			}
+		items = calibrationItems(unit, rating)
+		if rating == 0 {
+			// Every level's series is already known: render all five page
+			// stacks while the learner reads the placement question, so
+			// whichever they pick is on disk before they ask for it.
+			go s.prerenderCalibrationSets(sub, unit, checkSummary)
 		}
 	} else {
 		s.rngMu.Lock()
