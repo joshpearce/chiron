@@ -28,6 +28,14 @@ Rectangle {
     // Item -> page map from the server; ink on an item's page belongs to it.
     property var itemPages: []
     property var checkinResult: null
+    // Pages the learner explicitly marked "I don't know" - wins over ink.
+    property var idkPages: ({})
+
+    function itemForPage(p) {
+        for (var i = 0; i < itemPages.length; i++)
+            if (itemPages[i].page === p) return itemPages[i]
+        return null
+    }
 
     function loadMeta() {
         mode = "loading"
@@ -169,7 +177,9 @@ Rectangle {
         const items = []
         for (var i = 0; i < itemPages.length; i++) {
             const it = itemPages[i]
-            items.push({ item_id: it.id, strokes: strokesForPage(it.page) })
+            items.push({ item_id: it.id,
+                         idk: idkPages[it.page] === true,
+                         strokes: strokesForPage(it.page) })
         }
         const xhr = new XMLHttpRequest()
         xhr.onreadystatechange = function() {
@@ -186,6 +196,23 @@ Rectangle {
         xhr.open("POST", serverBase + "/ink/" + subject)
         xhr.setRequestHeader("Content-Type", "application/json")
         xhr.send(JSON.stringify({ unit: chapterUnit, items: items }))
+    }
+
+    // "I don't know" toggle, shown only on answer pages. Explicit beats
+    // inferred: a tick drawn in ink once came back graded correct because
+    // the vision model answered the question itself.
+    Button {
+        visible: root.mode === "reading" && root.itemForPage(root.page) !== null
+        checkable: true
+        checked: root.idkPages[root.page] === true
+        text: checked ? "✓ I don't know" : "I don't know"
+        font.pixelSize: 20
+        anchors { right: parent.right; top: parent.top; margins: 10 }
+        onToggled: {
+            var m = root.idkPages
+            m[root.page] = checked
+            root.idkPages = m
+        }
     }
 
     // Check in, from the last page - answers up, grades and the next
@@ -254,6 +281,7 @@ Rectangle {
                 font.pixelSize: 24
                 onClicked: {
                     root.inkByPage = ({})
+                    root.idkPages = ({})
                     root.checkinResult = null
                     root.loadMeta()
                 }

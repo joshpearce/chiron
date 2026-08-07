@@ -29,11 +29,14 @@ func TestInkCheckInGradesTranscriptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The "handwriting" answers the transcriber will return: right answer
-	// for item 1 (dot product of [2,0,-3].[1,4,2] = -4), garbage for item 2,
-	// everything else unanswered (no strokes at all).
-	s.transcribe = func(hint string, png []byte) (string, error) {
-		if strings.Contains(hint, "dot product") {
+	// The "handwriting" answers the transcriber will return, keyed by the
+	// item id it is called with (the tag): right answer for item 1 (dot
+	// product = -4), garbage for item 2. Everything else sends no strokes.
+	firstID := first.Chapter.Check[0].ID
+	transcribed := map[string]bool{}
+	s.transcribe = func(tag string, png []byte) (string, error) {
+		transcribed[tag] = true
+		if tag == firstID {
 			return "-4", nil
 		}
 		return "no idea, sorry", nil
@@ -43,8 +46,11 @@ func TestInkCheckInGradesTranscriptions(t *testing.T) {
 	items := []string{
 		`{"item_id":"` + first.Chapter.Check[0].ID + `","strokes":` + stroke + `}`,
 		`{"item_id":"` + first.Chapter.Check[1].ID + `","strokes":` + stroke + `}`,
+		// A ticked "I don't know" WITH stray ink: the toggle must win and
+		// the transcriber must never see the page.
+		`{"item_id":"` + first.Chapter.Check[2].ID + `","idk":true,"strokes":` + stroke + `}`,
 	}
-	for _, it := range first.Chapter.Check[2:] {
+	for _, it := range first.Chapter.Check[3:] {
 		items = append(items, `{"item_id":"`+it.ID+`","strokes":[]}`)
 	}
 	body := `{"unit":"u0","items":[` + strings.Join(items, ",") + `]}`
@@ -82,6 +88,13 @@ func TestInkCheckInGradesTranscriptions(t *testing.T) {
 	}
 	if got := resp.Transcripts[first.Chapter.Check[0].ID]; got != "-4" {
 		t.Errorf("transcript = %q", got)
+	}
+	idkID := first.Chapter.Check[2].ID
+	if v := verdicts[idkID]; v != "fail" {
+		t.Errorf("explicit IDK graded %q, want fail", v)
+	}
+	if transcribed[idkID] {
+		t.Error("IDK item was sent to the transcriber - the toggle must win")
 	}
 
 	// The graded artifacts are kept for audit.

@@ -22,6 +22,9 @@ import (
 type InkItem struct {
 	ItemID  string        `json:"item_id"`
 	Strokes [][]ink.Point `json:"strokes"`
+	// IDK is the client-side "I don't know" toggle. It wins over any ink on
+	// the page - a tick mark is not an answer.
+	IDK bool `json:"idk,omitempty"`
 	// Confidence is optional; paper has no slider, so absent means "shaky".
 	Confidence int `json:"confidence,omitempty"`
 }
@@ -81,6 +84,12 @@ func (s *Server) handleInk(w http.ResponseWriter, r *http.Request) {
 	responses := make([]ItemResponse, 0, len(in.Items))
 	transcripts := map[string]string{}
 	for _, item := range in.Items {
+		if item.IDK {
+			responses = append(responses, ItemResponse{
+				ItemID: item.ItemID, IDK: true, Confidence: 1})
+			transcripts[item.ItemID] = "[I don't know]"
+			continue
+		}
 		conf := item.Confidence
 		if conf == 0 {
 			conf = 2
@@ -95,11 +104,7 @@ func (s *Server) handleInk(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = os.WriteFile(filepath.Join(inkDir, item.ItemID+".png"), png, 0o644)
 
-		hint := ""
-		if q, _ := sub.Corpus.FindQuestion(item.ItemID); q != nil {
-			hint = q.Prompt
-		}
-		text, err := transcribe(hint, png)
+		text, err := transcribe(item.ItemID, png)
 		if err != nil {
 			writeError(w, http.StatusBadGateway, "transcription failed on %s: %v",
 				item.ItemID, err)

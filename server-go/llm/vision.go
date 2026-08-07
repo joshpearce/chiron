@@ -15,15 +15,17 @@ import (
 // separate, direct call rather than part of the role chain: transcription is
 // mechanical, needs no provider fallback, and the vision model is loaded on
 // demand next to the text model.
-func Transcribe(baseURL, model, hint string, pngData []byte) (string, error) {
-	prompt := "Transcribe the handwritten answer in this image exactly, " +
+// The tag parameter is for logging only. The question is deliberately NOT
+// given to the model: with the question in the prompt, a small vision model
+// answers it instead of transcribing the scribble - "I don't know" tick
+// marks came back as correct answers that way.
+func Transcribe(baseURL, model, tag string, pngData []byte) (string, error) {
+	_ = tag
+	prompt := "Transcribe the handwriting in this image exactly, " +
 		"preserving numbers, signs, and symbols. Output ONLY the transcription " +
-		"with no commentary. If the page is blank or only a checkbox is " +
-		"ticked, output exactly: [no answer]"
-	if hint != "" {
-		prompt += " Context (the question being answered, do not answer it " +
-			"yourself): " + hint
-	}
+		"with no commentary. If the image is blank, or contains only a tick, " +
+		"check mark, X, or a mark in a small box rather than written words or " +
+		"numbers, output exactly: [no answer]"
 	body, err := json.Marshal(map[string]any{
 		"model": model,
 		"messages": []map[string]any{{
