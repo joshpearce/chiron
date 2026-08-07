@@ -52,9 +52,12 @@ type Config struct {
 	StaticDir string        `yaml:"static_dir"`
 	// KatexDir points at the KaTeX assets used when rendering chapters to
 	// page images for e-ink clients (the same files the iPad bundles).
-	KatexDir  string        `yaml:"katex_dir"`
-	Session   SessionConfig `yaml:"session"`
-	AuthToken string        `yaml:"auth_token"`
+	KatexDir string `yaml:"katex_dir"`
+	// VisionModel transcribes handwritten ink submissions (loaded on demand
+	// by the same OpenAI-compatible server as the text upstream).
+	VisionModel string        `yaml:"vision_model"`
+	Session     SessionConfig `yaml:"session"`
+	AuthToken   string        `yaml:"auth_token"`
 	// Grade all free-text items of a check in one model call. Off by default:
 	// the per-item path is the one verified end to end, and a check is the
 	// moment a learner is most exposed to a regression.
@@ -90,12 +93,14 @@ type Subject struct {
 }
 
 type Server struct {
-	cfg   *Config
-	root  string // directory config.yaml lives in
-	chain llm.Chain
-	token string
-	rng   *rand.Rand
-	rngMu sync.Mutex
+	cfg  *Config
+	root string // directory config.yaml lives in
+	// transcribe overrides the ink vision transcriber; tests inject one.
+	transcribe func(hint string, png []byte) (string, error)
+	chain      llm.Chain
+	token      string
+	rng        *rand.Rand
+	rngMu      sync.Mutex
 
 	mu       sync.RWMutex
 	subjects map[string]*Subject
@@ -252,6 +257,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /review-schedule", s.handleReviewSchedule)
 	mux.HandleFunc("GET /pages/{subject}", s.handlePagesMeta)
 	mux.HandleFunc("GET /pages/{subject}/{page}", s.handlePage)
+	mux.HandleFunc("POST /ink/{subject}", s.handleInk)
 	mux.HandleFunc("POST /exchange", s.handleExchange)
 	mux.HandleFunc("POST /reset", s.handleReset)
 	mux.HandleFunc("POST /teach/turn", s.handleTeachTurn)

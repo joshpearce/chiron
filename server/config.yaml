@@ -6,6 +6,8 @@ subjects:
     state_dir: ../state/ai
 static_dir: static
 katex_dir: ../ipad-app/Chiron/Resources/katex
+# Transcribes handwritten ink submissions from the paper client.
+vision_model: google/gemma-3-4b
 
 upstreams:
   # First healthy upstream wins. Health = GET {base_url}/models within 3s.

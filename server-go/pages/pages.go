@@ -31,7 +31,7 @@ const (
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v5"
+const styleVersion = "v6"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -53,6 +53,28 @@ type Result struct {
 
 func (r Result) PagePath(n int) string {
 	return filepath.Join(r.Dir, fmt.Sprintf("page-%03d.png", n))
+}
+
+// ItemPage says which rendered page an item occupies. Pretest items open the
+// stack (the section header rides with the first box), check items close it;
+// every box starts its own page, so the mapping is arithmetic. Ink drawn on
+// an item's page belongs to that item.
+type ItemPage struct {
+	ID   string `json:"id"`
+	Kind string `json:"kind"`
+	Page int    `json:"page"`
+}
+
+func ItemPages(ch *render.Chapter, pageCount int) []ItemPage {
+	var out []ItemPage
+	for i, it := range ch.Pretest {
+		out = append(out, ItemPage{ID: it.ID, Kind: it.Kind, Page: i})
+	}
+	for j, it := range ch.Check {
+		out = append(out, ItemPage{ID: it.ID, Kind: it.Kind,
+			Page: pageCount - len(ch.Check) + j})
+	}
+	return out
 }
 
 func (r *Renderer) chrome() string {
@@ -266,7 +288,8 @@ blockquote, .planner-note { border-left: 6px solid #000; margin: 24px 0; padding
 .items-section { page-break-before: always; }
 .items-section:first-child { page-break-before: avoid; }
 .items-note { font-style: italic; color: #333; }
-.item-box { border: 3px solid #000; margin: 34px 0; padding: 20px 24px; page-break-inside: avoid; }
+.item-box { border: 3px solid #000; margin: 34px 0; padding: 20px 24px; page-break-inside: avoid; page-break-before: always; }
+.item-box:first-of-type { page-break-before: avoid; }
 .item-num { font-weight: bold; margin-right: 14px; }
 .item-ink { height: 420px; border-top: 2px dashed #999; margin-top: 18px; }
 .mcq { list-style: none; padding: 0; margin: 16px 0 0 0; }

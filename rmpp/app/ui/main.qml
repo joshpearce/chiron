@@ -17,13 +17,17 @@ Rectangle {
     property string serverBase: "http://localhost:8082"
     property string subject: "ai"
 
-    // "loading" | "reading" | "error"
+    // "loading" | "reading" | "submitting" | "results" | "error"
     property string mode: "loading"
     property string errorText: ""
     property string chapterTitle: ""
+    property string chapterUnit: ""
     property string pagesHash: ""
     property int pageCount: 0
     property int page: 0
+    // Item -> page map from the server; ink on an item's page belongs to it.
+    property var itemPages: []
+    property var checkinResult: null
 
     function loadMeta() {
         mode = "loading"
@@ -33,11 +37,14 @@ Rectangle {
             if (xhr.status === 200) {
                 const m = JSON.parse(xhr.responseText)
                 chapterTitle = m.title
+                chapterUnit = m.unit
                 pageCount = m.count
                 pagesHash = m.hash
+                itemPages = m.items || []
                 page = 0
                 mode = "reading"
-                console.log("[chiron] chapter:", m.unit, m.count, "pages")
+                console.log("[chiron] chapter:", m.unit, m.count, "pages,",
+                            itemPages.length, "answer pages")
             } else {
                 errorText = "No chapter available (" + xhr.status + ").\n"
                           + "Server: " + serverBase
@@ -157,11 +164,108 @@ Rectangle {
         anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 8 }
     }
 
+    function checkIn() {
+        mode = "submitting"
+        const items = []
+        for (var i = 0; i < itemPages.length; i++) {
+            const it = itemPages[i]
+            items.push({ item_id: it.id, strokes: strokesForPage(it.page) })
+        }
+        const xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return
+            if (xhr.status === 200) {
+                checkinResult = JSON.parse(xhr.responseText)
+                mode = "results"
+            } else {
+                errorText = "Check-in failed (" + xhr.status + "): "
+                          + xhr.responseText.substring(0, 200)
+                mode = "error"
+            }
+        }
+        xhr.open("POST", serverBase + "/ink/" + subject)
+        xhr.setRequestHeader("Content-Type", "application/json")
+        xhr.send(JSON.stringify({ unit: chapterUnit, items: items }))
+    }
+
+    // Check in, from the last page - answers up, grades and the next
+    // chapter back.
+    Button {
+        visible: root.mode === "reading" && root.page === root.pageCount - 1
+                 && root.itemPages.length > 0
+        text: "Check in"
+        font.pixelSize: 24
+        anchors { right: parent.right; bottom: parent.bottom; margins: 10 }
+        onClicked: root.checkIn()
+    }
+
+    // Results view
+    Flickable {
+        visible: root.mode === "results"
+        anchors.fill: parent
+        anchors.margins: 40
+        contentHeight: resultsColumn.height
+        clip: true
+
+        Column {
+            id: resultsColumn
+            width: parent.width
+            spacing: 16
+
+            Text {
+                text: {
+                    if (!root.checkinResult || !root.checkinResult.gate) return "Checked in"
+                    const g = root.checkinResult.gate
+                    const pct = g.score !== undefined && g.score !== null
+                        ? Math.round(g.score * 100) + "%" : ""
+                    if (g.calibration) return "Calibration complete - " + pct
+                    return (g.passed ? "Gate cleared - " : "Below the gate - ") + pct
+                }
+                font.pixelSize: 42
+                font.family: "serif"
+            }
+            Repeater {
+                model: root.checkinResult ? (root.checkinResult.results || []) : []
+                delegate: Column {
+                    width: resultsColumn.width
+                    spacing: 2
+                    Text {
+                        width: parent.width
+                        text: (modelData.verdict === "pass" ? "✓  " : "✗  ")
+                              + modelData.item_id + "   "
+                              + (root.checkinResult.transcripts
+                                 ? "“" + (root.checkinResult.transcripts[modelData.item_id] || "") + "”"
+                                 : "")
+                        font.pixelSize: 22
+                        wrapMode: Text.Wrap
+                    }
+                    Text {
+                        width: parent.width
+                        visible: modelData.feedback_md !== undefined && modelData.verdict !== "pass"
+                        text: modelData.feedback_md || ""
+                        font.pixelSize: 18
+                        color: "#444444"
+                        wrapMode: Text.Wrap
+                    }
+                }
+            }
+            Button {
+                text: "Next chapter"
+                font.pixelSize: 24
+                onClicked: {
+                    root.inkByPage = ({})
+                    root.checkinResult = null
+                    root.loadMeta()
+                }
+            }
+        }
+    }
+
     // Loading / error states
     Column {
         anchors.centerIn: parent
         spacing: 24
-        visible: root.mode !== "reading"
+        visible: root.mode === "loading" || root.mode === "submitting" || root.mode === "error"
 
         Text {
             text: "Chiron"
@@ -170,7 +274,9 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
         }
         Text {
-            text: root.mode === "loading" ? "fetching chapter..." : root.errorText
+            text: root.mode === "loading" ? "fetching chapter..."
+                : root.mode === "submitting" ? "Grading your answers - the next chapter is being written..."
+                : root.errorText
             font.pixelSize: 24
             horizontalAlignment: Text.AlignHCenter
             anchors.horizontalCenter: parent.horizontalCenter

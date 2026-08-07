@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/mjbraun/chiron/server/pages"
 	"github.com/mjbraun/chiron/server/render"
 )
 
@@ -79,10 +80,12 @@ func (s *Server) handlePagesMeta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"unit":  ch.Unit,
-		"title": ch.Title,
-		"count": res.Count,
-		"hash":  res.Hash,
+		"unit":        ch.Unit,
+		"title":       ch.Title,
+		"count":       res.Count,
+		"hash":        res.Hash,
+		"calibration": ch.Calibration,
+		"items":       pages.ItemPages(ch, res.Count),
 	})
 }
 

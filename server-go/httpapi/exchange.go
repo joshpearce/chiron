@@ -376,7 +376,12 @@ func (s *Server) handleExchange(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "unknown subject: %s", ex.Subject)
 		return
 	}
+	writeJSON(w, http.StatusOK, s.processExchange(sub, ex))
+}
 
+// processExchange is the whole boundary contract - grade, gate, plan, author,
+// persist - shared by the JSON exchange endpoint and the ink check-in.
+func (s *Server) processExchange(sub *Subject, ex Exchange) map[string]any {
 	results := []Result{}
 	var gate *Gate
 	var chapter *render.Chapter
@@ -501,13 +506,13 @@ func (s *Server) handleExchange(w http.ResponseWriter, r *http.Request) {
 			log.Printf("persist chapter %s: %v", chapter.Unit, err)
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	return map[string]any{
 		"results":          results,
 		"gate":             gate,
 		"chapter":          chapter,
 		"state":            s.statePayload(sub),
 		"break_suggestion": breakSuggestion,
-	})
+	}
 }
 
 func (s *Server) statePayload(sub *Subject) map[string]any {
