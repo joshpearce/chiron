@@ -505,6 +505,14 @@ func (s *Server) processExchange(sub *Subject, ex Exchange) map[string]any {
 		if err := persistChapter(sub, chapter); err != nil {
 			log.Printf("persist chapter %s: %v", chapter.Unit, err)
 		}
+		// Render the page images now, while the learner is still reading
+		// their results - by the time they ask for the next chapter it is
+		// already on disk. The renderer serializes with the on-demand path.
+		go func(ch *render.Chapter) {
+			if _, err := sub.Pages.Render(ch); err != nil {
+				log.Printf("eager page render %s: %v", ch.Unit, err)
+			}
+		}(chapter)
 	}
 	return map[string]any{
 		"results":          results,

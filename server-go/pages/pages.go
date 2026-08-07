@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/mjbraun/chiron/server/corpus"
 	"github.com/mjbraun/chiron/server/render"
@@ -37,6 +38,10 @@ type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
 	// usual places.
 	ChromePath string
+	// mu serializes renders: chapters are rendered eagerly at delivery AND
+	// on demand by the pages endpoints, and two identical renders racing
+	// into the same cache directory would trample each other.
+	mu sync.Mutex
 	// KatexDir holds katex.min.css/js and contrib/auto-render.min.js
 	// (the same assets the iPad bundles).
 	KatexDir string
@@ -100,6 +105,8 @@ func (r *Renderer) chrome() string {
 // Render produces the page stack for a chapter, reusing a previous render
 // of identical content.
 func (r *Renderer) Render(ch *render.Chapter) (Result, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	doc := r.wrap(ch)
 	sum := sha256.Sum256([]byte(doc))
 	hash := hex.EncodeToString(sum[:8])
