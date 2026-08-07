@@ -27,6 +27,9 @@ Rectangle {
     property int page: 0
     // Item -> page map from the server; ink on an item's page belongs to it.
     property var itemPages: []
+    // Non-null when the chapter is the placement screener: rendered natively,
+    // the question box is the UI.
+    property var screener: null
     property var checkinResult: null
     // Pages the learner explicitly marked "I don't know" - wins over ink.
     property var idkPages: ({})
@@ -59,8 +62,9 @@ Rectangle {
                 pageCount = m.count
                 pagesHash = m.hash
                 itemPages = m.items || []
+                screener = m.screener || null
                 page = 0
-                mode = "reading"
+                mode = screener ? "screener" : "reading"
                 console.log("[chiron] chapter:", m.unit, m.count, "pages,",
                             itemPages.length, "answer pages")
             } else {
@@ -182,9 +186,83 @@ Rectangle {
         anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 8 }
     }
 
+    // Native placement screen: the question box holds the level buttons.
+    Column {
+        visible: root.mode === "screener"
+        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 60 }
+        width: Math.min(parent.width * 0.86, 980)
+        spacing: 28
+
+        Text {
+            width: parent.width
+            text: root.screener ? root.screener.intro : ""
+            font.pixelSize: 22
+            font.family: "serif"
+            wrapMode: Text.Wrap
+        }
+        Rectangle {
+            width: parent.width
+            height: screenerBox.height + 56
+            color: "white"
+            border.color: "black"
+            border.width: 3
+
+            Column {
+                id: screenerBox
+                anchors { top: parent.top; left: parent.left; right: parent.right; margins: 28 }
+                spacing: 18
+
+                Text {
+                    width: parent.width
+                    text: root.screener ? root.screener.prompt : ""
+                    font.pixelSize: 24
+                    font.family: "serif"
+                    wrapMode: Text.Wrap
+                }
+                Repeater {
+                    model: root.screener ? root.screener.options : []
+                    delegate: Button {
+                        width: screenerBox.width
+                        height: 56
+                        checkable: true
+                        checked: root.selByPage[0] === index
+                        onClicked: root.setMap("selByPage", 0, index)
+                        contentItem: Row {
+                            spacing: 16
+                            leftPadding: 12
+                            Text {
+                                text: (index + 1) + "."
+                                font.pixelSize: 22
+                                font.bold: true
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            Text {
+                                text: modelData
+                                font.pixelSize: 22
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Button {
+            text: "Check in"
+            font.pixelSize: 24
+            enabled: root.selByPage[0] !== undefined && root.selByPage[0] !== null
+            anchors.horizontalCenter: parent.horizontalCenter
+            onClicked: root.checkIn()
+        }
+    }
+
     function checkIn() {
         mode = "submitting"
         const items = []
+        if (screener) {
+            items.push({ item_id: screener.item_id,
+                         selected_index: selByPage[0],
+                         strokes: [] })
+        } else
         for (var i = 0; i < itemPages.length; i++) {
             const it = itemPages[i]
             const entry = { item_id: it.id,

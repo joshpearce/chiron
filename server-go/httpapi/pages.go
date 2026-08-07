@@ -86,6 +86,7 @@ func (s *Server) handlePagesMeta(w http.ResponseWriter, r *http.Request) {
 		"hash":        res.Hash,
 		"calibration": ch.Calibration,
 		"items":       pages.ItemPages(ch, res.Count),
+		"screener":    pages.Screener(ch),
 	})
 }
 

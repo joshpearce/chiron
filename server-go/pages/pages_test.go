@@ -200,6 +200,17 @@ func TestScreenerLevelsRenderAsVerticalList(t *testing.T) {
 	if !strings.Contains(doc, `<ul class="screener-list">`) {
 		t.Fatal("no screener list")
 	}
+	if !strings.Contains(doc, `<div class="item-prompt">Rate yourself.`) {
+		t.Error("screener box should carry no item number")
+	}
+	info := Screener(ch)
+	if info == nil || info.ItemID != "u0-s1" || len(info.Options) != 2 ||
+		info.Intro != "intro" {
+		t.Fatalf("Screener() = %+v", info)
+	}
+	if Screener(&render.Chapter{HTML: "x"}) != nil {
+		t.Error("non-screener chapter must yield nil")
+	}
 	for _, want := range []string{`<span class="item-num">1.</span>Absolute novice`,
 		`<span class="item-num">2.</span>Expert`} {
 		if !strings.Contains(doc, want) {

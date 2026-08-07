@@ -32,7 +32,7 @@ const (
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v9"
+const styleVersion = "v10"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -202,6 +202,35 @@ func (r *Renderer) Render(ch *render.Chapter) (Result, error) {
 	return res, nil
 }
 
+// ScreenerInfo describes a screener-only calibration chapter so an
+// interactive client can render the placement step natively - the question
+// box IS the UI there, with the levels as buttons.
+type ScreenerInfo struct {
+	ItemID  string   `json:"item_id"`
+	Intro   string   `json:"intro"`
+	Prompt  string   `json:"prompt"`
+	Options []string `json:"options"`
+}
+
+var tagStrip = regexp.MustCompile(`<[^>]+>`)
+
+func Screener(ch *render.Chapter) *ScreenerInfo {
+	if !ch.Calibration || len(ch.Pretest) != 0 || len(ch.Check) != 1 ||
+		ch.Check[0].Check != "screener" {
+		return nil
+	}
+	it := ch.Check[0]
+	info := &ScreenerInfo{
+		ItemID: it.ID,
+		Intro:  strings.TrimSpace(tagStrip.ReplaceAllString(ch.HTML, "")),
+		Prompt: it.Prompt,
+	}
+	for _, o := range it.Options {
+		info.Options = append(info.Options, o.Text)
+	}
+	return info
+}
+
 var beatDiv = regexp.MustCompile(`<div class="beat" data-beat-id="([^"]+)"></div>`)
 
 // injectBeats replaces the client-side beat placeholders with printable
@@ -250,8 +279,11 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 	}
 	for i, it := range items {
 		b = append(b, fmt.Sprintf(`<div class="item-box" data-item-id=%q>`, it.ID))
-		b = append(b, fmt.Sprintf(
-			`<div class="item-prompt"><span class="item-num">%d.</span>`, i+1)+
+		num := fmt.Sprintf(`<span class="item-num">%d.</span>`, i+1)
+		if it.Check == "screener" {
+			num = ""
+		}
+		b = append(b, `<div class="item-prompt">`+num+
 			html.EscapeString(it.Prompt)+`</div>`)
 		switch {
 		case it.Kind == "mcq" && printLayout:
