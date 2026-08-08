@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="design_doc_mode" content="canvas"><title>Chiron — RMPP screens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,600&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<style>
+*{box-sizing:border-box}html,body{margin:0}
+a{color:#000}a:hover{color:#8A3D30}
+.fr{position:absolute;width:1620px;height:2160px;background:#fff;overflow:hidden;box-shadow:0 4px 34px rgba(0,0,0,.22);font-family:'Source Serif 4',Georgia,serif;color:#000}
+.cap{position:absolute;font:600 40px/1 'Source Sans 3',sans-serif;color:#45433f;letter-spacing:.02em;white-space:nowrap}
+.cap span{color:#8d8a84;font-weight:500}
+.rh{position:absolute;top:40px;left:110px;right:110px;display:flex;justify-content:space-between;font:600 24px/1 'Source Serif 4';letter-spacing:.08em;color:#444;text-transform:uppercase}
+.folio{position:absolute;left:0;right:0;bottom:34px;text-align:center;font:400 26px/1 'Source Serif 4';color:#444}
+.nav{position:absolute;left:110px;bottom:18px;display:flex;gap:12px}
+.nb{width:64px;height:64px;border:1px solid #666;background:#fff;color:#333;display:flex;align-items:center;justify-content:center;font:400 34px/1 'Source Sans 3'}
+.nb.dis{border-color:#CCC;color:#BBB}
+.act{position:absolute;right:110px;bottom:18px;height:64px;display:flex;align-items:center;padding:0 36px;border:2px solid #000;background:#fff;font:600 28px/1 'Source Sans 3';color:#000}
+.act.dis{border:1px solid #BBB;color:#999;padding:0 37px}
+.actcap{position:absolute;bottom:37px;font:400 22px/1 'Source Sans 3';color:#777}
+.content{position:absolute;left:110px;top:100px;width:1400px}
+.ib{position:relative;border:2px solid #000;background:#fff;margin-bottom:20px}
+.bd{padding:24px 28px 0}
+.pr{font:400 34px/50px 'Source Serif 4'}
+.pr code,.body code{font:400 .82em/1 Menlo,'DejaVu Sans Mono',monospace}
+.dotr{border-top:2px dotted #999;margin-top:20px}
+.strip{position:absolute;left:0;right:0;bottom:0;height:121px;border-top:1px solid #000;display:flex;align-items:center;justify-content:space-between;padding:0 30px}
+.strip.mcq{height:197px;flex-direction:column;align-items:stretch;justify-content:center;gap:16px}
+.srow{display:flex;align-items:center;justify-content:space-between}
+.srow.r{justify-content:flex-end}
+.grp{display:flex;gap:12px}
+.pill{height:64px;display:flex;align-items:center;padding:0 28px;border:2px solid #000;background:#fff;font:600 26px/1 'Source Sans 3';color:#000}
+.pill.sel{background:#000;color:#fff}
+.pill.mut{border:1px solid #BBB;color:#BBB;padding:0 29px}
+.idk{height:64px;display:flex;align-items:center;padding:0 28px;border:1px solid #666;background:#fff;font:500 26px/1 'Source Sans 3';color:#444}
+.idk.sel{border:2px solid #000;background:#000;color:#fff;padding:0 27px}
+.let{width:64px;height:64px;display:flex;align-items:center;justify-content:center;border:2px solid #000;background:#fff;font:700 30px/1 'Source Sans 3';color:#000}
+.let.sel{background:#000;color:#fff}
+.let.mut{border:1px solid #BBB;color:#BBB}
+.opt{display:flex;gap:16px;font:400 32px/46px 'Source Serif 4';margin-top:14px}
+.opt b{min-width:44px}
+.h1{font:600 72px/80px 'Source Serif 4';letter-spacing:-.005em}
+.dek{font:italic 400 32px/44px 'Source Serif 4';color:#444;margin-top:24px}
+.bar{position:relative;height:10px;border:1px solid #999;background:#fff;margin-top:40px}
+.fill{position:absolute;top:0;bottom:0;left:0;background:#000}
+.tick{position:absolute;top:-9px;bottom:-9px;width:2px;background:#000}
+.tlab{position:absolute;top:20px;font:600 20px/1 'Source Serif 4';letter-spacing:.1em;color:#444}
+.mc{font:600 22px/28px 'Source Serif 4';letter-spacing:.1em;text-transform:uppercase;color:#777}
+.rule{border-top:1px solid #000;margin-top:44px}
+.tally{font:600 24px/1 'Source Serif 4';letter-spacing:.1em;color:#444;margin-top:40px;text-transform:uppercase}
+.ent{display:grid;grid-template-columns:72px 1fr;padding:34px 0;border-top:1px solid #CCC}
+.ent.f{border-top:none}
+.mk{font:700 40px/40px 'Source Serif 4'}
+.mk.x{color:#8A3D30}
+.mk.sk{color:#999;font-weight:400}
+.eh{display:flex;gap:16px;align-items:baseline}
+.ep{font:400 30px/40px 'Source Serif 4';color:#222;flex:1}
+.tg{font:600 22px/28px 'Source Serif 4';letter-spacing:.1em;color:#777;white-space:nowrap;text-transform:uppercase}
+.tg.bad{color:#8A3D30}
+.mrow{display:grid;grid-template-columns:170px 1fr;margin-top:18px}
+.mv{font:400 30px/42px 'Source Serif 4'}
+.mv.note{font-size:28px;line-height:40px;color:#333}
+.rrow{height:112px;border:1px solid #666;display:flex;align-items:stretch;margin-top:20px;background:#fff}
+.rrow .n{width:96px;display:flex;align-items:center;justify-content:center;border-right:1px solid #666;font:700 30px/1 'Source Sans 3'}
+.rrow .l{display:flex;align-items:center;padding:0 28px;font:600 30px/1 'Source Sans 3';color:#111}
+.rrow.sel{background:#000;border:2px solid #000}
+.rrow.sel .n{border-right-color:#555;color:#fff}
+.rrow.sel .l{color:#fff}
+.body p{font:400 34px/53px 'Source Serif 4';max-width:1220px;text-align:justify;hyphens:auto;margin:0 0 26px}
+.h2{font:600 44px/54px 'Source Serif 4';margin:46px 0 24px}
+.dm{margin:10px 0 30px;font-size:34px}
+.blab{font:600 22px/28px 'Source Serif 4';letter-spacing:.1em;text-transform:uppercase;color:#444;margin-bottom:22px}
+.mid{position:absolute;left:0;right:0;top:880px;text-align:center}
+.dk{font:400 36px/1 'Source Serif 4';letter-spacing:26px;padding-left:26px;color:#000}
+.dk.err{color:#8A3D30}
+.wst{margin-top:56px;font:italic 400 40px/56px 'Source Serif 4';color:#000}
+.wsb{margin-top:14px;font:400 28px/40px 'Source Serif 4';color:#666}
+.wbtns{margin-top:72px;display:flex;justify-content:center;gap:24px}
+.wbtn{height:64px;display:inline-flex;align-items:center;padding:0 36px;border:2px solid #000;font:600 28px/1 'Source Sans 3';color:#000;background:#fff}
+.wbtn.q{border:1px solid #666;color:#444;font-weight:500;padding:0 37px}
+.wdet{margin-top:52px;font:400 22px/1 'Source Sans 3';letter-spacing:.06em;color:#999}
+.trow{height:88px;display:flex;align-items:center;gap:24px}
+.tn{width:60px;font:700 30px/1 'Source Serif 4'}
+.tt{font:400 34px/1 'Source Serif 4'}
+.tt.cur{font-weight:600}
+.lead{flex:1;border-bottom:2px dotted #BBB;height:1px;transform:translateY(12px)}
+.tst{font:600 22px/1 'Source Serif 4';letter-spacing:.1em;text-transform:uppercase;color:#444;white-space:nowrap}
+.tst.dim{font:italic 400 26px/1 'Source Serif 4';letter-spacing:0;text-transform:none;color:#999}
+.ink{position:absolute;pointer-events:none}
+.sys .mc{margin:38px 0 16px;color:#555}
+.chip{width:120px;height:120px;border:1px solid #DDD}
+.chipl{font:400 22px/30px 'Source Sans 3';color:#555;margin-top:8px}
+.spec{display:flex;align-items:center;gap:24px;margin-top:12px}
+.specl{width:420px;font:400 22px/30px 'Source Sans 3';color:#777;flex:none}
+</style>
+</head><body>
+
+<div class="cap" style="left:0;top:36px">01 RESULTS <span>· chapter check, gate cleared — page-rendered + native action</span></div>
+<section class="fr kx" data-screen-label="01 Results — gate cleared" style="left:0;top:120px">
+<div class="rh"><span>2 · The shape of computation</span><span>Results</span></div>
+<div class="content">
+<div class="h1" style="margin-top:78px">Gate cleared — 82%.</div>
+<div class="bar"><div class="fill" style="width:82%"></div><div class="tick" style="left:80%"></div><div class="tlab" style="left:calc(80% - 52px)">GATE 80</div></div>
+<div class="dek" style="margin-top:56px">Extension unlocked — an optional deeper section is appended to the next chapter.</div>
+<div class="rule"></div>
+<div class="ent f"><div class="mk">✓</div><div>
+<div class="eh"><div class="ep"><b>1.</b> Compute the dot product of $[2,\,0,\,-3]$ and $[1,\,4,\,2]$.</div><div class="tg">sure</div></div>
+<div class="mrow"><div class="mc">Read as</div><div class="mv">“−4”</div></div>
+</div></div>
+<div class="ent"><div class="mk x">✗</div><div>
+<div class="eh"><div class="ep"><b>2.</b> $X$ has shape $(32, 128)$ and $W$ has shape $(128, 512)$. What is the shape of $XW$?</div><div class="tg bad">confident</div></div>
+<div class="mrow"><div class="mc">Read as</div><div class="mv">“128 × 128”</div></div>
+<div class="mrow"><div class="mc">Answer</div><div class="mv">32 × 512</div></div>
+<div class="mrow"><div class="mc">Why</div><div class="mv note">128 × 128 is the inner pair — the pair that must match and then disappears. The product keeps the rows of $X$ (32) and the columns of $W$ (512).</div></div>
+</div></div>
+<div class="ent"><div class="mk">~</div><div>
+<div class="eh"><div class="ep"><b>3.</b> Softmax turns the score lists $[2, 1]$ and $[102, 101]$ into what relationship?</div><div class="tg">shaky</div></div>
+<div class="mrow"><div class="mc">Read as</div><div class="mv">“both give the same distribution”</div></div>
+<div class="mrow"><div class="mc">Answer</div><div class="mv">Identical — softmax depends only on differences; both gaps are 1, so both give roughly $[0.73,\,0.27]$.</div></div>
+<div class="mrow"><div class="mc">Why</div><div class="mv note">Right invariance — the question also asked for the distribution itself.</div></div>
+</div></div>
+<div class="ent"><div class="mk">✓</div><div>
+<div class="eh"><div class="ep"><b>4.</b> After softmax, each row of the attention matrix has which property?</div><div class="tg">confident</div></div>
+<div class="mrow"><div class="mc">Chose</div><div class="mv">A — “Non-negative entries that sum to 1”</div></div>
+</div></div>
+<div class="ent"><div class="mk sk">—</div><div>
+<div class="eh"><div class="ep"><b>5.</b> What does $\mathbb{E}_{x\sim\mathcal{D}}[f(x)]$ denote, and why can it never be computed exactly?</div></div>
+<div class="mrow"><div class="mc">Marked</div><div class="mv">“I don’t know.”</div></div>
+<div class="mrow"><div class="mc">Answer</div><div class="mv">The expected value of $f(x)$ when $x$ is drawn from $\mathcal{D}$ — the average of $f$ over every possible input, weighted by probability. $\mathcal{D}$ is not enumerable, so training estimates it with the mean over a batch.</div></div>
+</div></div>
+</div>
+<div class="folio">1 / 1</div>
+<div class="act">Next chapter</div>
+</section>
+
+<div class="cap" style="left:1860px;top:36px">02 RESULTS <span>· calibration framing</span></div>
+<section class="fr kx" data-screen-label="02 Results — calibration" style="left:1860px;top:120px">
+<div class="rh"><span>How AI works</span><span>Calibration</span></div>
+<div class="content">
+<div class="h1" style="margin-top:78px">Calibration complete — 7%.</div>
+<div class="tally">1 correct &nbsp;·&nbsp; 0 missed &nbsp;·&nbsp; 13 passed</div>
+<div class="dek">One sure answer, thirteen honest passes. The book will start from the ground up — that is exactly what this series is for.</div>
+<div class="rule"></div>
+<div class="ent f"><div class="mk">✓</div><div>
+<div class="eh"><div class="ep"><b>1.</b> Compute the dot product of $[2,\,0,\,-3]$ and $[1,\,4,\,2]$.</div><div class="tg">sure</div></div>
+<div class="mrow"><div class="mc">Read as</div><div class="mv">“−4”</div></div>
+</div></div>
+<div class="ent"><div class="mk sk">—</div><div>
+<div class="eh"><div class="ep"><b>2.</b> $X$ has shape $(256, 512)$ and $W$ has shape $(512, 1024)$. What is the shape of $XW$?</div></div>
+<div class="mrow"><div class="mc">Marked</div><div class="mv">“I don’t know.”</div></div>
+<div class="mrow"><div class="mc">Answer</div><div class="mv">256 × 1024</div></div>
+</div></div>
+<div class="ent"><div class="mk sk">—</div><div>
+<div class="eh"><div class="ep"><b>3.</b> What does $\mathbb{E}_{x\sim\mathcal{D}}[f(x)]$ denote?</div></div>
+<div class="mrow"><div class="mc">Marked</div><div class="mv">“I don’t know.”</div></div>
+<div class="mrow"><div class="mc">Answer</div><div class="mv">The expected value of $f(x)$ when $x$ is drawn from the distribution $\mathcal{D}$ — the average of $f$ over all possible inputs, weighted by their probability under $\mathcal{D}$.</div></div>
+</div></div>
+<div class="ent"><div class="mk sk">—</div><div>
+<div class="eh"><div class="ep"><b>4.</b> Softmax turns the score lists $[2, 1]$ and $[102, 101]$ into what relationship?</div></div>
+<div class="mrow"><div class="mc">Marked</div><div class="mv">“I don’t know.”</div></div>
+<div class="mrow"><div class="mc">Answer</div><div class="mv">Identical — softmax depends only on differences between scores; both inputs have a gap of 1, so both give roughly $[0.73,\,0.27]$.</div></div>
+</div></div>
+</div>
+<div class="nav"><div class="nb dis">‹</div><div class="nb">›</div></div>
+<div class="folio">1 / 4</div>
+<div class="act">Begin chapter 1</div>
+</section>
+
+<div class="cap" style="left:3720px;top:36px">03 RESULTS <span>· below the gate</span></div>
+<section class="fr kx" data-screen-label="03 Results — below gate" style="left:3720px;top:120px">
+<div class="rh"><span>2 · The shape of computation</span><span>Results</span></div>
+<div class="content">
+<div class="h1" style="margin-top:78px">Below the gate — 64%.</div>
+<div class="bar"><div class="fill" style="width:64%"></div><div class="tick" style="left:80%"></div><div class="tlab" style="left:calc(80% - 52px)">GATE 80</div></div>
+<div class="dek" style="margin-top:56px">Close. Two sections get a second look, then a fresh check — different questions, same ideas.</div>
+<div class="rule"></div>
+<div class="ent f"><div class="mk x">✗</div><div>
+<div class="eh"><div class="ep"><b>1.</b> $X$ has shape $(32, 128)$ and $W$ has shape $(128, 512)$. What is the shape of $XW$?</div><div class="tg bad">sure</div></div>
+<div class="mrow"><div class="mc">Read as</div><div class="mv">“128 × 128”</div></div>
+<div class="mrow"><div class="mc">Answer</div><div class="mv">32 × 512</div></div>
+<div class="mrow"><div class="mc">Why</div><div class="mv note">128 × 128 is the inner pair — the pair that must match and then disappears. The product keeps the rows of $X$ (32) and the columns of $W$ (512).</div></div>
+</div></div>
+<div class="ent"><div class="mk x">✗</div><div>
+<div class="eh"><div class="ep"><b>2.</b> Which multiplication is defined: $(QK)$ or $(QK^{\top})$, with both of shape $(n, d_k)$?</div><div class="tg">unsure</div></div>
+<div class="mrow"><div class="mc">Chose</div><div class="mv">B — “$QK$, because the shapes are equal”</div></div>
+<div class="mrow"><div class="mc">Answer</div><div class="mv">C — $QK^{\top}$: transposing $K$ makes the inner dimensions $d_k$ match.</div></div>
+<div class="mrow"><div class="mc">Why</div><div class="mv note">Equal shapes are not the requirement — matched <i>inner</i> dimensions are. $(n, d_k)(n, d_k)$ has inner pair $d_k$ against $n$.</div></div>
+</div></div>
+<div class="ent"><div class="mk">~</div><div>
+<div class="eh"><div class="ep"><b>3.</b> Softmax turns the score lists $[2, 1]$ and $[102, 101]$ into what relationship?</div><div class="tg">shaky</div></div>
+<div class="mrow"><div class="mc">Read as</div><div class="mv">“both give the same distribution”</div></div>
+<div class="mrow"><div class="mc">Answer</div><div class="mv">Identical — softmax depends only on differences; both gaps are 1, so both give roughly $[0.73,\,0.27]$.</div></div>
+</div></div>
+</div>
+<div class="nav"><div class="nb dis">‹</div><div class="nb">›</div></div>
+<div class="folio">1 / 2</div>
+<div class="act">Back to the chapter</div>
+</section>
+
+<div class="cap" style="left:5580px;top:36px">04 QUESTION PAGE <span>· constructed ×2 — ink + selected confidence / default</span></div>
+<section class="fr kx" data-screen-label="04 Question page — constructed" style="left:5580px;top:120px">
+<div class="rh"><span>2 · The shape of computation</span><span>Check</span></div>
+<div class="content">
+<div class="ib" style="height:970px">
+<div class="bd"><div class="pr"><b>1.</b> Compute the dot product of $[2,\,0,\,-3]$ and $[1,\,4,\,2]$. Answer with a single number.</div><div class="dotr"></div></div>
+<svg class="ink" style="left:0;top:200px" width="1396" height="620" viewBox="0 0 1396 620" fill="none">
+<path d="M528 318c26-6 52-8 80-6" stroke="#1a1a1a" stroke-width="5" stroke-linecap="round"/>
+<path d="M706 178c-24 70-50 122-66 148" stroke="#1a1a1a" stroke-width="5" stroke-linecap="round"/>
+<path d="M636 332c52 6 106 4 136-1" stroke="#1a1a1a" stroke-width="5" stroke-linecap="round"/>
+<path d="M716 206c-4 86-6 198-2 264" stroke="#1a1a1a" stroke-width="5" stroke-linecap="round"/>
+</svg>
+<div class="strip"><div class="idk">I don’t know</div><div class="grp"><div class="pill">unsure</div><div class="pill">shaky</div><div class="pill">confident</div><div class="pill sel">sure</div></div></div>
+</div>
+<div class="ib" style="height:970px">
+<div class="bd"><div class="pr"><b>2.</b> $X$ has shape $(32, 128)$ and $W$ has shape $(128, 512)$. What is the shape of $XW$? Answer in the exact form <code>rows x cols</code>, for example <code>3 x 8</code>.</div><div class="dotr"></div></div>
+<div class="strip"><div class="idk">I don’t know</div><div class="grp"><div class="pill">unsure</div><div class="pill">shaky</div><div class="pill">confident</div><div class="pill">sure</div></div></div>
+</div>
+</div>
+<div class="nav"><div class="nb dis">‹</div><div class="nb">›</div></div>
+<div class="folio">1 / 3</div>
+</section>
+
+<div class="cap" style="left:7440px;top:36px">05 QUESTION PAGE <span>· MCQ selected / constructed with “I don’t know” toggled — last page, Check in</span></div>
+<section class="fr kx" data-screen-label="05 Question page — MCQ + IDK" style="left:7440px;top:120px">
+<div class="rh"><span>2 · The shape of computation</span><span>Check</span></div>
+<div class="content">
+<div class="ib" style="height:640px">
+<div class="bd">
+<div class="pr"><b>4.</b> Attention scores are $QK^{\top}/\sqrt{d_k}$, one row per query. After softmax, each row has which property?</div>
+<div class="opt"><b>A.</b><span>Non-negative entries that sum to 1</span></div>
+<div class="opt"><b>B.</b><span>Unit Euclidean length</span></div>
+<div class="opt"><b>C.</b><span>At most one nonzero entry</span></div>
+</div>
+<div class="strip mcq">
+<div class="srow"><div class="grp"><div class="let sel">A</div><div class="let">B</div><div class="let">C</div></div><div class="idk">I don’t know</div></div>
+<div class="srow r"><div class="grp"><div class="pill">unsure</div><div class="pill">shaky</div><div class="pill sel">confident</div><div class="pill">sure</div></div></div>
+</div>
+</div>
+<div class="ib" style="height:970px">
+<div class="bd"><div class="pr"><b>5.</b> What does $\mathbb{E}_{x\sim\mathcal{D}}[f(x)]$ denote, and why can it never be computed exactly?</div><div class="dotr"></div></div>
+<div class="strip"><div class="idk sel">I don’t know</div><div class="grp"><div class="pill mut">unsure</div><div class="pill mut">shaky</div><div class="pill mut">confident</div><div class="pill mut">sure</div></div></div>
+</div>
+</div>
+<div class="nav"><div class="nb">‹</div><div class="nb dis">›</div></div>
+<div class="folio">3 / 3</div>
+<div class="act">Check in</div>
+</section>
+
+<div class="cap" style="left:9300px;top:36px">06 PLACEMENT <span>· fully native — level 3 selected, Check in enabled</span></div>
+<section class="fr" data-screen-label="06 Placement" style="left:9300px;top:120px">
+<div class="rh"><span>How AI works</span><span>Placement</span></div>
+<div class="content" style="top:200px">
+<p style="font:400 34px/53px 'Source Serif 4';max-width:1220px;margin:0">One placement question, then a short series of math questions sized to your answer — easy to hard, spanning everything this book leans on: dot products, matrix shapes, softmax, derivatives, gradient notation, expectations. Nothing is taught here, and you are expected to run out of sure answers somewhere in the middle — where that happens is the calibration. Answer fast, mark “I don’t know” freely, move on. The teaching starts next chapter, tuned by what these answers reveal.</p>
+<div style="font:600 40px/56px 'Source Serif 4';margin-top:72px;max-width:1300px">Before the questions: how would you rate your current understanding of the math inside modern AI models — dot products, matrix shapes, softmax, gradients?</div>
+<div style="margin-top:52px">
+<div class="rrow"><div class="n">1</div><div class="l">Absolute novice</div></div>
+<div class="rrow"><div class="n">2</div><div class="l">Seen the words, could not compute</div></div>
+<div class="rrow sel"><div class="n">3</div><div class="l">Could work through it slowly</div></div>
+<div class="rrow"><div class="n">4</div><div class="l">Comfortable</div></div>
+<div class="rrow"><div class="n">5</div><div class="l">Expert — I could teach it</div></div>
+</div>
+<div style="font:italic 400 26px/36px 'Source Serif 4';color:#666;margin-top:44px">This sets where the questions begin — nothing more.</div>
+</div>
+<div class="act">Check in</div>
+</section>
+
+<div class="cap" style="left:0;top:2596px">07 PROSE PAGE <span>· running head + time whisper, justified 1220 measure, beat box</span></div>
+<section class="fr kx" data-screen-label="07 Prose page" style="left:0;top:2680px">
+<div class="rh"><span>2 · The shape of computation</span><span style="color:#777">≈ 12 min left</span></div>
+<div class="content body">
+<p>Worked, with $A$ of shape $(2,3)$ and $B$ of shape $(3,2)$: the inner dimensions are both $3$, so the product is defined and has shape $(2,2)$ — the surviving outer dimensions. Four entries, four dot products; the first, and the assembled result:</p>
+<div class="dm">$$(AB)_{11}=(1)(4)+(0)(0)+(2)(-1)=2\qquad\qquad AB=\begin{bmatrix}2&11\\[2pt]13&0\end{bmatrix}$$</div>
+<p>$BA$ is also defined here — $(3,2)$ times $(2,3)$ gives $(3,3)$ — and is a different object of a different size. Same two matrices, different composition, different function.</p>
+<div class="ib" style="margin-top:44px;margin-bottom:0">
+<div class="bd" style="padding-bottom:280px">
+<div class="blab">Work this before reading on</div>
+<div class="pr" style="font-size:32px;line-height:48px">Fill the blanks. $A=\begin{bmatrix}2&1&0\\1&0&3\end{bmatrix}$ with shape $(2,3)$, $B=\begin{bmatrix}1&2\\4&0\\1&1\end{bmatrix}$ with shape $(3,2)$.<br>$(AB)_{12}=(2)(2)+(1)(0)+(0)(1)=$ ____ &nbsp;⟵ A<br>$(AB)_{22}=(1)(2)+(0)(0)+(3)(1)=$ ____ &nbsp;⟵ B<br>Answer with the two values in order, comma-separated, like <code>7, 9</code>.</div>
+<div class="dotr"></div>
+</div>
+</div>
+<div class="h2">Gradients and expectations</div>
+<p>Two symbols left, both used hundreds of times per paper and defined in none of them. <b>Expectation.</b> $\mathbb{E}_{x\sim\mathcal{D}}[f(x)]$ reads “the expected value of $f(x)$ when $x$ is drawn from the distribution $\mathcal{D}$” — the average of $f(x)$ over all possible $x$, weighted by how likely each $x$ is under $\mathcal{D}$. The subscript names the distribution, the brackets hold what you are averaging.</p>
+</div>
+<div class="nav"><div class="nb">‹</div><div class="nb">›</div></div>
+<div class="folio">7 / 28</div>
+</section>
+
+<div class="cap" style="left:1860px;top:2596px">08 WAIT <span>· grading — static, no spinner</span></div>
+<section class="fr" data-screen-label="08 Wait — grading" style="left:1860px;top:2680px">
+<div class="mid">
+<div class="dk">✱ ✱ ✱</div>
+<div class="wst">Grading your answers.</div>
+<div class="wsb">A few seconds.</div>
+</div>
+</section>
+
+<div class="cap" style="left:3720px;top:2596px">09 WAIT <span>· next chapter being written</span></div>
+<section class="fr" data-screen-label="09 Wait — authoring" style="left:3720px;top:2680px">
+<div class="mid">
+<div class="dk">✱ ✱ ✱</div>
+<div class="wst">The next chapter is being written.</div>
+<div class="wsb">Shaped by today’s answers. It is usually ready<br>before you finish reading the results.</div>
+</div>
+</section>
+
+<div class="cap" style="left:5580px;top:2596px">10 ERROR <span>· server unreachable</span></div>
+<section class="fr" data-screen-label="10 Error — server unreachable" style="left:5580px;top:2680px">
+<div class="mid">
+<div class="dk err">✱</div>
+<div class="wst">The server can’t be reached.</div>
+<div class="wsb">Your work is saved on this tablet. Nothing is lost.</div>
+<div class="wbtns"><div class="wbtn">Try again</div></div>
+<div class="wdet">HOST UNREACHABLE · 09:14</div>
+</div>
+</section>
+
+<div class="cap" style="left:7440px;top:2596px">11 ERROR <span>· authoring failed</span></div>
+<section class="fr" data-screen-label="11 Error — authoring failed" style="left:7440px;top:2680px">
+<div class="mid">
+<div class="dk err">✱</div>
+<div class="wst">This chapter couldn’t be written.</div>
+<div class="wsb">Nothing is lost — your results are kept.<br>Try again, or come back later.</div>
+<div class="wbtns"><div class="wbtn">Try again</div></div>
+<div class="wdet">PLANNER TIMEOUT · 21:36</div>
+</div>
+</section>
+
+<div class="cap" style="left:9300px;top:2596px">12 BREAK <span>· suggested pause</span></div>
+<section class="fr" data-screen-label="12 Break — suggestion" style="left:9300px;top:2680px">
+<div class="mid">
+<div class="dk">✱ ✱ ✱</div>
+<div class="wst">A good place to pause.</div>
+<div class="wsb">24 minutes of reading — and the next section is a climb.<br>Five minutes off pays for itself.</div>
+<div class="wbtns"><div class="wbtn">Take five</div><div class="wbtn q">Keep reading</div></div>
+</div>
+</section>
+
+<div class="cap" style="left:0;top:5156px">13 BREAK <span>· active — any tap resumes</span></div>
+<section class="fr" data-screen-label="13 Break — active" style="left:0;top:5240px">
+<div class="mid">
+<div class="dk">✱ ✱ ✱</div>
+<div class="wst">On break.</div>
+<div class="wsb">Tap anywhere when you’re ready.</div>
+</div>
+</section>
+
+<div class="cap" style="left:1860px;top:5156px">14 CONTENTS <span>· spine with mastery states — chapters exist only once reached</span></div>
+<section class="fr" data-screen-label="14 Contents" style="left:1860px;top:5240px">
+<div class="rh"><span>How AI works</span><span>Contents</span></div>
+<div class="content">
+<div style="font:600 56px/64px 'Source Serif 4';margin-top:104px">Contents.</div>
+<div style="font:italic 400 26px/36px 'Source Serif 4';color:#666;margin-top:16px">Chapters are written as you reach them, shaped by your checks.</div>
+<div style="margin-top:64px">
+<div class="trow"><div class="tn">1</div><div class="tt">Tokens &amp; embeddings</div><div class="lead"></div><div class="tst">Cleared · 91</div></div>
+<div class="trow"><div class="tn">2</div><div class="tt">The shape of computation</div><div class="lead"></div><div class="tst">Cleared · 82</div></div>
+<div class="trow"><div class="tn">3</div><div class="tt cur">Attention</div><div class="lead"></div><div class="tst">In progress · p. 1</div></div>
+<div class="trow"><div class="tn">4</div><div class="tt" style="color:#999">Training</div><div class="tst dim">not yet written</div></div>
+<div class="trow"><div class="tn">5</div><div class="tt" style="color:#999">Inference &amp; sampling</div><div class="tst dim">not yet written</div></div>
+<div class="trow"><div class="tn">6</div><div class="tt" style="color:#999">Mixture of experts</div><div class="tst dim">not yet written</div></div>
+</div>
+</div>
+<div class="folio">·</div>
+</section>
+
+<div class="cap" style="left:3720px;top:5156px">15 SYSTEM SHEET <span>· palette, type, rules, native control states</span></div>
+<section class="fr sys" data-screen-label="15 System sheet" style="left:3720px;top:5240px">
+<div class="content" style="top:80px">
+<div style="font:600 56px/64px 'Source Serif 4'">Chiron — system sheet.</div>
+<div class="mc">Palette · monochrome first, one accent</div>
+<div style="display:flex;gap:28px">
+<div><div class="chip" style="background:#000"></div><div class="chipl">#000000<br>ink · body · fills</div></div>
+<div><div class="chip" style="background:#444"></div><div class="chipl">#444444<br>secondary · heads</div></div>
+<div><div class="chip" style="background:#777"></div><div class="chipl">#777777<br>micro-labels</div></div>
+<div><div class="chip" style="background:#BBB"></div><div class="chipl">#BBBBBB<br>disabled · muted</div></div>
+<div><div class="chip" style="background:#CCC"></div><div class="chipl">#CCCCCC<br>hairline seps</div></div>
+<div><div class="chip" style="background:#FFF"></div><div class="chipl">#FFFFFF<br>paper</div></div>
+<div><div class="chip" style="background:#8A3D30"></div><div class="chipl">#8A3D30 accent<br>misses · errors only</div></div>
+</div>
+<div class="mc">Type · Source Serif 4 (content) / Source Sans 3 (controls) / Menlo (code) / KaTeX (math)</div>
+<div class="spec"><div class="specl">Results headline 72/80 ·600</div><div style="font:600 72px/80px 'Source Serif 4'">Gate cleared — 82%.</div></div>
+<div class="spec"><div class="specl">Chapter H1 56/64 ·600</div><div style="font:600 56px/64px 'Source Serif 4'">The shape of computation</div></div>
+<div class="spec"><div class="specl">Section H2 44/54 ·600</div><div style="font:600 44px/54px 'Source Serif 4'">Gradients and expectations</div></div>
+<div class="spec"><div class="specl">Body 34/53 · justified · ≤1220</div><div style="font:400 34px/53px 'Source Serif 4'">The pen is the answer instrument; touch is for choices.</div></div>
+<div class="spec"><div class="specl">Dek / footnote · italic 32/44 · 26/36</div><div style="font:italic 400 32px/44px 'Source Serif 4';color:#444">Extension unlocked — an optional deeper section.</div></div>
+<div class="spec"><div class="specl">Micro-caps 22 ·600 ·+.10em</div><div class="mc" style="margin:0">Work this before reading on</div></div>
+<div class="spec"><div class="specl">Running head 24 ·600 ·+.08em / folio 26</div><div style="font:600 24px/1 'Source Serif 4';letter-spacing:.08em;text-transform:uppercase;color:#444">2 · The shape of computation</div></div>
+<div class="mc">Rules</div>
+<div class="spec"><div class="specl">Box border 2px #000 · shelf 1px #000</div><div style="width:560px;border-top:2px solid #000"></div></div>
+<div class="spec"><div class="specl">Hairline separator 1px #CCC</div><div style="width:560px;border-top:1px solid #CCC"></div></div>
+<div class="spec"><div class="specl">Ink boundary · dotted 2px #999</div><div style="width:560px;border-top:2px dotted #999"></div></div>
+<div class="mc">Native controls · square, flat, 64px targets</div>
+<div class="spec"><div class="specl">Primary default / pressed / disabled</div><div class="grp"><div class="wbtn">Check in</div><div class="wbtn" style="background:#000;color:#fff">Check in</div><div class="wbtn" style="border:1px solid #BBB;color:#999;padding:0 37px">Check in</div></div></div>
+<div class="spec"><div class="specl">Disabled + caption</div><div class="grp" style="align-items:center"><div class="actcap" style="position:static">2 items still need an answer</div><div class="wbtn" style="border:1px solid #BBB;color:#999;padding:0 37px">Check in</div></div></div>
+<div class="spec"><div class="specl">Confidence pill default / selected / muted</div><div class="grp"><div class="pill">confident</div><div class="pill sel">confident</div><div class="pill mut">confident</div></div></div>
+<div class="spec"><div class="specl">I don’t know default / selected</div><div class="grp"><div class="idk">I don’t know</div><div class="idk sel">I don’t know</div></div></div>
+<div class="spec"><div class="specl">MCQ letter default / selected / muted</div><div class="grp"><div class="let">B</div><div class="let sel">B</div><div class="let mut">B</div></div></div>
+<div class="spec"><div class="specl">Page turn default / disabled</div><div class="grp"><div class="nb">›</div><div class="nb dis">›</div></div></div>
+<div class="spec"><div class="specl">Rating row selected (h112, n-cell 96)</div><div class="rrow sel" style="width:700px;margin:0"><div class="n">3</div><div class="l">Could work through it slowly</div></div></div>
+<div class="mc" style="margin-bottom:8px">Geometry constants</div>
+<div style="font:400 24px/40px Menlo,monospace;color:#333">page 1620×2160 · margins 100/110 · content 1400×1960<br>item box h 640|970 · gap 20 · border 2 · pad 28/24<br>strip 120 (constructed) | 196 (mcq) · shelf rule 1px<br>controls h64 · inset 30 · gap 12 · chrome band y2060–2160</div>
+</div>
+</section>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" onload="document.querySelectorAll('.kx').forEach(function(e){renderMathInElement(e,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})})"></script>
+</body></html>
