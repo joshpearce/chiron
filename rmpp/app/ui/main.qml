@@ -17,6 +17,143 @@ Rectangle {
     property string serverBase: "http://localhost:8082"
     property string subject: "ai"
 
+    // Bundled faces (SPEC §0.3): Source Sans 3 for every control label,
+    // Source Serif 4 for native prose. Loaded per weight - the desktop TTFs
+    // register distinct family names, so each use site names its loader.
+    FontLoader { id: fontSans; source: "fonts/SourceSans3-Regular.ttf" }
+    FontLoader { id: fontSansMed; source: "fonts/SourceSans3-Medium.ttf" }
+    FontLoader { id: fontSansSemi; source: "fonts/SourceSans3-Semibold.ttf" }
+    FontLoader { id: fontSansBold; source: "fonts/SourceSans3-Bold.ttf" }
+    FontLoader { id: fontSerif; source: "fonts/SourceSerif4-Regular.ttf" }
+    FontLoader { id: fontSerifSemi; source: "fonts/SourceSerif4-Semibold.ttf" }
+    FontLoader { id: fontSerifIt; source: "fonts/SourceSerif4-It.ttf" }
+
+    // SPEC dimensions are page pixels at 1620x2160. ps maps them through
+    // the painted page (1.0 on the tablet, smaller in the emulator window);
+    // px0/py0 are the painted page's screen origin.
+    property real ps: pageImage.paintedWidth > 0 ? pageImage.paintedWidth / 1620
+                     : Math.min(width / 1620, height / 2160)
+    property real px0: pageImage.x + (pageImage.width - pageImage.paintedWidth) / 2
+    property real py0: pageImage.y + (pageImage.height - pageImage.paintedHeight) / 2
+    // Border widths never scale below one device pixel.
+    function bw(w) { return Math.max(1, Math.round(w * ps)) }
+
+    // Native control anatomy (SPEC §0.7): flat, square, black-on-white.
+    // "Pressed" is a momentary inversion - selected XOR pressed fills black.
+    component ConfPill: Rectangle {
+        id: pill
+        property string label
+        property bool selected: false
+        property bool muted: false
+        signal tapped()
+        height: 64 * root.ps
+        width: pillText.implicitWidth + 56 * root.ps
+        color: pill.selected !== pillArea.pressed ? "#000000" : "#FFFFFF"
+        border.width: pill.muted && !pill.selected ? root.bw(1) : root.bw(2)
+        border.color: pill.muted && !pill.selected ? "#BBBBBB" : "#000000"
+        Text {
+            id: pillText
+            anchors.centerIn: parent
+            text: pill.label
+            font.family: fontSansSemi.name
+            font.pixelSize: 26 * root.ps
+            color: pill.selected !== pillArea.pressed ? "#FFFFFF"
+                 : (pill.muted ? "#BBBBBB" : "#000000")
+        }
+        MouseArea { id: pillArea; anchors.fill: parent; onClicked: pill.tapped() }
+    }
+
+    component IdkButton: Rectangle {
+        id: idkBtn
+        property bool selected: false
+        signal tapped()
+        height: 64 * root.ps
+        width: idkText.implicitWidth + 56 * root.ps
+        color: idkBtn.selected !== idkArea.pressed ? "#000000" : "#FFFFFF"
+        border.width: idkBtn.selected ? root.bw(2) : root.bw(1)
+        border.color: idkBtn.selected ? "#000000" : "#666666"
+        Text {
+            id: idkText
+            anchors.centerIn: parent
+            text: "I don't know"
+            font.family: fontSansMed.name
+            font.pixelSize: 26 * root.ps
+            color: idkBtn.selected !== idkArea.pressed ? "#FFFFFF" : "#444444"
+        }
+        MouseArea { id: idkArea; anchors.fill: parent; onClicked: idkBtn.tapped() }
+    }
+
+    component LetterButton: Rectangle {
+        id: lb
+        property string letter
+        property bool selected: false
+        property bool muted: false
+        signal tapped()
+        width: 64 * root.ps
+        height: 64 * root.ps
+        color: lb.selected !== lbArea.pressed ? "#000000" : "#FFFFFF"
+        border.width: lb.muted && !lb.selected ? root.bw(1) : root.bw(2)
+        border.color: lb.muted && !lb.selected ? "#BBBBBB" : "#000000"
+        Text {
+            anchors.centerIn: parent
+            text: lb.letter
+            font.family: fontSansBold.name
+            font.pixelSize: 30 * root.ps
+            color: lb.selected !== lbArea.pressed ? "#FFFFFF"
+                 : (lb.muted ? "#BBBBBB" : "#000000")
+        }
+        MouseArea { id: lbArea; anchors.fill: parent; onClicked: lb.tapped() }
+    }
+
+    component ActionButton: Rectangle {
+        id: ab
+        property string label
+        property bool active: true
+        signal tapped()
+        height: 64 * root.ps
+        width: abText.implicitWidth + 72 * root.ps
+        color: ab.active && abArea.pressed ? "#000000" : "#FFFFFF"
+        border.width: ab.active ? root.bw(2) : root.bw(1)
+        border.color: ab.active ? "#000000" : "#BBBBBB"
+        Text {
+            id: abText
+            anchors.centerIn: parent
+            text: ab.label
+            font.family: fontSansSemi.name
+            font.pixelSize: 28 * root.ps
+            color: ab.active ? (abArea.pressed ? "#FFFFFF" : "#000000") : "#999999"
+        }
+        MouseArea {
+            id: abArea
+            anchors.fill: parent
+            onClicked: if (ab.active) ab.tapped()
+        }
+    }
+
+    component PageTurn: Rectangle {
+        id: pt
+        property string glyph
+        property bool active: true
+        signal tapped()
+        width: 64 * root.ps
+        height: 64 * root.ps
+        color: pt.active && ptArea.pressed ? "#000000" : "#FFFFFF"
+        border.width: root.bw(1)
+        border.color: pt.active ? "#666666" : "#CCCCCC"
+        Text {
+            anchors.centerIn: parent
+            text: pt.glyph
+            font.family: fontSans.name
+            font.pixelSize: 34 * root.ps
+            color: pt.active ? (ptArea.pressed ? "#FFFFFF" : "#333333") : "#BBBBBB"
+        }
+        MouseArea {
+            id: ptArea
+            anchors.fill: parent
+            onClicked: if (pt.active) pt.tapped()
+        }
+    }
+
     // "loading" | "reading" | "submitting" | "results" | "error"
     property string mode: "loading"
     property string errorText: ""
@@ -59,6 +196,46 @@ Rectangle {
         for (var i = 0; i < itemPages.length; i++)
             if (itemPages[i].page === p) out.push(itemPages[i])
         return out
+    }
+
+    function itemById(id) {
+        for (var i = 0; i < itemPages.length; i++)
+            if (itemPages[i].item === id) return itemPages[i]
+        return null
+    }
+
+    // IDK and the four confidence levels are one 5-way exclusive choice
+    // (SPEC §2.3); selecting IDK on an MCQ also clears the letter. Muted
+    // controls stay tappable - tapping restores attempt mode.
+    function tapIdk(id) {
+        setMap("idkByItem", id, true)
+        setMap("confByItem", id, undefined)
+        const it = itemById(id)
+        if (it && it.kind === "mcq") setMap("selByItem", id, undefined)
+    }
+    function tapConf(id, v) {
+        setMap("confByItem", id, v)
+        setMap("idkByItem", id, false)
+    }
+    function tapLetter(id, i) {
+        setMap("selByItem", id, i)
+        setMap("idkByItem", id, false)
+    }
+
+    // Answered: IDK, or a confidence level (constructed - the transcriber
+    // handles blank ink), or letter plus confidence (MCQ).
+    function answered(it) {
+        if (idkByItem[it.item] === true) return true
+        if (!confByItem[it.item]) return false
+        if (it.kind === "mcq")
+            return selByItem[it.item] !== undefined && selByItem[it.item] !== null
+        return true
+    }
+    function unansweredCount() {
+        var n = 0
+        for (var i = 0; i < itemPages.length; i++)
+            if (!answered(itemPages[i])) n++
+        return n
     }
 
     property string loadingWhy: "fetching chapter..."
@@ -203,46 +380,72 @@ Rectangle {
 
         MouseArea {
             anchors.fill: parent
-            onPressed: (e) => {
-                ink.liveStroke = [{x: e.x / ink.width, y: e.y / ink.height}]
-                ink.requestPaint()
-            }
-            onPositionChanged: (e) => {
-                if (!ink.liveStroke) return
-                ink.liveStroke.push({x: e.x / ink.width, y: e.y / ink.height})
-                ink.requestPaint()
-            }
-            onReleased: {
+            function endStroke() {
                 if (ink.liveStroke && ink.liveStroke.length > 1)
                     root.strokesForPage(root.page).push(ink.liveStroke)
                 ink.liveStroke = null
                 ink.requestPaint()
             }
+            onPressed: (e) => {
+                if (!root.inkAllowedAt(e.x / ink.width, e.y / ink.height)) return
+                ink.liveStroke = [{x: e.x / ink.width, y: e.y / ink.height}]
+                ink.requestPaint()
+            }
+            onPositionChanged: (e) => {
+                if (!ink.liveStroke) return
+                // Leaving the ink zone ends the stroke - nothing is ever
+                // drawn over a control strip (SPEC §2.3).
+                if (!root.inkAllowedAt(e.x / ink.width, e.y / ink.height)) {
+                    endStroke()
+                    return
+                }
+                ink.liveStroke.push({x: e.x / ink.width, y: e.y / ink.height})
+                ink.requestPaint()
+            }
+            onReleased: endStroke()
         }
     }
 
     onPageChanged: ink.requestPaint()
 
-    // Page turning moved to explicit corner controls: the whole page
-    // surface belongs to ink now.
-    Row {
-        visible: root.mode === "reading"
-        spacing: 12
-        anchors { left: parent.left; bottom: parent.bottom; margins: 10 }
-        Button {
-            text: "‹"
-            font.pixelSize: 28
-            width: 56
-            enabled: root.page > 0
-            onClicked: root.page--
-        }
-        Button {
-            text: "›"
-            font.pixelSize: 28
-            width: 56
-            enabled: root.page < root.pageCount - 1
-            onClicked: root.page++
-        }
+    // Bottom chrome band (SPEC §1): page turns at x 110/186, action button
+    // right-aligned to x 1510, all 64px controls centered in the bottom
+    // margin (y 2078). Page-side folio owns the center.
+    PageTurn {
+        visible: root.mode === "reading" && root.pageCount > 1
+        glyph: "‹"
+        active: root.page > 0
+        x: root.px0 + 110 * root.ps
+        y: root.py0 + 2078 * root.ps
+        onTapped: root.page--
+    }
+    PageTurn {
+        visible: root.mode === "reading" && root.pageCount > 1
+        glyph: "›"
+        active: root.page < root.pageCount - 1
+        x: root.px0 + 186 * root.ps
+        y: root.py0 + 2078 * root.ps
+        onTapped: root.page++
+    }
+    ActionButton {
+        id: checkInBtn
+        visible: root.mode === "reading" && root.page === root.pageCount - 1
+                 && root.itemPages.length > 0
+        label: "Check in"
+        active: root.unansweredCount() === 0
+        x: root.px0 + 1510 * root.ps - width
+        y: root.py0 + 2078 * root.ps
+        onTapped: root.checkIn()
+    }
+    Text {
+        visible: checkInBtn.visible && !checkInBtn.active
+        text: root.unansweredCount() + (root.unansweredCount() === 1
+              ? " item still needs an answer" : " items still need an answer")
+        font.family: fontSans.name
+        font.pixelSize: 22 * root.ps
+        color: "#777777"
+        anchors.verticalCenter: checkInBtn.verticalCenter
+        x: checkInBtn.x - width - 16 * root.ps
     }
 
     // Native placement screen: the question box holds the level buttons.
@@ -314,21 +517,40 @@ Rectangle {
         }
     }
 
-    // Strokes on a page belong to the item whose region contains their
-    // first point, renormalized to the region so the transcriber gets a
-    // tight crop instead of a mostly empty page.
+    // Pen input is captured only inside a constructed item's box, above the
+    // shelf rule; MCQ boxes take no ink. Pages without published items
+    // (prose, beat boxes) are open ink room.
+    function inkAllowedAt(nx, ny) {
+        if (mode !== "reading" || layoutC === null) return true
+        const items = itemsForPage(page)
+        if (items.length === 0) return true
+        for (var i = 0; i < items.length; i++) {
+            const it = items[i]
+            if (it.kind === "mcq") continue
+            if (nx < it.rect[0] / layoutC.page_w) continue
+            if (nx > (it.rect[0] + it.rect[2]) / layoutC.page_w) continue
+            if (ny < it.rect[1] / layoutC.page_h) continue
+            if (ny > (it.rect[1] + it.rect[3] - it.strip) / layoutC.page_h) continue
+            return true
+        }
+        return false
+    }
+
+    // Strokes on a page belong to the item whose ink zone (rect minus the
+    // control strip) contains their first point, renormalized to that zone
+    // so the transcriber gets a tight crop instead of a mostly empty page.
     function strokesForItem(it) {
         const page = strokesForPage(it.page)
         const top = it.rect[1] / layoutC.page_h
-        const h = it.rect[3] / layoutC.page_h
+        const zoneH = (it.rect[3] - it.strip) / layoutC.page_h
         const out = []
         for (var i = 0; i < page.length; i++) {
             const s = page[i]
             if (s.length === 0) continue
-            if (s[0].y < top || s[0].y > top + h) continue
+            if (s[0].y < top || s[0].y > top + zoneH) continue
             const rs = []
             for (var j = 0; j < s.length; j++)
-                rs.push({ x: s[j].x, y: (s[j].y - top) / h })
+                rs.push({ x: s[j].x, y: (s[j].y - top) / zoneH })
             out.push(rs)
         }
         return out
@@ -349,7 +571,8 @@ Rectangle {
             const it = itemPages[i]
             const entry = { item_id: it.item,
                             idk: idkByItem[it.item] === true,
-                            aspect: it.rect[3] > 0 ? layoutC.page_w / it.rect[3] : 0.75,
+                            aspect: it.rect[3] > it.strip
+                                    ? layoutC.page_w / (it.rect[3] - it.strip) : 0.75,
                             strokes: strokesForItem(it) }
             if (selByItem[it.item] !== undefined && selByItem[it.item] !== null)
                 entry.selected_index = selByItem[it.item]
@@ -384,47 +607,57 @@ Rectangle {
         xhr.send(JSON.stringify({ unit: chapterUnit, items: items }))
     }
 
-    // Per-item controls, one row mapped into each answer box's reserved
-    // strip (regions come from the pages meta - the server enforces the
-    // same geometry it publishes).
+    // Per-item controls mapped into each answer box's reserved strip
+    // (SPEC §2.3; regions come from the pages meta - the server enforces
+    // the same geometry it publishes). Constructed: one centered row, IDK
+    // left, confidence right. MCQ: letters left + IDK right, then a
+    // confidence row, both right-group aligned. Side insets 30 from the
+    // box's inner edges.
     Repeater {
         model: root.mode === "reading" && root.layoutC !== null
                ? root.itemsForPage(root.page) : []
-        delegate: Row {
-            spacing: 10
+        delegate: Item {
             property var it: modelData
-            x: pageImage.x + (pageImage.width - pageImage.paintedWidth) / 2
-               + pageImage.paintedWidth / 2 - width / 2
-            y: pageImage.y + (pageImage.height - pageImage.paintedHeight) / 2
-               + ((it.rect[1] + it.rect[3] - it.strip / 2) / root.layoutC.page_h)
-                 * pageImage.paintedHeight - height / 2
+            property bool ik: root.idkByItem[it.item] === true
+            property bool mcq: it.kind === "mcq"
+            x: root.px0 + (it.rect[0] + 2) * root.ps
+            y: root.py0 + (it.rect[1] + it.rect[3] - 2 - it.strip) * root.ps
+            width: (it.rect[2] - 4) * root.ps
+            height: it.strip * root.ps
 
-            Button {
-                checkable: true
-                checked: root.idkByItem[it.item] === true
-                text: checked ? "✓ I don't know" : "I don't know"
-                font.pixelSize: 14
-                onToggled: root.setMap("idkByItem", it.item, checked)
+            IdkButton {
+                selected: ik
+                x: mcq ? parent.width - width - 30 * root.ps : 30 * root.ps
+                y: mcq ? 26 * root.ps : (parent.height - height) / 2
+                onTapped: root.tapIdk(it.item)
             }
-            Repeater {
-                model: it.kind === "mcq" ? it.options : 0
-                delegate: Button {
-                    text: String.fromCharCode(65 + index)
-                    width: 44
-                    font.pixelSize: 15
-                    checkable: true
-                    checked: root.selByItem[it.item] === index
-                    onClicked: root.setMap("selByItem", it.item, index)
+            Row {
+                visible: mcq
+                spacing: 12 * root.ps
+                x: 30 * root.ps
+                y: 26 * root.ps
+                Repeater {
+                    model: mcq ? it.options : 0
+                    delegate: LetterButton {
+                        letter: String.fromCharCode(65 + index)
+                        selected: root.selByItem[it.item] === index
+                        muted: ik
+                        onTapped: root.tapLetter(it.item, index)
+                    }
                 }
             }
-            Repeater {
-                model: it.kind !== "mcq" ? ["unsure", "shaky", "confident", "sure"] : 0
-                delegate: Button {
-                    text: modelData
-                    font.pixelSize: 13
-                    checkable: true
-                    checked: root.confByItem[it.item] === index + 1
-                    onClicked: root.setMap("confByItem", it.item, index + 1)
+            Row {
+                spacing: 12 * root.ps
+                x: parent.width - width - 30 * root.ps
+                y: mcq ? 106 * root.ps : (parent.height - height) / 2
+                Repeater {
+                    model: ["unsure", "shaky", "confident", "sure"]
+                    delegate: ConfPill {
+                        label: modelData
+                        selected: root.confByItem[it.item] === index + 1
+                        muted: ik
+                        onTapped: root.tapConf(it.item, index + 1)
+                    }
                 }
             }
         }
@@ -478,11 +711,17 @@ Rectangle {
             if (c.cmd === "dump")
                 console.log("[drive]", JSON.stringify({mode: root.mode, page: root.page,
                     sel: root.selByItem, idk: root.idkByItem, conf: root.confByItem,
-                    items: root.itemPages.length, server: root.serverBase}))
+                    items: root.itemPages.length, server: root.serverBase,
+                    w: root.width, h: root.height, ps: root.ps,
+                    pw: pageImage.paintedWidth, ph: pageImage.paintedHeight,
+                    px0: root.px0, py0: root.py0}))
             else if (c.cmd === "level") root.setMap("selByItem", root.screener ? root.screener.item_id : "", c.i)
-            else if (c.cmd === "select") root.setMap("selByItem", c.item || driveItem(0), c.i)
-            else if (c.cmd === "conf") root.setMap("confByItem", c.item || driveItem(0), c.v)
-            else if (c.cmd === "idk") root.setMap("idkByItem", c.item || driveItem(c.slot || 0), c.on === false ? false : true)
+            else if (c.cmd === "select") root.tapLetter(c.item || driveItem(0), c.i)
+            else if (c.cmd === "conf") root.tapConf(c.item || driveItem(0), c.v)
+            else if (c.cmd === "idk") {
+                if (c.on === false) root.setMap("idkByItem", c.item || driveItem(c.slot || 0), false)
+                else root.tapIdk(c.item || driveItem(c.slot || 0))
+            }
             else if (c.cmd === "page") {
                 if (root.mode === "results") root.resultsPage = c.n
                 else root.page = c.n
@@ -508,17 +747,6 @@ Rectangle {
         }
     }
 
-    // Check in, from the last page - answers up, grades and the next
-    // chapter back.
-    Button {
-        visible: root.mode === "reading" && root.page === root.pageCount - 1
-                 && root.itemPages.length > 0
-        text: "Check in"
-        font.pixelSize: 24
-        anchors { right: parent.right; bottom: parent.bottom; margins: 10 }
-        onClicked: root.checkIn()
-    }
-
     // Results view: server-rendered pages (headline, gate bar, per-item
     // reveals with typeset math). Native contributes only the page turns
     // and the action button, whose label the server drives.
@@ -531,6 +759,7 @@ Rectangle {
     }
 
     Image {
+        id: resultsImage
         visible: root.mode === "results" && root.resultsMeta !== null
         anchors.fill: parent
         fillMode: Image.PreserveAspectFit
@@ -541,42 +770,43 @@ Rectangle {
         asynchronous: true
         cache: true
     }
+    property real rx0: resultsImage.x + (resultsImage.width - resultsImage.paintedWidth) / 2
+    property real ry0: resultsImage.y + (resultsImage.height - resultsImage.paintedHeight) / 2
     Text {
         // A graded check-in without typeset pages should not strand the
         // learner: state the fact plainly and let the action move on.
         visible: root.mode === "results" && root.resultsMeta === null
         text: "Checked in."
-        font.pixelSize: 32
+        font.family: fontSerif.name
+        font.pixelSize: 32 * root.ps
         anchors.centerIn: parent
     }
-    Row {
+    PageTurn {
         visible: root.mode === "results" && root.resultsMeta !== null
                  && root.resultsMeta.count > 1
-        spacing: 12
-        anchors { left: parent.left; bottom: parent.bottom; margins: 10 }
-        Button {
-            text: "‹"
-            font.pixelSize: 28
-            width: 56
-            enabled: root.resultsPage > 0
-            onClicked: root.resultsPage--
-        }
-        Button {
-            text: "›"
-            font.pixelSize: 28
-            width: 56
-            enabled: root.resultsMeta !== null
-                     && root.resultsPage < root.resultsMeta.count - 1
-            onClicked: root.resultsPage++
-        }
+        glyph: "‹"
+        active: root.resultsPage > 0
+        x: root.rx0 + 110 * root.ps
+        y: root.ry0 + 2078 * root.ps
+        onTapped: root.resultsPage--
     }
-    Button {
+    PageTurn {
+        visible: root.mode === "results" && root.resultsMeta !== null
+                 && root.resultsMeta.count > 1
+        glyph: "›"
+        active: root.resultsMeta !== null
+                && root.resultsPage < root.resultsMeta.count - 1
+        x: root.rx0 + 186 * root.ps
+        y: root.ry0 + 2078 * root.ps
+        onTapped: root.resultsPage++
+    }
+    ActionButton {
         visible: root.mode === "results"
-        text: root.resultsMeta && root.resultsMeta.action
-              ? root.resultsMeta.action : "Next chapter"
-        font.pixelSize: 24
-        anchors { right: parent.right; bottom: parent.bottom; margins: 10 }
-        onClicked: root.advance()
+        label: root.resultsMeta && root.resultsMeta.action
+               ? root.resultsMeta.action : "Next chapter"
+        x: root.rx0 + 1510 * root.ps - width
+        y: root.ry0 + 2078 * root.ps
+        onTapped: root.advance()
     }
 
     // Loading / error states
