@@ -53,6 +53,9 @@ type Config struct {
 	// KatexDir points at the KaTeX assets used when rendering chapters to
 	// page images for e-ink clients (the same files the iPad bundles).
 	KatexDir string `yaml:"katex_dir"`
+	// FontsDir holds the bundled page faces (Source Serif 4, Source Sans 3)
+	// referenced by the page stylesheet.
+	FontsDir string `yaml:"fonts_dir"`
 	// VisionModel transcribes handwritten ink submissions (loaded on demand
 	// by the same OpenAI-compatible server as the text upstream).
 	VisionModel string        `yaml:"vision_model"`
@@ -187,11 +190,16 @@ func (s *Server) register(id, title, corpusDir, stateDir string) error {
 	if err != nil {
 		return err
 	}
+	fonts := ""
+	if s.cfg.FontsDir != "" {
+		fonts = resolve(s.root, s.cfg.FontsDir)
+	}
 	s.mu.Lock()
 	s.subjects[id] = &Subject{ID: id, Title: title, Corpus: c, Learner: l,
 		StateDir: stateDir,
 		Pages: &pages.Renderer{
 			KatexDir: resolve(s.root, s.cfg.KatexDir),
+			FontsDir: fonts,
 			CacheDir: filepath.Join(stateDir, "pages"),
 		}}
 	s.mu.Unlock()

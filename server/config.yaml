@@ -6,6 +6,7 @@ subjects:
     state_dir: ../state/ai
 static_dir: static
 katex_dir: ../ipad-app/Chiron/Resources/katex
+fonts_dir: ../assets/fonts
 # Transcribes handwritten ink submissions from the paper client.
 vision_model: google/gemma-3-4b
 

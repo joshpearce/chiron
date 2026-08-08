@@ -1,6 +1,9 @@
 package pages
 
 import (
+	"encoding/json"
+	"image"
+	"image/png"
 	"os"
 	"os/exec"
 	"strings"
@@ -147,6 +150,82 @@ func TestBeatInjection(t *testing.T) {
 
 func contains(s, sub string) bool { return strings.Contains(s, sub) }
 
+// The design contract (rmpp/design/SPEC.md §2.1, §9): fixed box heights 640
+// and 970 with a 20px gap, packed top-aligned into the 1960px content area,
+// each item published as page + rect [110, y, 1400, h] + strip.
+func TestPackingFixedHeights(t *testing.T) {
+	llmQ := func(id string) render.ClientItem {
+		return render.ClientItem{ID: id, Kind: "constructed", Check: "llm",
+			Prompt: "Explain why the residual stream is a bus."}
+	}
+	numQ := func(id string) render.ClientItem {
+		return render.ClientItem{ID: id, Kind: "constructed", Check: "numeric",
+			Prompt: "Compute $2+2$."}
+	}
+	mcqQ := func(id string, n int) render.ClientItem {
+		it := render.ClientItem{ID: id, Kind: "mcq", Check: "key", Prompt: "Pick one."}
+		for i := 0; i < n; i++ {
+			it.Options = append(it.Options, render.ClientOption{Text: "an option"})
+		}
+		return it
+	}
+
+	// Two ink-work items fill a page flush: 970 + 20 + 970 = 1960.
+	ch := &render.Chapter{Check: []render.ClientItem{llmQ("a"), llmQ("b")}}
+	ip := ItemPages(ch, 1)
+	if len(ip) != 2 || ip[0].Page != 0 || ip[1].Page != 0 {
+		t.Fatalf("want both items on page 0: %+v", ip)
+	}
+	if ip[0].Rect != [4]int{110, 100, 1400, 970} {
+		t.Fatalf("first rect = %v", ip[0].Rect)
+	}
+	if ip[1].Rect != [4]int{110, 1090, 1400, 970} {
+		t.Fatalf("second rect = %v", ip[1].Rect)
+	}
+	if ip[0].Strip != StripConstructed || ip[1].Strip != StripConstructed {
+		t.Fatalf("constructed strip = %d/%d, want %d", ip[0].Strip, ip[1].Strip, StripConstructed)
+	}
+
+	// Three short items pack one page exactly (640×3 + 2×20 = 1960); the
+	// fourth starts the next page.
+	ch = &render.Chapter{Check: []render.ClientItem{
+		mcqQ("a", 3), numQ("b"), mcqQ("c", 4), numQ("d")}}
+	ip = ItemPages(ch, 2)
+	wantY := []int{100, 760, 1420, 100}
+	wantPage := []int{0, 0, 0, 1}
+	for i := range ip {
+		if ip[i].Page != wantPage[i] || ip[i].Rect[1] != wantY[i] || ip[i].Rect[3] != BoxShort {
+			t.Fatalf("item %d = %+v, want page %d y %d h %d",
+				i, ip[i], wantPage[i], wantY[i], BoxShort)
+		}
+	}
+	if ip[0].Strip != StripMCQ || ip[1].Strip != StripConstructed {
+		t.Fatalf("strips = %d/%d, want %d/%d", ip[0].Strip, ip[1].Strip, StripMCQ, StripConstructed)
+	}
+
+	// Tall triggers: five options, or a long stem.
+	if h := boxH(mcqQ("e", 5)); h != BoxTall {
+		t.Fatalf("5-option MCQ box = %d, want %d", h, BoxTall)
+	}
+	long := numQ("f")
+	long.Prompt = strings.Repeat("A very long stem that keeps going. ", 12)
+	if h := boxH(long); h != BoxTall {
+		t.Fatalf("long-stem box = %d, want %d", h, BoxTall)
+	}
+
+	// The published payload speaks the spec's language: item, rect, strip.
+	b, err := json.Marshal(ip[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"item":"a"`, `"rect":[110,100,1400,640]`,
+		`"strip":196`, `"page":0`, `"kind":"mcq"`} {
+		if !strings.Contains(string(b), want) {
+			t.Fatalf("payload %s missing %s", b, want)
+		}
+	}
+}
+
 func loremParagraphs(n int) string {
 	s := ""
 	for i := 0; i < n; i++ {
@@ -168,6 +247,80 @@ func pngSize(path string) (int, int, error) {
 	w := int(hdr[16])<<24 | int(hdr[17])<<16 | int(hdr[18])<<8 | int(hdr[19])
 	h := int(hdr[20])<<24 | int(hdr[21])<<16 | int(hdr[22])<<8 | int(hdr[23])
 	return w, h, nil
+}
+
+// Every interactive page carries the print chrome the design specifies: a
+// running head in the top margin and a centered folio in the bottom margin,
+// and question pages pin their boxes to the published geometry (SPEC §1, §2.4).
+func TestRenderedPagesCarryChrome(t *testing.T) {
+	r := testRenderer(t)
+	r.FontsDir = "../../assets/fonts"
+	if _, err := os.Stat(r.FontsDir); err != nil {
+		t.Skip("bundled fonts not present")
+	}
+	ch := &render.Chapter{
+		Unit:  "u2",
+		Title: "The shape of computation",
+		HTML:  `<h1>Chapter</h1><p>` + loremParagraphs(60) + `</p>`,
+		Check: []render.ClientItem{
+			{ID: "u2-q1", Kind: "constructed", Check: "llm", Prompt: "Explain."},
+			{ID: "u2-q2", Kind: "constructed", Check: "llm", Prompt: "Derive."},
+		},
+	}
+	res, err := r.Render(ch)
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if res.Count < 3 {
+		t.Fatalf("want >=3 pages (prose + check), got %d", res.Count)
+	}
+	darkIn := func(img image.Image, x0, y0, x1, y1 int) bool {
+		for y := y0; y <= y1; y++ {
+			for x := x0; x <= x1; x++ {
+				r, g, b, _ := img.At(x, y).RGBA()
+				if r < 0x8000 && g < 0x8000 && b < 0x8000 {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	for i := 0; i < res.Count; i++ {
+		f, err := os.Open(res.PagePath(i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		img, err := png.Decode(f)
+		f.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !darkIn(img, 110, 38, 700, 66) {
+			t.Errorf("page %d: no running head in the top margin", i)
+		}
+		if !darkIn(img, 600, 2098, 1020, 2128) {
+			t.Errorf("page %d: no folio in the bottom margin", i)
+		}
+	}
+	// The check page (last): two 970 boxes flush with the content area -
+	// top border at y 100, bottom border at y 2060, shelf rule above each
+	// strip (970 box, strip 120: shelf top edge at y0+849).
+	f, _ := os.Open(res.PagePath(res.Count - 1))
+	img, err := png.Decode(f)
+	f.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, band := range [][2]int{{99, 103}, {1088, 1093}, {2055, 2060}} {
+		if !darkIn(img, 400, band[0], 420, band[1]) {
+			t.Errorf("check page: no box border in rows %d-%d", band[0], band[1])
+		}
+	}
+	for _, shelf := range []int{100 + 970 - 121, 1090 + 970 - 121} {
+		if !darkIn(img, 400, shelf-3, 420, shelf+4) {
+			t.Errorf("check page: no shelf rule near y %d", shelf)
+		}
+	}
 }
 
 // The placement step is one question: same page as the intro, no series

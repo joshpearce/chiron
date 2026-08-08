@@ -242,15 +242,6 @@ Rectangle {
         }
     }
 
-    // Progress footer, deliberately tiny
-    Text {
-        visible: root.mode === "reading"
-        text: (root.page + 1) + " / " + root.pageCount
-        font.pixelSize: 18
-        color: "#666666"
-        anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 8 }
-    }
-
     // Native placement screen: the question box holds the level buttons.
     Column {
         visible: root.mode === "screener"
@@ -325,14 +316,16 @@ Rectangle {
     // tight crop instead of a mostly empty page.
     function strokesForItem(it) {
         const page = strokesForPage(it.page)
+        const top = it.rect[1] / layoutC.page_h
+        const h = it.rect[3] / layoutC.page_h
         const out = []
         for (var i = 0; i < page.length; i++) {
             const s = page[i]
             if (s.length === 0) continue
-            if (s[0].y < it.top || s[0].y > it.top + it.h) continue
+            if (s[0].y < top || s[0].y > top + h) continue
             const rs = []
             for (var j = 0; j < s.length; j++)
-                rs.push({ x: s[j].x, y: (s[j].y - it.top) / it.h })
+                rs.push({ x: s[j].x, y: (s[j].y - top) / h })
             out.push(rs)
         }
         return out
@@ -351,14 +344,14 @@ Rectangle {
         } else
         for (var i = 0; i < itemPages.length; i++) {
             const it = itemPages[i]
-            const entry = { item_id: it.id,
-                            idk: idkByItem[it.id] === true,
-                            aspect: it.h > 0 ? 0.75 / it.h : 0.75,
+            const entry = { item_id: it.item,
+                            idk: idkByItem[it.item] === true,
+                            aspect: it.rect[3] > 0 ? layoutC.page_w / it.rect[3] : 0.75,
                             strokes: strokesForItem(it) }
-            if (selByItem[it.id] !== undefined && selByItem[it.id] !== null)
-                entry.selected_index = selByItem[it.id]
-            if (confByItem[it.id])
-                entry.confidence = confByItem[it.id]
+            if (selByItem[it.item] !== undefined && selByItem[it.item] !== null)
+                entry.selected_index = selByItem[it.item]
+            if (confByItem[it.item])
+                entry.confidence = confByItem[it.item]
             items.push(entry)
         }
         const xhr = new XMLHttpRequest()
@@ -398,15 +391,15 @@ Rectangle {
             x: pageImage.x + (pageImage.width - pageImage.paintedWidth) / 2
                + pageImage.paintedWidth / 2 - width / 2
             y: pageImage.y + (pageImage.height - pageImage.paintedHeight) / 2
-               + (it.top + it.h - (root.layoutC.strip_h / root.layoutC.page_h) / 2)
+               + ((it.rect[1] + it.rect[3] - it.strip / 2) / root.layoutC.page_h)
                  * pageImage.paintedHeight - height / 2
 
             Button {
                 checkable: true
-                checked: root.idkByItem[it.id] === true
+                checked: root.idkByItem[it.item] === true
                 text: checked ? "✓ I don't know" : "I don't know"
                 font.pixelSize: 14
-                onToggled: root.setMap("idkByItem", it.id, checked)
+                onToggled: root.setMap("idkByItem", it.item, checked)
             }
             Repeater {
                 model: it.kind === "mcq" ? it.options : 0
@@ -415,8 +408,8 @@ Rectangle {
                     width: 44
                     font.pixelSize: 15
                     checkable: true
-                    checked: root.selByItem[it.id] === index
-                    onClicked: root.setMap("selByItem", it.id, index)
+                    checked: root.selByItem[it.item] === index
+                    onClicked: root.setMap("selByItem", it.item, index)
                 }
             }
             Repeater {
@@ -425,8 +418,8 @@ Rectangle {
                     text: modelData
                     font.pixelSize: 13
                     checkable: true
-                    checked: root.confByItem[it.id] === index + 1
-                    onClicked: root.setMap("confByItem", it.id, index + 1)
+                    checked: root.confByItem[it.item] === index + 1
+                    onClicked: root.setMap("confByItem", it.item, index + 1)
                 }
             }
         }
@@ -474,7 +467,7 @@ Rectangle {
         // The n-th item on the current page, for commands that omit ids.
         function driveItem(n) {
             const list = root.itemsForPage(root.page)
-            return list.length > n ? list[n].id : ""
+            return list.length > n ? list[n].item : ""
         }
         function execInner(c) {
             if (c.cmd === "dump")

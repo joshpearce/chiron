@@ -5,6 +5,13 @@
 // iPad renders in a WKWebView) into a stack of PNGs at the Paper Pro's native
 // portrait resolution, via headless Chrome print-to-PDF (which runs KaTeX)
 // and pdftoppm.
+//
+// Layout follows rmpp/design/SPEC.md: a fixed page grid (running head, folio,
+// 1400x1960 content area), item boxes at two fixed heights with a reserved
+// control strip, and pagination done by an in-page script that packs prose
+// into explicit page containers - so every page's geometry is known and
+// enforced by the server, and the interesting parts (item rects, strips) are
+// published to the client through the pages meta.
 package pages
 
 import (
@@ -31,22 +38,28 @@ const (
 	PageH = 2160
 )
 
-// The interactive item-page geometry contract. Items are packed 1-3 to a
-// page into fixed-height slots measured in sixths of the content area; the
-// server both enforces the geometry (explicit page containers and box
-// heights) and publishes it (per-item regions in the pages meta), which is
-// what lets the client place controls INSIDE each box and assign ink to
+// The page grid and the item-box geometry contract (SPEC §1, §2.1). Boxes
+// come in exactly two heights and pack top-aligned into the content area;
+// the server both enforces the geometry (explicit page containers and box
+// heights) and publishes it (per-item rect + strip in the pages meta), which
+// is what lets the client place controls INSIDE each box and assign ink to
 // items without extracting anything from the render.
 const (
-	BoxTop     = 100 // content top, page px
-	SlotUnit   = 326 // one sixth of the content area, page px
-	SlotsTotal = 6
-	BoxGap     = 14  // margin between stacked boxes, inside the slot height
-	StripH     = 130 // control strip reserved inside each box bottom
+	MarginX  = 110  // side margins
+	MarginY  = 100  // top/bottom margins
+	ContentW = 1400 // PageW - 2*MarginX
+	ContentH = 1960 // PageH - 2*MarginY
+
+	BoxShort = 640 // MCQ <=4 options, short constructed
+	BoxTall  = 970 // constructed with ink work, MCQ >=5 options, long stems
+	BoxGap   = 20  // white between stacked boxes
+
+	StripConstructed = 120 // control strip above the box's inner bottom edge
+	StripMCQ         = 196 // two control rows (letters, then confidence)
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v13"
+const styleVersion = "v14"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -62,6 +75,9 @@ type Renderer struct {
 	// KatexDir holds katex.min.css/js and contrib/auto-render.min.js
 	// (the same assets the iPad bundles).
 	KatexDir string
+	// FontsDir holds the bundled page faces (Source Serif 4). Empty falls
+	// back to system Georgia - renders still work, off-spec.
+	FontsDir string
 	// CacheDir receives one subdirectory per rendered chapter, keyed by
 	// content hash.
 	CacheDir string
@@ -82,58 +98,76 @@ func (r Result) PagePath(n int) string {
 	return filepath.Join(r.Dir, fmt.Sprintf("page-%03d.png", n))
 }
 
-// ItemPage says which rendered page an item occupies. Pretest items open the
-// stack (the section header rides with the first box), check items close it;
-// every box starts its own page, so the mapping is arithmetic. Ink drawn on
-// an item's page belongs to that item.
+// ItemPage is the published geometry for one item (SPEC §9): which page its
+// box is on, the box rect in page pixels, and the strip height reserved for
+// native controls above the box's inner bottom edge. Pretest items open the
+// stack, check items close it; every question page is an explicit container,
+// so the mapping is arithmetic. Ink drawn inside an item's rect (above the
+// strip) belongs to that item.
 type ItemPage struct {
-	ID      string `json:"id"`
+	Item    string `json:"item"`
 	Kind    string `json:"kind"`
-	Check   string `json:"check"`
+	Check   string `json:"check,omitempty"`
 	Options int    `json:"options,omitempty"`
 	Page    int    `json:"page"`
-	// Region on the page, normalized 0..1 of page height.
-	Top float64 `json:"top"`
-	H   float64 `json:"h"`
+	Rect    [4]int `json:"rect"`  // x, y, w, h in page px
+	Strip   int    `json:"strip"` // px above the inner bottom edge
 }
 
-// slotSixths estimates how much of a page an item needs: prompt length,
-// options for MCQs, writing room for constructed answers (more for prose
-// answers than for numbers), plus the control strip.
-func slotSixths(it render.ClientItem) int {
-	lines := 1 + len(it.Prompt)/75
-	h := 170 + lines*44 + StripH
+func stripH(it render.ClientItem) int {
 	if it.Kind == "mcq" {
-		h += len(it.Options) * 70
-	} else if it.Check == "llm" {
-		h += 460
-	} else {
-		h += 250
+		return StripMCQ
 	}
-	s := (h + SlotUnit - 1) / SlotUnit
-	if s < 2 {
-		s = 2
-	}
-	if s > SlotsTotal {
-		s = SlotsTotal
-	}
-	return s
+	return StripConstructed
 }
 
-// packItems fills pages in order: a new page starts when the next item
-// does not fit.
+// boxH picks between the two fixed heights. The estimate is deliberately
+// conservative (boxes clip overflow): prompt lines at ~62 chars each,
+// option rows at ~68.
+func boxH(it render.ClientItem) int {
+	promptPx := (1 + len(it.Prompt)/62) * 50
+	if it.Kind == "mcq" {
+		if len(it.Options) >= 5 {
+			return BoxTall
+		}
+		rows := 0
+		for _, o := range it.Options {
+			rows += 1 + len(o.Text)/68
+		}
+		need := 28 + promptPx + 14 + rows*46 + (len(it.Options)-1)*14 + StripMCQ + 1
+		if need > BoxShort {
+			return BoxTall
+		}
+		return BoxShort
+	}
+	if it.Check == "llm" {
+		// Prose answers get real ink room.
+		return BoxTall
+	}
+	// Short constructed: prompt, dotted rule, modest ink room.
+	if 28+promptPx+22+240+StripConstructed+1 > BoxShort {
+		return BoxTall
+	}
+	return BoxShort
+}
+
+// packItems fills pages in order: a new page starts when the next box
+// does not fit under the content height.
 func packItems(items []render.ClientItem) [][]render.ClientItem {
 	var pages [][]render.ClientItem
 	var cur []render.ClientItem
 	used := 0
 	for _, it := range items {
-		s := slotSixths(it)
-		if used+s > SlotsTotal && len(cur) > 0 {
+		h := boxH(it)
+		if len(cur) > 0 && used+BoxGap+h > ContentH {
 			pages = append(pages, cur)
 			cur, used = nil, 0
 		}
+		if len(cur) > 0 {
+			used += BoxGap
+		}
 		cur = append(cur, it)
-		used += s
+		used += h
 	}
 	if len(cur) > 0 {
 		pages = append(pages, cur)
@@ -149,16 +183,16 @@ func ItemPages(ch *render.Chapter, pageCount int) []ItemPage {
 			base = pageCount - len(groups)
 		}
 		for p, group := range groups {
-			off := BoxTop
+			y := MarginY
 			for _, it := range group {
-				hPx := slotSixths(it)*SlotUnit - BoxGap
+				h := boxH(it)
 				out = append(out, ItemPage{
-					ID: it.ID, Kind: it.Kind, Check: it.Check,
+					Item: it.ID, Kind: it.Kind, Check: it.Check,
 					Options: len(it.Options), Page: base + p,
-					Top: float64(off) / float64(PageH),
-					H:   float64(hPx) / float64(PageH),
+					Rect:  [4]int{MarginX, y, ContentW, h},
+					Strip: stripH(it),
 				})
-				off += hPx + BoxGap
+				y += h + BoxGap
 			}
 		}
 		return out
@@ -254,7 +288,8 @@ func (r *Renderer) renderDoc(ch *render.Chapter, doc, hash string) (Result, erro
 	}
 	pdfPath := filepath.Join(work, "chapter.pdf")
 
-	// virtual-time-budget lets KaTeX finish before printing.
+	// virtual-time-budget lets KaTeX, font loading, and the paginator
+	// finish before printing.
 	cmd := exec.Command(chrome,
 		"--headless=new", "--disable-gpu", "--no-first-run",
 		"--virtual-time-budget=15000",
@@ -383,7 +418,7 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 		class += " items-inline"
 	}
 	b = append(b, `<section class="`+class+`">`)
-	// Interactive item pages are headerless: the slot geometry is the
+	// Interactive item pages are headerless: the box geometry is the
 	// contract that lets the client place controls INSIDE each box. Print
 	// keeps the section framing - paper has no client to explain it.
 	if printLayout {
@@ -417,8 +452,8 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 			// The client renders matching lettered buttons.
 			b = append(b, `<ul class="mcq">`)
 			for oi, o := range it.Options {
-				b = append(b, fmt.Sprintf(`<li><span class="mcq-letter">%c.</span>`, 'A'+oi)+
-					html.EscapeString(o.Text)+`</li>`)
+				b = append(b, fmt.Sprintf(`<li><span class="mcq-letter">%c.</span><span>`, 'A'+oi)+
+					html.EscapeString(o.Text)+`</span></li>`)
 			}
 			b = append(b, `</ul>`)
 		case it.Check == "screener":
@@ -441,7 +476,7 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 				`<span class="conf-opt">unsure</span><span class="conf-opt">shaky</span>`+
 				`<span class="conf-opt">confident</span><span class="conf-opt">sure</span></div>`)
 		} else if it.Check != "screener" {
-			b = append(b, `<div class="control-strip"></div>`)
+			b = append(b, fmt.Sprintf(`<div class="control-strip" style="height: %dpx"></div>`, stripH(it)))
 		}
 		b = append(b, `</div>`)
 		return b
@@ -453,20 +488,49 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 			b = append(b, renderItem(it, "")...)
 		}
 	} else {
-		// Slot-packed pages: explicit page containers with fixed-height
-		// boxes, exactly mirroring the regions published in the meta.
+		// Explicit page containers with fixed-height boxes, exactly
+		// mirroring the rects published in the meta.
 		for _, group := range packItems(items) {
 			b = append(b, `<div class="qpage">`)
 			for _, it := range group {
-				hPx := slotSixths(it)*SlotUnit - BoxGap
 				b = append(b, renderItem(it,
-					fmt.Sprintf(` style="height: %dpx"`, hPx))...)
+					fmt.Sprintf(` style="height: %dpx"`, boxH(it)))...)
 			}
 			b = append(b, `</div>`)
 		}
 	}
 	b = append(b, `</section>`)
 	return strings.Join(b, "\n")
+}
+
+// runningHead is the left slot of every page's running head: chapter number
+// and title for numbered units, the bare title otherwise.
+func runningHead(ch *render.Chapter) string {
+	title := strings.ToUpper(ch.Title)
+	if m := regexp.MustCompile(`^u(\d+)$`).FindStringSubmatch(ch.Unit); m != nil && m[1] != "0" {
+		return m[1] + " · " + title
+	}
+	return title
+}
+
+// fontFaces binds the bundled Source Serif 4 files. Page-side native-control
+// faces (Source Sans 3) live in the same directory but are the client's
+// concern, not the page's.
+func (r *Renderer) fontFaces() string {
+	if r.FontsDir == "" {
+		return ""
+	}
+	base := "file://" + mustAbs(r.FontsDir)
+	face := func(file, weight, style string) string {
+		return fmt.Sprintf(`@font-face { font-family: 'Source Serif 4'; src: url('%s/%s'); font-weight: %s; font-style: %s; }`,
+			base, file, weight, style)
+	}
+	return strings.Join([]string{
+		face("SourceSerif4-Regular.ttf", "400", "normal"),
+		face("SourceSerif4-Semibold.ttf", "600", "normal"),
+		face("SourceSerif4-Bold.ttf", "700", "normal"),
+		face("SourceSerif4-It.ttf", "400", "italic"),
+	}, "\n")
 }
 
 func (r *Renderer) wrap(ch *render.Chapter) string {
@@ -489,50 +553,52 @@ func (r *Renderer) wrap(ch *render.Chapter) string {
 		ch.Pretest, r.PrintLayout, false) +
 		injectBeats(ch.HTML, ch.Beats) +
 		itemsSection(checkTitle, checkNote, ch.Check, r.PrintLayout, screenerOnly)
-	return `<!DOCTYPE html><html><head><meta charset="utf-8">
+
+	rhLeft, _ := json.Marshal(runningHead(ch))
+
+	structural := paginatedCSS()
+	script := paginatorJS(string(rhLeft))
+	if r.PrintLayout {
+		structural = printCSS()
+		script = ""
+		body = `<div id="src">` + body + `</div>`
+	} else {
+		body = `<div id="src">` + body + `</div><div id="pages"></div>`
+	}
+
+	return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <link rel="stylesheet" href="` + katex + `/katex.min.css">
 <script src="` + katex + `/katex.min.js"></script>
 <script src="` + katex + `/contrib/auto-render.min.js"></script>
 <style>
 /* ` + fmt.Sprintf("%s-print=%v", styleVersion, r.PrintLayout) + ` */
+` + r.fontFaces() + `
 @page { size: ` + fmt.Sprint(PageW) + `px ` + fmt.Sprint(PageH) + `px; margin: 0; }
 html, body { margin: 0; padding: 0; background: white; color: black; }
-body {
-  font-family: Georgia, serif;
-  font-size: 34px;
-  line-height: 1.55;
-  padding: 100px 110px;
-}
-h1 { font-size: 56px; line-height: 1.2; margin: 0 0 28px 0; }
-h2 { font-size: 44px; line-height: 1.25; margin: 44px 0 18px 0; page-break-after: avoid; }
-p { margin: 0 0 22px 0; }
+body { font-family: 'Source Serif 4', Georgia, serif; font-size: 34px; line-height: 53px; }
+h1 { font-size: 56px; line-height: 64px; font-weight: 600; margin: 0 0 28px 0; }
+h2 { font-size: 44px; line-height: 54px; font-weight: 600; margin: 46px 0 24px 0; page-break-after: avoid; }
+p { margin: 0 0 22px 0; max-width: 1220px; text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
 table { border-collapse: collapse; margin: 24px 0; page-break-inside: avoid; }
 th, td { border: 2px solid #000; padding: 10px 16px; text-align: left; }
-code { font-family: Menlo, monospace; font-size: 0.85em; }
-pre { border: 2px solid #000; padding: 16px; overflow: hidden; page-break-inside: avoid; }
-blockquote, .planner-note { border-left: 6px solid #000; margin: 24px 0; padding: 8px 0 8px 24px; font-style: italic; }
+code { font-family: Menlo, monospace; font-size: 0.82em; }
+pre { border: 2px solid #000; padding: 16px; overflow: hidden; page-break-inside: avoid; font-size: 28px; line-height: 40px; }
+blockquote, .planner-note { border-left: 2px solid #000; margin: 24px 0; padding: 8px 0 8px 28px; font-style: italic; font-size: 32px; line-height: 48px; color: #333; }
+blockquote p, .planner-note p { font-size: 32px; line-height: 48px; text-align: left; hyphens: none; }
 .katex-display { margin: 26px 0; page-break-inside: avoid; }
-.beat-box { border: 3px solid #000; margin: 30px 0; padding: 20px 24px; page-break-inside: avoid; }
-.beat-label { font-size: 24px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
-.beat-ink { height: 340px; }
-.items-section { page-break-before: always; }
-.items-inline { page-break-before: avoid; }
-.items-section:first-child { page-break-before: avoid; }
+.beat-box { border: 2px solid #000; margin: 30px 0; padding: 24px 28px 0 28px; page-break-inside: avoid; }
+.beat-label { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase; color: #444; margin-bottom: 22px; }
+.beat-prompt { font-size: 32px; line-height: 48px; }
+.beat-ink { border-top: 2px dotted #999; margin-top: 20px; height: 280px; }
 .items-note { font-style: italic; color: #333; }
-.item-box { border: 3px solid #000; margin: 34px 0; padding: 20px 24px; page-break-inside: avoid; page-break-before: always; }
-.item-box:first-of-type { page-break-before: avoid; }
-` + interactiveItemCSS(r.PrintLayout) + `
-.item-num { font-weight: bold; margin-right: 14px; }
-.item-ink { height: 420px; border-top: 2px dashed #999; margin-top: 18px; }
-.mcq { list-style: none; padding: 0; margin: 16px 0 0 0; }
-.mcq li { margin: 14px 0; }
-.mcq-tick { display: inline-block; width: 34px; height: 34px; border: 3px solid #000; margin-right: 16px; vertical-align: middle; }
-.mcq-letter { font-weight: bold; margin-right: 14px; }
+.item-num { font-weight: 700; margin-right: 14px; }
+.item-prompt { font-size: 34px; line-height: 50px; text-align: left; hyphens: none; max-width: none; }
+.mcq { list-style: none; padding: 0; margin: 14px 0 0 0; }
+.mcq li { display: flex; margin: 0 0 14px 0; font-size: 32px; line-height: 46px; }
+.mcq-letter { font-weight: 700; flex: 0 0 44px; }
 .screener-list { list-style: none; padding: 0; margin: 18px 0 0 0; }
 .screener-list li { margin: 14px 0; }
-.idk-row { margin-top: 14px; font-size: 26px; color: #333; }
-.confidence { margin-top: 16px; font-size: 26px; }
-.conf-opt { border: 2px solid #000; border-radius: 24px; padding: 4px 18px; margin-left: 14px; }
+` + structural + `
 </style></head><body>` + body + `
 <script>
 document.addEventListener("DOMContentLoaded", function() {
@@ -541,21 +607,188 @@ document.addEventListener("DOMContentLoaded", function() {
                  {left: "$", right: "$", display: false}],
     throwOnError: false
   });
+` + script + `
 });
 </script></body></html>`
 }
 
-// interactiveItemCSS pins every interactive answer box to the geometry
-// contract (BoxTop..BoxBottom with a reserved control strip). Print keeps
-// natural flow - paper needs no reserved zone.
-func interactiveItemCSS(printLayout bool) string {
-	if printLayout {
-		return ""
-	}
-	return fmt.Sprintf(`.qpage { page-break-before: always; page-break-inside: avoid; height: %dpx; overflow: hidden; }
-.qpage .item-box { margin: 0 0 %dpx 0; box-sizing: border-box; position: relative; padding-bottom: %dpx; overflow: hidden; }
-.control-strip { position: absolute; left: 24px; right: 24px; bottom: 0; height: %dpx; border-top: 2px dashed #999; }`,
-		SlotsTotal*SlotUnit-BoxGap, BoxGap, StripH+16, StripH)
+// paginatedCSS lays out the interactive render as explicit page containers
+// (filled by the paginator script) with the SPEC §1 chrome: content area at
+// (110,100) sized 1400x1960, running head in the top margin, centered folio
+// in the bottom margin. Item boxes clip and reserve their control strip,
+// with the shelf rule as the strip's top border.
+func paginatedCSS() string {
+	return fmt.Sprintf(`#src { display: none; }
+.pg { width: %dpx; height: %dpx; position: relative; overflow: hidden; }
+.pg + .pg { page-break-before: always; break-before: page; }
+.pg-content { position: absolute; left: %dpx; top: %dpx; width: %dpx; height: %dpx; overflow: hidden; }
+.pg-content > :first-child { margin-top: 0; }
+.rh { position: absolute; top: 40px; left: %dpx; width: %dpx; height: 24px; line-height: 24px; font-size: 24px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #444; display: flex; justify-content: space-between; }
+.rh .whisper { color: #777; }
+.folio { position: absolute; top: 2100px; left: %dpx; width: %dpx; height: 26px; line-height: 26px; font-size: 26px; color: #444; text-align: center; }
+.split-head { text-align-last: justify; }
+.qpage { height: %dpx; }
+.item-box { border: 2px solid #000; box-sizing: border-box; position: relative; padding: 24px 28px 0 28px; overflow: hidden; margin: 0 0 %dpx 0; }
+.items-inline .item-box { height: auto; margin: 34px 0; }
+.item-ink { border-top: 2px dotted #999; margin-top: 20px; }
+.control-strip { position: absolute; left: 0; right: 0; bottom: 0; border-top: 1px solid #000; }`,
+		PageW, PageH, MarginX, MarginY, ContentW, ContentH,
+		MarginX, ContentW, MarginX, ContentW, ContentH, BoxGap)
+}
+
+// printCSS keeps the natural-flow layout for real paper: Chrome paginates,
+// boxes size to content, and the answer scaffolding prints on the page.
+// (Print divergence per SPEC §8 - running heads and folios - is not built
+// yet; the interactive layout is the primary client.)
+func printCSS() string {
+	return `body { padding: 100px 110px; }
+.items-section { page-break-before: always; }
+.items-inline { page-break-before: avoid; }
+.items-section:first-child { page-break-before: avoid; }
+.item-box { border: 2px solid #000; margin: 34px 0; padding: 24px 28px; page-break-inside: avoid; page-break-before: always; }
+.item-box:first-of-type { page-break-before: avoid; }
+.item-ink { height: 420px; border-top: 2px dotted #999; margin-top: 20px; }
+.mcq li { display: block; }
+.mcq-tick { display: inline-block; width: 34px; height: 34px; border: 2px solid #000; margin-right: 16px; vertical-align: middle; }
+.idk-row { margin-top: 14px; font-size: 26px; color: #333; }
+.confidence { margin-top: 16px; font-size: 26px; }
+.conf-opt { border: 2px solid #000; padding: 4px 18px; margin-left: 14px; }`
+}
+
+// paginatorJS packs the rendered flow into explicit page containers after
+// KaTeX and the bundled fonts settle (both change metrics; measuring before
+// they load would paginate a different document). Question pages (.qpage)
+// pass through as-is; prose fills 1960px content areas, paragraphs and lists
+// splitting at word/item boundaries. Every page then gets its running head
+// (chapter left; CHECK or the remaining-time whisper right) and folio.
+func paginatorJS(rhLeftJSON string) string {
+	return `
+  var RH_LEFT = ` + rhLeftJSON + `;
+  document.fonts.ready.then(function() {
+    var CH = ` + fmt.Sprint(ContentH) + `;
+    var src = document.getElementById("src");
+    var out = document.getElementById("pages");
+    var content = null, kinds = [], contents = [];
+
+    function newPage(kind) {
+      var pg = document.createElement("div"); pg.className = "pg";
+      content = document.createElement("div"); content.className = "pg-content";
+      pg.appendChild(content); out.appendChild(pg);
+      kinds.push(kind); contents.push(content);
+    }
+    function fits() { return content.scrollHeight <= CH; }
+
+    // Split units: paragraphs at word boundaries (inline elements atomic),
+    // lists at item boundaries; everything else is unsplittable.
+    function units(el) {
+      if (el.tagName === "UL" || el.tagName === "OL")
+        return Array.prototype.slice.call(el.children);
+      if (el.tagName !== "P") return null;
+      var us = [];
+      Array.prototype.slice.call(el.childNodes).forEach(function(n) {
+        if (n.nodeType === 3) {
+          n.textContent.split(/(\s+)/).forEach(function(w) {
+            if (w !== "") us.push(document.createTextNode(w));
+          });
+        } else us.push(n);
+      });
+      return us;
+    }
+
+    // Largest unit prefix of el that fits in the current page.
+    function maxFit(el, us) {
+      var probe = el.cloneNode(false);
+      content.replaceChild(probe, el);
+      function fitK(k) {
+        while (probe.firstChild) probe.removeChild(probe.firstChild);
+        for (var i = 0; i < k; i++) probe.appendChild(us[i].cloneNode(true));
+        return fits();
+      }
+      var lo = 0, hi = us.length - 1;
+      while (lo < hi) {
+        var mid = (lo + hi + 1) >> 1;
+        if (fitK(mid)) lo = mid; else hi = mid - 1;
+      }
+      content.replaceChild(el, probe);
+      return lo;
+    }
+
+    var queue = [];
+    Array.prototype.slice.call(src.children).forEach(function(el) {
+      if (el.classList.contains("items-section") && !el.classList.contains("items-inline"))
+        Array.prototype.slice.call(el.children).forEach(function(q) { queue.push(q); });
+      else queue.push(el);
+    });
+
+    while (queue.length) {
+      var el = queue.shift();
+      if (el.classList && el.classList.contains("qpage")) {
+        newPage("check"); content.appendChild(el); content = null;
+        continue;
+      }
+      if (!content) newPage("prose");
+      content.appendChild(el);
+      if (fits()) continue;
+
+      var us = units(el);
+      var k = us && us.length > 1 ? maxFit(el, us) : 0;
+      if (k > 0) {
+        // Head stays (justified through its last line - it is not the
+        // paragraph's end), tail reflows onto the next page.
+        var head = el.cloneNode(false), tail = el.cloneNode(false);
+        for (var i = 0; i < us.length; i++) (i < k ? head : tail).appendChild(us[i]);
+        if (head.tagName === "P") head.classList.add("split-head");
+        content.replaceChild(head, el);
+        queue.unshift(tail);
+        content = null;
+        continue;
+      }
+      // Unsplittable: move whole to a fresh page, pulling a stranded
+      // heading along. A block too tall even alone stays and clips.
+      content.removeChild(el);
+      if (content.children.length === 0 || el.dataset.retried) {
+        content.appendChild(el);
+        content = null;
+        continue;
+      }
+      var last = content.lastElementChild;
+      if (last && /^H[12]$/.test(last.tagName)) {
+        content.removeChild(last);
+        queue.unshift(el); queue.unshift(last);
+      } else {
+        queue.unshift(el);
+      }
+      el.dataset.retried = "1";
+      content = null;
+    }
+
+    // Chrome: running head and folio on every page. The whisper is the
+    // remaining reading estimate from this page on (~200 wpm).
+    var N = out.children.length;
+    var wordsLeft = [], acc = 0;
+    for (var i = N - 1; i >= 0; i--) {
+      if (kinds[i] === "prose")
+        acc += (contents[i].textContent.match(/\S+/g) || []).length;
+      wordsLeft[i] = acc;
+    }
+    for (var i = 0; i < N; i++) {
+      var pg = out.children[i];
+      var rh = document.createElement("div"); rh.className = "rh";
+      var l = document.createElement("span"); l.textContent = RH_LEFT;
+      var r = document.createElement("span");
+      if (kinds[i] === "check") {
+        r.textContent = "CHECK";
+      } else {
+        r.className = "whisper";
+        r.textContent = "≈ " + Math.max(1, Math.round(wordsLeft[i] / 200)) + " MIN LEFT";
+      }
+      rh.appendChild(l); rh.appendChild(r);
+      var folio = document.createElement("div"); folio.className = "folio";
+      folio.textContent = (i + 1) + " / " + N;
+      pg.appendChild(rh); pg.appendChild(folio);
+    }
+    src.parentNode.removeChild(src);
+  });`
 }
 
 func mustAbs(p string) string {

@@ -40,6 +40,7 @@ sed -e "s|corpus_dir: ../corpus|corpus_dir: $ROOT/corpus|" \
     -e "s|state_dir: ../state/ai|state_dir: $STATE/state/ai|" \
     -e "s|static_dir: static|static_dir: $ROOT/server/static|" \
     -e "s|katex_dir: ../ipad-app|katex_dir: $ROOT/ipad-app|" \
+    -e "s|fonts_dir: ../assets|fonts_dir: $ROOT/assets|" \
     "$ROOT/server/config.yaml" > "$CONF"
 
 (cd "$ROOT/server-go" && go build -o "$STATE/chiron-server" ./cmd/chiron-server)
