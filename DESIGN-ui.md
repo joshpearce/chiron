@@ -127,6 +127,14 @@ depend on fast redraws.
 - The native macOS control style refuses `contentItem` customization and
   renders such buttons blank; the emulator launches with
   `QT_QUICK_CONTROLS_STYLE=Basic`.
+- `Text.lineHeight` is a multiplier of the FONT's natural line height, not
+  of `pixelSize` - a spec that says "34/53" needs
+  `lineHeightMode: Text.FixedHeight; lineHeight: 53` or the leading comes
+  out ~30% too airy.
+- A standalone italic TTF (SourceSerif4-It) registers under the base family
+  name, so `font.family: loader.name` alone silently renders the ROMAN
+  face; set `font.italic: true` as well. Non-RIBBI weights (Semibold,
+  Medium) register distinct family names and work by name alone.
 - Text that reaches native elements from server HTML must have entities
   unescaped; `&quot;` on screen is a class of bug the renderer path never
   shows (KaTeX pages go through a real HTML engine, native Text does not).
