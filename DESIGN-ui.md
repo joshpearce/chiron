@@ -130,6 +130,11 @@ depend on fast redraws.
 - Text that reaches native elements from server HTML must have entities
   unescaped; `&quot;` on screen is a class of bug the renderer path never
   shows (KaTeX pages go through a real HTML engine, native Text does not).
+- `grabToImage` callbacks never complete while the window is occluded -
+  Qt parks the render loop for unexposed windows. It looked like random
+  flakiness for a day. Harness runs use `QT_QPA_PLATFORM=offscreen`,
+  which renders unconditionally and keeps automated runs off the
+  human's screen entirely.
 
 ## The design must be verifiable without a human
 
