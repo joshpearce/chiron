@@ -35,6 +35,10 @@ Rectangle {
                      : Math.min(width / 1620, height / 2160)
     property real px0: pageImage.x + (pageImage.width - pageImage.paintedWidth) / 2
     property real py0: pageImage.y + (pageImage.height - pageImage.paintedHeight) / 2
+    // Fully-native screens (placement, waits, errors) have no page image;
+    // they lay out on the same virtual page, centered.
+    property real nx0: (width - 1620 * ps) / 2
+    property real ny0: (height - 2160 * ps) / 2
     // Border widths never scale below one device pixel.
     function bw(w) { return Math.max(1, Math.round(w * ps)) }
 
@@ -130,6 +134,51 @@ Rectangle {
         }
     }
 
+    // Placement rating row (SPEC §0.7): 1400x112, a 96px number cell with
+    // a full-height divider, label to its right. Exactly one selectable;
+    // a second tap on the selected row does not deselect.
+    component RatingRow: Rectangle {
+        id: rr
+        property int number
+        property string label
+        property bool selected: false
+        signal tapped()
+        width: 1400 * root.ps
+        height: 112 * root.ps
+        color: rr.selected !== rrArea.pressed ? "#000000" : "#FFFFFF"
+        border.width: rr.selected ? root.bw(2) : root.bw(1)
+        border.color: rr.selected ? "#000000" : "#666666"
+        Text {
+            x: 0
+            width: 96 * root.ps
+            height: parent.height
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            text: rr.number
+            font.family: fontSansBold.name
+            font.pixelSize: 30 * root.ps
+            color: rr.selected !== rrArea.pressed ? "#FFFFFF" : "#000000"
+        }
+        Rectangle {
+            x: 96 * root.ps
+            width: root.bw(1)
+            height: parent.height
+            color: rr.selected ? "#555555" : "#666666"
+        }
+        Text {
+            x: (96 + 28) * root.ps
+            width: parent.width - x - 28 * root.ps
+            height: parent.height
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+            text: rr.label
+            font.family: fontSansSemi.name
+            font.pixelSize: 30 * root.ps
+            color: rr.selected !== rrArea.pressed ? "#FFFFFF" : "#000000"
+        }
+        MouseArea { id: rrArea; anchors.fill: parent; onClicked: rr.tapped() }
+    }
+
     component PageTurn: Rectangle {
         id: pt
         property string glyph
@@ -157,6 +206,7 @@ Rectangle {
     // "loading" | "reading" | "submitting" | "results" | "error"
     property string mode: "loading"
     property string errorText: ""
+    property string subjectTitle: ""
     property string chapterTitle: ""
     property string chapterUnit: ""
     property string pagesHash: ""
@@ -238,8 +288,6 @@ Rectangle {
         return n
     }
 
-    property string loadingWhy: "fetching chapter..."
-
     Timer {
         id: retryMeta
         interval: 3000
@@ -256,17 +304,24 @@ Rectangle {
                 if (m.authoring) {
                     // Grades came back instantly; the chapter is still being
                     // written. Keep the learner informed and poll.
-                    loadingWhy = "The next chapter is being written..."
+                    if (!authoring) {
+                        authoring = true
+                        authoringLong = false
+                        authoringLongTimer.restart()
+                    }
                     retryMeta.restart()
                     return
                 }
+                authoring = false
+                authoringLong = false
+                authoringLongTimer.stop()
                 if (m.authoring_error) {
                     errorText = "Chapter authoring failed:\n" + m.authoring_error
                     mode = "error"
                     return
                 }
-                loadingWhy = "fetching chapter..."
                 chapterTitle = m.title
+                subjectTitle = m.subject_title || ""
                 chapterUnit = m.unit
                 pageCount = m.count
                 pagesHash = m.hash
@@ -448,72 +503,91 @@ Rectangle {
         x: checkInBtn.x - width - 16 * root.ps
     }
 
-    // Native placement screen: the question box holds the level buttons.
-    Column {
+    // Placement (SPEC §4): fully native. Running head, serif intro,
+    // question, five rating rows, footnote; Check in stays disabled until
+    // a level is chosen.
+    Item {
         visible: root.mode === "screener"
-        anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 60 }
-        width: Math.min(parent.width * 0.86, 980)
-        spacing: 28
+        anchors.fill: parent
 
         Text {
-            width: parent.width
-            text: root.screener ? root.screener.intro : ""
-            font.pixelSize: 22
-            font.family: "serif"
-            wrapMode: Text.Wrap
+            x: root.nx0 + 110 * root.ps
+            y: root.ny0 + 40 * root.ps
+            text: root.subjectTitle.toUpperCase()
+            font.family: fontSerifSemi.name
+            font.pixelSize: 24 * root.ps
+            font.letterSpacing: 24 * 0.08 * root.ps
+            color: "#444444"
         }
-        Rectangle {
-            width: parent.width
-            height: screenerBox.height + 56
-            color: "white"
-            border.color: "black"
-            border.width: 3
+        Text {
+            x: root.nx0 + 1510 * root.ps - width
+            y: root.ny0 + 40 * root.ps
+            text: "PLACEMENT"
+            font.family: fontSerifSemi.name
+            font.pixelSize: 24 * root.ps
+            font.letterSpacing: 24 * 0.08 * root.ps
+            color: "#444444"
+        }
 
+        Column {
+            x: root.nx0 + 110 * root.ps
+            y: root.ny0 + 200 * root.ps
+            Text {
+                width: 1220 * root.ps
+                text: root.screener ? root.screener.intro : ""
+                font.family: fontSerif.name
+                font.pixelSize: 34 * root.ps
+                lineHeightMode: Text.FixedHeight
+                lineHeight: 53 * root.ps
+                wrapMode: Text.Wrap
+                color: "#000000"
+            }
+            Item { width: 1; height: 72 * root.ps }
+            Text {
+                width: 1300 * root.ps
+                text: root.screener ? root.screener.prompt : ""
+                font.family: fontSerifSemi.name
+                font.pixelSize: 40 * root.ps
+                lineHeightMode: Text.FixedHeight
+                lineHeight: 56 * root.ps
+                wrapMode: Text.Wrap
+                color: "#000000"
+            }
+            Item { width: 1; height: 52 * root.ps }
             Column {
-                id: screenerBox
-                anchors { top: parent.top; left: parent.left; right: parent.right; margins: 28 }
-                spacing: 18
-
-                Text {
-                    width: parent.width
-                    text: root.screener ? root.screener.prompt : ""
-                    font.pixelSize: 24
-                    font.family: "serif"
-                    wrapMode: Text.Wrap
-                }
+                spacing: 20 * root.ps
                 Repeater {
                     model: root.screener ? root.screener.options : []
-                    delegate: Button {
-                        width: screenerBox.width
-                        height: 56
-                        checkable: true
-                        checked: root.screener && root.selByItem[root.screener.item_id] === index
-                        onClicked: root.setMap("selByItem", root.screener.item_id, index)
-                        contentItem: Row {
-                            spacing: 16
-                            leftPadding: 12
-                            Text {
-                                text: (index + 1) + "."
-                                font.pixelSize: 22
-                                font.bold: true
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-                            Text {
-                                text: modelData
-                                font.pixelSize: 22
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-                        }
+                    delegate: RatingRow {
+                        number: index + 1
+                        label: modelData
+                        selected: root.screener
+                                  && root.selByItem[root.screener.item_id] === index
+                        onTapped: root.setMap("selByItem", root.screener.item_id, index)
                     }
                 }
             }
+            Item { width: 1; height: 44 * root.ps }
+            Text {
+                width: 1220 * root.ps
+                text: "This sets where the questions begin — nothing more."
+                font.family: fontSerifIt.name
+            font.italic: true
+                font.pixelSize: 26 * root.ps
+                lineHeightMode: Text.FixedHeight
+                lineHeight: 36 * root.ps
+                wrapMode: Text.Wrap
+                color: "#666666"
+            }
         }
-        Button {
-            text: "Check in"
-            font.pixelSize: 24
-            enabled: root.screener && root.selByItem[root.screener.item_id] !== undefined
-            anchors.horizontalCenter: parent.horizontalCenter
-            onClicked: root.checkIn()
+
+        ActionButton {
+            label: "Check in"
+            active: root.screener !== null
+                    && root.selByItem[root.screener.item_id] !== undefined
+            x: root.nx0 + 1510 * root.ps - width
+            y: root.ny0 + 2078 * root.ps
+            onTapped: root.checkIn()
         }
     }
 
@@ -809,32 +883,102 @@ Rectangle {
         onTapped: root.advance()
     }
 
-    // Loading / error states
-    Column {
-        anchors.centerIn: parent
-        spacing: 24
-        visible: root.mode === "loading" || root.mode === "submitting" || root.mode === "error"
+    // Waits and errors (SPEC §6): a shared static skeleton - dinkus,
+    // italic statement, sub-line; errors add [Try again] and a detail
+    // line. Nothing on these screens moves, blinks, or counts.
+    property bool authoring: false
+    property bool authoringLong: false
+    Timer {
+        id: authoringLongTimer
+        interval: 45000
+        onTriggered: root.authoringLong = true
+    }
+
+    Item {
+        visible: root.mode === "loading" || root.mode === "submitting"
+                 || root.mode === "error"
+        anchors.fill: parent
+
+        property bool isError: root.mode === "error"
+        property bool isAuthoringErr: root.errorText.indexOf("authoring") !== -1
 
         Text {
-            text: "Chiron"
-            font.pixelSize: 64
-            font.family: "serif"
-            anchors.horizontalCenter: parent.horizontalCenter
+            id: dinkus
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: root.ny0 + 880 * root.ps
+            text: parent.isError ? "✱" : "✱ ✱ ✱"
+            font.family: fontSerif.name
+            font.pixelSize: 36 * root.ps
+            font.letterSpacing: 26 * root.ps
+            color: parent.isError ? "#8A3D30" : "#000000"
         }
         Text {
-            text: root.mode === "loading" ? root.loadingWhy
-                : root.mode === "submitting" ? "Grading your answers..."
-                : root.errorText
-            font.pixelSize: 24
-            horizontalAlignment: Text.AlignHCenter
-            anchors.horizontalCenter: parent.horizontalCenter
+            id: waitStatement
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: dinkus.y + dinkus.height + 56 * root.ps
+            text: {
+                if (parent.isError)
+                    return parent.isAuthoringErr ? "This chapter couldn't be written."
+                                                 : "The server can't be reached."
+                if (root.mode === "submitting") return "Grading your answers."
+                if (root.authoring) return "The next chapter is being written."
+                return "Opening the book."
+            }
+            font.family: fontSerifIt.name
+            font.italic: true
+            font.pixelSize: 40 * root.ps
+            color: "#000000"
         }
-        Button {
-            visible: root.mode === "error"
-            text: "Retry"
-            font.pixelSize: 24
-            anchors.horizontalCenter: parent.horizontalCenter
-            onClicked: root.loadMeta()
+        Text {
+            id: waitSub
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: waitStatement.y + waitStatement.height + 14 * root.ps
+            width: 1100 * root.ps
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+            text: {
+                if (parent.isError)
+                    return parent.isAuthoringErr
+                        ? "Nothing is lost — your results are kept. Try again, or come back later."
+                        : "Your work is saved on this tablet. Nothing is lost."
+                if (root.mode === "submitting") return "A few seconds."
+                if (root.authoring)
+                    return "Shaped by today's answers. It is usually ready before you finish reading the results."
+                return ""
+            }
+            font.family: fontSerif.name
+            font.pixelSize: 28 * root.ps
+            lineHeightMode: Text.FixedHeight
+            lineHeight: 40 * root.ps
+            color: "#666666"
+        }
+        Text {
+            visible: !parent.isError && root.authoring && root.authoringLong
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: waitSub.y + waitSub.height + 14 * root.ps
+            text: "Still writing — Chiron checks every few seconds."
+            font.family: fontSerif.name
+            font.pixelSize: 26 * root.ps
+            color: "#999999"
+        }
+        ActionButton {
+            id: tryAgainBtn
+            visible: parent.isError
+            label: "Try again"
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: waitSub.y + waitSub.height + 72 * root.ps
+            onTapped: root.loadMeta()
+        }
+        Text {
+            visible: parent.isError
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: tryAgainBtn.y + tryAgainBtn.height + 52 * root.ps
+            text: (parent.isAuthoringErr ? "AUTHORING FAILED · " : "HOST UNREACHABLE · ")
+                  + Qt.formatTime(new Date(), "hh:mm")
+            font.family: fontSans.name
+            font.pixelSize: 22 * root.ps
+            font.letterSpacing: 22 * 0.06 * root.ps
+            color: "#999999"
         }
     }
 }

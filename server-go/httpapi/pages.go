@@ -87,13 +87,14 @@ func (s *Server) handlePagesMeta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"unit":        ch.Unit,
-		"title":       ch.Title,
-		"count":       res.Count,
-		"hash":        res.Hash,
-		"calibration": ch.Calibration,
-		"items":       pages.ItemPages(ch, res.Count),
-		"screener":    pages.Screener(ch),
+		"unit":          ch.Unit,
+		"title":         ch.Title,
+		"subject_title": sub.Title,
+		"count":         res.Count,
+		"hash":          res.Hash,
+		"calibration":   ch.Calibration,
+		"items":         pages.ItemPages(ch, res.Count),
+		"screener":      pages.Screener(ch),
 		"layout": map[string]int{
 			"page_w": pages.PageW, "page_h": pages.PageH,
 		},
