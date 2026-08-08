@@ -10,8 +10,11 @@ import (
 	"strings"
 	"sync"
 
+	"sort"
+
 	"github.com/mjbraun/chiron/server/checkers"
 	"github.com/mjbraun/chiron/server/corpus"
+	"github.com/mjbraun/chiron/server/pages"
 	"github.com/mjbraun/chiron/server/render"
 	"github.com/mjbraun/chiron/server/review"
 	"github.com/mjbraun/chiron/server/roles"
@@ -690,7 +693,129 @@ func (s *Server) processExchange(sub *Subject, ex Exchange, asyncAuthor bool) ma
 	if authoring != "" {
 		out["authoring"] = authoring
 	}
+	// A graded check gets typeset results pages (SPEC §0.1): render them
+	// before responding - the grading wait covers grade + typeset time, so
+	// the client lands on finished pages.
+	if gate != nil && gate.Score != nil {
+		if doc := s.buildResultsDoc(sub, ex, results, gate); len(doc.Entries) > 0 {
+			if err := persistResults(sub, doc); err != nil {
+				log.Printf("persist results %s: %v", ex.Unit, err)
+			}
+			if res, err := sub.Pages.RenderResults(doc); err == nil {
+				out["results_pages"] = map[string]any{
+					"count": res.Count, "hash": res.Hash, "action": doc.Action,
+				}
+			} else {
+				log.Printf("render results %s: %v", ex.Unit, err)
+			}
+		}
+	}
 	return out
+}
+
+// buildResultsDoc assembles the typeset results content from the graded
+// exchange: printed item numbers from the chapter's own sequence, the
+// transcripts, references, and the framing copy.
+func (s *Server) buildResultsDoc(sub *Subject, ex Exchange, results []Result, gate *Gate) *pages.ResultsDoc {
+	respByID := map[string]ItemResponse{}
+	for _, r := range ex.PretestResponses {
+		respByID[r.ItemID] = r
+	}
+	for _, r := range ex.CheckResponses {
+		respByID[r.ItemID] = r
+	}
+	nByID := map[string]int{}
+	title := ex.Unit
+	if ch, err := loadChapter(sub, ex.Unit); err == nil {
+		title = ch.Title
+		n := 1
+		for _, it := range ch.Pretest {
+			nByID[it.ID] = n
+			n++
+		}
+		for _, it := range ch.Check {
+			nByID[it.ID] = n
+			n++
+		}
+	}
+
+	doc := &pages.ResultsDoc{
+		Unit:              ex.Unit,
+		Calibration:       gate.Calibration,
+		Score:             *gate.Score,
+		GatePct:           gate.Gate,
+		Passed:            gate.Passed,
+		ExtensionUnlocked: gate.ExtensionUnlocked,
+	}
+	switch {
+	case gate.Calibration:
+		doc.HeadLeft = strings.ToUpper(sub.Title)
+		doc.Action = "Begin chapter 1"
+		doc.Dek = "A measurement, not a verdict - the chapters ahead are shaped by where the sure answers stopped."
+	case gate.Passed:
+		doc.HeadLeft = pages.HeadLeft(ex.Unit, title)
+		doc.Action = "Next chapter"
+		if gate.ExtensionUnlocked {
+			doc.Dek = "Cleared with room to spare - an extension section is unlocked in the next chapter."
+		} else {
+			doc.Dek = "The next chapter builds on what held. The misses below are worth a minute before moving on."
+		}
+	default:
+		doc.HeadLeft = pages.HeadLeft(ex.Unit, title)
+		doc.Action = "Back to the chapter"
+		doc.Dek = "Not yet - the chapter returns from a different angle. The reveals below are the map."
+	}
+
+	for _, res := range results {
+		q, _ := sub.Corpus.FindQuestion(res.ItemID)
+		if q == nil || q.Check == "screener" {
+			continue
+		}
+		r := respByID[res.ItemID]
+		e := pages.ResultsEntry{
+			N:       nByID[res.ItemID],
+			Verdict: res.Verdict,
+			IDK:     r.IDK,
+			Kind:    q.Kind,
+			Prompt:  q.Prompt,
+		}
+		if !r.IDK {
+			e.Confidence = r.Confidence
+		}
+		switch {
+		case q.Kind == "mcq":
+			if r.SelectedIndex != nil && *r.SelectedIndex >= 0 && *r.SelectedIndex < len(q.Options) {
+				e.Chose = fmt.Sprintf("%c — '%s'", 'A'+*r.SelectedIndex, q.Options[*r.SelectedIndex].Text)
+			}
+			for i, o := range q.Options {
+				if o.Correct {
+					e.Answer = fmt.Sprintf("%c — %s", 'A'+i, o.Text)
+					break
+				}
+			}
+		default:
+			e.ReadAs = r.Response
+			e.Answer = q.Answer.String()
+		}
+		if fb := strings.TrimSpace(res.FeedbackMD); fb != "" &&
+			!strings.HasPrefix(fb, "Reference:") && !strings.HasPrefix(fb, "Marked \"I don't know\".") {
+			e.Why = fb
+		}
+		doc.Entries = append(doc.Entries, e)
+	}
+	// Unmapped items (not in the persisted chapter) sort last, in
+	// submission order.
+	next := len(nByID) + 1
+	for i := range doc.Entries {
+		if doc.Entries[i].N == 0 {
+			doc.Entries[i].N = next
+			next++
+		}
+	}
+	sort.SliceStable(doc.Entries, func(i, j int) bool {
+		return doc.Entries[i].N < doc.Entries[j].N
+	})
+	return doc
 }
 
 // buildAsync authors a chapter in the background and delivers it through

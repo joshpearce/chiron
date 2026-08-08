@@ -295,6 +295,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /review-schedule", s.handleReviewSchedule)
 	mux.HandleFunc("GET /pages/{subject}", s.handlePagesMeta)
 	mux.HandleFunc("GET /pages/{subject}/{page}", s.handlePage)
+	mux.HandleFunc("GET /pages/{subject}/results", s.handleResultsMeta)
+	mux.HandleFunc("GET /pages/{subject}/results/{page}", s.handleResultsPage)
 	mux.HandleFunc("POST /ink/{subject}", s.handleInk)
 	mux.HandleFunc("POST /drive/cmd", s.handleDriveCmd)
 	mux.HandleFunc("GET /drive/next", s.handleDriveNext)

@@ -59,7 +59,7 @@ const (
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v14"
+const styleVersion = "v15"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -232,7 +232,12 @@ type renderJob struct {
 // Render produces the page stack for a chapter, reusing a previous render
 // of identical content and joining an in-flight render of the same content.
 func (r *Renderer) Render(ch *render.Chapter) (Result, error) {
-	doc := r.wrap(ch)
+	return r.renderShared(ch.Unit, r.wrap(ch))
+}
+
+// renderShared is the cached, deduplicated path under every page render:
+// chapters and results docs both land here, keyed by content hash.
+func (r *Renderer) renderShared(name, doc string) (Result, error) {
 	sum := sha256.Sum256([]byte(doc))
 	key := hex.EncodeToString(sum[:8])
 
@@ -249,7 +254,7 @@ func (r *Renderer) Render(ch *render.Chapter) (Result, error) {
 	r.inflight[key] = job
 	r.mu.Unlock()
 
-	job.res, job.err = r.renderDoc(ch, doc, key)
+	job.res, job.err = r.renderDoc(name, doc, key)
 	close(job.done)
 	r.mu.Lock()
 	delete(r.inflight, key)
@@ -257,8 +262,8 @@ func (r *Renderer) Render(ch *render.Chapter) (Result, error) {
 	return job.res, job.err
 }
 
-func (r *Renderer) renderDoc(ch *render.Chapter, doc, hash string) (Result, error) {
-	dir := filepath.Join(r.CacheDir, ch.Unit+"-"+hash)
+func (r *Renderer) renderDoc(name, doc, hash string) (Result, error) {
+	dir := filepath.Join(r.CacheDir, name+"-"+hash)
 	res := Result{Dir: dir, Hash: hash}
 
 	if meta, err := os.ReadFile(filepath.Join(dir, "meta.json")); err == nil {
@@ -408,7 +413,10 @@ func injectBeats(doc string, beats []corpus.Beat) string {
 // prompt, ink room, and a confidence scale to circle. Reveals (reference
 // answers, rubrics) deliberately never reach the page - the check is
 // closed-book, and answers come back with the next exchange.
-func itemsSection(title, note string, items []render.ClientItem, printLayout, inline bool) string {
+// itemsSection numbers its boxes from first so the chapter carries one
+// continuous sequence (pretest, then check) - the same numbers the results
+// entries cite.
+func itemsSection(title, note string, items []render.ClientItem, printLayout, inline bool, first int) string {
 	if len(items) == 0 {
 		return ""
 	}
@@ -429,7 +437,7 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 			b = append(b, `<p class="items-note">`+html.EscapeString(note)+`</p>`)
 		}
 	}
-	num := 0
+	num := first - 1
 	renderItem := func(it render.ClientItem, style string) []string {
 		num++
 		i := num - 1
@@ -503,14 +511,18 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 	return strings.Join(b, "\n")
 }
 
-// runningHead is the left slot of every page's running head: chapter number
-// and title for numbered units, the bare title otherwise.
-func runningHead(ch *render.Chapter) string {
-	title := strings.ToUpper(ch.Title)
-	if m := regexp.MustCompile(`^u(\d+)$`).FindStringSubmatch(ch.Unit); m != nil && m[1] != "0" {
+// HeadLeft is the left slot of a page's running head: chapter number and
+// title for numbered units, the bare title otherwise.
+func HeadLeft(unit, title string) string {
+	title = strings.ToUpper(title)
+	if m := regexp.MustCompile(`^u(\d+)$`).FindStringSubmatch(unit); m != nil && m[1] != "0" {
 		return m[1] + " · " + title
 	}
 	return title
+}
+
+func runningHead(ch *render.Chapter) string {
+	return HeadLeft(ch.Unit, ch.Title)
 }
 
 // fontFaces binds the bundled Source Serif 4 files. Page-side native-control
@@ -534,7 +546,6 @@ func (r *Renderer) fontFaces() string {
 }
 
 func (r *Renderer) wrap(ch *render.Chapter) string {
-	katex := "file://" + mustAbs(r.KatexDir)
 	checkTitle, checkNote := "Comprehension check",
 		"Closed book. Answer every item before moving on."
 	if ch.Calibration {
@@ -550,31 +561,80 @@ func (r *Renderer) wrap(ch *render.Chapter) string {
 	}
 	body := itemsSection("Before you read",
 		"You are not supposed to know these yet - answering wrong here is part of how the chapter calibrates.",
-		ch.Pretest, r.PrintLayout, false) +
+		ch.Pretest, r.PrintLayout, false, 1) +
 		injectBeats(ch.HTML, ch.Beats) +
-		itemsSection(checkTitle, checkNote, ch.Check, r.PrintLayout, screenerOnly)
+		itemsSection(checkTitle, checkNote, ch.Check, r.PrintLayout, screenerOnly,
+			1+len(ch.Pretest))
 
-	rhLeft, _ := json.Marshal(runningHead(ch))
-
-	structural := paginatedCSS()
-	script := paginatorJS(string(rhLeft))
 	if r.PrintLayout {
-		structural = printCSS()
-		script = ""
-		body = `<div id="src">` + body + `</div>`
-	} else {
-		body = `<div id="src">` + body + `</div><div id="pages"></div>`
+		return r.printDoc(body)
 	}
+	return r.shell(body, chapterCSS(), runningHead(ch), "")
+}
 
+// shell wraps page content in the interactive render skeleton: fonts, KaTeX,
+// the base typography, the page-container chrome, and the paginator script.
+// rhRight fixes the running head's right slot ("RESULTS", "CALIBRATION");
+// empty means the dynamic chapter behavior (CHECK on question pages, the
+// time whisper on prose).
+func (r *Renderer) shell(content, extraCSS, rhLeft, rhRight string) string {
+	katex := "file://" + mustAbs(r.KatexDir)
+	left, _ := json.Marshal(rhLeft)
+	right, _ := json.Marshal(rhRight)
 	return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <link rel="stylesheet" href="` + katex + `/katex.min.css">
 <script src="` + katex + `/katex.min.js"></script>
 <script src="` + katex + `/contrib/auto-render.min.js"></script>
 <style>
-/* ` + fmt.Sprintf("%s-print=%v", styleVersion, r.PrintLayout) + ` */
+/* ` + styleVersion + `-interactive */
 ` + r.fontFaces() + `
 @page { size: ` + fmt.Sprint(PageW) + `px ` + fmt.Sprint(PageH) + `px; margin: 0; }
-html, body { margin: 0; padding: 0; background: white; color: black; }
+` + baseCSS() + `
+` + chromeCSS() + `
+` + extraCSS + `
+</style></head><body><div id="src">` + content + `</div><div id="pages"></div>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  renderMathInElement(document.body, {
+    delimiters: [{left: "$$", right: "$$", display: true},
+                 {left: "$", right: "$", display: false}],
+    throwOnError: false
+  });
+` + paginatorJS(string(left), string(right)) + `
+});
+</script></body></html>`
+}
+
+// printDoc keeps the natural-flow document for real paper: Chrome paginates,
+// no page containers, no running heads (SPEC §8 print divergence is a later
+// phase).
+func (r *Renderer) printDoc(body string) string {
+	katex := "file://" + mustAbs(r.KatexDir)
+	return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" href="` + katex + `/katex.min.css">
+<script src="` + katex + `/katex.min.js"></script>
+<script src="` + katex + `/contrib/auto-render.min.js"></script>
+<style>
+/* ` + styleVersion + `-print */
+` + r.fontFaces() + `
+@page { size: ` + fmt.Sprint(PageW) + `px ` + fmt.Sprint(PageH) + `px; margin: 0; }
+` + baseCSS() + `
+` + printCSS() + `
+</style></head><body>` + body + `
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  renderMathInElement(document.body, {
+    delimiters: [{left: "$$", right: "$$", display: true},
+                 {left: "$", right: "$", display: false}],
+    throwOnError: false
+  });
+});
+</script></body></html>`
+}
+
+// baseCSS is the shared typography (SPEC §0.5) for every rendered page.
+func baseCSS() string {
+	return `html, body { margin: 0; padding: 0; background: white; color: black; }
 body { font-family: 'Source Serif 4', Georgia, serif; font-size: 34px; line-height: 53px; }
 h1 { font-size: 56px; line-height: 64px; font-weight: 600; margin: 0 0 28px 0; }
 h2 { font-size: 44px; line-height: 54px; font-weight: 600; margin: 46px 0 24px 0; page-break-after: avoid; }
@@ -597,27 +657,13 @@ blockquote p, .planner-note p { font-size: 32px; line-height: 48px; text-align: 
 .mcq li { display: flex; margin: 0 0 14px 0; font-size: 32px; line-height: 46px; }
 .mcq-letter { font-weight: 700; flex: 0 0 44px; }
 .screener-list { list-style: none; padding: 0; margin: 18px 0 0 0; }
-.screener-list li { margin: 14px 0; }
-` + structural + `
-</style></head><body>` + body + `
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  renderMathInElement(document.body, {
-    delimiters: [{left: "$$", right: "$$", display: true},
-                 {left: "$", right: "$", display: false}],
-    throwOnError: false
-  });
-` + script + `
-});
-</script></body></html>`
+.screener-list li { margin: 14px 0; }`
 }
 
-// paginatedCSS lays out the interactive render as explicit page containers
-// (filled by the paginator script) with the SPEC §1 chrome: content area at
-// (110,100) sized 1400x1960, running head in the top margin, centered folio
-// in the bottom margin. Item boxes clip and reserve their control strip,
-// with the shelf rule as the strip's top border.
-func paginatedCSS() string {
+// chromeCSS is the page-container chrome (SPEC §1): explicit page divs
+// filled by the paginator, the content area at (110,100) sized 1400x1960,
+// running head in the top margin, centered folio in the bottom margin.
+func chromeCSS() string {
 	return fmt.Sprintf(`#src { display: none; }
 .pg { width: %dpx; height: %dpx; position: relative; overflow: hidden; }
 .pg + .pg { page-break-before: always; break-before: page; }
@@ -626,14 +672,21 @@ func paginatedCSS() string {
 .rh { position: absolute; top: 40px; left: %dpx; width: %dpx; height: 24px; line-height: 24px; font-size: 24px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #444; display: flex; justify-content: space-between; }
 .rh .whisper { color: #777; }
 .folio { position: absolute; top: 2100px; left: %dpx; width: %dpx; height: 26px; line-height: 26px; font-size: 26px; color: #444; text-align: center; }
-.split-head { text-align-last: justify; }
-.qpage { height: %dpx; }
+.split-head { text-align-last: justify; }`,
+		PageW, PageH, MarginX, MarginY, ContentW, ContentH,
+		MarginX, ContentW, MarginX, ContentW)
+}
+
+// chapterCSS pins interactive item boxes to the geometry contract: fixed
+// heights, clipped overflow, and the control strip with the shelf rule as
+// its top border.
+func chapterCSS() string {
+	return fmt.Sprintf(`.qpage { height: %dpx; }
 .item-box { border: 2px solid #000; box-sizing: border-box; position: relative; padding: 24px 28px 0 28px; overflow: hidden; margin: 0 0 %dpx 0; }
 .items-inline .item-box { height: auto; margin: 34px 0; }
 .item-ink { border-top: 2px dotted #999; margin-top: 20px; }
 .control-strip { position: absolute; left: 0; right: 0; bottom: 0; border-top: 1px solid #000; }`,
-		PageW, PageH, MarginX, MarginY, ContentW, ContentH,
-		MarginX, ContentW, MarginX, ContentW, ContentH, BoxGap)
+		ContentH, BoxGap)
 }
 
 // printCSS keeps the natural-flow layout for real paper: Chrome paginates,
@@ -660,10 +713,12 @@ func printCSS() string {
 // they load would paginate a different document). Question pages (.qpage)
 // pass through as-is; prose fills 1960px content areas, paragraphs and lists
 // splitting at word/item boundaries. Every page then gets its running head
-// (chapter left; CHECK or the remaining-time whisper right) and folio.
-func paginatorJS(rhLeftJSON string) string {
+// (left slot fixed; right slot either the fixed rhRight or the dynamic
+// CHECK / remaining-time whisper) and folio.
+func paginatorJS(rhLeftJSON, rhRightJSON string) string {
 	return `
   var RH_LEFT = ` + rhLeftJSON + `;
+  var RH_RIGHT = ` + rhRightJSON + `;
   document.fonts.ready.then(function() {
     var CH = ` + fmt.Sprint(ContentH) + `;
     var src = document.getElementById("src");
@@ -776,7 +831,9 @@ func paginatorJS(rhLeftJSON string) string {
       var rh = document.createElement("div"); rh.className = "rh";
       var l = document.createElement("span"); l.textContent = RH_LEFT;
       var r = document.createElement("span");
-      if (kinds[i] === "check") {
+      if (RH_RIGHT) {
+        r.textContent = RH_RIGHT;
+      } else if (kinds[i] === "check") {
         r.textContent = "CHECK";
       } else {
         r.className = "whisper";

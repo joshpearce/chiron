@@ -100,6 +100,98 @@ func (s *Server) handlePagesMeta(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// The most recent graded check's typeset results, kept on disk like
+// chapters so the pages survive a server restart mid-results.
+
+func resultsPath(sub *Subject) string {
+	return filepath.Join(sub.StateDir, "results", "current.json")
+}
+
+func persistResults(sub *Subject, doc *pages.ResultsDoc) error {
+	if err := os.MkdirAll(filepath.Dir(resultsPath(sub)), 0o755); err != nil {
+		return err
+	}
+	data, err := json.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	tmp := resultsPath(sub) + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, resultsPath(sub))
+}
+
+func loadResults(sub *Subject) (*pages.ResultsDoc, error) {
+	data, err := os.ReadFile(resultsPath(sub))
+	if err != nil {
+		return nil, err
+	}
+	var doc pages.ResultsDoc
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	return &doc, nil
+}
+
+func (s *Server) handleResultsMeta(w http.ResponseWriter, r *http.Request) {
+	sub, ok := s.subject(r.PathValue("subject"))
+	if !ok {
+		http.Error(w, "unknown subject", http.StatusNotFound)
+		return
+	}
+	doc, err := loadResults(sub)
+	if err != nil {
+		http.Error(w, "no results available", http.StatusNotFound)
+		return
+	}
+	res, err := sub.Pages.RenderResults(doc)
+	if err != nil {
+		http.Error(w, "render: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"unit":        doc.Unit,
+		"count":       res.Count,
+		"hash":        res.Hash,
+		"action":      doc.Action,
+		"calibration": doc.Calibration,
+		"layout": map[string]int{
+			"page_w": pages.PageW, "page_h": pages.PageH,
+		},
+	})
+}
+
+func (s *Server) handleResultsPage(w http.ResponseWriter, r *http.Request) {
+	sub, ok := s.subject(r.PathValue("subject"))
+	if !ok {
+		http.Error(w, "unknown subject", http.StatusNotFound)
+		return
+	}
+	n, err := strconv.Atoi(r.PathValue("page"))
+	if err != nil || n < 0 {
+		http.Error(w, "bad page number", http.StatusBadRequest)
+		return
+	}
+	doc, err := loadResults(sub)
+	if err != nil {
+		http.Error(w, "no results available", http.StatusNotFound)
+		return
+	}
+	res, err := sub.Pages.RenderResults(doc)
+	if err != nil {
+		http.Error(w, "render: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if n >= res.Count {
+		http.Error(w, "page out of range", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "max-age=86400")
+	http.ServeFile(w, r, res.PagePath(n))
+}
+
 func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 	sub, ok := s.subject(r.PathValue("subject"))
 	if !ok {

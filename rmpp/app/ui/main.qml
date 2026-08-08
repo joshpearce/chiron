@@ -35,6 +35,9 @@ Rectangle {
     // the question box is the UI.
     property var screener: null
     property var checkinResult: null
+    // Typeset results pages (server-rendered): {count, hash, action}.
+    property var resultsMeta: null
+    property int resultsPage: 0
     // Answer state keyed by item id - pages hold several items now.
     property var idkByItem: ({})
     property var selByItem: ({})
@@ -366,6 +369,8 @@ Rectangle {
                     checkinResult = null
                     loadMeta()
                 } else {
+                    resultsMeta = checkinResult.results_pages || null
+                    resultsPage = 0
                     mode = "results"
                 }
             } else {
@@ -478,10 +483,13 @@ Rectangle {
             else if (c.cmd === "select") root.setMap("selByItem", c.item || driveItem(0), c.i)
             else if (c.cmd === "conf") root.setMap("confByItem", c.item || driveItem(0), c.v)
             else if (c.cmd === "idk") root.setMap("idkByItem", c.item || driveItem(c.slot || 0), c.on === false ? false : true)
-            else if (c.cmd === "page") root.page = c.n
+            else if (c.cmd === "page") {
+                if (root.mode === "results") root.resultsPage = c.n
+                else root.page = c.n
+            }
             else if (c.cmd === "checkin") root.checkIn()
             else if (c.cmd === "ink" && c.stroke) { root.strokesForPage(root.page).push(c.stroke); ink.requestPaint() }
-            else if (c.cmd === "next") { root.inkByPage = ({}); root.idkByItem = ({}); root.selByItem = ({}); root.confByItem = ({}); root.checkinResult = null; root.loadMeta() }
+            else if (c.cmd === "next") root.advance()
             else if (c.cmd === "server") { root.serverBase = c.url; root.bootstrapTried = false; root.loadMeta() }
             else if (c.cmd === "reload") { root.bootstrapTried = false; root.loadMeta() }
             // "shot" and unknown commands just ack with a screenshot
@@ -511,69 +519,64 @@ Rectangle {
         onClicked: root.checkIn()
     }
 
-    // Results view
-    Flickable {
-        visible: root.mode === "results"
+    // Results view: server-rendered pages (headline, gate bar, per-item
+    // reveals with typeset math). Native contributes only the page turns
+    // and the action button, whose label the server drives.
+    function advance() {
+        inkByPage = ({}); idkByItem = ({}); selByItem = ({}); confByItem = ({})
+        checkinResult = null
+        resultsMeta = null
+        resultsPage = 0
+        loadMeta()
+    }
+
+    Image {
+        visible: root.mode === "results" && root.resultsMeta !== null
         anchors.fill: parent
-        anchors.margins: 40
-        contentHeight: resultsColumn.height
-        clip: true
-
-        Column {
-            id: resultsColumn
-            width: parent.width
-            spacing: 16
-
-            Text {
-                text: {
-                    if (!root.checkinResult || !root.checkinResult.gate) return "Checked in"
-                    const g = root.checkinResult.gate
-                    const pct = g.score !== undefined && g.score !== null
-                        ? Math.round(g.score * 100) + "%" : ""
-                    if (g.calibration) return "Calibration complete - " + pct
-                    return (g.passed ? "Gate cleared - " : "Below the gate - ") + pct
-                }
-                font.pixelSize: 42
-                font.family: "serif"
-            }
-            Repeater {
-                model: root.checkinResult ? (root.checkinResult.results || []) : []
-                delegate: Column {
-                    width: resultsColumn.width
-                    spacing: 2
-                    Text {
-                        width: parent.width
-                        text: (modelData.verdict === "pass" ? "✓  " : "✗  ")
-                              + modelData.item_id + "   "
-                              + (root.checkinResult.transcripts
-                                 ? "“" + (root.checkinResult.transcripts[modelData.item_id] || "") + "”"
-                                 : "")
-                        font.pixelSize: 22
-                        wrapMode: Text.Wrap
-                    }
-                    Text {
-                        width: parent.width
-                        visible: modelData.feedback_md !== undefined && modelData.verdict !== "pass"
-                        text: modelData.feedback_md || ""
-                        font.pixelSize: 18
-                        color: "#444444"
-                        wrapMode: Text.Wrap
-                    }
-                }
-            }
-            Button {
-                text: "Next chapter"
-                font.pixelSize: 24
-                onClicked: {
-                    root.inkByPage = ({})
-                    root.idkByItem = ({})
-                    root.selByItem = ({})
-                    root.confByItem = ({})
-                    root.checkinResult = null
-                    root.loadMeta()
-                }
-            }
+        fillMode: Image.PreserveAspectFit
+        source: root.mode === "results" && root.resultsMeta !== null
+            ? root.serverBase + "/pages/" + root.subject + "/results/"
+              + root.resultsPage + "?v=" + root.resultsMeta.hash
+            : ""
+        asynchronous: true
+        cache: true
+    }
+    Text {
+        // A graded check-in without typeset pages should not strand the
+        // learner: state the fact plainly and let the action move on.
+        visible: root.mode === "results" && root.resultsMeta === null
+        text: "Checked in."
+        font.pixelSize: 32
+        anchors.centerIn: parent
+    }
+    Row {
+        visible: root.mode === "results" && root.resultsMeta !== null
+                 && root.resultsMeta.count > 1
+        spacing: 12
+        anchors { left: parent.left; bottom: parent.bottom; margins: 10 }
+        Button {
+            text: "‹"
+            font.pixelSize: 28
+            width: 56
+            enabled: root.resultsPage > 0
+            onClicked: root.resultsPage--
         }
+        Button {
+            text: "›"
+            font.pixelSize: 28
+            width: 56
+            enabled: root.resultsMeta !== null
+                     && root.resultsPage < root.resultsMeta.count - 1
+            onClicked: root.resultsPage++
+        }
+    }
+    Button {
+        visible: root.mode === "results"
+        text: root.resultsMeta && root.resultsMeta.action
+              ? root.resultsMeta.action : "Next chapter"
+        font.pixelSize: 24
+        anchors { right: parent.right; bottom: parent.bottom; margins: 10 }
+        onClicked: root.advance()
     }
 
     // Loading / error states
