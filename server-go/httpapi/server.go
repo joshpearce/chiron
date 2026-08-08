@@ -140,6 +140,10 @@ type Server struct {
 
 	jobsMu sync.Mutex
 	jobs   map[string]*Job
+
+	// renders tracks eager background page renders so tests (and shutdown)
+	// can wait for them instead of racing temp-dir cleanup.
+	renders sync.WaitGroup
 }
 
 func New(cfg *Config, root string) (*Server, error) {

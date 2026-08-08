@@ -56,10 +56,15 @@ const (
 
 	StripConstructed = 120 // control strip above the box's inner bottom edge
 	StripMCQ         = 196 // two control rows (letters, then confidence)
+
+	// PretestNoteH is reserved at the top of the first pretest page for the
+	// framing note - pretest items are designed to be failed, and without
+	// the framing they read as a test to pass.
+	PretestNoteH = 160
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v15"
+const styleVersion = "v16"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -152,11 +157,12 @@ func boxH(it render.ClientItem) int {
 }
 
 // packItems fills pages in order: a new page starts when the next box
-// does not fit under the content height.
-func packItems(items []render.ClientItem) [][]render.ClientItem {
+// does not fit under the content height. lead is height already consumed
+// at the top of the first page (the pretest framing note).
+func packItems(items []render.ClientItem, lead int) [][]render.ClientItem {
 	var pages [][]render.ClientItem
 	var cur []render.ClientItem
-	used := 0
+	used := lead
 	for _, it := range items {
 		h := boxH(it)
 		if len(cur) > 0 && used+BoxGap+h > ContentH {
@@ -176,7 +182,7 @@ func packItems(items []render.ClientItem) [][]render.ClientItem {
 }
 
 func ItemPages(ch *render.Chapter, pageCount int) []ItemPage {
-	regions := func(groups [][]render.ClientItem, firstPage int, fromEnd bool) []ItemPage {
+	regions := func(groups [][]render.ClientItem, firstPage int, fromEnd bool, lead int) []ItemPage {
 		var out []ItemPage
 		base := firstPage
 		if fromEnd {
@@ -184,6 +190,9 @@ func ItemPages(ch *render.Chapter, pageCount int) []ItemPage {
 		}
 		for p, group := range groups {
 			y := MarginY
+			if p == 0 {
+				y += lead
+			}
 			for _, it := range group {
 				h := boxH(it)
 				out = append(out, ItemPage{
@@ -198,8 +207,8 @@ func ItemPages(ch *render.Chapter, pageCount int) []ItemPage {
 		return out
 	}
 	var out []ItemPage
-	out = append(out, regions(packItems(ch.Pretest), 0, false)...)
-	out = append(out, regions(packItems(ch.Check), 0, true)...)
+	out = append(out, regions(packItems(ch.Pretest, PretestNoteH), 0, false, PretestNoteH)...)
+	out = append(out, regions(packItems(ch.Check, 0), 0, true, 0)...)
 	return out
 }
 
@@ -415,8 +424,10 @@ func injectBeats(doc string, beats []corpus.Beat) string {
 // closed-book, and answers come back with the next exchange.
 // itemsSection numbers its boxes from first so the chapter carries one
 // continuous sequence (pretest, then check) - the same numbers the results
-// entries cite.
-func itemsSection(title, note string, items []render.ClientItem, printLayout, inline bool, first int) string {
+// entries cite. pretest sections carry their framing on the page: the note
+// in a reserved block above the first box, and a page class the paginator
+// turns into the BEFORE YOU READ running head.
+func itemsSection(title, note string, items []render.ClientItem, printLayout, inline bool, first int, pretest bool) string {
 	if len(items) == 0 {
 		return ""
 	}
@@ -498,8 +509,17 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 	} else {
 		// Explicit page containers with fixed-height boxes, exactly
 		// mirroring the rects published in the meta.
-		for _, group := range packItems(items) {
-			b = append(b, `<div class="qpage">`)
+		lead := 0
+		class := `qpage`
+		if pretest {
+			lead = PretestNoteH
+			class = `qpage qpage-pretest`
+		}
+		for gi, group := range packItems(items, lead) {
+			b = append(b, `<div class="`+class+`">`)
+			if pretest && gi == 0 && note != "" {
+				b = append(b, `<div class="qpage-note">`+html.EscapeString(note)+`</div>`)
+			}
 			for _, it := range group {
 				b = append(b, renderItem(it,
 					fmt.Sprintf(` style="height: %dpx"`, boxH(it)))...)
@@ -561,10 +581,10 @@ func (r *Renderer) wrap(ch *render.Chapter) string {
 	}
 	body := itemsSection("Before you read",
 		"You are not supposed to know these yet - answering wrong here is part of how the chapter calibrates.",
-		ch.Pretest, r.PrintLayout, false, 1) +
+		ch.Pretest, r.PrintLayout, false, 1, true) +
 		injectBeats(ch.HTML, ch.Beats) +
 		itemsSection(checkTitle, checkNote, ch.Check, r.PrintLayout, screenerOnly,
-			1+len(ch.Pretest))
+			1+len(ch.Pretest), false)
 
 	if r.PrintLayout {
 		return r.printDoc(body)
@@ -685,8 +705,9 @@ func chapterCSS() string {
 .item-box { border: 2px solid #000; box-sizing: border-box; position: relative; padding: 24px 28px 0 28px; overflow: hidden; margin: 0 0 %dpx 0; }
 .items-inline .item-box { height: auto; margin: 34px 0; }
 .item-ink { border-top: 2px dotted #999; margin-top: 20px; }
-.control-strip { position: absolute; left: 0; right: 0; bottom: 0; border-top: 1px solid #000; }`,
-		ContentH, BoxGap)
+.control-strip { position: absolute; left: 0; right: 0; bottom: 0; border-top: 1px solid #000; }
+.qpage-note { height: %dpx; box-sizing: border-box; padding-bottom: 20px; font-style: italic; font-size: 28px; line-height: 40px; color: #444; overflow: hidden; }`,
+		ContentH, BoxGap, PretestNoteH)
 }
 
 // printCSS keeps the natural-flow layout for real paper: Chrome paginates,
@@ -778,7 +799,8 @@ func paginatorJS(rhLeftJSON, rhRightJSON string) string {
     while (queue.length) {
       var el = queue.shift();
       if (el.classList && el.classList.contains("qpage")) {
-        newPage("check"); content.appendChild(el); content = null;
+        newPage(el.classList.contains("qpage-pretest") ? "pretest" : "check");
+        content.appendChild(el); content = null;
         continue;
       }
       if (!content) newPage("prose");
@@ -833,6 +855,8 @@ func paginatorJS(rhLeftJSON, rhRightJSON string) string {
       var r = document.createElement("span");
       if (RH_RIGHT) {
         r.textContent = RH_RIGHT;
+      } else if (kinds[i] === "pretest") {
+        r.textContent = "BEFORE YOU READ";
       } else if (kinds[i] === "check") {
         r.textContent = "CHECK";
       } else {

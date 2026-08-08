@@ -323,6 +323,46 @@ func TestRenderedPagesCarryChrome(t *testing.T) {
 	}
 }
 
+// Pretest pages carry their framing: the note in a reserved block above
+// the first box (geometry shifted by PretestNoteH), and a page class the
+// paginator turns into the BEFORE YOU READ running head. Check pages stay
+// unmarked.
+func TestPretestFraming(t *testing.T) {
+	r := &Renderer{KatexDir: "k", CacheDir: "c"}
+	ch := &render.Chapter{
+		Unit: "u3", Title: "T", HTML: "<p>body</p>",
+		Pretest: []render.ClientItem{
+			{ID: "p1", Kind: "constructed", Check: "llm", Prompt: "One."},
+			{ID: "p2", Kind: "constructed", Check: "llm", Prompt: "Two."},
+		},
+		Check: []render.ClientItem{
+			{ID: "q1", Kind: "constructed", Check: "llm", Prompt: "Q."}},
+	}
+	doc := r.wrap(ch)
+	if !strings.Contains(doc, `<div class="qpage qpage-pretest">`) {
+		t.Error("pretest pages not marked")
+	}
+	if !strings.Contains(doc, `class="qpage-note"`) ||
+		!strings.Contains(doc, "not supposed to know these yet") {
+		t.Error("framing note missing from the first pretest page")
+	}
+	if strings.Count(doc, `class="qpage-note"`) != 1 {
+		t.Error("note must appear only on the first pretest page")
+	}
+	if !strings.Contains(doc, `<div class="qpage">`) {
+		t.Error("check pages must stay unmarked")
+	}
+	// The note shifts geometry: p1 starts below it; p2 no longer fits the
+	// first page (160+970+20+970 > 1960) and opens page 1 at the top.
+	ip := ItemPages(ch, 10)
+	if ip[0].Rect[1] != MarginY+PretestNoteH || ip[0].Page != 0 {
+		t.Fatalf("p1 = %+v, want y %d page 0", ip[0], MarginY+PretestNoteH)
+	}
+	if ip[1].Rect[1] != MarginY || ip[1].Page != 1 {
+		t.Fatalf("p2 = %+v, want y %d page 1", ip[1], MarginY)
+	}
+}
+
 // The placement step is one question: same page as the intro, no series
 // header, and the item map still points at it.
 func TestScreenerChapterIsOnePage(t *testing.T) {

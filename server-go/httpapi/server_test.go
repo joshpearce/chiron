@@ -37,6 +37,9 @@ func newServer(t *testing.T, token string) *Server {
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}
+	// Eager page renders run in the background; the state dir is a TempDir,
+	// so cleanup must not race them.
+	t.Cleanup(s.renders.Wait)
 	return s
 }
 

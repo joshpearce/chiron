@@ -295,6 +295,19 @@ func (s *Server) prerenderCalibrationSets(sub *Subject, unit *corpus.Unit, check
 	wg.Wait()
 }
 
+// followsCalibration reports whether the unit sits directly after a
+// calibration unit in the syllabus.
+func followsCalibration(c *corpus.Corpus, unitID string) bool {
+	order := c.UnitOrder()
+	for i, id := range order {
+		if id == unitID && i > 0 {
+			prev, ok := c.Units[order[i-1]]
+			return ok && prev.IsCalibration()
+		}
+	}
+	return false
+}
+
 func (s *Server) nextUnit(sub *Subject, choice string) string {
 	fringe := sub.Learner.Fringe()
 	if len(fringe) == 0 {
@@ -332,6 +345,9 @@ func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*rende
 			var entry authorCacheEntry
 			if json.Unmarshal(data, &entry) == nil && entry.Chapter != nil {
 				log.Printf("author cache hit: %s/%s", sub.ID, unitID)
+				if followsCalibration(sub.Corpus, unitID) {
+					entry.Chapter.Pretest = nil
+				}
 				s.markUnitStarted(sub, unit, entry.Summary)
 				return entry.Chapter, nil
 			}
@@ -370,9 +386,15 @@ func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*rende
 		cp.IntroMD = ""
 		ru = &cp
 	}
+	pretest := unit.Questions.Pretest
+	if followsCalibration(sub.Corpus, unitID) {
+		// The calibration series just measured this ground minutes ago; a
+		// pretest here would be two question blocks back to back.
+		pretest = nil
+	}
 	ch, err := render.RenderChapter(ru, sections,
 		render.Directives{OpeningNoteMD: d.OpeningNoteMD, NextAction: d.NextAction},
-		unit.Questions.Pretest, items)
+		pretest, items)
 	if err == nil && driveEnabled() && !unit.IsCalibration() {
 		if data, merr := json.Marshal(authorCacheEntry{Chapter: ch, Summary: d.Summary}); merr == nil {
 			_ = os.MkdirAll(filepath.Dir(authorCachePath(sub.ID, unitID)), 0o755)
@@ -677,7 +699,9 @@ func (s *Server) processExchange(sub *Subject, ex Exchange, asyncAuthor bool) ma
 		// Render the page images now, while the learner is still reading
 		// their results - by the time they ask for the next chapter it is
 		// already on disk. The renderer serializes with the on-demand path.
+		s.renders.Add(1)
 		go func(ch *render.Chapter) {
+			defer s.renders.Done()
 			if _, err := sub.Pages.Render(ch); err != nil {
 				log.Printf("eager page render %s: %v", ch.Unit, err)
 			}
