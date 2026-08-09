@@ -1,6 +1,10 @@
 #!/bin/bash
 # Build the Chiron AppLoad bundle into output/ and, if the AppLoad PC
 # emulator checkout is present, refresh its applications_root copy.
+#
+# CHIRON_SERVER bakes a server address into the bundle for the tablet:
+#   CHIRON_SERVER=http://192.168.1.20:8080 ./build.sh
+# Unset, the bundle keeps the dev default (localhost:8082, the sim server).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -9,7 +13,19 @@ RCC=$(command -v rcc || echo /opt/homebrew/opt/qt/share/qt/libexec/rcc)
 rm -rf output
 mkdir output
 cp icon.png manifest.json output
-"$RCC" --binary -o output/resources.rcc application.qrc
+
+SRC=.
+if [ -n "${CHIRON_SERVER:-}" ]; then
+  SRC=$(mktemp -d)
+  trap 'rm -rf "$SRC"' EXIT
+  cp application.qrc "$SRC/"
+  cp -r ui "$SRC/"
+  sed -i '' "s|property string serverBase: \"[^\"]*\"|property string serverBase: \"$CHIRON_SERVER\"|" \
+    "$SRC/ui/main.qml"
+  grep -q "$CHIRON_SERVER" "$SRC/ui/main.qml" || { echo "server bake failed" >&2; exit 1; }
+  echo "baked server: $CHIRON_SERVER"
+fi
+"$RCC" --binary -o output/resources.rcc "$SRC/application.qrc"
 
 EMU_ROOT="../vendor/rm-appload/applications_root"
 if [ -d "$EMU_ROOT" ]; then
