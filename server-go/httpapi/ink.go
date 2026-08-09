@@ -40,6 +40,9 @@ type InkSubmission struct {
 	Unit         string    `json:"unit"`
 	Items        []InkItem `json:"items"`
 	ChunkMinutes float64   `json:"chunk_minutes,omitempty"`
+	// BreakMinutes reports a break actually taken since the last exchange,
+	// so the fatigue model sees rest, not absence.
+	BreakMinutes float64 `json:"break_minutes,omitempty"`
 }
 
 // transcriber is swappable for tests.
@@ -149,6 +152,7 @@ func (s *Server) handleInk(w http.ResponseWriter, r *http.Request) {
 		Unit:           in.Unit,
 		CheckResponses: responses,
 		ChunkMinutes:   in.ChunkMinutes,
+		BreakMinutes:   in.BreakMinutes,
 	}, true)
 	out["transcripts"] = transcripts
 	writeJSON(w, http.StatusOK, out)

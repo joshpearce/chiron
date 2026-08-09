@@ -134,6 +134,27 @@ Rectangle {
         }
     }
 
+    // The quiet action variant (SPEC §6): the path the design does not push.
+    component QuietButton: Rectangle {
+        id: qb
+        property string label
+        signal tapped()
+        height: 64 * root.ps
+        width: qbText.implicitWidth + 72 * root.ps
+        color: qbArea.pressed ? "#000000" : "#FFFFFF"
+        border.width: root.bw(1)
+        border.color: "#666666"
+        Text {
+            id: qbText
+            anchors.centerIn: parent
+            text: qb.label
+            font.family: fontSansMed.name
+            font.pixelSize: 28 * root.ps
+            color: qbArea.pressed ? "#FFFFFF" : "#444444"
+        }
+        MouseArea { id: qbArea; anchors.fill: parent; onClicked: qb.tapped() }
+    }
+
     // Placement rating row (SPEC §0.7): 1400x112, a 96px number cell with
     // a full-height divider, label to its right. Exactly one selectable;
     // a second tap on the selected row does not deselect.
@@ -225,6 +246,20 @@ Rectangle {
     // Typeset results pages (server-rendered): {count, hash, action}.
     property var resultsMeta: null
     property int resultsPage: 0
+    // Contents / spine (SPEC §7): server-rendered rows, native tap targets.
+    property var contentsMeta: null
+    // Non-empty while reading a past chapter read-only from the contents.
+    property string browseUnit: ""
+    // The learner's actual current unit and reading position, restored when
+    // contents or a browsed chapter is left.
+    property string homeUnit: ""
+    property int savedPage: 0
+    // Pacing (SPEC §6): the server suggests breaks from reported reading
+    // time; actual break minutes ride the next check-in.
+    property var breakSuggestion: null
+    property double chapterStartMs: 0
+    property double breakStartMs: 0
+    property double pendingBreakMinutes: 0
     // Answer state keyed by item id - pages hold several items now.
     property var idkByItem: ({})
     property var selByItem: ({})
@@ -296,9 +331,17 @@ Rectangle {
 
     function loadMeta() {
         mode = "loading"
+        const browsing = browseUnit !== ""
         const xhr = new XMLHttpRequest()
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== XMLHttpRequest.DONE) return
+            if (browsing && xhr.status !== 200) {
+                // A past chapter that cannot load is a dead end, not an
+                // error state: fall back to the contents.
+                browseUnit = ""
+                openContents()
+                return
+            }
             if (xhr.status === 200) {
                 const m = JSON.parse(xhr.responseText)
                 if (m.authoring) {
@@ -329,7 +372,11 @@ Rectangle {
                 screener = m.screener || null
                 layoutC = m.layout || null
                 page = 0
-                mode = screener ? "screener" : "reading"
+                if (!browsing) {
+                    homeUnit = m.unit
+                    chapterStartMs = Date.now()
+                }
+                mode = screener && !browsing ? "screener" : "reading"
                 console.log("[chiron] chapter:", m.unit, m.count, "pages,",
                             itemPages.length, "answer pages")
             } else if (xhr.status === 404 && !root.bootstrapTried) {
@@ -357,8 +404,42 @@ Rectangle {
                 console.log("[chiron] meta failed:", xhr.status)
             }
         }
-        xhr.open("GET", serverBase + "/pages/" + subject)
+        xhr.open("GET", serverBase + "/pages/" + subject
+                 + (browsing ? "?unit=" + browseUnit : ""))
         xhr.send()
+    }
+
+    // Contents / spine: fetch the rendered page and the row map, remembering
+    // where reading left off.
+    function openContents() {
+        if (mode === "reading" && browseUnit === "") savedPage = page
+        const xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return
+            if (xhr.status !== 200) return
+            contentsMeta = JSON.parse(xhr.responseText)
+            mode = "contents"
+        }
+        xhr.open("GET", serverBase + "/pages/" + subject + "/contents")
+        xhr.send()
+    }
+
+    // A tap on a written contents row opens that chapter: the current one
+    // resumes where reading left off, cleared ones open read-only.
+    function contentsGoto(row) {
+        if (!row || row.state === "unwritten") return
+        if (row.unit === homeUnit) {
+            browseUnit = ""
+            if (chapterUnit === homeUnit) {
+                page = savedPage
+                mode = "reading"
+            } else {
+                loadMeta()
+            }
+            return
+        }
+        browseUnit = row.unit
+        loadMeta()
     }
 
     Component.onCompleted: {
@@ -401,6 +482,7 @@ Rectangle {
         source: root.mode === "reading"
             ? root.serverBase + "/pages/" + root.subject + "/" + root.page
               + "?v=" + root.pagesHash
+              + (root.browseUnit !== "" ? "&unit=" + root.browseUnit : "")
             : ""
         asynchronous: true
         cache: true
@@ -484,7 +566,8 @@ Rectangle {
     }
     ActionButton {
         id: checkInBtn
-        visible: root.mode === "reading" && root.page === root.pageCount - 1
+        visible: root.mode === "reading" && root.browseUnit === ""
+                 && root.page === root.pageCount - 1
                  && root.itemPages.length > 0
         label: "Check in"
         active: root.unansweredCount() === 0
@@ -595,6 +678,7 @@ Rectangle {
     // shelf rule; MCQ boxes take no ink. Pages without published items
     // (prose, beat boxes) are open ink room.
     function inkAllowedAt(nx, ny) {
+        if (browseUnit !== "") return false // past chapters are read-only
         if (mode !== "reading" || layoutC === null) return true
         const items = itemsForPage(page)
         if (items.length === 0) return true
@@ -632,8 +716,10 @@ Rectangle {
 
     function checkIn() {
         // Only answerable states may submit: a check-in during loading or
-        // error would ship stale item pages from a previous chapter.
+        // error would ship stale item pages from a previous chapter, and
+        // browsed chapters are read-only.
         if (mode !== "reading" && mode !== "screener") return
+        if (browseUnit !== "") return
         mode = "submitting"
         const items = []
         if (screener) {
@@ -668,6 +754,7 @@ Rectangle {
                 } else {
                     resultsMeta = checkinResult.results_pages || null
                     resultsPage = 0
+                    breakSuggestion = checkinResult.break_suggestion || null
                     mode = "results"
                 }
             } else {
@@ -678,7 +765,25 @@ Rectangle {
         }
         xhr.open("POST", serverBase + "/ink/" + subject)
         xhr.setRequestHeader("Content-Type", "application/json")
-        xhr.send(JSON.stringify({ unit: chapterUnit, items: items }))
+        const payload = { unit: chapterUnit, items: items,
+                          chunk_minutes: chapterStartMs > 0
+                              ? (Date.now() - chapterStartMs) / 60000 : 0 }
+        if (pendingBreakMinutes > 0) {
+            payload.break_minutes = pendingBreakMinutes
+            pendingBreakMinutes = 0
+        }
+        xhr.send(JSON.stringify(payload))
+    }
+
+    // Tapping the running-head band opens the contents, book-style. Sits
+    // above the ink canvas; the top margin holds no ink zones.
+    MouseArea {
+        visible: root.mode === "reading"
+        x: root.px0
+        y: root.py0
+        width: 1620 * root.ps
+        height: 100 * root.ps
+        onClicked: root.openContents()
     }
 
     // Per-item controls mapped into each answer box's reserved strip
@@ -803,6 +908,23 @@ Rectangle {
             else if (c.cmd === "checkin") root.checkIn()
             else if (c.cmd === "ink" && c.stroke) { root.strokesForPage(root.page).push(c.stroke); ink.requestPaint() }
             else if (c.cmd === "next") root.advance()
+            else if (c.cmd === "contents") root.openContents()
+            else if (c.cmd === "take5") root.takeBreak()
+            else if (c.cmd === "resume") root.resumeFromBreak()
+            else if (c.cmd === "breaktest") {
+                // Harness-only: stage a suggestion without waiting 22 minutes.
+                root.breakSuggestion = { minutes: 5, kind: "short",
+                    note: "Chunk done. Five minutes, eyes off screens." }
+                root.mode = "breakSuggested"
+            }
+            else if (c.cmd === "goto") {
+                var row = null
+                if (root.contentsMeta)
+                    for (var gi = 0; gi < root.contentsMeta.rows.length; gi++)
+                        if (root.contentsMeta.rows[gi].unit === c.unit)
+                            row = root.contentsMeta.rows[gi]
+                root.contentsGoto(row)
+            }
             else if (c.cmd === "server") { root.serverBase = c.url; root.bootstrapTried = false; root.loadMeta() }
             else if (c.cmd === "reload") { root.bootstrapTried = false; root.loadMeta() }
             // "shot" and unknown commands just ack with a screenshot
@@ -829,6 +951,26 @@ Rectangle {
         checkinResult = null
         resultsMeta = null
         resultsPage = 0
+        browseUnit = ""
+        savedPage = 0
+        if (breakSuggestion !== null) {
+            // The pacing system asked for a pause; the break screen decides
+            // before the next chapter opens.
+            mode = "breakSuggested"
+            return
+        }
+        loadMeta()
+    }
+
+    function takeBreak() {
+        breakStartMs = Date.now()
+        mode = "breakActive"
+    }
+    function resumeFromBreak() {
+        if (mode === "breakActive" && breakStartMs > 0)
+            pendingBreakMinutes += (Date.now() - breakStartMs) / 60000
+        breakSuggestion = null
+        breakStartMs = 0
         loadMeta()
     }
 
@@ -881,6 +1023,105 @@ Rectangle {
         x: root.rx0 + 1510 * root.ps - width
         y: root.ry0 + 2078 * root.ps
         onTapped: root.advance()
+    }
+
+    // Break screens (SPEC §6): suggested offers the pause, active is a
+    // still page until any tap resumes. Same static skeleton as the waits.
+    Item {
+        visible: root.mode === "breakSuggested" || root.mode === "breakActive"
+        anchors.fill: parent
+        property bool suggested: root.mode === "breakSuggested"
+
+        MouseArea {
+            // Any tap resumes an active break; declared first so the
+            // suggested-state buttons stack above it.
+            anchors.fill: parent
+            enabled: root.mode === "breakActive"
+            onClicked: root.resumeFromBreak()
+        }
+        Text {
+            id: breakDinkus
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: root.ny0 + 880 * root.ps
+            text: "✱ ✱ ✱"
+            font.family: fontSerif.name
+            font.pixelSize: 36 * root.ps
+            font.letterSpacing: 26 * root.ps
+            color: "#000000"
+        }
+        Text {
+            id: breakStatement
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: breakDinkus.y + breakDinkus.height + 56 * root.ps
+            text: parent.suggested ? "A good place to pause." : "On break."
+            font.family: fontSerifIt.name
+            font.italic: true
+            font.pixelSize: 40 * root.ps
+            color: "#000000"
+        }
+        Text {
+            id: breakSub
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: breakStatement.y + breakStatement.height + 14 * root.ps
+            width: 1100 * root.ps
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+            text: parent.suggested
+                  ? (root.breakSuggestion ? root.breakSuggestion.note : "")
+                  : "Tap anywhere when you're ready."
+            font.family: fontSerif.name
+            font.pixelSize: 28 * root.ps
+            lineHeightMode: Text.FixedHeight
+            lineHeight: 40 * root.ps
+            color: "#666666"
+        }
+        Row {
+            visible: parent.suggested
+            spacing: 24 * root.ps
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: breakSub.y + breakSub.height + 72 * root.ps
+            ActionButton {
+                label: root.breakSuggestion && root.breakSuggestion.kind === "long"
+                       ? "Take fifteen" : "Take five"
+                onTapped: root.takeBreak()
+            }
+            QuietButton {
+                label: "Keep reading"
+                onTapped: root.resumeFromBreak()
+            }
+        }
+    }
+
+    // Contents / spine: the rendered page plus invisible row tap targets
+    // and the way back.
+    Image {
+        visible: root.mode === "contents" && root.contentsMeta !== null
+        anchors.fill: parent
+        fillMode: Image.PreserveAspectFit
+        source: root.mode === "contents" && root.contentsMeta !== null
+            ? root.serverBase + "/pages/" + root.subject + "/contents/0?v="
+              + root.contentsMeta.hash
+            : ""
+        asynchronous: true
+        cache: true
+    }
+    MouseArea {
+        visible: root.mode === "contents" && root.contentsMeta !== null
+        anchors.fill: parent
+        onClicked: (e) => {
+            const m = root.contentsMeta
+            if (m === null) return
+            const py = (e.y - root.ny0) / root.ps
+            const i = Math.floor((py - m.rows_top) / m.row_h)
+            if (i >= 0 && i < m.rows.length) root.contentsGoto(m.rows[i])
+        }
+    }
+    ActionButton {
+        visible: root.mode === "contents"
+        label: "Back to the chapter"
+        x: root.nx0 + 1510 * root.ps - width
+        y: root.ny0 + 2078 * root.ps
+        onTapped: root.contentsGoto({ unit: root.homeUnit, state: "in_progress" })
     }
 
     // Waits and errors (SPEC §6): a shared static skeleton - dinkus,

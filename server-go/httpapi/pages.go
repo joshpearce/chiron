@@ -63,13 +63,23 @@ func currentChapter(sub *Subject) (*render.Chapter, error) {
 	return loadChapter(sub, *cur)
 }
 
+// requestChapter resolves the chapter a pages request is about: the active
+// unit, or - with ?unit= - any persisted chapter, read-only, so the contents
+// screen can open cleared chapters without touching learner state.
+func requestChapter(sub *Subject, r *http.Request) (*render.Chapter, error) {
+	if unit := r.URL.Query().Get("unit"); unit != "" {
+		return loadChapter(sub, unit)
+	}
+	return currentChapter(sub)
+}
+
 func (s *Server) handlePagesMeta(w http.ResponseWriter, r *http.Request) {
 	sub, ok := s.subject(r.PathValue("subject"))
 	if !ok {
 		http.Error(w, "unknown subject", http.StatusNotFound)
 		return
 	}
-	ch, err := currentChapter(sub)
+	ch, err := requestChapter(sub, r)
 	if err != nil {
 		if building, buildErr := sub.buildStatus(); building || buildErr != "" {
 			writeJSON(w, http.StatusOK, map[string]any{
@@ -193,6 +203,91 @@ func (s *Server) handleResultsPage(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, res.PagePath(n))
 }
 
+// buildContentsDoc assembles the spine: every non-calibration unit in
+// syllabus order, with cleared/in-progress/unwritten state from the learner
+// model and the persisted chapters.
+func (s *Server) buildContentsDoc(sub *Subject) *pages.ContentsDoc {
+	doc := &pages.ContentsDoc{Subject: sub.Title}
+	cur := ""
+	if sub.Learner.Data.CurrentUnit != nil {
+		cur = *sub.Learner.Data.CurrentUnit
+	}
+	n := 0
+	for _, uid := range sub.Corpus.UnitOrder() {
+		unit, ok := sub.Corpus.Units[uid]
+		if !ok || unit.IsCalibration() {
+			continue
+		}
+		n++
+		row := pages.ContentsRow{Unit: uid, N: n, Title: unit.Title, Current: uid == cur}
+		us := sub.Learner.Data.Units[uid]
+		_, chErr := loadChapter(sub, uid)
+		switch {
+		case us != nil && us.Status == "passed":
+			row.State = "cleared"
+			if us.CheckScore != nil {
+				row.Score = int(*us.CheckScore*100 + 0.5)
+			}
+		case chErr == nil:
+			row.State = "in_progress"
+		default:
+			row.State = "unwritten"
+		}
+		doc.Rows = append(doc.Rows, row)
+	}
+	return doc
+}
+
+func (s *Server) handleContentsMeta(w http.ResponseWriter, r *http.Request) {
+	sub, ok := s.subject(r.PathValue("subject"))
+	if !ok {
+		http.Error(w, "unknown subject", http.StatusNotFound)
+		return
+	}
+	doc := s.buildContentsDoc(sub)
+	res, err := sub.Pages.RenderContents(doc)
+	if err != nil {
+		http.Error(w, "render: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"count":    res.Count,
+		"hash":     res.Hash,
+		"rows":     doc.Rows,
+		"rows_top": pages.ContentsRowsTop,
+		"row_h":    pages.ContentsRowH,
+		"layout": map[string]int{
+			"page_w": pages.PageW, "page_h": pages.PageH,
+		},
+	})
+}
+
+func (s *Server) handleContentsPage(w http.ResponseWriter, r *http.Request) {
+	sub, ok := s.subject(r.PathValue("subject"))
+	if !ok {
+		http.Error(w, "unknown subject", http.StatusNotFound)
+		return
+	}
+	n, err := strconv.Atoi(r.PathValue("page"))
+	if err != nil || n < 0 {
+		http.Error(w, "bad page number", http.StatusBadRequest)
+		return
+	}
+	res, err := sub.Pages.RenderContents(s.buildContentsDoc(sub))
+	if err != nil {
+		http.Error(w, "render: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if n >= res.Count {
+		http.Error(w, "page out of range", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	// The contents page changes with learner state; cache briefly.
+	w.Header().Set("Cache-Control", "max-age=60")
+	http.ServeFile(w, r, res.PagePath(n))
+}
+
 func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 	sub, ok := s.subject(r.PathValue("subject"))
 	if !ok {
@@ -204,7 +299,7 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad page number", http.StatusBadRequest)
 		return
 	}
-	ch, err := currentChapter(sub)
+	ch, err := requestChapter(sub, r)
 	if err != nil {
 		http.Error(w, "no chapter available", http.StatusNotFound)
 		return

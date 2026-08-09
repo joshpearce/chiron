@@ -182,3 +182,37 @@ func abs(v int) int {
 	}
 	return v
 }
+
+// Contents rows (SPEC §7): cleared rows carry leader + score, the current
+// chapter is the one IN PROGRESS row, unwritten rows have no leader and an
+// italic note.
+func TestWrapContents(t *testing.T) {
+	r := &Renderer{KatexDir: "k", CacheDir: "c"}
+	doc := r.wrapContents(&ContentsDoc{
+		Subject: "How AI Works",
+		Rows: []ContentsRow{
+			{Unit: "u1", N: 1, Title: "The core bet", State: "cleared", Score: 91},
+			{Unit: "u2", N: 2, Title: "Math floor", State: "in_progress", Current: true},
+			{Unit: "u3", N: 3, Title: "Attention", State: "unwritten"},
+		},
+	})
+	for _, want := range []string{
+		"Contents.",
+		"Chapters are written as you reach them",
+		"CLEARED · 91",
+		"IN PROGRESS",
+		"not yet written",
+		`class="crow crow-current"`,
+		`class="crow crow-unwritten"`,
+		"HOW AI WORKS",
+		"CONTENTS",
+	} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("contents missing %q", want)
+		}
+	}
+	// Unwritten rows carry no leader; written rows do (2 of 3).
+	if strings.Count(doc, `class="cleader"`) != 2 {
+		t.Errorf("want 2 leaders, got %d", strings.Count(doc, `class="cleader"`))
+	}
+}
