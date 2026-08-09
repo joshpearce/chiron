@@ -111,23 +111,22 @@ func TestWrapOrdersPretestBodyCheck(t *testing.T) {
 			t.Fatalf("missing %q", want)
 		}
 	}
-	// Interactive layout leaves confidence/IDK to the client's controls.
-	for _, banned := range []string{"How confident are you?", "I don't know - moving on"} {
-		if strings.Contains(doc, banned) {
-			t.Fatalf("interactive layout printed %q", banned)
-		}
+	// Interactive strips stay empty - controls are the client's.
+	if strings.Contains(doc, "☐") {
+		t.Fatal("interactive layout printed scaffold checkboxes")
 	}
-	// The print layout keeps them on the page for the real-paper flow.
+	// Print shares the whole page chrome (SPEC §8); its strips carry the
+	// checkbox scaffold on the same geometry.
 	rp := &Renderer{KatexDir: "k", CacheDir: "c", PrintLayout: true}
 	pdoc := rp.wrap(ch)
-	for _, want := range []string{"How confident are you?", "I don't know - moving on",
-		"mcq-tick", "Comprehension check"} {
+	for _, want := range []string{"☐ I don't know", "☐ unsure", "☐ A", "☐ B",
+		`class="control-strip"`, `class="sc-row"`} {
 		if !strings.Contains(pdoc, want) {
 			t.Fatalf("print layout missing %q", want)
 		}
 	}
-	if strings.Contains(pdoc, "control-strip") {
-		t.Error("print layout must not reserve a control strip")
+	if strings.Contains(pdoc, "How confident are you?") {
+		t.Error("old prose scaffolding leaked into print")
 	}
 	// Reference answers and rubrics must never reach paper.
 	if strings.Contains(doc, "Reference answer") {

@@ -64,7 +64,7 @@ const (
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v16"
+const styleVersion = "v17"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
@@ -427,7 +427,24 @@ func injectBeats(doc string, beats []corpus.Beat) string {
 // entries cite. pretest sections carry their framing on the page: the note
 // in a reserved block above the first box, and a page class the paginator
 // turns into the BEFORE YOU READ running head.
-func itemsSection(title, note string, items []render.ClientItem, printLayout, inline bool, first int, pretest bool) string {
+// scaffold is the printed stand-in for the native controls (SPEC §8):
+// checkboxes on the same strip geometry - IDK left and confidence right for
+// constructed answers; MCQ letters left with IDK right, confidence below.
+func scaffold(it render.ClientItem) string {
+	conf := `<div>☐ unsure&ensp;&ensp;☐ shaky&ensp;&ensp;☐ confident&ensp;&ensp;☐ sure</div>`
+	idk := `<div>☐ I don't know</div>`
+	if it.Kind != "mcq" {
+		return `<div class="sc-row">` + idk + conf + `</div>`
+	}
+	var letters []string
+	for i := range it.Options {
+		letters = append(letters, fmt.Sprintf("☐ %c", 'A'+i))
+	}
+	return `<div class="sc-row"><div>` + strings.Join(letters, "&ensp;&ensp;") + `</div>` + idk + `</div>` +
+		`<div class="sc-row"><div></div>` + conf + `</div>`
+}
+
+func itemsSection(note string, items []render.ClientItem, printLayout, inline bool, first int, pretest bool) string {
 	if len(items) == 0 {
 		return ""
 	}
@@ -437,17 +454,6 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 		class += " items-inline"
 	}
 	b = append(b, `<section class="`+class+`">`)
-	// Interactive item pages are headerless: the box geometry is the
-	// contract that lets the client place controls INSIDE each box. Print
-	// keeps the section framing - paper has no client to explain it.
-	if printLayout {
-		if title != "" {
-			b = append(b, `<h1>`+html.EscapeString(title)+`</h1>`)
-		}
-		if note != "" {
-			b = append(b, `<p class="items-note">`+html.EscapeString(note)+`</p>`)
-		}
-	}
 	num := first - 1
 	renderItem := func(it render.ClientItem, style string) []string {
 		num++
@@ -461,14 +467,9 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 		b = append(b, `<div class="item-prompt">`+numSpan+
 			html.EscapeString(it.Prompt)+`</div>`)
 		switch {
-		case it.Kind == "mcq" && printLayout:
-			b = append(b, `<ul class="mcq">`)
-			for _, o := range it.Options {
-				b = append(b, `<li><span class="mcq-tick"></span>`+html.EscapeString(o.Text)+`</li>`)
-			}
-			b = append(b, `</ul>`)
 		case it.Kind == "mcq":
-			// The client renders matching lettered buttons.
+			// Lettered options; the client's letter buttons and the printed
+			// ☐ A ☐ B row both key off the same letters.
 			b = append(b, `<ul class="mcq">`)
 			for oi, o := range it.Options {
 				b = append(b, fmt.Sprintf(`<li><span class="mcq-letter">%c.</span><span>`, 'A'+oi)+
@@ -478,31 +479,27 @@ func itemsSection(title, note string, items []render.ClientItem, printLayout, in
 		case it.Check == "screener":
 			b = append(b, `<ul class="screener-list">`)
 			for oi, o := range it.Options {
-				tick := ""
-				if printLayout {
-					tick = `<span class="mcq-tick"></span>`
-				}
-				b = append(b, fmt.Sprintf(`<li>%s<span class="item-num">%d.</span>`, tick, oi+1)+
+				b = append(b, fmt.Sprintf(`<li><span class="item-num">%d.</span>`, oi+1)+
 					html.EscapeString(o.Text)+`</li>`)
 			}
 			b = append(b, `</ul>`)
 		default:
 			b = append(b, `<div class="item-ink"></div>`)
 		}
-		if printLayout {
-			b = append(b, `<div class="idk-row"><span class="mcq-tick"></span>I don't know - moving on</div>`)
-			b = append(b, `<div class="confidence">How confident are you?`+
-				`<span class="conf-opt">unsure</span><span class="conf-opt">shaky</span>`+
-				`<span class="conf-opt">confident</span><span class="conf-opt">sure</span></div>`)
-		} else if it.Check != "screener" {
-			b = append(b, fmt.Sprintf(`<div class="control-strip" style="height: %dpx"></div>`, stripH(it)))
+		if it.Check != "screener" {
+			inner := ""
+			if printLayout {
+				inner = scaffold(it)
+			}
+			b = append(b, fmt.Sprintf(`<div class="control-strip" style="height: %dpx">%s</div>`,
+				stripH(it), inner))
 		}
 		b = append(b, `</div>`)
 		return b
 	}
 
-	if printLayout || inline {
-		// Natural flow: paper pages and the inline screener box.
+	if inline {
+		// Natural flow for the inline screener box.
 		for _, it := range items {
 			b = append(b, renderItem(it, "")...)
 		}
@@ -565,30 +562,20 @@ func (r *Renderer) fontFaces() string {
 	}, "\n")
 }
 
+// wrap builds the chapter document. Print and interactive share the whole
+// page chrome (SPEC §8) - the only divergence is what fills the control
+// strips: nothing for the native client, printed checkboxes for paper.
 func (r *Renderer) wrap(ch *render.Chapter) string {
-	checkTitle, checkNote := "Comprehension check",
-		"Closed book. Answer every item before moving on."
-	if ch.Calibration {
-		checkTitle, checkNote = "The series",
-			"Easy to hard. Marking \"I don't know\" freely is part of the design - running out of sure answers is the point."
-	}
 	// A screener-only chapter is one question: it belongs on the intro
 	// page, under the intro, with no series framing above it.
 	screenerOnly := ch.Calibration && len(ch.Pretest) == 0 &&
 		len(ch.Check) == 1 && ch.Check[0].Check == "screener"
-	if screenerOnly {
-		checkTitle, checkNote = "", ""
-	}
-	body := itemsSection("Before you read",
+	body := itemsSection(
 		"You are not supposed to know these yet - answering wrong here is part of how the chapter calibrates.",
 		ch.Pretest, r.PrintLayout, false, 1, true) +
 		injectBeats(ch.HTML, ch.Beats) +
-		itemsSection(checkTitle, checkNote, ch.Check, r.PrintLayout, screenerOnly,
+		itemsSection("", ch.Check, r.PrintLayout, screenerOnly,
 			1+len(ch.Pretest), false)
-
-	if r.PrintLayout {
-		return r.printDoc(body)
-	}
 	return r.shell(body, chapterCSS(), runningHead(ch), "")
 }
 
@@ -625,33 +612,6 @@ document.addEventListener("DOMContentLoaded", function() {
 </script></body></html>`
 }
 
-// printDoc keeps the natural-flow document for real paper: Chrome paginates,
-// no page containers, no running heads (SPEC §8 print divergence is a later
-// phase).
-func (r *Renderer) printDoc(body string) string {
-	katex := "file://" + mustAbs(r.KatexDir)
-	return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-<link rel="stylesheet" href="` + katex + `/katex.min.css">
-<script src="` + katex + `/katex.min.js"></script>
-<script src="` + katex + `/contrib/auto-render.min.js"></script>
-<style>
-/* ` + styleVersion + `-print */
-` + r.fontFaces() + `
-@page { size: ` + fmt.Sprint(PageW) + `px ` + fmt.Sprint(PageH) + `px; margin: 0; }
-` + baseCSS() + `
-` + printCSS() + `
-</style></head><body>` + body + `
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  renderMathInElement(document.body, {
-    delimiters: [{left: "$$", right: "$$", display: true},
-                 {left: "$", right: "$", display: false}],
-    throwOnError: false
-  });
-});
-</script></body></html>`
-}
-
 // baseCSS is the shared typography (SPEC §0.5) for every rendered page.
 func baseCSS() string {
 	return `html, body { margin: 0; padding: 0; background: white; color: black; }
@@ -670,7 +630,6 @@ blockquote p, .planner-note p { font-size: 32px; line-height: 48px; text-align: 
 .beat-label { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase; color: #444; margin-bottom: 22px; }
 .beat-prompt { font-size: 32px; line-height: 48px; }
 .beat-ink { border-top: 2px dotted #999; margin-top: 20px; height: 280px; }
-.items-note { font-style: italic; color: #333; }
 .item-num { font-weight: 700; margin-right: 14px; }
 .item-prompt { font-size: 34px; line-height: 50px; text-align: left; hyphens: none; max-width: none; }
 .mcq { list-style: none; padding: 0; margin: 14px 0 0 0; }
@@ -705,28 +664,10 @@ func chapterCSS() string {
 .item-box { border: 2px solid #000; box-sizing: border-box; position: relative; padding: 24px 28px 0 28px; overflow: hidden; margin: 0 0 %dpx 0; }
 .items-inline .item-box { height: auto; margin: 34px 0; }
 .item-ink { border-top: 2px dotted #999; margin-top: 20px; }
-.control-strip { position: absolute; left: 0; right: 0; bottom: 0; border-top: 1px solid #000; }
+.control-strip { position: absolute; left: 0; right: 0; bottom: 0; border-top: 1px solid #000; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; padding: 0 30px; gap: 16px; }
+.sc-row { display: flex; justify-content: space-between; font-size: 26px; line-height: 34px; color: #333; }
 .qpage-note { height: %dpx; box-sizing: border-box; padding-bottom: 20px; font-style: italic; font-size: 28px; line-height: 40px; color: #444; overflow: hidden; }`,
 		ContentH, BoxGap, PretestNoteH)
-}
-
-// printCSS keeps the natural-flow layout for real paper: Chrome paginates,
-// boxes size to content, and the answer scaffolding prints on the page.
-// (Print divergence per SPEC §8 - running heads and folios - is not built
-// yet; the interactive layout is the primary client.)
-func printCSS() string {
-	return `body { padding: 100px 110px; }
-.items-section { page-break-before: always; }
-.items-inline { page-break-before: avoid; }
-.items-section:first-child { page-break-before: avoid; }
-.item-box { border: 2px solid #000; margin: 34px 0; padding: 24px 28px; page-break-inside: avoid; page-break-before: always; }
-.item-box:first-of-type { page-break-before: avoid; }
-.item-ink { height: 420px; border-top: 2px dotted #999; margin-top: 20px; }
-.mcq li { display: block; }
-.mcq-tick { display: inline-block; width: 34px; height: 34px; border: 2px solid #000; margin-right: 16px; vertical-align: middle; }
-.idk-row { margin-top: 14px; font-size: 26px; color: #333; }
-.confidence { margin-top: 16px; font-size: 26px; }
-.conf-opt { border: 2px solid #000; padding: 4px 18px; margin-left: 14px; }`
 }
 
 // paginatorJS packs the rendered flow into explicit page containers after
