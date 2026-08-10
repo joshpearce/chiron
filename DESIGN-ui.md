@@ -119,6 +119,12 @@ depend on fast redraws.
 - The AppLoad backend channel is SOCK_SEQPACKET, which macOS lacks - the Go
   backend speaks HTTP on localhost instead, so the emulator and the device
   share one transport.
+- On SOCK_SEQPACKET a zero-length packet reads as n=0 with no error -
+  byte-identical to EOF - and AppLoad transmits an empty-string message
+  payload as exactly such a packet. Treating every zero read as a hangup
+  killed the backend (and with it the app) on the first page turn. Never
+  send an empty payload, and disambiguate zero reads with a poll for
+  POLLHUP/POLLRDHUP before concluding the peer closed.
 - MathText-style web views are invisible to the accessibility tree; anything
   that must be automatable or readable belongs in native elements.
 - `file://` XMLHttpRequests need `QML_XHR_ALLOW_FILE_READ=1` and get cached
