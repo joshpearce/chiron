@@ -85,10 +85,13 @@ type ink struct {
 	lastY   int
 	down    bool
 
-	// Dirty-rect accumulator: pixels land in the framebuffer immediately,
-	// but refresh requests are coalesced to ~66Hz - the display engine
-	// coalesces in-flight updates fine, xochitl's socket + event loop do
-	// not (research brief), and 500 messages/sec falls behind.
+	// Refresh coalescing: pixels land in the framebuffer immediately;
+	// refresh requests drain at ~66Hz covering the WHOLE live stroke's
+	// bounding box. Disjoint per-chunk rects put adjacent path pieces in
+	// different waveform phases (visible as dashes that fill in later);
+	// re-targeting one growing region keeps the stroke rendering as a
+	// single continuously-updated area, which the display engine coalesces
+	// natively.
 	dirty      [4]int
 	dirtyValid bool
 
@@ -185,7 +188,11 @@ func (k *ink) flushDirtyLocked() {
 	}
 	partialUpdate(k.qtfbFD, k.dirty[0], k.dirty[1],
 		k.dirty[2]-k.dirty[0]+1, k.dirty[3]-k.dirty[1]+1)
-	k.dirtyValid = false
+	// While the pen is down the bbox persists and keeps growing - each
+	// tick re-targets the same region. It resets at stroke end.
+	if !k.down {
+		k.dirtyValid = false
+	}
 }
 
 func (k *ink) inZone(x, y int) bool {
@@ -303,8 +310,9 @@ func (k *ink) pen(kind, x, y, d int) {
 		k.live = append(k.live, point{float64(x) / fbW, float64(y) / fbH})
 		k.lastX, k.lastY = x, y
 	case inputPenRelease:
-		k.flushDirtyLocked()
 		k.endStrokeLocked()
+		k.flushDirtyLocked()
+		k.dirtyValid = false
 	}
 }
 
