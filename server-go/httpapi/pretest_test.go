@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/mjbraun/chiron/server/corpus"
@@ -50,5 +52,40 @@ func TestQueryParamToken(t *testing.T) {
 	s.Handler().ServeHTTP(w, r)
 	if w.Code != 401 {
 		t.Fatalf("missing token accepted: %d", w.Code)
+	}
+}
+
+// Starting over archives the old book instead of destroying it: chapters,
+// results, ink, and the learner log all move under archive/<stamp>, and the
+// learner comes back fresh.
+func TestResetArchivesInsteadOfDeleting(t *testing.T) {
+	s := newServer(t, "")
+	do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start"}`, "")
+	sub, _ := s.subject("ai")
+	if _, err := os.Stat(filepath.Join(sub.StateDir, "chapters", "u0.json")); err != nil {
+		t.Fatalf("no chapter persisted before reset: %v", err)
+	}
+	w := do(t, s, "POST", "/reset", `{"subject":"ai","confirm":true}`, "")
+	if w.Code != 200 {
+		t.Fatalf("reset: %d %s", w.Code, w.Body.String())
+	}
+	entries, err := os.ReadDir(filepath.Join(sub.StateDir, "archive"))
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("archive dir: %v entries=%d", err, len(entries))
+	}
+	arch := filepath.Join(sub.StateDir, "archive", entries[0].Name())
+	if _, err := os.Stat(filepath.Join(arch, "chapters", "u0.json")); err != nil {
+		t.Fatalf("chapter not archived: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(sub.StateDir, "chapters", "u0.json")); err == nil {
+		t.Fatal("live chapter survived reset")
+	}
+	if cur := sub.Learner.Data.CurrentUnit; cur != nil && *cur != "" {
+		t.Fatalf("learner not fresh after reset: current=%v", *cur)
+	}
+	// Unconfirmed resets must refuse.
+	w = do(t, s, "POST", "/reset", `{"subject":"ai"}`, "")
+	if w.Code != 422 {
+		t.Fatalf("unconfirmed reset: %d", w.Code)
 	}
 }

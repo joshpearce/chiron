@@ -1315,6 +1315,29 @@ Rectangle {
         loadMeta()
     }
 
+    function doReset() {
+        mode = "loading"
+        const xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return
+            if (xhr.status === 200) {
+                inkByPage = ({}); idkByItem = ({}); selByItem = ({}); confByItem = ({})
+                textByItem = ({})
+                checkinResult = null; resultsMeta = null; resultsPage = 0
+                contentsMeta = null; browseUnit = ""; homeUnit = ""
+                savedPage = 0; breakSuggestion = null
+                bootstrapTried = false
+                loadMeta()
+            } else {
+                errorText = "Reset failed (" + xhr.status + ")"
+                mode = "error"
+            }
+        }
+        xhr.open("POST", tok(serverBase + "/reset"))
+        xhr.setRequestHeader("Content-Type", "application/json")
+        xhr.send(JSON.stringify({ subject: subject, confirm: true }))
+    }
+
     function takeBreak() {
         breakStartMs = Date.now()
         mode = "breakActive"
@@ -1490,6 +1513,7 @@ Rectangle {
         onTapped: root.contentsGoto({ unit: root.homeUnit, state: "in_progress" })
     }
     QuietButton {
+        id: contentsCloseBtn
         // The discoverable way out (the AppLoad top-edge drag gesture is
         // not something anyone finds on their own).
         visible: root.mode === "contents"
@@ -1497,6 +1521,67 @@ Rectangle {
         x: root.nx0 + 110 * root.ps
         y: root.ny0 + 2078 * root.ps
         onTapped: root.close()
+    }
+    QuietButton {
+        visible: root.mode === "contents"
+        label: "Start over"
+        x: contentsCloseBtn.x + contentsCloseBtn.width + 24 * root.ps
+        y: root.ny0 + 2078 * root.ps
+        onTapped: root.mode = "confirmReset"
+    }
+
+    // Starting over asks first, and says what actually happens: the old
+    // book is archived on the server, never deleted.
+    Item {
+        visible: root.mode === "confirmReset"
+        anchors.fill: parent
+        Text {
+            id: resetDinkus
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: root.ny0 + 880 * root.ps
+            text: "✱ ✱ ✱"
+            font.family: fontSerif.name
+            font.pixelSize: 36 * root.ps
+            font.letterSpacing: 26 * root.ps
+            color: "#000000"
+        }
+        Text {
+            id: resetStatement
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: resetDinkus.y + resetDinkus.height + 56 * root.ps
+            text: "Start the book over?"
+            font.family: fontSerifIt.name
+            font.italic: true
+            font.pixelSize: 40 * root.ps
+            color: "#000000"
+        }
+        Text {
+            id: resetSub
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: resetStatement.y + resetStatement.height + 14 * root.ps
+            width: 1100 * root.ps
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+            text: "Calibration runs again and a new book is written for where you are now. The current book is archived on the server - nothing is deleted."
+            font.family: fontSerif.name
+            font.pixelSize: 28 * root.ps
+            lineHeightMode: Text.FixedHeight
+            lineHeight: 40 * root.ps
+            color: "#666666"
+        }
+        Row {
+            spacing: 24 * root.ps
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: resetSub.y + resetSub.height + 72 * root.ps
+            ActionButton {
+                label: "Start over"
+                onTapped: root.doReset()
+            }
+            QuietButton {
+                label: "Keep reading"
+                onTapped: root.mode = "contents"
+            }
+        }
     }
 
     // Waits and errors (SPEC §6): a shared static skeleton - dinkus,
