@@ -22,7 +22,11 @@ import (
 	"os"
 	"sync"
 	"syscall"
+	"time"
+	"unsafe"
 )
+
+func unsafePointer(v *[6]int32) unsafe.Pointer { return unsafe.Pointer(v) }
 
 const (
 	fbW = 1620
@@ -80,6 +84,15 @@ type ink struct {
 	lastX   int
 	lastY   int
 	down    bool
+
+	// Latency forensics: where does the time go between pen events?
+	strokeStart time.Time
+	lastEvent   time.Time
+	gapSum      time.Duration
+	gapMax      time.Duration
+	procSum     time.Duration
+	procMax     time.Duration
+	events      int
 }
 
 func seqConnect(path string) (int, error) {
@@ -223,11 +236,16 @@ func (k *ink) pen(kind, x, y, d int) {
 		if !k.inZone(x, y) {
 			return
 		}
+		now := time.Now()
 		k.down = true
 		k.live = []point{{float64(x) / fbW, float64(y) / fbH}}
 		k.stamp(x, y)
 		partialUpdate(k.qtfbFD, x-nib, y-nib, 2*nib+1, 2*nib+1)
 		k.lastX, k.lastY = x, y
+		k.strokeStart = now
+		k.lastEvent = now
+		k.gapSum, k.gapMax, k.procSum, k.procMax = 0, 0, 0, 0
+		k.events = 0
 	case inputPenUpdate:
 		if !k.down {
 			return
@@ -236,10 +254,26 @@ func (k *ink) pen(kind, x, y, d int) {
 			k.endStrokeLocked()
 			return
 		}
+		now := time.Now()
+		if k.events%20 == 0 {
+			log.Printf("qt pen=(%d,%d)", x, y)
+		}
+		gap := now.Sub(k.lastEvent)
+		k.lastEvent = now
+		k.gapSum += gap
+		if gap > k.gapMax {
+			k.gapMax = gap
+		}
+		k.events++
 		k.segment(k.lastX, k.lastY, x, y)
 		x0, y0 := min(k.lastX, x)-nib, min(k.lastY, y)-nib
 		w, h := abs(x-k.lastX)+2*nib+1, abs(y-k.lastY)+2*nib+1
 		partialUpdate(k.qtfbFD, x0, y0, w, h)
+		proc := time.Since(now)
+		k.procSum += proc
+		if proc > k.procMax {
+			k.procMax = proc
+		}
 		k.live = append(k.live, point{float64(x) / fbW, float64(y) / fbH})
 		k.lastX, k.lastY = x, y
 	case inputPenRelease:
@@ -250,6 +284,17 @@ func (k *ink) pen(kind, x, y, d int) {
 func (k *ink) endStrokeLocked() {
 	if k.down && len(k.live) > 1 {
 		k.strokes = append(k.strokes, k.live)
+		if k.events > 0 {
+			// One line per stroke: if event gaps are large, latency is
+			// upstream of us (input delivery); if proc is large, it is
+			// ours; if both are small and ink still lags, it is the
+			// refresh pipeline downstream.
+			log.Printf("stroke: %d pts in %dms | evt gap avg %.1fms max %.1fms | proc avg %dus max %dus",
+				len(k.live), time.Since(k.strokeStart).Milliseconds(),
+				float64(k.gapSum.Microseconds())/float64(k.events)/1000,
+				float64(k.gapMax.Microseconds())/1000,
+				k.procSum.Microseconds()/int64(k.events), k.procMax.Microseconds())
+		}
 	}
 	k.down = false
 	k.live = nil
@@ -298,6 +343,72 @@ func sendAppLoad(fd int, msgType uint32, contents string) {
 	}
 }
 
+// evdevCompare reads the pen digitizer directly and logs sampled raw
+// coordinates so the digitizer->screen transform can be derived by
+// comparing against the Qt-forwarded events. Once the transform is known,
+// this path takes over pen input entirely.
+func evdevCompare() {
+	fd, err := syscall.Open("/dev/input/event2", syscall.O_RDONLY, 0)
+	if err != nil {
+		log.Printf("evdev open: %v", err)
+		return
+	}
+	absinfo := func(axis int) (int32, int32) {
+		var info [6]int32
+		req := uintptr(0x80184540 + axis)
+		_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), req,
+			uintptr(unsafePointer(&info)))
+		if errno != 0 {
+			return 0, 0
+		}
+		return info[1], info[2] // min, max
+	}
+	x0, x1 := absinfo(0)
+	y0, y1 := absinfo(1)
+	p0, p1 := absinfo(24)
+	log.Printf("evdev pen ranges: x[%d..%d] y[%d..%d] p[%d..%d]", x0, x1, y0, y1, p0, p1)
+
+	buf := make([]byte, 24*64)
+	var x, y, p int32
+	touching := false
+	count := 0
+	for {
+		n, err := syscall.Read(fd, buf)
+		if err != nil || n == 0 {
+			log.Printf("evdev read: n=%d err=%v", n, err)
+			return
+		}
+		for o := 0; o+24 <= n; o += 24 {
+			typ := binary.LittleEndian.Uint16(buf[o+16:])
+			code := binary.LittleEndian.Uint16(buf[o+18:])
+			val := int32(binary.LittleEndian.Uint32(buf[o+20:]))
+			switch typ {
+			case 1: // EV_KEY
+				if code == 330 { // BTN_TOUCH
+					touching = val != 0
+					log.Printf("evdev touch=%v at raw=(%d,%d) p=%d", touching, x, y, p)
+				}
+			case 3: // EV_ABS
+				switch code {
+				case 0:
+					x = val
+				case 1:
+					y = val
+				case 24:
+					p = val
+				}
+			case 0: // SYN_REPORT
+				if touching {
+					count++
+					if count%25 == 0 {
+						log.Printf("evdev raw=(%d,%d) p=%d", x, y, p)
+					}
+				}
+			}
+		}
+	}
+}
+
 func main() {
 	log.SetPrefix("[chiron-ink] ")
 	if len(os.Args) < 2 {
@@ -318,6 +429,7 @@ func main() {
 	k := &ink{fb: fb, qtfbFD: qfd}
 	setRefreshMode(qfd, refreshUFast)
 	log.Printf("up: fb %d bytes, ufast", len(fb))
+	go evdevCompare()
 
 	// qtfb reader: pen input arrives here.
 	go func() {

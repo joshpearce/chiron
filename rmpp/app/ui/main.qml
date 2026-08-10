@@ -981,13 +981,14 @@ Rectangle {
         xhr.send(JSON.stringify(payload))
     }
 
-    // Tapping the running-head band opens the contents, book-style. Sits
-    // above the ink canvas; the top margin holds no ink zones.
+    // Tapping the running head (left slot - the chapter title) opens the
+    // contents, book-style. Deliberately not the full top edge: the center
+    // strip belongs to AppLoad's close-the-app drag gesture.
     MouseArea {
         visible: root.mode === "reading"
         x: root.px0
         y: root.py0
-        width: 1620 * root.ps
+        width: 620 * root.ps
         height: 100 * root.ps
         onClicked: root.openContents()
     }
@@ -1460,6 +1461,15 @@ Rectangle {
         x: root.nx0 + 1510 * root.ps - width
         y: root.ny0 + 2078 * root.ps
         onTapped: root.contentsGoto({ unit: root.homeUnit, state: "in_progress" })
+    }
+    QuietButton {
+        // The discoverable way out (the AppLoad top-edge drag gesture is
+        // not something anyone finds on their own).
+        visible: root.mode === "contents"
+        label: "Close Chiron"
+        x: root.nx0 + 110 * root.ps
+        y: root.ny0 + 2078 * root.ps
+        onTapped: root.close()
     }
 
     // Waits and errors (SPEC §6): a shared static skeleton - dinkus,
