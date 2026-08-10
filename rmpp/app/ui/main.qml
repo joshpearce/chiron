@@ -544,15 +544,59 @@ Rectangle {
         anchors.fill: pageImage
         visible: root.mode === "reading"
 
-        property var liveStroke: null
+        // Pen latency lives or dies on damage size: painting synchronously
+        // and marking ONLY the new segment's rect dirty keeps each update
+        // tiny, so the e-ink compositor can take its fast refresh path. A
+        // full clear-and-redraw per point (the naive approach) produces
+        // whole-canvas damage and the slow waveform on every pen movement.
+        renderStrategy: Canvas.Immediate
+        renderTarget: Canvas.Image
 
-        onPaint: {
-            const ctx = getContext("2d")
-            ctx.clearRect(0, 0, width, height)
+        property var liveStroke: null
+        // How many liveStroke points are already on the canvas.
+        property int painted: 0
+        property bool fullRepaint: true
+
+        function pen(ctx) {
             ctx.strokeStyle = "black"
             ctx.lineWidth = 3
             ctx.lineCap = "round"
             ctx.lineJoin = "round"
+        }
+
+        function requestFull() {
+            fullRepaint = true
+            requestPaint()
+        }
+
+        // Mark only the last segment's bounding box dirty and paint it.
+        function extendLive() {
+            if (!liveStroke || liveStroke.length === 0) return
+            const a = liveStroke[Math.max(0, liveStroke.length - 2)]
+            const b = liveStroke[liveStroke.length - 1]
+            const x0 = Math.min(a.x, b.x) * width - 6
+            const y0 = Math.min(a.y, b.y) * height - 6
+            const w = Math.abs(a.x - b.x) * width + 12
+            const h = Math.abs(a.y - b.y) * height + 12
+            markDirty(Qt.rect(x0, y0, w, h))
+        }
+
+        onPaint: {
+            const ctx = getContext("2d")
+            if (!fullRepaint && liveStroke && painted < liveStroke.length) {
+                // Incremental: draw just the new tail of the live stroke.
+                pen(ctx)
+                ctx.beginPath()
+                const from = Math.max(0, painted - 1)
+                ctx.moveTo(liveStroke[from].x * width, liveStroke[from].y * height)
+                for (var i = from + 1; i < liveStroke.length; i++)
+                    ctx.lineTo(liveStroke[i].x * width, liveStroke[i].y * height)
+                ctx.stroke()
+                painted = liveStroke.length
+                return
+            }
+            ctx.clearRect(0, 0, width, height)
+            pen(ctx)
             const all = root.strokesForPage(root.page)
             const drawStroke = function(s) {
                 if (s.length < 2) return
@@ -564,6 +608,8 @@ Rectangle {
             }
             for (var j = 0; j < all.length; j++) drawStroke(all[j])
             if (liveStroke) drawStroke(liveStroke)
+            painted = liveStroke ? liveStroke.length : 0
+            fullRepaint = false
         }
 
         MouseArea {
@@ -572,12 +618,14 @@ Rectangle {
                 if (ink.liveStroke && ink.liveStroke.length > 1)
                     root.strokesForPage(root.page).push(ink.liveStroke)
                 ink.liveStroke = null
-                ink.requestPaint()
+                ink.painted = 0
+                // The stroke is already on the canvas; nothing to repaint.
             }
             onPressed: (e) => {
                 if (!root.inkAllowedAt(e.x / ink.width, e.y / ink.height)) return
                 ink.liveStroke = [{x: e.x / ink.width, y: e.y / ink.height}]
-                ink.requestPaint()
+                ink.painted = 0
+                ink.extendLive()
             }
             onPositionChanged: (e) => {
                 if (!ink.liveStroke) return
@@ -588,13 +636,14 @@ Rectangle {
                     return
                 }
                 ink.liveStroke.push({x: e.x / ink.width, y: e.y / ink.height})
-                ink.requestPaint()
+                ink.extendLive()
             }
             onReleased: endStroke()
         }
     }
 
-    onPageChanged: ink.requestPaint()
+    onPageChanged: ink.requestFull()
+    onModeChanged: if (mode === "reading") ink.requestFull()
 
     // Bottom chrome band (SPEC §1): page turns at x 110/186, action button
     // right-aligned to x 1510, all 64px controls centered in the bottom
@@ -1086,7 +1135,7 @@ Rectangle {
                 else root.page = c.n
             }
             else if (c.cmd === "checkin") root.checkIn()
-            else if (c.cmd === "ink" && c.stroke) { root.strokesForPage(root.page).push(c.stroke); ink.requestPaint() }
+            else if (c.cmd === "ink" && c.stroke) { root.strokesForPage(root.page).push(c.stroke); ink.requestFull() }
             else if (c.cmd === "next") root.advance()
             else if (c.cmd === "contents") root.openContents()
             else if (c.cmd === "type") {
