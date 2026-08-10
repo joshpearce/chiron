@@ -95,7 +95,9 @@ Rectangle {
         if (!backendAlive) { act(); return }
         pendingFlushAction = act
         flushTimeout.restart()
-        inkBackend.sendMessage(2, "")
+        // Never an empty payload: AppLoad transmits "" as a zero-length
+        // packet, which reads exactly like EOF on the backend's socket.
+        inkBackend.sendMessage(2, "{}")
     }
 
     // Bundled faces (SPEC §0.3): Source Sans 3 for every control label,
@@ -719,7 +721,7 @@ Rectangle {
     onPageChanged: {
         ink.requestFull()
         // Persist the old page's backend strokes, then arm the new page.
-        if (backendAlive) { inkBackend.sendMessage(2, ""); pushInkState() }
+        if (backendAlive) { inkBackend.sendMessage(2, "{}"); pushInkState() }
     }
     onModeChanged: {
         if (mode === "reading") ink.requestFull()

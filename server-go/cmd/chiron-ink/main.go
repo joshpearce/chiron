@@ -506,21 +506,58 @@ func main() {
 	}()
 
 	sendAppLoad(alFD, mReady, "")
+	apploadLoop(alFD, k)
+}
 
-	// AppLoad reader: frontend control messages.
+const (
+	pollIn    = 0x0001
+	pollErr   = 0x0008
+	pollHup   = 0x0010
+	pollRdHup = 0x2000
+)
+
+// peerHungUp disambiguates a 0-byte read on SOCK_SEQPACKET: an empty
+// packet and EOF both read as n=0, err=nil (verified on-device), and
+// AppLoad sends a zero-length payload packet for every empty-string
+// message. Poll reports HUP/RDHUP only for a real hangup.
+func peerHungUp(fd int) bool {
+	pfd := struct {
+		fd      int32
+		events  int16
+		revents int16
+	}{fd: int32(fd), events: pollIn | pollRdHup}
+	ts := syscall.Timespec{}
+	n, _, _ := syscall.Syscall6(syscall.SYS_PPOLL,
+		uintptr(unsafe.Pointer(&pfd)), 1,
+		uintptr(unsafe.Pointer(&ts)), 0, 0, 0)
+	return n > 0 && pfd.revents&(pollErr|pollHup|pollRdHup) != 0
+}
+
+// apploadLoop reads frontend control messages until the socket closes.
+func apploadLoop(alFD int, k *ink) {
 	head := make([]byte, 8)
 	body := make([]byte, 1<<20)
 	for {
 		n, err := syscall.Read(alFD, head)
-		if err != nil || n == 0 {
+		if err != nil {
 			log.Printf("appload closed: %v", err)
 			return
+		}
+		if n == 0 {
+			if peerHungUp(alFD) {
+				log.Printf("appload closed")
+				return
+			}
+			continue // zero-length packet, not a hangup
 		}
 		if n < 8 {
 			continue
 		}
 		msgType := binary.LittleEndian.Uint32(head)
 		length := binary.LittleEndian.Uint32(head[4:])
+		if int(length) > len(body) {
+			length = uint32(len(body))
+		}
 		payload := ""
 		if length > 0 {
 			bn, err := syscall.Read(alFD, body[:length])
