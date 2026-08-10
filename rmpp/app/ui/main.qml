@@ -16,6 +16,13 @@ Rectangle {
 
     property string serverBase: "http://localhost:8082"
     property string subject: "ai"
+    // Baked auth token for a public server (CHIRON_TOKEN at build time).
+    // Rides as a query parameter: QML Image elements cannot send headers.
+    property string authToken: ""
+    function tok(u) {
+        if (authToken === "") return u
+        return u + (u.indexOf("?") >= 0 ? "&" : "?") + "token=" + authToken
+    }
 
     // Bundled faces (SPEC §0.3): Source Sans 3 for every control label,
     // Source Serif 4 for native prose. Loaded per weight - the desktop TTFs
@@ -394,7 +401,7 @@ Rectangle {
                         mode = "error"
                     }
                 }
-                boot.open("POST", serverBase + "/exchange")
+                boot.open("POST", tok(serverBase + "/exchange"))
                 boot.setRequestHeader("Content-Type", "application/json")
                 boot.send(JSON.stringify({ subject: subject, phase: "start" }))
             } else {
@@ -404,8 +411,8 @@ Rectangle {
                 console.log("[chiron] meta failed:", xhr.status)
             }
         }
-        xhr.open("GET", serverBase + "/pages/" + subject
-                 + (browsing ? "?unit=" + browseUnit : ""))
+        xhr.open("GET", tok(serverBase + "/pages/" + subject
+                 + (browsing ? "?unit=" + browseUnit : "")))
         xhr.send()
     }
 
@@ -420,7 +427,7 @@ Rectangle {
             contentsMeta = JSON.parse(xhr.responseText)
             mode = "contents"
         }
-        xhr.open("GET", serverBase + "/pages/" + subject + "/contents")
+        xhr.open("GET", tok(serverBase + "/pages/" + subject + "/contents"))
         xhr.send()
     }
 
@@ -480,9 +487,9 @@ Rectangle {
         // The hash pins the URL to the chapter revision, so stale cached
         // pages can never show for a regenerated chapter.
         source: root.mode === "reading"
-            ? root.serverBase + "/pages/" + root.subject + "/" + root.page
+            ? root.tok(root.serverBase + "/pages/" + root.subject + "/" + root.page
               + "?v=" + root.pagesHash
-              + (root.browseUnit !== "" ? "&unit=" + root.browseUnit : "")
+              + (root.browseUnit !== "" ? "&unit=" + root.browseUnit : ""))
             : ""
         asynchronous: true
         cache: true
@@ -763,7 +770,7 @@ Rectangle {
                 mode = "error"
             }
         }
-        xhr.open("POST", serverBase + "/ink/" + subject)
+        xhr.open("POST", tok(serverBase + "/ink/" + subject))
         xhr.setRequestHeader("Content-Type", "application/json")
         const payload = { unit: chapterUnit, items: items,
                           chunk_minutes: chapterStartMs > 0
@@ -980,8 +987,8 @@ Rectangle {
         anchors.fill: parent
         fillMode: Image.PreserveAspectFit
         source: root.mode === "results" && root.resultsMeta !== null
-            ? root.serverBase + "/pages/" + root.subject + "/results/"
-              + root.resultsPage + "?v=" + root.resultsMeta.hash
+            ? root.tok(root.serverBase + "/pages/" + root.subject + "/results/"
+              + root.resultsPage + "?v=" + root.resultsMeta.hash)
             : ""
         asynchronous: true
         cache: true
@@ -1099,8 +1106,8 @@ Rectangle {
         anchors.fill: parent
         fillMode: Image.PreserveAspectFit
         source: root.mode === "contents" && root.contentsMeta !== null
-            ? root.serverBase + "/pages/" + root.subject + "/contents/0?v="
-              + root.contentsMeta.hash
+            ? root.tok(root.serverBase + "/pages/" + root.subject + "/contents/0?v="
+              + root.contentsMeta.hash)
             : ""
         asynchronous: true
         cache: true

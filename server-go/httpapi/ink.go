@@ -49,6 +49,17 @@ type InkSubmission struct {
 type transcriber func(hint string, png []byte) (string, error)
 
 func (s *Server) transcriberFor() transcriber {
+	if s.cfg.Provider == "anthropic" {
+		// vision_model may still name a local model from a shared config;
+		// only claude models make sense here (empty picks the default).
+		model := s.cfg.VisionModel
+		if !strings.HasPrefix(model, "claude") {
+			model = ""
+		}
+		return func(hint string, png []byte) (string, error) {
+			return llm.TranscribeAnthropic(model, hint, png)
+		}
+	}
 	base := ""
 	for _, up := range s.cfg.Upstreams {
 		if up.Enabled {

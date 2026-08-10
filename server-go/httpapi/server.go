@@ -325,7 +325,13 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) requireToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.token != "" && r.URL.Path != "/ping" {
+			// The e-ink client loads page images through QML Image elements,
+			// which cannot set headers - those requests carry the token as a
+			// query parameter instead.
 			supplied := r.Header.Get("Authorization")
+			if supplied == "" {
+				supplied = "Bearer " + r.URL.Query().Get("token")
+			}
 			expected := "Bearer " + s.token
 			// Constant-time compare: a length- or prefix-leaking check on a
 			// shared secret is a bad habit even on a small deployment.
