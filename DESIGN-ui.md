@@ -184,6 +184,18 @@ that came with it:
 - Math-answer symbols (- + = / * ^ ( ) , .) get a dedicated key row;
   answers here are short expressions, not prose.
 
+## E-ink renders grays lighter than you designed them
+
+The panel washes out grays by one to two steps relative to their sRGB
+intent: #999 text is near-invisible, #666 reads like #999. A screen
+that is MOSTLY gray text (the contents screen, with its unwritten
+chapters) exposes this brutally even when individual grays looked fine
+on the emulator. Rule: nothing meant to be read sits lighter than #777
+on device, and screens dominated by de-emphasized text get their whole
+palette shifted a step darker rather than per-element tweaks. Every
+screen also needs an exit: a Close affordance must be reachable from
+ANY screen, not just via happy-path navigation.
+
 ## Pen ink on e-ink: what we measured on the Paper Pro
 
 The QML canvas can never feel like a pen, and the reasons are specific.
