@@ -85,6 +85,13 @@ type ink struct {
 	lastY   int
 	down    bool
 
+	// Dirty-rect accumulator: pixels land in the framebuffer immediately,
+	// but refresh requests are coalesced to ~66Hz - the display engine
+	// coalesces in-flight updates fine, xochitl's socket + event loop do
+	// not (research brief), and 500 messages/sec falls behind.
+	dirty      [4]int
+	dirtyValid bool
+
 	// Latency forensics: where does the time go between pen events?
 	strokeStart time.Time
 	lastEvent   time.Time
@@ -157,6 +164,28 @@ func partialUpdate(fd, x, y, w, h int) {
 	binary.LittleEndian.PutUint32(msg[16:], uint32(w))
 	binary.LittleEndian.PutUint32(msg[20:], uint32(h))
 	qtfbSend24(fd, msg)
+}
+
+// markDirty grows the pending refresh rect; flushDirty sends it.
+func (k *ink) markDirty(x0, y0, x1, y1 int) {
+	if !k.dirtyValid {
+		k.dirty = [4]int{x0, y0, x1, y1}
+		k.dirtyValid = true
+		return
+	}
+	k.dirty[0] = min(k.dirty[0], x0)
+	k.dirty[1] = min(k.dirty[1], y0)
+	k.dirty[2] = max(k.dirty[2], x1)
+	k.dirty[3] = max(k.dirty[3], y1)
+}
+
+func (k *ink) flushDirtyLocked() {
+	if !k.dirtyValid {
+		return
+	}
+	partialUpdate(k.qtfbFD, k.dirty[0], k.dirty[1],
+		k.dirty[2]-k.dirty[0]+1, k.dirty[3]-k.dirty[1]+1)
+	k.dirtyValid = false
 }
 
 func (k *ink) inZone(x, y int) bool {
@@ -240,6 +269,7 @@ func (k *ink) pen(kind, x, y, d int) {
 		k.down = true
 		k.live = []point{{float64(x) / fbW, float64(y) / fbH}}
 		k.stamp(x, y)
+		// First contact refreshes immediately - the dot must not wait a tick.
 		partialUpdate(k.qtfbFD, x-nib, y-nib, 2*nib+1, 2*nib+1)
 		k.lastX, k.lastY = x, y
 		k.strokeStart = now
@@ -263,9 +293,8 @@ func (k *ink) pen(kind, x, y, d int) {
 		}
 		k.events++
 		k.segment(k.lastX, k.lastY, x, y)
-		x0, y0 := min(k.lastX, x)-nib, min(k.lastY, y)-nib
-		w, h := abs(x-k.lastX)+2*nib+1, abs(y-k.lastY)+2*nib+1
-		partialUpdate(k.qtfbFD, x0, y0, w, h)
+		k.markDirty(min(k.lastX, x)-nib, min(k.lastY, y)-nib,
+			max(k.lastX, x)+nib, max(k.lastY, y)+nib)
 		proc := time.Since(now)
 		k.procSum += proc
 		if proc > k.procMax {
@@ -274,7 +303,18 @@ func (k *ink) pen(kind, x, y, d int) {
 		k.live = append(k.live, point{float64(x) / fbW, float64(y) / fbH})
 		k.lastX, k.lastY = x, y
 	case inputPenRelease:
+		k.flushDirtyLocked()
 		k.endStrokeLocked()
+	}
+}
+
+// refreshLoop drains the dirty rect at ~66Hz while the pen is down.
+func (k *ink) refreshLoop() {
+	t := time.NewTicker(15 * time.Millisecond)
+	for range t.C {
+		k.mu.Lock()
+		k.flushDirtyLocked()
+		k.mu.Unlock()
 	}
 }
 
@@ -436,6 +476,7 @@ func main() {
 	setRefreshMode(qfd, refreshUFast)
 	log.Printf("up: fb %d bytes, ufast", len(fb))
 	go evdevPen(k)
+	go k.refreshLoop()
 
 	// qtfb reader: pen input arrives here.
 	go func() {

@@ -732,13 +732,17 @@ Rectangle {
     // the painted page; all tappable chrome is declared later, so stays
     // above it.
     FBController {
+        // Full-screen at native resolution with scaling off: the scaled
+        // path forces smooth-transform drawImage on every dirty rect
+        // (research brief); the unscaled path is a plain blit. Only ever
+        // visible on the device, where the app IS 1620x2160.
         visible: root.mode === "reading" && root.backendAlive
         framebufferID: root.backendAlive ? 0x43484952 : -1
-        x: root.px0
-        y: root.py0
-        width: pageImage.paintedWidth > 0 ? pageImage.paintedWidth : 1620 * root.ps
-        height: pageImage.paintedHeight > 0 ? pageImage.paintedHeight : 2160 * root.ps
-        allowScaling: true
+        x: 0
+        y: 0
+        width: 1620
+        height: 2160
+        allowScaling: false
     }
 
     // Bottom chrome band (SPEC §1): page turns at x 110/186, action button
