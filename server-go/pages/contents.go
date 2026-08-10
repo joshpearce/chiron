@@ -79,16 +79,16 @@ func contentsCSS() string {
 	// padding-top, not margin: the page container zeroes its first child's
 	// top margin.
 	return fmt.Sprintf(`.contents-h1 { font-size: 56px; line-height: 64px; height: 64px; overflow: hidden; font-weight: 600; padding-top: 104px; margin: 0 0 16px 0; }
-.contents-why { font-style: italic; font-size: 26px; line-height: 36px; height: 36px; overflow: hidden; color: #666; }
+.contents-why { font-style: italic; font-size: 26px; line-height: 36px; height: 36px; overflow: hidden; color: #555; }
 .contents-gap { height: 64px; }
 .crow { height: %dpx; display: flex; align-items: center; }
 .cnum { flex: 0 0 60px; font-size: 30px; font-weight: 700; }
 .ctitle { flex: 0 1 auto; font-size: 34px; padding-right: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .crow-current .ctitle { font-weight: 600; }
-.crow-unwritten .ctitle, .crow-unwritten .cnum { color: #999; }
-.cleader { flex: 1 1 auto; border-bottom: 2px dotted #BBB; margin: 0 24px 10px 0; align-self: flex-end; height: 54%%; }
-.cstate { flex: 0 0 auto; font-size: 22px; font-weight: 600; letter-spacing: 0.10em; color: #444; }
+.crow-unwritten .ctitle, .crow-unwritten .cnum { color: #777; }
+.cleader { flex: 1 1 auto; border-bottom: 2px dotted #999; margin: 0 24px 10px 0; align-self: flex-end; height: 54%%; }
+.cstate { flex: 0 0 auto; font-size: 22px; font-weight: 600; letter-spacing: 0.10em; color: #333; }
 .cstate-now { color: #000; }
-.cstate-unwritten { flex: 0 0 auto; margin-left: auto; font-style: italic; font-size: 26px; color: #999; }`,
+.cstate-unwritten { flex: 0 0 auto; margin-left: auto; font-style: italic; font-size: 26px; color: #777; }`,
 		ContentsRowH)
 }

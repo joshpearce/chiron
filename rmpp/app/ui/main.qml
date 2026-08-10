@@ -872,6 +872,12 @@ Rectangle {
             y: root.ny0 + 2078 * root.ps
             onTapped: root.checkIn()
         }
+        QuietButton {
+            label: "Close"
+            x: root.nx0 + 110 * root.ps
+            y: root.ny0 + 2078 * root.ps
+            onTapped: root.close()
+        }
     }
 
     // Pen input is captured only inside a constructed item's box, above the
@@ -1371,6 +1377,13 @@ Rectangle {
         y: root.ry0 + 2078 * root.ps
         onTapped: root.advance()
     }
+    QuietButton {
+        visible: root.mode === "results"
+        label: "Close"
+        x: root.rx0 + 262 * root.ps
+        y: root.ry0 + 2078 * root.ps
+        onTapped: root.close()
+    }
 
     // Break screens (SPEC §6): suggested offers the pause, active is a
     // still page until any tap resumes. Same static skeleton as the waits.
@@ -1436,6 +1449,12 @@ Rectangle {
                 label: "Keep reading"
                 onTapped: root.resumeFromBreak()
             }
+        }
+        QuietButton {
+            label: "Close"
+            x: root.nx0 + 110 * root.ps
+            y: root.ny0 + 2078 * root.ps
+            onTapped: root.close()
         }
     }
 
@@ -1576,6 +1595,12 @@ Rectangle {
             font.pixelSize: 22 * root.ps
             font.letterSpacing: 22 * 0.06 * root.ps
             color: "#999999"
+        }
+        QuietButton {
+            label: "Close"
+            x: root.nx0 + 110 * root.ps
+            y: root.ny0 + 2078 * root.ps
+            onTapped: root.close()
         }
     }
 }

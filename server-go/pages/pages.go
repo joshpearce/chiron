@@ -66,7 +66,7 @@ const (
 )
 
 // Bump when the wrapper HTML/CSS changes so cached renders invalidate.
-const styleVersion = "v17"
+const styleVersion = "v18"
 
 type Renderer struct {
 	// ChromePath overrides Chrome discovery; empty means look in the
