@@ -15,6 +15,7 @@
 package pages
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -27,6 +28,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/mjbraun/chiron/server/corpus"
 	"github.com/mjbraun/chiron/server/render"
@@ -303,20 +305,79 @@ func (r *Renderer) renderDoc(name, doc, hash string) (Result, error) {
 	pdfPath := filepath.Join(work, "chapter.pdf")
 
 	// virtual-time-budget lets KaTeX, font loading, and the paginator
-	// finish before printing.
-	cmd := exec.Command(chrome,
+	// finish before printing. Each render gets its own profile dir -
+	// concurrent Chromes sharing the default profile deadlock on its
+	// singleton lock - and a hard deadline, so a wedged Chrome can never
+	// jam the render singleflight forever.
+	chromeCtx, chromeCancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer chromeCancel()
+	cmd := exec.CommandContext(chromeCtx, chrome,
 		"--headless=new", "--disable-gpu", "--no-first-run",
+		"--disable-component-update",
+		// Fresh profiles hang on credential stores without these: the
+		// macOS Keychain prompt (invisible under headless) and the Linux
+		// keyring equivalent.
+		"--use-mock-keychain", "--password-store=basic",
+		"--user-data-dir="+filepath.Join(work, "chrome-profile"),
 		"--virtual-time-budget=15000",
 		"--no-pdf-header-footer",
 		"--print-to-pdf="+pdfPath,
 		"file://"+htmlPath)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return res, fmt.Errorf("chrome print: %w: %s", err, out)
+	// Output goes to a file, not pipes: a fresh profile makes Chrome fork
+	// updater/crashpad children that inherit pipes and outlive the print,
+	// which would block CombinedOutput until the deadline.
+	chromeLog := filepath.Join(work, "chrome.log")
+	if f, err := os.Create(chromeLog); err == nil {
+		cmd.Stdout, cmd.Stderr = f, f
+		defer f.Close()
 	}
+	chromeFail := func(why error) error {
+		out, _ := os.ReadFile(chromeLog)
+		if len(out) > 400 {
+			out = out[len(out)-400:]
+		}
+		return fmt.Errorf("chrome print: %w: %s", why, out)
+	}
+	if err := cmd.Start(); err != nil {
+		return res, chromeFail(err)
+	}
+	waitCh := make(chan error, 1)
+	go func() { waitCh <- cmd.Wait() }()
+	// Wait for the PDF, not the process: branded Chrome with a fresh
+	// profile finishes the print and then lingers (updater machinery on
+	// macOS), so process exit is not the completion signal. The artifact
+	// settling - or a clean exit - is.
+	var lastSize int64 = -1
+	settled, exited := false, false
+	for !settled {
+		if st, err := os.Stat(pdfPath); err == nil && st.Size() > 0 && st.Size() == lastSize {
+			settled = true
+			break
+		} else if err == nil {
+			lastSize = st.Size()
+		}
+		if exited {
+			if _, err := os.Stat(pdfPath); err != nil {
+				return res, chromeFail(fmt.Errorf("no pdf produced"))
+			}
+			settled = true
+			break
+		}
+		select {
+		case <-waitCh:
+			exited = true
+		case <-chromeCtx.Done():
+			return res, chromeFail(fmt.Errorf("deadline exceeded"))
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
+	chromeCancel()
 
 	// Scaling to the device dimensions directly avoids the off-by-one that
 	// DPI-based sizing hits when the PDF page size rounds to whole points.
-	cmd = exec.Command("pdftoppm", "-png",
+	ppmCtx, ppmCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer ppmCancel()
+	cmd = exec.CommandContext(ppmCtx, "pdftoppm", "-png",
 		"-scale-to-x", fmt.Sprint(PageW), "-scale-to-y", fmt.Sprint(PageH),
 		pdfPath, filepath.Join(work, "page"))
 	if out, err := cmd.CombinedOutput(); err != nil {
