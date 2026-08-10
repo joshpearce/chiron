@@ -184,6 +184,38 @@ that came with it:
 - Math-answer symbols (- + = / * ^ ( ) , .) get a dedicated key row;
   answers here are short expressions, not prose.
 
+## Pen ink on e-ink: what we measured on the Paper Pro
+
+The QML canvas can never feel like a pen, and the reasons are specific.
+Findings from instrumented strokes and the display-pipeline research
+(2026-08-10), so nobody re-litigates them:
+
+- Qt's pointer-event delivery stalls ~130ms at every stroke start and
+  delivers in bursts; the digitizer hardware (Elan SPI, ~500Hz, ranges
+  11180x15340 mapping straight onto the portrait screen) has none of
+  that. The ink backend reads /dev/input/event2 directly; xochitl does
+  not grab the device, so both readers coexist.
+- qtfb's UFAST refresh mode IS xochitl's own Pen waveform - there is no
+  faster mode to find. The display floor is ~12ms to first visible ink,
+  ~370ms to full completion; the darkening tail is physics, not a bug.
+- Refresh-request granularity is a three-way trap, all observed live:
+  one request per pen sample (500/s) floods xochitl's event loop, which
+  does not coalesce; large batched chunks (15ms of path) render as
+  dashes because adjacent pieces sit in different waveform phases; one
+  growing re-targeted rect defers everything to pen-up because the
+  engine coalesces same-region updates. Small DISJOINT chunks at ~5ms
+  cadence read as a continuously growing line.
+- Pixels go into the shared framebuffer immediately; only refresh
+  REQUESTS are batched. First contact always refreshes instantly.
+- The remaining gap to native feel is mostly stroke prediction:
+  reMarkable patented ~20ms-horizon pen prediction tuned to minimize
+  the visible white tail and to keep small mispredictions rather than
+  pay a refresh to erase them. A Kalman predictor over the 500Hz
+  timestamped stream is the known next step if ever wanted.
+- Per-stroke latency forensics stay in chiron-ink (one journal line per
+  stroke: event gaps vs processing time). That split is what located
+  every bottleneck above; keep it.
+
 ## The audit trail is part of the UI
 
 Every interpreted answer keeps its evidence next to the learner state: the
