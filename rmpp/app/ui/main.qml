@@ -271,6 +271,45 @@ Rectangle {
     property var idkByItem: ({})
     property var selByItem: ({})
     property var confByItem: ({})
+    // Typed answers (the on-screen keyboard alternative to ink). Every
+    // entry field offers both; a typed answer goes to grading verbatim.
+    property var textByItem: ({})
+    // Item id whose keyboard is open; the page shifts up so the active
+    // field stays visible above the keyboard.
+    property string kbItem: ""
+    property bool kbShift: false
+    property real viewShift: 0
+
+    function openKb(id) {
+        const it = itemById(id)
+        if (!it || it.kind === "mcq") return
+        kbItem = id
+        // Shift the page so the item's box bottom clears the keyboard.
+        const pyBase = (height - pageImage.paintedHeight) / 2
+        const boxBottom = pyBase + (it.rect[1] + it.rect[3]) * ps
+        const kbTop = height - osk.height
+        viewShift = Math.min(0, kbTop - 24 * ps - boxBottom)
+    }
+    function closeKb() {
+        kbItem = ""
+        kbShift = false
+        viewShift = 0
+    }
+    function oskPress(k) {
+        if (kbItem === "") return
+        var cur = textByItem[kbItem] || ""
+        if (k === "⌫") cur = cur.slice(0, -1)
+        else if (k === "⇧") { kbShift = !kbShift; return }
+        else if (k === "space") cur += " "
+        else if (k === "done") { closeKb(); return }
+        else {
+            cur += kbShift ? k.toUpperCase() : k
+            kbShift = false
+        }
+        setMap("textByItem", kbItem, cur)
+        // Typing is an attempt: it clears IDK, like tapping a letter does.
+        if (cur !== "") setMap("idkByItem", kbItem, false)
+    }
 
     // Copy-on-write: assigning the SAME object reference back to a var
     // property does not signal a change, so bindings (button checked state,
@@ -481,7 +520,12 @@ Rectangle {
     // Reading view
     Image {
         id: pageImage
-        anchors.fill: parent
+        // Not anchored: y carries the keyboard view-shift, and every
+        // overlay tracks it through px0/py0.
+        x: 0
+        y: root.viewShift
+        width: parent.width
+        height: parent.height
         visible: root.mode === "reading"
         fillMode: Image.PreserveAspectFit
         // The hash pins the URL to the chapter revision, so stale cached
@@ -686,6 +730,7 @@ Rectangle {
     // (prose, beat boxes) are open ink room.
     function inkAllowedAt(nx, ny) {
         if (browseUnit !== "") return false // past chapters are read-only
+        if (kbItem !== "") return false     // keyboard mode owns the field
         if (mode !== "reading" || layoutC === null) return true
         const items = itemsForPage(page)
         if (items.length === 0) return true
@@ -745,6 +790,9 @@ Rectangle {
                 entry.selected_index = selByItem[it.item]
             if (confByItem[it.item])
                 entry.confidence = confByItem[it.item]
+            const typed = (textByItem[it.item] || "").trim()
+            if (typed !== "")
+                entry.text = typed
             items.push(entry)
         }
         const xhr = new XMLHttpRequest()
@@ -756,6 +804,7 @@ Rectangle {
                     // Nothing was gated (the screener step): go straight to
                     // the freshly delivered pages.
                     inkByPage = ({}); idkByItem = ({}); selByItem = ({}); confByItem = ({})
+                    textByItem = ({})
                     checkinResult = null
                     loadMeta()
                 } else {
@@ -812,10 +861,19 @@ Rectangle {
             height: it.strip * root.ps
 
             IdkButton {
+                id: idkBtnStrip
                 selected: ik
                 x: mcq ? parent.width - width - 30 * root.ps : 30 * root.ps
                 y: mcq ? 26 * root.ps : (parent.height - height) / 2
                 onTapped: root.tapIdk(it.item)
+            }
+            QuietButton {
+                // Every entry field offers keyboard entry as well as pen.
+                visible: !mcq
+                label: root.kbItem === it.item ? "Done" : "Type"
+                x: idkBtnStrip.x + idkBtnStrip.width + 12 * root.ps
+                y: (parent.height - height) / 2
+                onTapped: root.kbItem === it.item ? root.closeKb() : root.openKb(it.item)
             }
             Row {
                 visible: mcq
@@ -844,6 +902,121 @@ Rectangle {
                         muted: ik
                         onTapped: root.tapConf(it.item, index + 1)
                     }
+                }
+            }
+        }
+    }
+
+    // Typed answers, displayed in the item's ink zone (lower half, above
+    // the shelf rule) with a cursor while the keyboard is open.
+    Repeater {
+        model: root.mode === "reading" && root.layoutC !== null
+               ? root.itemsForPage(root.page) : []
+        delegate: Text {
+            property var it: modelData
+            visible: it.kind !== "mcq"
+                     && ((root.textByItem[it.item] || "") !== ""
+                         || root.kbItem === it.item)
+            x: root.px0 + (it.rect[0] + 58) * root.ps
+            y: root.py0 + (it.rect[1] + (it.rect[3] - it.strip) * 0.45) * root.ps
+            width: (it.rect[2] - 116) * root.ps
+            height: (it.rect[3] - it.strip) * 0.5 * root.ps
+            text: (root.textByItem[it.item] || "")
+                  + (root.kbItem === it.item ? "▎" : "")
+            wrapMode: Text.Wrap
+            font.family: fontSerif.name
+            font.pixelSize: 30 * root.ps
+            lineHeightMode: Text.FixedHeight
+            lineHeight: 42 * root.ps
+            color: "#000000"
+        }
+    }
+
+    // The on-screen keyboard (SPEC extension): flat monochrome keys, fixed
+    // to the window bottom; the page view shifts to keep the field visible.
+    Rectangle {
+        id: osk
+        visible: root.kbItem !== ""
+        width: parent.width
+        height: oskCol.height + 32 * root.ps
+        y: parent.height - height
+        color: "#FFFFFF"
+        border.width: root.bw(1)
+        border.color: "#666666"
+
+        Column {
+            id: oskCol
+            spacing: 8 * root.ps
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 16 * root.ps
+
+            Repeater {
+                model: [
+                    ["1","2","3","4","5","6","7","8","9","0"],
+                    ["q","w","e","r","t","y","u","i","o","p"],
+                    ["a","s","d","f","g","h","j","k","l"],
+                    ["⇧","z","x","c","v","b","n","m","⌫"],
+                    ["-","+","=","/","*","^","(",")",",","."]
+                ]
+                delegate: Row {
+                    spacing: 8 * root.ps
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    property var keys: modelData
+                    Repeater {
+                        model: parent.keys
+                        delegate: Rectangle {
+                            width: 140 * root.ps
+                            height: 88 * root.ps
+                            color: keyArea.pressed
+                                   || (modelData === "⇧" && root.kbShift)
+                                   ? "#000000" : "#FFFFFF"
+                            border.width: root.bw(1)
+                            border.color: "#666666"
+                            Text {
+                                anchors.centerIn: parent
+                                text: root.kbShift && modelData.length === 1
+                                      && modelData >= "a" && modelData <= "z"
+                                      ? modelData.toUpperCase() : modelData
+                                font.family: fontSans.name
+                                font.pixelSize: 34 * root.ps
+                                color: keyArea.pressed
+                                       || (modelData === "⇧" && root.kbShift)
+                                       ? "#FFFFFF" : "#000000"
+                            }
+                            MouseArea {
+                                id: keyArea
+                                anchors.fill: parent
+                                onClicked: root.oskPress(modelData)
+                            }
+                        }
+                    }
+                }
+            }
+            Row {
+                spacing: 8 * root.ps
+                anchors.horizontalCenter: parent.horizontalCenter
+                Rectangle {
+                    width: 888 * root.ps
+                    height: 88 * root.ps
+                    color: spaceArea.pressed ? "#000000" : "#FFFFFF"
+                    border.width: root.bw(1)
+                    border.color: "#666666"
+                    MouseArea { id: spaceArea; anchors.fill: parent; onClicked: root.oskPress("space") }
+                }
+                Rectangle {
+                    width: 288 * root.ps
+                    height: 88 * root.ps
+                    color: doneArea.pressed ? "#FFFFFF" : "#000000"
+                    border.width: root.bw(2)
+                    border.color: "#000000"
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Done"
+                        font.family: fontSansSemi.name
+                        font.pixelSize: 30 * root.ps
+                        color: doneArea.pressed ? "#000000" : "#FFFFFF"
+                    }
+                    MouseArea { id: doneArea; anchors.fill: parent; onClicked: root.oskPress("done") }
                 }
             }
         }
@@ -916,6 +1089,12 @@ Rectangle {
             else if (c.cmd === "ink" && c.stroke) { root.strokesForPage(root.page).push(c.stroke); ink.requestPaint() }
             else if (c.cmd === "next") root.advance()
             else if (c.cmd === "contents") root.openContents()
+            else if (c.cmd === "type") {
+                const tid = c.item || driveItem(c.slot || 0)
+                root.setMap("textByItem", tid, c.text || "")
+                if ((c.text || "") !== "") root.setMap("idkByItem", tid, false)
+            }
+            else if (c.cmd === "kb") root.openKb(c.item || driveItem(c.slot || 0))
             else if (c.cmd === "take5") root.takeBreak()
             else if (c.cmd === "resume") root.resumeFromBreak()
             else if (c.cmd === "breaktest") {
@@ -954,7 +1133,9 @@ Rectangle {
     // reveals with typeset math). Native contributes only the page turns
     // and the action button, whose label the server drives.
     function advance() {
+        closeKb()
         inkByPage = ({}); idkByItem = ({}); selByItem = ({}); confByItem = ({})
+        textByItem = ({})
         checkinResult = null
         resultsMeta = null
         resultsPage = 0

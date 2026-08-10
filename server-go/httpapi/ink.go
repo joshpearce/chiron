@@ -28,6 +28,10 @@ type InkItem struct {
 	// IDK is the client-side "I don't know" toggle. It wins over any ink on
 	// the page - a tick mark is not an answer.
 	IDK bool `json:"idk,omitempty"`
+	// Text is a typed answer from the on-screen keyboard. It goes to
+	// grading verbatim - no rasterizing, no transcription - and wins over
+	// any stray ink on the page.
+	Text string `json:"text,omitempty"`
 	// Confidence is optional; paper has no slider, so absent means "shaky".
 	Confidence int `json:"confidence,omitempty"`
 	// Aspect is the width/height ratio of the region the strokes were
@@ -114,6 +118,12 @@ func (s *Server) handleInk(w http.ResponseWriter, r *http.Request) {
 		conf := item.Confidence
 		if conf == 0 {
 			conf = 2
+		}
+		if text := strings.TrimSpace(item.Text); text != "" {
+			responses = append(responses, ItemResponse{
+				ItemID: item.ItemID, Response: text, Confidence: conf})
+			transcripts[item.ItemID] = text
+			continue
 		}
 		if item.SelectedIndex != nil {
 			responses = append(responses, ItemResponse{

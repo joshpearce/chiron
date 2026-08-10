@@ -123,3 +123,51 @@ func TestInkCheckInGradesTranscriptions(t *testing.T) {
 }
 
 var _ = fmt.Sprintf
+
+// A typed answer must reach grading verbatim - never the transcriber - and
+// still land in the transcript record (READ AS shows what the system read,
+// typed or inked).
+func TestTypedAnswerSkipsTranscriber(t *testing.T) {
+	s := newServer(t, "")
+	do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start"}`, "")
+	s.transcribe = func(tag string, png []byte) (string, error) { return "3", nil }
+	screen := do(t, s, "POST", "/ink/ai",
+		`{"unit":"u0","items":[{"item_id":"u0-s1","selected_index":0}]}`, "")
+	var first struct {
+		Chapter struct {
+			Check []struct {
+				ID string `json:"id"`
+			} `json:"check"`
+		} `json:"chapter"`
+	}
+	if err := json.Unmarshal(screen.Body.Bytes(), &first); err != nil {
+		t.Fatal(err)
+	}
+	if len(first.Chapter.Check) == 0 {
+		t.Fatal("no series delivered")
+	}
+	s.transcribe = func(tag string, png []byte) (string, error) {
+		t.Errorf("transcriber called for %s despite typed answer", tag)
+		return "", nil
+	}
+	stray := `[[{"x":0.3,"y":0.4},{"x":0.5,"y":0.6}]]`
+	items := []string{`{"item_id":"` + first.Chapter.Check[0].ID +
+		`","text":"  -4  ","strokes":` + stray + `,"confidence":3}`}
+	for _, it := range first.Chapter.Check[1:] {
+		items = append(items, `{"item_id":"`+it.ID+`","idk":true}`)
+	}
+	w := do(t, s, "POST", "/ink/ai",
+		`{"unit":"u0","items":[`+strings.Join(items, ",")+`]}`, "")
+	if w.Code != 200 {
+		t.Fatalf("ink -> %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Transcripts map[string]string `json:"transcripts"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if got := resp.Transcripts[first.Chapter.Check[0].ID]; got != "-4" {
+		t.Fatalf("typed transcript = %q, want -4", got)
+	}
+}

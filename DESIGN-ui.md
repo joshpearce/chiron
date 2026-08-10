@@ -161,6 +161,29 @@ human is working through. Being able to see the screen ("the pills are at
 the bottom, not in the box") is the difference between confirming a design
 and hoping about it.
 
+## Every entry field offers pen AND keyboard
+
+Ink is the primary answer medium, but every text-entry field also offers an
+on-screen keyboard (the "Type" toggle in the item's control strip). Rules
+that came with it:
+
+- The keyboard is our own flat monochrome QML component, not the system
+  one: xochitl's input method is not guaranteed to attach inside an AppLoad
+  app, and a hand-rolled keyboard keeps the e-ink design language (square
+  keys, discrete repaints, no animation) and works identically in the
+  emulator.
+- The keyboard must never hide the field being edited. It docks at the
+  window bottom and the page view shifts up so the active item's box stays
+  fully visible above it; closing the keyboard restores the view. All
+  overlays track automatically because they position through the page
+  image's origin.
+- Typed answers go to grading verbatim - no rasterizing, no vision model -
+  and still land in the transcript record, so READ AS on the results page
+  shows exactly what the system graded, typed or inked. Typing clears IDK
+  (it is an attempt); IDK still wins over any content at submission.
+- Math-answer symbols (- + = / * ^ ( ) , .) get a dedicated key row;
+  answers here are short expressions, not prose.
+
 ## The audit trail is part of the UI
 
 Every interpreted answer keeps its evidence next to the learner state: the
