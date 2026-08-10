@@ -255,9 +255,6 @@ func (k *ink) pen(kind, x, y, d int) {
 			return
 		}
 		now := time.Now()
-		if k.events%20 == 0 {
-			log.Printf("qt pen=(%d,%d)", x, y)
-		}
 		gap := now.Sub(k.lastEvent)
 		k.lastEvent = now
 		k.gapSum += gap
@@ -343,11 +340,12 @@ func sendAppLoad(fd int, msgType uint32, contents string) {
 	}
 }
 
-// evdevCompare reads the pen digitizer directly and logs sampled raw
-// coordinates so the digitizer->screen transform can be derived by
-// comparing against the Qt-forwarded events. Once the transform is known,
-// this path takes over pen input entirely.
-func evdevCompare() {
+// evdevPen reads the pen digitizer directly - the Qt event path adds a
+// ~130ms stall at every stroke start plus buffering (measured), so the
+// hardware stream is the pen source. Calibrated against Qt-forwarded
+// events: the digitizer maps straight onto the portrait screen,
+// screen = raw * (1620/11180, 2160/15340), no swap, no flip.
+func evdevPen(k *ink) {
 	fd, err := syscall.Open("/dev/input/event2", syscall.O_RDONLY, 0)
 	if err != nil {
 		log.Printf("evdev open: %v", err)
@@ -368,10 +366,17 @@ func evdevCompare() {
 	p0, p1 := absinfo(24)
 	log.Printf("evdev pen ranges: x[%d..%d] y[%d..%d] p[%d..%d]", x0, x1, y0, y1, p0, p1)
 
+	if x1 == 0 || y1 == 0 {
+		x1, y1 = 11180, 15340 // measured Paper Pro ranges
+	}
+	_ = p0
+	_ = p1
+	scaleX := float64(fbW) / float64(x1)
+	scaleY := float64(fbH) / float64(y1)
+
 	buf := make([]byte, 24*64)
-	var x, y, p int32
+	var x, y int32
 	touching := false
-	count := 0
 	for {
 		n, err := syscall.Read(fd, buf)
 		if err != nil || n == 0 {
@@ -385,8 +390,14 @@ func evdevCompare() {
 			switch typ {
 			case 1: // EV_KEY
 				if code == 330 { // BTN_TOUCH
+					was := touching
 					touching = val != 0
-					log.Printf("evdev touch=%v at raw=(%d,%d) p=%d", touching, x, y, p)
+					sx, sy := int(float64(x)*scaleX), int(float64(y)*scaleY)
+					if touching && !was {
+						k.pen(inputPenPress, sx, sy, 0)
+					} else if !touching && was {
+						k.pen(inputPenRelease, sx, sy, 0)
+					}
 				}
 			case 3: // EV_ABS
 				switch code {
@@ -394,15 +405,10 @@ func evdevCompare() {
 					x = val
 				case 1:
 					y = val
-				case 24:
-					p = val
 				}
 			case 0: // SYN_REPORT
 				if touching {
-					count++
-					if count%25 == 0 {
-						log.Printf("evdev raw=(%d,%d) p=%d", x, y, p)
-					}
+					k.pen(inputPenUpdate, int(float64(x)*scaleX), int(float64(y)*scaleY), 0)
 				}
 			}
 		}
@@ -429,7 +435,7 @@ func main() {
 	k := &ink{fb: fb, qtfbFD: qfd}
 	setRefreshMode(qfd, refreshUFast)
 	log.Printf("up: fb %d bytes, ufast", len(fb))
-	go evdevCompare()
+	go evdevPen(k)
 
 	// qtfb reader: pen input arrives here.
 	go func() {
@@ -447,9 +453,10 @@ func main() {
 			x := int(int32(binary.LittleEndian.Uint32(buf[16:])))
 			y := int(int32(binary.LittleEndian.Uint32(buf[20:])))
 			d := int(int32(binary.LittleEndian.Uint32(buf[24:])))
-			if kind == inputPenPress || kind == inputPenUpdate || kind == inputPenRelease {
-				k.pen(kind, x, y, d)
-			}
+			// Pen input comes from evdev now; Qt-forwarded events are
+			// drained and dropped (they trail the hardware by ~100ms).
+			_ = kind
+			_, _, _ = x, y, d
 		}
 	}()
 

@@ -80,6 +80,10 @@ Rectangle {
                                 it.rect[3] - it.strip])
             }
             if (zones.length === 0) enabled = false
+        } else {
+            // Prose pages: ink anywhere in the content area, never the
+            // margins - the chrome (page turns, running head) lives there.
+            zones.push([110, 100, 1400, 1960])
         }
         inkBackend.sendMessage(1, JSON.stringify({
             enabled: enabled, page: page, zones: zones,
