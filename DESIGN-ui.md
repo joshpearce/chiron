@@ -187,12 +187,15 @@ that came with it:
 ## E-ink renders grays lighter than you designed them
 
 The panel washes out grays by one to two steps relative to their sRGB
-intent: #999 text is near-invisible, #666 reads like #999. A screen
-that is MOSTLY gray text (the contents screen, with its unwritten
-chapters) exposes this brutally even when individual grays looked fine
-on the emulator. Rule: nothing meant to be read sits lighter than #777
-on device, and screens dominated by de-emphasized text get their whole
-palette shifted a step darker rather than per-element tweaks. Every
+intent: #999 text is near-invisible, #666 reads like #999 - the color
+filter array over the Gallery 3 panel eats grays harder than plain
+carta would. A screen that is MOSTLY gray text (the contents screen,
+with its unwritten chapters) exposes this brutally even when individual
+grays looked fine on the emulator. Rule, calibrated twice on device:
+nothing meant to be READ sits lighter than #555; #777 is the floor for
+purely decorative marks (leaders, rules). Screens dominated by
+de-emphasized text get their whole palette shifted rather than
+per-element tweaks. Every
 screen also needs an exit: a Close affordance must be reachable from
 ANY screen, not just via happy-path navigation.
 
