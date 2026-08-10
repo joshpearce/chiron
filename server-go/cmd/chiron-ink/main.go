@@ -1,0 +1,392 @@
+//go:build linux
+
+// chiron-ink is the AppLoad backend that gives pen strokes native-feeling
+// latency on the reMarkable. The QML layer cannot get the e-ink fast
+// waveform - xochitl reserves it for surfaces it knows - so ink goes
+// through AppLoad's qtfb channel instead: this process owns a transparent
+// RGBA framebuffer (displayed by an FBController in the frontend), receives
+// pen events directly, stamps stroke segments into shared memory, and
+// requests segment-sized partial refreshes in UFAST mode.
+//
+// The frontend stays the source of truth for submission: it pushes the
+// current page's zones and stored strokes on every page change, and pulls
+// everything back with a flush before check-ins. Stroke coordinates cross
+// the wire normalized to the page, exactly like the QML canvas kept them.
+package main
+
+import (
+	"encoding/binary"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"sync"
+	"syscall"
+)
+
+const (
+	fbW = 1620
+	fbH = 2160
+	// The rendezvous key shared with the frontend's FBController.
+	fbKey = 0x43484952 // "CHIR"
+
+	qtfbSocket = "/tmp/qtfb.sock"
+
+	msgInitialize     = 0
+	msgUpdate         = 1
+	msgTerminate      = 3
+	msgUserInput      = 4
+	msgSetRefreshMode = 5
+
+	fbfmtRMPPRGBA8888 = 2
+	updatePartial     = 1
+	refreshUFast      = 0
+
+	inputPenPress   = 0x20
+	inputPenRelease = 0x21
+	inputPenUpdate  = 0x22
+
+	// Frontend -> backend
+	mState = 1
+	mFlush = 2
+	// Backend -> frontend
+	mReady   = 100
+	mStrokes = 101
+
+	nib = 3 // stroke radius, px
+)
+
+type point struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type state struct {
+	Enabled bool      `json:"enabled"`
+	Page    int       `json:"page"`
+	Zones   [][4]int  `json:"zones"` // page px; empty means whole page
+	Strokes [][]point `json:"strokes"`
+}
+
+type ink struct {
+	mu      sync.Mutex
+	fb      []byte
+	qtfbFD  int
+	enabled bool
+	page    int
+	zones   [][4]int
+	strokes [][]point
+	live    []point
+	lastX   int
+	lastY   int
+	down    bool
+}
+
+func seqConnect(path string) (int, error) {
+	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_SEQPACKET, 0)
+	if err != nil {
+		return -1, err
+	}
+	if err := syscall.Connect(fd, &syscall.SockaddrUnix{Name: path}); err != nil {
+		syscall.Close(fd)
+		return -1, err
+	}
+	return fd, nil
+}
+
+// qtfb wire structs, hand-packed to the C ABI (LP64, little-endian).
+func qtfbInit(fd int) ([]byte, error) {
+	msg := make([]byte, 24)
+	msg[0] = msgInitialize
+	binary.LittleEndian.PutUint32(msg[4:], uint32(fbKey))
+	msg[8] = fbfmtRMPPRGBA8888
+	if _, err := syscall.Write(fd, msg); err != nil {
+		return nil, err
+	}
+	resp := make([]byte, 32)
+	n, err := syscall.Read(fd, resp)
+	if err != nil || n < 24 {
+		return nil, fmt.Errorf("init response: n=%d err=%v", n, err)
+	}
+	shmKey := int32(binary.LittleEndian.Uint32(resp[8:]))
+	shmSize := binary.LittleEndian.Uint64(resp[16:])
+	shmFD, err := syscall.Open(fmt.Sprintf("/dev/shm/qtfb_%d", shmKey), syscall.O_RDWR, 0)
+	if err != nil {
+		return nil, fmt.Errorf("shm open: %w", err)
+	}
+	mem, err := syscall.Mmap(shmFD, 0, int(shmSize),
+		syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	if err != nil {
+		return nil, fmt.Errorf("mmap: %w", err)
+	}
+	return mem, nil
+}
+
+func qtfbSend24(fd int, b []byte) {
+	if _, err := syscall.Write(fd, b); err != nil {
+		log.Printf("qtfb write: %v", err)
+	}
+}
+
+func setRefreshMode(fd, mode int) {
+	msg := make([]byte, 24)
+	msg[0] = msgSetRefreshMode
+	binary.LittleEndian.PutUint32(msg[4:], uint32(mode))
+	qtfbSend24(fd, msg)
+}
+
+func partialUpdate(fd, x, y, w, h int) {
+	msg := make([]byte, 24)
+	msg[0] = msgUpdate
+	binary.LittleEndian.PutUint32(msg[4:], updatePartial)
+	binary.LittleEndian.PutUint32(msg[8:], uint32(x))
+	binary.LittleEndian.PutUint32(msg[12:], uint32(y))
+	binary.LittleEndian.PutUint32(msg[16:], uint32(w))
+	binary.LittleEndian.PutUint32(msg[20:], uint32(h))
+	qtfbSend24(fd, msg)
+}
+
+func (k *ink) inZone(x, y int) bool {
+	if len(k.zones) == 0 {
+		return true
+	}
+	for _, z := range k.zones {
+		if x >= z[0] && x <= z[0]+z[2] && y >= z[1] && y <= z[1]+z[3] {
+			return true
+		}
+	}
+	return false
+}
+
+func (k *ink) stamp(x, y int) {
+	for dy := -nib; dy <= nib; dy++ {
+		for dx := -nib; dx <= nib; dx++ {
+			if dx*dx+dy*dy > nib*nib {
+				continue
+			}
+			px, py := x+dx, y+dy
+			if px < 0 || px >= fbW || py < 0 || py >= fbH {
+				continue
+			}
+			o := (py*fbW + px) * 4
+			k.fb[o] = 0
+			k.fb[o+1] = 0
+			k.fb[o+2] = 0
+			k.fb[o+3] = 255
+		}
+	}
+}
+
+func (k *ink) segment(x0, y0, x1, y1 int) {
+	dx, dy := x1-x0, y1-y0
+	steps := max(abs(dx), abs(dy))
+	if steps == 0 {
+		k.stamp(x0, y0)
+	} else {
+		for i := 0; i <= steps; i++ {
+			k.stamp(x0+dx*i/steps, y0+dy*i/steps)
+		}
+	}
+}
+
+func (k *ink) clear() {
+	for i := range k.fb {
+		k.fb[i] = 0
+	}
+	partialUpdate(k.qtfbFD, 0, 0, fbW, fbH)
+}
+
+func (k *ink) redraw() {
+	for i := range k.fb {
+		k.fb[i] = 0
+	}
+	for _, s := range k.strokes {
+		for i := 1; i < len(s); i++ {
+			k.segment(int(s[i-1].X*fbW), int(s[i-1].Y*fbH),
+				int(s[i].X*fbW), int(s[i].Y*fbH))
+		}
+		if len(s) == 1 {
+			k.stamp(int(s[0].X*fbW), int(s[0].Y*fbH))
+		}
+	}
+	partialUpdate(k.qtfbFD, 0, 0, fbW, fbH)
+}
+
+func (k *ink) pen(kind, x, y, d int) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if !k.enabled {
+		return
+	}
+	switch kind {
+	case inputPenPress:
+		if !k.inZone(x, y) {
+			return
+		}
+		k.down = true
+		k.live = []point{{float64(x) / fbW, float64(y) / fbH}}
+		k.stamp(x, y)
+		partialUpdate(k.qtfbFD, x-nib, y-nib, 2*nib+1, 2*nib+1)
+		k.lastX, k.lastY = x, y
+	case inputPenUpdate:
+		if !k.down {
+			return
+		}
+		if !k.inZone(x, y) {
+			k.endStrokeLocked()
+			return
+		}
+		k.segment(k.lastX, k.lastY, x, y)
+		x0, y0 := min(k.lastX, x)-nib, min(k.lastY, y)-nib
+		w, h := abs(x-k.lastX)+2*nib+1, abs(y-k.lastY)+2*nib+1
+		partialUpdate(k.qtfbFD, x0, y0, w, h)
+		k.live = append(k.live, point{float64(x) / fbW, float64(y) / fbH})
+		k.lastX, k.lastY = x, y
+	case inputPenRelease:
+		k.endStrokeLocked()
+	}
+}
+
+func (k *ink) endStrokeLocked() {
+	if k.down && len(k.live) > 1 {
+		k.strokes = append(k.strokes, k.live)
+	}
+	k.down = false
+	k.live = nil
+}
+
+func (k *ink) setState(s state) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.enabled = s.Enabled
+	k.page = s.Page
+	k.zones = s.Zones
+	k.strokes = s.Strokes
+	if k.strokes == nil {
+		k.strokes = [][]point{}
+	}
+	k.down = false
+	k.live = nil
+	if s.Enabled {
+		k.redraw()
+	} else {
+		k.clear()
+	}
+}
+
+func (k *ink) flush() (int, [][]point) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.endStrokeLocked()
+	out := make([][]point, len(k.strokes))
+	copy(out, k.strokes)
+	return k.page, out
+}
+
+func sendAppLoad(fd int, msgType uint32, contents string) {
+	head := make([]byte, 8)
+	binary.LittleEndian.PutUint32(head, msgType)
+	binary.LittleEndian.PutUint32(head[4:], uint32(len(contents)))
+	if _, err := syscall.Write(fd, head); err != nil {
+		log.Printf("appload write: %v", err)
+		return
+	}
+	if len(contents) > 0 {
+		if _, err := syscall.Write(fd, []byte(contents)); err != nil {
+			log.Printf("appload write body: %v", err)
+		}
+	}
+}
+
+func main() {
+	log.SetPrefix("[chiron-ink] ")
+	if len(os.Args) < 2 {
+		log.Fatal("usage: chiron-ink <appload-socket>")
+	}
+	alFD, err := seqConnect(os.Args[1])
+	if err != nil {
+		log.Fatalf("appload socket: %v", err)
+	}
+	qfd, err := seqConnect(qtfbSocket)
+	if err != nil {
+		log.Fatalf("qtfb socket: %v", err)
+	}
+	fb, err := qtfbInit(qfd)
+	if err != nil {
+		log.Fatalf("qtfb init: %v", err)
+	}
+	k := &ink{fb: fb, qtfbFD: qfd}
+	setRefreshMode(qfd, refreshUFast)
+	log.Printf("up: fb %d bytes, ufast", len(fb))
+
+	// qtfb reader: pen input arrives here.
+	go func() {
+		buf := make([]byte, 32)
+		for {
+			n, err := syscall.Read(qfd, buf)
+			if err != nil || n == 0 {
+				log.Printf("qtfb closed: n=%d err=%v", n, err)
+				os.Exit(0)
+			}
+			if buf[0] != msgUserInput || n < 28 {
+				continue
+			}
+			kind := int(int32(binary.LittleEndian.Uint32(buf[8:])))
+			x := int(int32(binary.LittleEndian.Uint32(buf[16:])))
+			y := int(int32(binary.LittleEndian.Uint32(buf[20:])))
+			d := int(int32(binary.LittleEndian.Uint32(buf[24:])))
+			if kind == inputPenPress || kind == inputPenUpdate || kind == inputPenRelease {
+				k.pen(kind, x, y, d)
+			}
+		}
+	}()
+
+	sendAppLoad(alFD, mReady, "")
+
+	// AppLoad reader: frontend control messages.
+	head := make([]byte, 8)
+	body := make([]byte, 1<<20)
+	for {
+		n, err := syscall.Read(alFD, head)
+		if err != nil || n == 0 {
+			log.Printf("appload closed: %v", err)
+			return
+		}
+		if n < 8 {
+			continue
+		}
+		msgType := binary.LittleEndian.Uint32(head)
+		length := binary.LittleEndian.Uint32(head[4:])
+		payload := ""
+		if length > 0 {
+			bn, err := syscall.Read(alFD, body[:length])
+			if err != nil {
+				log.Printf("appload body: %v", err)
+				return
+			}
+			payload = string(body[:bn])
+		}
+		switch msgType {
+		case 0xFFFFFFFF: // terminate
+			return
+		case 0xFFFFFFFE: // new coordinator: re-announce
+			sendAppLoad(alFD, mReady, "")
+		case mState:
+			var s state
+			if err := json.Unmarshal([]byte(payload), &s); err == nil {
+				k.setState(s)
+			}
+		case mFlush:
+			page, strokes := k.flush()
+			out, _ := json.Marshal(map[string]any{"page": page, "strokes": strokes})
+			sendAppLoad(alFD, mStrokes, string(out))
+		}
+	}
+}
+
+func abs(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}

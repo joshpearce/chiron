@@ -1,5 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
+import net.asivery.AppLoad 1.0
+import net.asivery.Framebuffer 1.0
 
 // Chiron on reMarkable Paper Pro - reading client.
 //
@@ -22,6 +24,74 @@ Rectangle {
     function tok(u) {
         if (authToken === "") return u
         return u + (u.indexOf("?") >= 0 ? "&" : "?") + "token=" + authToken
+    }
+
+    // Low-latency ink: a backend process (chiron-ink) draws pen strokes
+    // into a qtfb framebuffer with the e-ink fast waveform - QML rendering
+    // never gets that path. The frontend pushes zones + stored strokes per
+    // page and pulls everything back before submissions. Without a backend
+    // (the PC emulator) the QML canvas fallback below handles ink.
+    property bool backendAlive: false
+    property var pendingFlushAction: null
+
+    AppLoad {
+        id: inkBackend
+        applicationID: "dev.mjbraun.chiron"
+        onMessageReceived: (type, contents) => {
+            if (type === 100) {
+                root.backendAlive = true
+                root.pushInkState()
+            } else if (type === 101) {
+                const r = JSON.parse(contents)
+                root.setMap("inkByPage", r.page, r.strokes || [])
+                if (root.pendingFlushAction !== null) {
+                    const act = root.pendingFlushAction
+                    root.pendingFlushAction = null
+                    flushTimeout.stop()
+                    act()
+                }
+            }
+        }
+    }
+    Timer {
+        // A backend hiccup must not hard-lock submission: proceed with
+        // whatever strokes the frontend already has.
+        id: flushTimeout
+        interval: 2000
+        onTriggered: {
+            if (root.pendingFlushAction !== null) {
+                const act = root.pendingFlushAction
+                root.pendingFlushAction = null
+                act()
+            }
+        }
+    }
+
+    function pushInkState() {
+        if (!backendAlive) return
+        const items = itemsForPage(page)
+        const zones = []
+        var enabled = mode === "reading" && browseUnit === "" && kbItem === ""
+        if (items.length > 0) {
+            for (var i = 0; i < items.length; i++) {
+                const it = items[i]
+                if (it.kind !== "mcq")
+                    zones.push([it.rect[0], it.rect[1], it.rect[2],
+                                it.rect[3] - it.strip])
+            }
+            if (zones.length === 0) enabled = false
+        }
+        inkBackend.sendMessage(1, JSON.stringify({
+            enabled: enabled, page: page, zones: zones,
+            strokes: strokesForPage(page)
+        }))
+    }
+    // Pull the backend's strokes (tagged with its current page), then act.
+    function inkFlush(act) {
+        if (!backendAlive) { act(); return }
+        pendingFlushAction = act
+        flushTimeout.restart()
+        inkBackend.sendMessage(2, "")
     }
 
     // Bundled faces (SPEC §0.3): Source Sans 3 for every control label,
@@ -542,7 +612,7 @@ Rectangle {
     Canvas {
         id: ink
         anchors.fill: pageImage
-        visible: root.mode === "reading"
+        visible: root.mode === "reading" && !root.backendAlive
 
         // Pen latency lives or dies on damage size: painting synchronously
         // and marking ONLY the new segment's rect dirty keeps each update
@@ -642,8 +712,30 @@ Rectangle {
         }
     }
 
-    onPageChanged: ink.requestFull()
-    onModeChanged: if (mode === "reading") ink.requestFull()
+    onPageChanged: {
+        ink.requestFull()
+        // Persist the old page's backend strokes, then arm the new page.
+        if (backendAlive) { inkBackend.sendMessage(2, ""); pushInkState() }
+    }
+    onModeChanged: {
+        if (mode === "reading") ink.requestFull()
+        pushInkState()
+    }
+    onKbItemChanged: pushInkState()
+
+    // The backend's ink overlay: a transparent RGBA framebuffer the
+    // chiron-ink process draws into with fast-waveform refreshes. Sits over
+    // the painted page; all tappable chrome is declared later, so stays
+    // above it.
+    FBController {
+        visible: root.mode === "reading" && root.backendAlive
+        framebufferID: root.backendAlive ? 0x43484952 : -1
+        x: root.px0
+        y: root.py0
+        width: pageImage.paintedWidth > 0 ? pageImage.paintedWidth : 1620 * root.ps
+        height: pageImage.paintedHeight > 0 ? pageImage.paintedHeight : 2160 * root.ps
+        allowScaling: true
+    }
 
     // Bottom chrome band (SPEC §1): page turns at x 110/186, action button
     // right-aligned to x 1510, all 64px controls centered in the bottom
@@ -821,6 +913,15 @@ Rectangle {
         // browsed chapters are read-only.
         if (mode !== "reading" && mode !== "screener") return
         if (browseUnit !== "") return
+        if (backendAlive && mode === "reading") {
+            // Pull the pen strokes the backend holds before building the
+            // submission.
+            inkFlush(function() { root.doCheckIn() })
+            return
+        }
+        doCheckIn()
+    }
+    function doCheckIn() {
         mode = "submitting"
         const items = []
         if (screener) {

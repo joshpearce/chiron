@@ -34,6 +34,11 @@ if [ -n "${CHIRON_SERVER:-}" ]; then
 fi
 "$RCC" --binary -o output/resources.rcc "$SRC/application.qrc"
 
+# The ink backend rides in every bundle (Linux-only; the PC emulator fails
+# to start it and the frontend falls back to canvas ink).
+mkdir -p output/backend
+(cd ../../server-go && GOOS=linux GOARCH=arm64 go build -o ../rmpp/app/output/backend/entry ./cmd/chiron-ink)
+
 EMU_ROOT="../vendor/rm-appload/applications_root"
 if [ -d "$EMU_ROOT" ]; then
   rm -rf "$EMU_ROOT/chiron"
