@@ -353,7 +353,12 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func writeError(w http.ResponseWriter, status int, format string, a ...any) {
-	writeJSON(w, status, map[string]string{"detail": fmt.Sprintf(format, a...)})
+	// The response is the error's only copy unless we log it too: a client
+	// that gave up (or an edge proxy that cut the connection) makes the
+	// failure invisible.
+	detail := fmt.Sprintf(format, a...)
+	log.Printf("http %d: %s", status, detail)
+	writeJSON(w, status, map[string]string{"detail": detail})
 }
 
 // handlePing is an unauthenticated liveness probe that deliberately reveals

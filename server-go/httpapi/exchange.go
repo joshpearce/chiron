@@ -667,6 +667,8 @@ func (s *Server) processExchange(sub *Subject, ex Exchange, asyncAuthor bool) ma
 	if ex.CatchMeUp {
 		if ch, err := s.buildCatchup(sub); err == nil {
 			chapter = ch
+		} else {
+			log.Printf("build catchup: %v", err)
 		}
 	}
 	authoring := ""
@@ -677,6 +679,8 @@ func (s *Server) processExchange(sub *Subject, ex Exchange, asyncAuthor bool) ma
 				authoring = next
 			} else if ch, err := s.buildChapter(sub, next, summary.String()); err == nil {
 				chapter = ch
+			} else {
+				log.Printf("build chapter %s: %v", next, err)
 			}
 		}
 	} else if chapter == nil && gate != nil && !gate.Passed && !ex.Override && ex.Unit != "" {
@@ -689,6 +693,8 @@ func (s *Server) processExchange(sub *Subject, ex Exchange, asyncAuthor bool) ma
 			authoring = ex.Unit
 		} else if ch, err := s.buildChapter(sub, ex.Unit, remSummary); err == nil {
 			chapter = ch
+		} else {
+			log.Printf("build remediation %s: %v", ex.Unit, err)
 		}
 	}
 

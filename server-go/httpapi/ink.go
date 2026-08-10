@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mjbraun/chiron/server/ink"
 	"github.com/mjbraun/chiron/server/llm"
@@ -167,6 +168,7 @@ func (s *Server) handleInk(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("ink check-in %s/%s: %d items", sub.ID, in.Unit, len(responses))
 
+	start := time.Now()
 	out := s.processExchange(sub, Exchange{
 		Subject:        sub.ID,
 		Phase:          "boundary",
@@ -176,6 +178,8 @@ func (s *Server) handleInk(w http.ResponseWriter, r *http.Request) {
 		BreakMinutes:   in.BreakMinutes,
 	}, true)
 	out["transcripts"] = transcripts
+	log.Printf("ink check-in %s/%s: done in %.0fs", sub.ID, in.Unit,
+		time.Since(start).Seconds())
 	writeJSON(w, http.StatusOK, out)
 }
 
