@@ -114,3 +114,37 @@ func TestRealCorpusLintsClean(t *testing.T) {
 			len(r.Warnings), r.Warnings)
 	}
 }
+
+// A section deliberately written without depth variants - a closing notation
+// reference, a correction transplanted from another unit - is marked
+// <!-- canon-only --> in canon. The missing-variant warning exists to catch
+// ACCIDENTAL gaps, so a marked section must not trip it while an unmarked
+// gap still does.
+func TestCanonOnlySectionsExemptFromDepthWarning(t *testing.T) {
+	u := &corpus.Unit{
+		ID: "u1",
+		Sections: []corpus.Section{
+			{Heading: "Real teaching", Segments: []corpus.Segment{
+				{Type: "prose", MD: "body"}}},
+			{Heading: "Notation in this unit", Segments: []corpus.Segment{
+				{Type: "prose", MD: "<!-- canon-only -->\n\nreference table"}}},
+		},
+		Depths: map[string]map[string]string{
+			"more-intuition": {"Real teaching": strings.Repeat("v", 500)},
+		},
+	}
+	r := &Report{}
+	checkDepthHeadings(u, r)
+	if len(r.Warnings) != 0 {
+		t.Fatalf("marked canon-only section warned anyway: %v", r.Warnings)
+	}
+
+	// The same unit without the marker must still warn.
+	u.Sections[1].Segments[0].MD = "reference table"
+	r = &Report{}
+	checkDepthHeadings(u, r)
+	if len(r.Warnings) != 1 {
+		t.Fatalf("unmarked missing variant: got %d warnings, want 1: %v",
+			len(r.Warnings), r.Warnings)
+	}
+}

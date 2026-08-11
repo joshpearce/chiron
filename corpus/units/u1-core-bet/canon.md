@@ -9,482 +9,14 @@ concepts:
 assumes: []
 ---
 
-## The dialect first
+One idea runs this whole book: a model trained to do nothing but predict the
+next token becomes, at sufficient scale, the systems you use every day. This
+unit states that bet precisely and walks it end to end - what a token is, how
+text enters the model, how scores come out, and what the training objective
+does and does not promise. By the end you can trace `The cat sat on` from
+characters to a scored vocabulary, and say exactly which claims about
+"understanding" that loop licenses.
 
-Calibration told the planner which of these you already own; anything the
-series showed you have cold gets compressed to a glance here. This is the
-notation the whole book is written in - four pieces of machinery, stated
-once, precisely.
-
-## The shape contract
-
-Every quantity in this book is a block of numbers, and the only thing you need
-to track is its shape. Get the shapes right and the equations follow almost
-mechanically.
-
-The index letters are near-universal across papers. Memorize these five:
-
-| Symbol | Means | Typical value |
-| --- | --- | --- |
-| $b$ | batch size - how many independent sequences processed at once | 1 to 1024 |
-| $n$ | sequence length - number of tokens in one sequence | 8 to 1,000,000 |
-| $d_{\text{model}}$ | width of the residual stream - the vector size carried between layers | 768 to 16384 |
-| $d_k$ | width of one attention head's query/key vectors | 64 to 128 |
-| $V$ | vocabulary size - how many distinct tokens exist | ~32,000 to ~200,000 |
-
-A batch of token embeddings therefore has shape $(b, n, d_{\text{model}})$, the
-single most common shape in this book. Most equations drop the batch dimension,
-so you will see $X$ with shape $(n, d_{\text{model}})$ and are expected to know
-that everything applies per-sequence, in parallel, across the batch.
-
-Now the part that trips engineers, because it is a convention choice that nobody
-announces.
-
-<!-- refutes: U0-M4 -->
-You probably think the row-vs-column orientation of a vector is cosmetic - a
-transpose here or there, the kind of thing you fix when the code throws. Here is
-the prediction that fails: under that belief, a paper writing $xW$ and a
-textbook writing $Wx$ describe the same operation with the same matrix, so a
-shape derived in one carries to the other. It does not. In $Wx$, the
-linear-algebra-textbook form, $x$ is a column vector of shape
-$(d_{\text{in}}, 1)$ and $W$ has shape $(d_{\text{out}}, d_{\text{in}})$ - input
-dimension **last**. In $xW$, the form nearly all ML papers and every tensor
-library use, $x$ is a row vector of shape $(1, d_{\text{in}})$ and $W$ has shape
-$(d_{\text{in}}, d_{\text{out}})$ - input dimension **first**. The same weight
-matrix is stored transposed between the two worlds.
-
-The belief is appealing because in scalar-land orientation genuinely is
-cosmetic, and because broadcasting hides orientation errors until they surface
-three layers downstream as a wrong-but-plausible shape.
-
-What is actually true: this book, like the papers, uses the **row-vector
-convention** for every equation that carries data through a model. Data on the
-left, weights on the right, dimensions contract at the join:
-
-$$X W = Y, \quad X: (n, d_{\text{in}}), \quad W: (d_{\text{in}}, d_{\text{out}}), \quad Y: (n, d_{\text{out}})$$
-
-where $X$ holds one token vector per row, $W$ is a learned weight matrix, and
-$Y$ holds one output vector per row. The inner dimensions - the $d_{\text{in}}$
-on both sides of the join - must match, and then they vanish. The outer
-dimensions survive. That is the only shape rule you need for the rest of the
-book.
-
-One deliberate exception, flagged now so it does not read as a contradiction
-later. Unit u2 works its two-dimensional geometric examples - rotations,
-scalings, projections - in the textbook column form $Wx$, because that is the
-form every linear algebra text and every picture of a rotation uses, and it
-says so at the point of use. Those are the same maps with the same weights
-stored transposed: $(Wx)^T = x^T W^T$. Outside that one section, data is on the
-left. When you meet an unfamiliar equation, do not look at the letter order -
-look at which index the two factors share, because that is the one that
-contracts.
-
-```beat
-id: u0-b1
-type: compute
-concept: c-notation
-prompt: |
-  Row-vector convention. $X$ has shape $(12, 64)$ and $W$ has shape
-  $(64, 256)$. Give the shape of $XW$.
-  Answer in the exact form `rows x cols`, for example `3 x 8`.
-answer: "12 x 256"
-check: exact
-```
-
-## Dot products: alignment, not distance
-
-The dot product takes two vectors of the same length and returns one number.
-That is its whole type signature, and half of what makes attention confusing is
-forgetting that the output is a scalar.
-
-<!-- fade: dot-product -->
-For $u = [2, -1, 3]$ and $v = [1, 4, 2]$, multiply componentwise and sum:
-
-$$u \cdot v = (2)(1) + (-1)(4) + (3)(2) = 2 - 4 + 6 = 4$$
-
-where $u \cdot v$ (also written $u v^T$ in row-vector convention, or
-$\langle u, v \rangle$) denotes the dot product, and the result $4$ is a single
-number, not a vector. Three multiplications, two additions, one scalar out.
-
-The geometric identity is where the meaning lives:
-
-$$u \cdot v = \lVert u \rVert \, \lVert v \rVert \cos\theta$$
-
-where $\lVert u \rVert$ is the length (Euclidean norm) of $u$, computed as
-$\sqrt{\sum_i u_i^2}$, and $\theta$ is the angle between the two vectors. So the
-dot product is **alignment scaled by both magnitudes**. Positive means the
-vectors point the same general way, zero means perpendicular, negative means
-opposed.
-
-<!-- refutes: U0-M2 -->
-You probably read that as a similarity score - a bigger dot product means "more
-similar", the way cosine similarity does in every vector database you have used.
-Here is the prediction that fails: under that belief, scaling a vector without
-rotating it cannot change how similar it is to anything, since its direction is
-unchanged. Take $q = [3, 0]$ and two keys pointing in identical directions,
-$k_1 = [0.6, 0.8]$ and $k_2 = [6, 8]$. Cosine similarity is $0.6$ for both. But
-$q \cdot k_1 = 1.8$ and $q \cdot k_2 = 18$ - ten times the score for zero change
-in direction.
-
-The belief is appealing because your tooling normalizes for you: embedding
-databases store unit-length vectors, and on unit vectors the dot product and the
-cosine are literally the same number. That is a property of the normalization,
-not of the dot product.
-
-What is actually true: the dot product is cosine similarity multiplied by both
-magnitudes, so it conflates "points the same way" with "is large". Nothing
-inside a transformer normalizes before the dot product, which matters twice - it
-is why attention scores need a $1/\sqrt{d_k}$ correction (u3), and why a single
-high-magnitude key can dominate an attention distribution regardless of
-direction.
-
-```beat
-id: u0-b2
-type: predict
-concept: c-dotprod
-prompt: |
-  Same three vectors: $q = [3, 0]$, $k_1 = [0.6, 0.8]$, $k_2 = [6, 8]$, with
-  $k_1$ and $k_2$ pointing in identical directions.
-
-  Before reading on, predict: which of $k_1$, $k_2$ is physically *closer* to
-  $q$ in the plane, and does the ranking by distance agree with the ranking by
-  dot product? Commit to an answer before you compute anything.
-answer: |
-  $k_1$ is much closer - $\lVert q - k_1 \rVert \approx 2.53$ against
-  $\lVert q - k_2 \rVert \approx 8.54$ - and the two rankings disagree
-  completely. $k_1$ is the nearer vector and scores $1.8$; $k_2$ is over three
-  times farther away and scores $18$. The dot product is not a distance and is
-  not even a decreasing function of distance.
-rubric: |
-  Pass requires both: (1) $k_1$ identified as the closer vector (exact
-  distances not required - "the short one, obviously" is fine); (2) an explicit
-  statement that the distance ranking and the dot-product ranking disagree.
-  Partial = (1) with no statement about the disagreement, or a hedge that they
-  "usually" agree.
-  Fail and what it diagnoses: predicting that $k_2$ is closer because it scores
-  higher, or that the rankings must agree = U0-M6, and it means the next
-  paragraph must be delivered rather than skipped.
-check: llm
-```
-
-<!-- refutes: U0-M6 -->
-The neighboring instinct, that a bigger dot product means "closer", fails on the
-same example and harder. Proximity would mean the score shrinks as vectors move
-apart. Measure it: $\lVert q - k_1 \rVert \approx 2.53$ while
-$\lVert q - k_2 \rVert \approx 8.54$, so $k_2$ is over three times farther away
-and scores ten times higher. The two quantities are related by
-$\lVert u - v \rVert^2 = \lVert u \rVert^2 - 2(u \cdot v) + \lVert v \rVert^2$,
-which agrees on ranking only when all norms are equal - the unit-sphere case
-your vector database quietly enforces and a transformer does not.
-
-```beat
-id: u0-b3
-type: completion
-concept: c-dotprod
-# variants: blank lines 1 and 3 instead of 2 and 3; or blank all three products
-#           and keep the sum, which tests componentwise pairing rather than
-#           sign handling and summation.
-prompt: |
-  Fill the blanks. $q = [4, -2, 1]$, $k = [3, 5, 2]$.
-
-      (4)(3)   = 12
-      (-2)(5)  = ____      <- A
-      (1)(2)   = 2
-      q . k    = ____      <- B
-
-  Answer with the two values in order, comma-separated, like `7, 9`.
-answer: "-10, 4"
-check: exact
-```
-
-## Matrix multiply: composition, not a loop
-
-<!-- refutes: U0-M1 -->
-You probably think matrix multiplication is a triple-nested loop whose
-inner-dimensions-must-match rule is bookkeeping - an implementation detail of
-how the numbers happen to be stored. Here is the prediction that fails: under
-that belief the rule is arbitrary enough that another pairing (multiplying
-aligned entries, say, or matching outer dimensions) would be an equally valid
-definition. It would not. Matrices are functions. $A$ of shape $(p, q)$ is a
-function from $p$-dimensional space to $q$-dimensional space in row convention,
-and $AB$ is the **composition** of two such functions. The shape rule is nothing
-but the requirement that one function's output type matches the next one's input
-type. It is a type check, not a storage detail - which is also why
-$AB \neq BA$: composing in the other order is a different function, and often
-not a well-typed one.
-
-The belief is appealing because the loop is what the hardware runs, and
-reasoning at the memory-layout level is usually the productive instinct. That
-level is real. It is not where the meaning is.
-
-What is actually true: every entry of the product is a dot product. Entry
-$(i, j)$ of $AB$ is row $i$ of $A$ dotted with column $j$ of $B$:
-
-$$(AB)_{ij} = \sum_{t} A_{it} B_{tj}$$
-
-where $t$ runs over the shared inner dimension, $A_{it}$ is the entry of $A$ in
-row $i$ and column $t$, and $B_{tj}$ is the entry of $B$ in row $t$ and column
-$j$. A matrix multiply is a grid of dot products, one per (row of $A$, column of
-$B$) pair.
-
-<!-- fade: matrix-multiply -->
-Worked, with $A$ of shape $(2, 3)$ and $B$ of shape $(3, 2)$:
-
-$$A = \begin{bmatrix} 1 & 0 & 2 \\ 3 & 1 & -1 \end{bmatrix}, \quad
-B = \begin{bmatrix} 4 & 1 \\ 0 & 2 \\ -1 & 5 \end{bmatrix}$$
-
-The inner dimensions are both $3$, so the product is defined and has shape
-$(2, 2)$ - the surviving outer dimensions. Four entries, four dot products:
-
-$$(AB)_{11} = (1)(4) + (0)(0) + (2)(-1) = 4 + 0 - 2 = 2$$
-$$(AB)_{12} = (1)(1) + (0)(2) + (2)(5) = 1 + 0 + 10 = 11$$
-$$(AB)_{21} = (3)(4) + (1)(0) + (-1)(-1) = 12 + 0 + 1 = 13$$
-$$(AB)_{22} = (3)(1) + (1)(2) + (-1)(5) = 3 + 2 - 5 = 0$$
-
-$$AB = \begin{bmatrix} 2 & 11 \\ 13 & 0 \end{bmatrix}$$
-
-$BA$ is also defined here - $(3,2)$ times $(2,3)$ gives $(3,3)$ - and is a
-different object of a different size. Same two matrices, different composition,
-different function.
-
-```beat
-id: u0-b4
-type: completion
-concept: c-matmul
-# variants: blank (AB)_11 and (AB)_21 instead, which tests column-of-B
-#           selection rather than row-of-A selection.
-prompt: |
-  Fill the blanks. $A = \begin{bmatrix} 2 & 1 & 0 \\ 1 & 0 & 3 \end{bmatrix}$
-  with shape $(2,3)$, $B = \begin{bmatrix} 1 & 2 \\ 4 & 0 \\ 1 & 1 \end{bmatrix}$
-  with shape $(3,2)$.
-
-      (AB)_11 = (2)(1) + (1)(4) + (0)(1) = 6
-      (AB)_12 = (2)(2) + (1)(0) + (0)(1) = ____      <- A
-      (AB)_21 = (1)(1) + (0)(4) + (3)(1) = 4
-      (AB)_22 = (1)(2) + (0)(0) + (3)(1) = ____      <- B
-
-  Answer with the two values in order, comma-separated, like `7, 9`.
-answer: "4, 5"
-check: exact
-```
-
-## Gradients and expectations
-
-Two symbols left, both used hundreds of times per paper and defined in none of
-them.
-
-**Expectation.** $\mathbb{E}_{x \sim \mathcal{D}}[f(x)]$ reads "the expected
-value of $f(x)$ when $x$ is drawn from the distribution $\mathcal{D}$" - the
-average of $f(x)$ over all possible $x$, weighted by how likely each $x$ is
-under $\mathcal{D}$. The subscript names the distribution, the brackets hold
-what you are averaging. You cannot compute that average, because $\mathcal{D}$
-is "the distribution of all text that could exist" and you have a hard drive.
-So every expectation in this book is estimated by a sample mean over a batch:
-
-$$\mathbb{E}_{x \sim \mathcal{D}}[f(x)] \approx \frac{1}{b} \sum_{i=1}^{b} f(x_i)$$
-
-where $b$ is the batch size and $x_1, \dots, x_b$ are the examples in the batch.
-
-<!-- refutes: U0-M5 -->
-You probably read that approximation as an equality with extra ceremony, with
-$\mathbb{E}$ meaning "average of the numbers I have". Here is the prediction
-that fails: if the objective were defined over your dataset, a model that
-memorized the dataset would have optimally solved the stated problem, and
-generalization error would not exist as a concept. Every number anyone reports
-is held-out loss. The belief is appealing because the batch mean is what the
-code computes and the dataset is the only concrete object in sight. What is
-true: the thing you want is an expectation over a distribution nobody can
-enumerate, the thing you compute is an unbiased but noisy estimate of it, and
-the gap is exactly why batch size affects training stability (u5). A related
-trap - $\mathbb{E}$ is a probability-weighted mean, not the typical value. The
-expected roll of a fair die is 3.5.
-
-```beat
-id: u0-b5
-type: compute
-concept: c-notation
-prompt: |
-  A batch of three examples produces per-example losses $0.1$, $0.2$, and
-  $9.0$. Training uses the batch mean as its estimate of
-  $\mathbb{E}_{x \sim \mathcal{D}}[\ell(x)]$.
-
-  Compute that estimate, to two decimal places. Then notice that it is larger
-  than two of the three numbers it averages: this is what "probability-weighted
-  mean, not typical value" looks like on real data, and it is why a handful of
-  pathological examples can dominate a training objective.
-answer: 3.10
-check: numeric(0.01)
-```
-
-**Gradients.** For a scalar loss $L$ and a weight matrix $W$, the symbol
-$\partial L / \partial W$ - also written $\nabla_W L$ - denotes the collection
-of partial derivatives of $L$ with respect to each entry of $W$.
-
-<!-- refutes: U0-M3 -->
-You probably think of that symbol as a slope: one number saying which way the
-loss is heading. Here is the prediction that fails: the update rule
-$W \leftarrow W - \eta \, \partial L / \partial W$, where $\eta$ is the learning
-rate, would then be subtracting a scalar from a matrix, moving every weight by
-the identical amount in the identical direction forever. Training would be a
-single global dial.
-
-The belief is appealing because that is what a derivative is in one-variable
-calculus, which is the last place most engineers used one.
-
-What is actually true, and it is the most useful fact in this section: **the
-gradient has the same shape as the thing you differentiate with respect to.** If
-$W$ has shape $(768, 3072)$, so does $\partial L / \partial W$. Entry $(i,j)$
-answers one narrow question - nudge $W_{ij}$ up by a hair, change nothing else,
-how much does $L$ go up? The update subtracts the whole gradient matrix from the
-whole weight matrix entrywise, so every weight gets its own step. That shape
-correspondence is called denominator layout, and every ML framework uses it
-because it makes the update rule shape-correct by construction. (Some math texts
-use numerator layout, where the gradient comes out transposed. When a paper's
-shapes look transposed from what the code does, this is usually why.)
-
-The chain rule makes this computable through a deep stack: if $L$ depends on $y$
-and $y$ depends on $x$, then
-
-$$\frac{\partial L}{\partial x} = \frac{\partial L}{\partial y} \cdot \frac{\partial y}{\partial x}$$
-
-Local derivatives multiply along the path. Backpropagation (u5) is that identity
-applied layer by layer with matrix multiplies in place of the scalar product,
-which is why it is bookkeeping rather than new mathematics.
-
-```beat
-id: u0-b6
-type: self-explain
-concept: c-notation
-prompt: |
-  In your own words, in two or three sentences: a transformer's MLP has a weight
-  matrix $W$ of shape $(d_{\text{model}}, d_{\text{ff}})$. What shape is
-  $\partial L / \partial W$, and what does one single entry of it tell you?
-answer: |
-  Same shape as $W$, namely $(d_{\text{model}}, d_{\text{ff}})$. Entry $(i,j)$
-  is the partial derivative of the scalar loss with respect to the single weight
-  $W_{ij}$: how much $L$ changes per unit increase in that one weight, holding
-  all other weights fixed. Matching shapes is what makes the entrywise update
-  $W \leftarrow W - \eta \, \partial L / \partial W$ well-defined.
-rubric: |
-  Must contain both: (1) the gradient has the SAME shape as $W$,
-  $(d_{\text{model}}, d_{\text{ff}})$ - stating the shape correctly is required,
-  not merely "same shape"; (2) one entry is the sensitivity of the scalar loss
-  to one individual weight (partial derivative w.r.t. $W_{ij}$).
-  Pass = both. Partial = (1) only, or (2) phrased as "how much that weight
-  matters" without the derivative/sensitivity idea.
-  Fail conditions and what they diagnose: calling the gradient a scalar or a
-  single direction = U0-M3. Giving the transposed shape
-  $(d_{\text{ff}}, d_{\text{model}})$ = numerator/denominator layout confusion,
-  re-teach the layout paragraph. Describing an entry as "the value the weight
-  should become" rather than a sensitivity = confusing gradient with update.
-check: llm
-```
-
-<!-- skippable: notation-pretraining ends -->
-
-That is the whole notation surface. Shapes contract at the join, dot products
-return scalars that mix direction with magnitude, matrix multiply composes
-functions, gradients wear the shape of their weights, and $\mathbb{E}$ is an
-average you can only estimate. Every equation in the next nine units is built
-from those five facts.
-
-## The objective, stated exactly
-
-Everything in this book is downstream of one training objective. Here it is, with
-every symbol defined.
-
-A document is a sequence of $T$ discrete symbols $x_1, x_2, \ldots, x_T$. Each
-$x_t$ is an integer in $\{1, \ldots, V\}$, where $V$ is the vocabulary size (the
-number of distinct symbols the model can emit). The tokenization section below
-explains what those symbols actually are; for now, think "roughly a word
-fragment."
-
-The probability of the whole document factors exactly, with no approximation, by
-the chain rule of probability:
-
-$$P(x_1, x_2, \ldots, x_T) = \prod_{t=1}^{T} P(x_t \mid x_1, \ldots, x_{t-1})$$
-
-Read the right-hand side as: the probability of symbol 1, times the probability
-of symbol 2 given symbol 1, times the probability of symbol 3 given symbols 1
-and 2, and so on. The notation $x_{<t}$ abbreviates $x_1, \ldots, x_{t-1}$, the
-prefix before position $t$.
-
-This factorization is a tautology. It is true for any sequence of any kind. What
-makes it useful is that it converts "model the distribution over all documents"
-(a hopeless object: there are $V^T$ possible documents) into "model one
-conditional distribution over $V$ options, and apply it $T$ times."
-
-A neural network with parameters $\theta$ (a big pile of real numbers, roughly
-$10^{10}$ of them) approximates that one conditional:
-
-$$P_\theta(\cdot \mid x_{<t}) \in \mathbb{R}^V, \qquad \sum_{v=1}^{V} P_\theta(v \mid x_{<t}) = 1$$
-
-Training minimizes the average negative log probability that the model assigned
-to the symbols that actually occurred:
-
-$$\mathcal{L}(\theta) = -\frac{1}{T}\sum_{t=1}^{T} \log P_\theta(x_t \mid x_{<t})$$
-
-Here $\log$ is natural log, $x_t$ is the true symbol at position $t$, and
-$P_\theta(x_t \mid x_{<t})$ is the single number the model assigned to that
-symbol. If the model assigned probability 1 to the correct symbol every time,
-$\log 1 = 0$ and the loss is 0. If it assigned probability 0 to something that
-happened, $-\log 0 = \infty$. The loss punishes confident wrongness without
-bound.
-
-That expression is cross-entropy loss; u5 derives its gradient and explains why
-its floor is not zero. For now, take it as: a scalar that goes down when the
-model is less surprised by real text.
-
-Two things are worth noticing immediately, because they are the source of most
-confusion later.
-
-First, the sum runs over *every* position $t$. A single 4000-token training
-document produces 4000 prediction problems, not one. The model predicts position
-2 from position 1, position 3 from positions 1-2, and so on, all in one forward
-pass. Training is not "read the document, then guess the end."
-
-Second, nothing in $\mathcal{L}$ mentions truth, helpfulness, reasoning, or
-correctness. The only thing being optimized is agreement with the empirical
-distribution of the training text. Every capability the finished system has is a
-side effect of that.
-
-```beat
-id: u1-b1
-type: predict
-concept: c-lm-objective
-prompt: |
-  Two prefixes, both from a Python file the model is training on:
-
-  (a) `def add(a, b):\n    return a + `
-  (b) `>>> add(2847, 1913)\n`
-
-  A model that has driven $\mathcal{L}$ low must put high probability on `b`
-  for (a) and on `4760` for (b). Before reading on: state, in one sentence
-  each, what kind of thing the model must have internalized to succeed at
-  (a) versus at (b). What separates the two cases?
-answer: |
-  (a) requires only a local surface regularity: inside a function whose
-  parameters are named a and b, the token after "a + " is overwhelmingly "b".
-  A frequency table over short contexts gets this.
-
-  (b) requires the model to actually perform the addition. No surface statistic
-  of the prefix contains 4760 - that exact string may never appear near "2847"
-  anywhere in the training data. The only way to drive loss down on the general
-  case of this pattern is to implement an algorithm that computes sums.
-
-  The separator: (a) can be solved by memorizing co-occurrence, (b) cannot,
-  because the space of (operand, operand) pairs is far larger than any corpus.
-  Compression of case (b) forces the acquisition of a mechanism.
-rubric: |
-  Must identify: (1) case (a) is solvable by local co-occurrence statistics
-  or pattern matching, (2) case (b) requires computing/implementing addition
-  rather than recalling it, (3) some version of "the space of possible operand
-  pairs exceeds what could be memorized". Any 2 of 3 = pass.
-  Answering that (b) is also just memorization from seeing many arithmetic
-  examples, with no acknowledgement that the operand space is too large,
-  = M4-style lookup-table thinking, fail.
-check: llm
-```
 
 ## Why prediction forces world modeling
 
@@ -495,12 +27,63 @@ other way to be good at it.*
 That claim deserves scrutiny rather than assent. Here is the argument in its
 strong form, and then the honest statement of where it stops.
 
+Start from behavior, not machinery. Four fragments of ordinary text, each
+cut off one word early:
+
+- `The 44th president of the United States was Barack ____`
+- `>>> sorted([5, 2, 9, 1])\n[1, 2, 5, ____`
+- `Therefore, since triangle ABC is isosceles with AB = AC, angle ABC = angle ____`
+- `Alice put the keys in the drawer and left. Bob moved them to the safe.
+  When Alice returned, she looked for the keys in the ____`
+
+```beat
+id: u1-b9
+type: predict
+concept: c-lm-objective
+prompt: |
+  Fill each blank above yourself - all four are easy for you. Then, before
+  reading on: for each one, state in a phrase what a system would have to be
+  able to DO to fill it reliably. Are the four demands the same kind of
+  thing, or four different kinds?
+answer: |
+  Barack Obama; 9; angle ACB (base angles of an isosceles triangle); the
+  drawer (Alice never saw the move).
+
+  The demands: recall a stored fact about the world; execute a sorting
+  algorithm; apply a geometric theorem; track two agents' divergent beliefs
+  about the same object. Four different kinds of capability - a fact store,
+  an algorithm, deductive rule application, and a theory of other minds -
+  hiding behind one uniform interface: predict the next token.
+rubric: |
+  Pass requires: (1) at least three blanks filled correctly, and (2) an
+  explicit recognition that the blanks demand different KINDS of capability
+  (fact recall vs computation vs deduction vs belief tracking), in any
+  wording. The exact taxonomy does not matter.
+  Fail if the answer says all four are "just pattern completion" with no
+  differentiation - that is the misconception the section dismantles, so
+  deliver the section slowly rather than skipping.
+check: llm
+```
+
+To fill those blanks a system must, respectively: hold a fact about the
+world, execute a sorting algorithm, apply a geometric theorem, and track two
+agents' divergent beliefs about where an object is. Nothing about the
+interface distinguishes the four cases. The same next-token question is
+silently asking for lookup, computation, deduction, and a theory of mind -
+and human text is full of all four. Whatever gets good at this game must
+carry some working version of each capability. The rest of this section makes
+that argument precise, and then states honestly where it stops.
+
 The argument is about compression. Shannon's source coding theorem says that if
 you have a probability model $Q$ over symbols, you can encode a symbol $x$ in
 $-\log_2 Q(x)$ bits, and you cannot do better on average than the true entropy.
-This is not a metaphor. Arithmetic coding achieves it in practice. So the
-training loss, converted to base 2, *is* the compressed size of the training
-corpus in bits per token under the model's code:
+This is not a metaphor. Arithmetic coding achieves it in practice. And the
+number training pushes down - the loss, written $\mathcal{L}$: the average
+over the corpus of $-\ln$ of the probability the model gave the symbol that
+actually came next; the objective section below states it exactly - is this
+same quantity in natural-log units. Converted to base 2, the loss *is* the
+compressed size of the training corpus in bits per token under the model's
+code:
 
 $$\text{bits per token} = \frac{\mathcal{L}}{\ln 2}$$
 
@@ -510,21 +93,9 @@ has a known lower bound tied to structure: the only way to encode a string in
 fewer bits than its length is to exploit regularity in the process that
 generated it.
 
-Now apply that to a corpus of human text. Consider the bits the model must spend
-on the final token of each of these:
-
-- `The 44th president of the United States was Barack ____`
-- `>>> sorted([5, 2, 9, 1])\n[1, 2, 5, ____`
-- `Therefore, since triangle ABC is isosceles with AB = AC, angle ABC = angle ____`
-- `Alice put the keys in the drawer and left. Bob moved them to the safe.
-  When Alice returned, she looked for the keys in the ____`
-
-To spend near-zero bits on those blanks, a system must respectively: hold a fact
-about the world, execute a sorting algorithm, apply a geometric theorem, and
-track two agents' divergent beliefs about object locations. There is no shortcut.
-A frequency table over 5-token windows spends many bits on each of these, and
-those bits show up in the loss. The corpus is full of such continuations, and the
-gradient pushes on every one of them.
+A frequency table over 5-token windows spends many bits on every one of the
+four blanks above, and those bits show up in the loss. The corpus is full of
+such continuations, and the gradient pushes on every one of them.
 
 That is the argument, and it is strong. Here is where it stops, stated plainly
 because the overclaimed version of this argument is everywhere.
@@ -810,6 +381,154 @@ rubric: |
 check: llm
 ```
 
+## The objective, stated exactly
+
+Everything in this book is downstream of one training objective. Here it is, with
+every symbol defined.
+
+A document is a sequence of $T$ discrete symbols $x_1, x_2, \ldots, x_T$. Each
+$x_t$ is an integer in $\{1, \ldots, V\}$, where $V$ is the vocabulary size (the
+number of distinct symbols the model can emit) - these are exactly the BPE
+tokens of the last section, integers indexing a frozen vocabulary.
+
+The probability of the whole document factors exactly, with no approximation, by
+the chain rule of probability:
+
+$$P(x_1, x_2, \ldots, x_T) = \prod_{t=1}^{T} P(x_t \mid x_1, \ldots, x_{t-1})$$
+
+Read the right-hand side as: the probability of symbol 1, times the probability
+of symbol 2 given symbol 1, times the probability of symbol 3 given symbols 1
+and 2, and so on. The notation $x_{<t}$ abbreviates $x_1, \ldots, x_{t-1}$, the
+prefix before position $t$.
+
+This factorization is a tautology. It is true for any sequence of any kind. What
+makes it useful is that it converts "model the distribution over all documents"
+(a hopeless object: there are $V^T$ possible documents) into "model one
+conditional distribution over $V$ options, and apply it $T$ times."
+
+A neural network with parameters $\theta$ (a big pile of real numbers, roughly
+$10^{10}$ of them) approximates that one conditional:
+
+$$P_\theta(\cdot \mid x_{<t}) \in \mathbb{R}^V, \qquad \sum_{v=1}^{V} P_\theta(v \mid x_{<t}) = 1$$
+
+Training minimizes the average negative log probability that the model assigned
+to the symbols that actually occurred:
+
+$$\mathcal{L}(\theta) = -\frac{1}{T}\sum_{t=1}^{T} \log P_\theta(x_t \mid x_{<t})$$
+
+Here $\log$ is natural log, $x_t$ is the true symbol at position $t$, and
+$P_\theta(x_t \mid x_{<t})$ is the single number the model assigned to that
+symbol. If the model assigned probability 1 to the correct symbol every time,
+$\log 1 = 0$ and the loss is 0. If it assigned probability 0 to something that
+happened, $-\log 0 = \infty$. The loss punishes confident wrongness without
+bound.
+
+That expression is cross-entropy loss; u5 derives its gradient and explains why
+its floor is not zero. For now, take it as: a scalar that goes down when the
+model is less surprised by real text.
+
+Two things are worth noticing immediately, because they are the source of most
+confusion later.
+
+First, the sum runs over *every* position $t$. A single 4000-token training
+document produces 4000 prediction problems, not one. The model predicts position
+2 from position 1, position 3 from positions 1-2, and so on, all in one forward
+pass. Training is not "read the document, then guess the end."
+
+Second, nothing in $\mathcal{L}$ mentions truth, helpfulness, reasoning, or
+correctness. The only thing being optimized is agreement with the empirical
+distribution of the training text. Every capability the finished system has is a
+side effect of that.
+
+```beat
+id: u1-b1
+type: predict
+concept: c-lm-objective
+prompt: |
+  Two prefixes, both from a Python file the model is training on:
+
+  (a) `def add(a, b):\n    return a + `
+  (b) `>>> add(2847, 1913)\n`
+
+  A model that has driven $\mathcal{L}$ low must put high probability on `b`
+  for (a) and on `4760` for (b). Before reading on: state, in one sentence
+  each, what kind of thing the model must have internalized to succeed at
+  (a) versus at (b). What separates the two cases?
+answer: |
+  (a) requires only a local surface regularity: inside a function whose
+  parameters are named a and b, the token after "a + " is overwhelmingly "b".
+  A frequency table over short contexts gets this.
+
+  (b) requires the model to actually perform the addition. No surface statistic
+  of the prefix contains 4760 - that exact string may never appear near "2847"
+  anywhere in the training data. The only way to drive loss down on the general
+  case of this pattern is to implement an algorithm that computes sums.
+
+  The separator: (a) can be solved by memorizing co-occurrence, (b) cannot,
+  because the space of (operand, operand) pairs is far larger than any corpus.
+  Compression of case (b) forces the acquisition of a mechanism.
+rubric: |
+  Must identify: (1) case (a) is solvable by local co-occurrence statistics
+  or pattern matching, (2) case (b) requires computing/implementing addition
+  rather than recalling it, (3) some version of "the space of possible operand
+  pairs exceeds what could be memorized". Any 2 of 3 = pass.
+  Answering that (b) is also just memorization from seeing many arithmetic
+  examples, with no acknowledgement that the operand space is too large,
+  = M4-style lookup-table thinking, fail.
+check: llm
+```
+
+## The average is a stand-in
+
+<!-- canon-only -->
+
+The loss above averages over a training corpus. The quantity anyone
+actually cares about is defined over text nobody has - and papers write
+that distinction in a notation worth owning now.
+
+**Expectation.** $\mathbb{E}_{x \sim \mathcal{D}}[f(x)]$ reads "the expected
+value of $f(x)$ when $x$ is drawn from the distribution $\mathcal{D}$" - the
+average of $f(x)$ over all possible $x$, weighted by how likely each $x$ is
+under $\mathcal{D}$. The subscript names the distribution, the brackets hold
+what you are averaging. You cannot compute that average, because $\mathcal{D}$
+is "the distribution of all text that could exist" and you have a hard drive.
+So every expectation in this book is estimated by a sample mean over a batch:
+
+$$\mathbb{E}_{x \sim \mathcal{D}}[f(x)] \approx \frac{1}{b} \sum_{i=1}^{b} f(x_i)$$
+
+where $b$ is the batch size and $x_1, \dots, x_b$ are the examples in the batch.
+
+<!-- refutes: U0-M5 -->
+You probably read that approximation as an equality with extra ceremony, with
+$\mathbb{E}$ meaning "average of the numbers I have". Here is the prediction
+that fails: if the objective were defined over your dataset, a model that
+memorized the dataset would have optimally solved the stated problem, and
+generalization error would not exist as a concept. Every number anyone reports
+is held-out loss. The belief is appealing because the batch mean is what the
+code computes and the dataset is the only concrete object in sight. What is
+true: the thing you want is an expectation over a distribution nobody can
+enumerate, the thing you compute is an unbiased but noisy estimate of it, and
+the gap is exactly why batch size affects training stability (u5). A related
+trap - $\mathbb{E}$ is a probability-weighted mean, not the typical value. The
+expected roll of a fair die is 3.5.
+
+```beat
+id: u0-b5
+type: compute
+concept: c-notation
+prompt: |
+  A batch of three examples produces per-example losses $0.1$, $0.2$, and
+  $9.0$. Training uses the batch mean as its estimate of
+  $\mathbb{E}_{x \sim \mathcal{D}}[\ell(x)]$.
+
+  Compute that estimate, to two decimal places. Then notice that it is larger
+  than two of the three numbers it averages: this is what "probability-weighted
+  mean, not typical value" looks like on real data, and it is why a handful of
+  pathological examples can dominate a training objective.
+answer: 3.10
+check: numeric(0.01)
+```
+
 ## Embeddings are coordinates, not contents
 
 <!-- refutes: M3 -->
@@ -1046,7 +765,7 @@ componentwise, this is the part that matters:
 $$z_j = \langle W_U[j,:],\ h \rangle = \sum_{k=1}^{d_{model}} W_U[j,k] \, h_k$$
 
 $W_U[j,:] \in \mathbb{R}^{d_{model}}$ is row $j$, token $j$'s output direction,
-and $\langle \cdot, \cdot \rangle$ is the dot product from u0. So the logit for
+and $\langle \cdot, \cdot \rangle$ is the dot product: multiply the vectors componentwise, sum. So the logit for
 token $j$ is the *similarity between the hidden state and token $j$'s stored
 direction*. The output layer is $V$ dot products run in parallel: score the
 hidden state against every token's direction, keep all the scores.
@@ -1201,3 +920,76 @@ that is where the loss went down.
 
 u2 builds the math floor - softmax properly, gradients, loss surfaces - and u3
 opens the middle of the model.
+
+## Notation in this unit
+
+<!-- canon-only -->
+
+Reference, not reading. Return here when a symbol goes blurry; nothing
+below is new.
+
+The index letters are near-universal across papers. These five cover the book:
+
+| Symbol | Means | Typical value |
+| --- | --- | --- |
+| $b$ | batch size - how many independent sequences processed at once | 1 to 1024 |
+| $n$ | sequence length - number of tokens in one sequence | 8 to 1,000,000 |
+| $d_{\text{model}}$ | width of the residual stream - the vector size carried between layers | 768 to 16384 |
+| $d_k$ | width of one attention head's query/key vectors | 64 to 128 |
+| $V$ | vocabulary size - how many distinct tokens exist | ~32,000 to ~200,000 |
+
+A batch of token embeddings therefore has shape $(b, n, d_{\text{model}})$, the
+single most common shape in this book. Most equations drop the batch dimension,
+so you will see $X$ with shape $(n, d_{\text{model}})$ and are expected to know
+that everything applies per-sequence, in parallel, across the batch.
+
+<!-- refutes: U0-M4 -->
+You probably think the row-vs-column orientation of a vector is cosmetic - a
+transpose here or there, the kind of thing you fix when the code throws. Here is
+the prediction that fails: under that belief, a paper writing $xW$ and a
+textbook writing $Wx$ describe the same operation with the same matrix, so a
+shape derived in one carries to the other. It does not. In $Wx$, the
+linear-algebra-textbook form, $x$ is a column vector of shape
+$(d_{\text{in}}, 1)$ and $W$ has shape $(d_{\text{out}}, d_{\text{in}})$ - input
+dimension **last**. In $xW$, the form nearly all ML papers and every tensor
+library use, $x$ is a row vector of shape $(1, d_{\text{in}})$ and $W$ has shape
+$(d_{\text{in}}, d_{\text{out}})$ - input dimension **first**. The same weight
+matrix is stored transposed between the two worlds.
+
+The belief is appealing because in scalar-land orientation genuinely is
+cosmetic, and because broadcasting hides orientation errors until they surface
+three layers downstream as a wrong-but-plausible shape.
+
+What is actually true: this book, like the papers, uses the **row-vector
+convention** for every equation that carries data through a model. Data on the
+left, weights on the right, dimensions contract at the join:
+
+$$X W = Y, \quad X: (n, d_{\text{in}}), \quad W: (d_{\text{in}}, d_{\text{out}}), \quad Y: (n, d_{\text{out}})$$
+
+where $X$ holds one token vector per row, $W$ is a learned weight matrix, and
+$Y$ holds one output vector per row. The inner dimensions - the $d_{\text{in}}$
+on both sides of the join - must match, and then they vanish. The outer
+dimensions survive. That is the only shape rule you need for the rest of the
+book.
+
+One deliberate exception, flagged now so it does not read as a contradiction
+later. Unit u2 works its two-dimensional geometric examples - rotations,
+scalings, projections - in the textbook column form $Wx$, because that is the
+form every linear algebra text and every picture of a rotation uses, and it
+says so at the point of use. Those are the same maps with the same weights
+stored transposed: $(Wx)^T = x^T W^T$. Outside that one section, data is on the
+left. When you meet an unfamiliar equation, do not look at the letter order -
+look at which index the two factors share, because that is the one that
+contracts.
+
+```beat
+id: u0-b1
+type: compute
+concept: c-notation
+prompt: |
+  Row-vector convention. $X$ has shape $(12, 64)$ and $W$ has shape
+  $(64, 256)$. Give the shape of $XW$.
+  Answer in the exact form `rows x cols`, for example `3 x 8`.
+answer: "12 x 256"
+check: exact
+```

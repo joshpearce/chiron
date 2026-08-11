@@ -222,10 +222,16 @@ func checkSpecConformance(u *corpus.Unit, r *Report) {
 
 func checkDepthHeadings(u *corpus.Unit, r *Report) {
 	canon := map[string]bool{}
+	canonOnly := map[string]bool{}
 	var canonOrder []string
 	for _, s := range u.Sections {
 		canon[s.Heading] = true
 		canonOrder = append(canonOrder, s.Heading)
+		// Sections marked canon-only (notation references, corrections
+		// transplanted between units) are variantless by design.
+		if strings.Contains(s.Markdown(), "<!-- canon-only -->") {
+			canonOnly[s.Heading] = true
+		}
 	}
 	var names []string
 	for name := range u.Depths {
@@ -251,7 +257,7 @@ func checkDepthHeadings(u *corpus.Unit, r *Report) {
 		// anywhere saying the variant was never written.
 		var missing []string
 		for _, heading := range canonOrder {
-			if _, ok := sections[heading]; !ok {
+			if _, ok := sections[heading]; !ok && !canonOnly[heading] {
 				missing = append(missing, heading)
 			}
 		}

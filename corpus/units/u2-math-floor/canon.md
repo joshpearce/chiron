@@ -37,7 +37,7 @@ $$W : \mathbb{R}^{n} \rightarrow \mathbb{R}^{m}$$
 map on the left of its argument, $Wx$, with $x$ a column vector. That is the
 form every linear algebra text uses and the form every picture of a rotation is
 drawn in, and the hand-worked 2D examples below are much easier to read that
-way. It is the opposite of the row-vector form $XW$ that u0 established and that
+way. It is the opposite of the row-vector form $XW$ that u1 established and that
 u3 onward uses for data flowing through a model. They are the same maps with the
 weights stored transposed: $(Wx)^T = x^T W^T$, so a $W$ of shape $(m, n)$ here
 is a $W$ of shape $(n, m)$ there. Read the shape, not the letter order. The rule
@@ -213,6 +213,78 @@ rubric: |
 check: llm
 ```
 
+## A matrix multiply by hand
+
+<!-- canon-only -->
+
+<!-- refutes: U0-M1 -->
+You probably think matrix multiplication is a triple-nested loop whose
+inner-dimensions-must-match rule is bookkeeping - an implementation detail of
+how the numbers happen to be stored. Here is the prediction that fails: under
+that belief the rule is arbitrary enough that another pairing (multiplying
+aligned entries, say, or matching outer dimensions) would be an equally valid
+definition. It would not. Matrices are functions. $A$ of shape $(p, q)$ is a
+function from $p$-dimensional space to $q$-dimensional space in row convention,
+and $AB$ is the **composition** of two such functions. The shape rule is nothing
+but the requirement that one function's output type matches the next one's input
+type. It is a type check, not a storage detail - which is also why
+$AB \neq BA$: composing in the other order is a different function, and often
+not a well-typed one.
+
+The belief is appealing because the loop is what the hardware runs, and
+reasoning at the memory-layout level is usually the productive instinct. That
+level is real. It is not where the meaning is.
+
+What is actually true: every entry of the product is a dot product. Entry
+$(i, j)$ of $AB$ is row $i$ of $A$ dotted with column $j$ of $B$:
+
+$$(AB)_{ij} = \sum_{t} A_{it} B_{tj}$$
+
+where $t$ runs over the shared inner dimension, $A_{it}$ is the entry of $A$ in
+row $i$ and column $t$, and $B_{tj}$ is the entry of $B$ in row $t$ and column
+$j$. A matrix multiply is a grid of dot products, one per (row of $A$, column of
+$B$) pair.
+
+<!-- fade: matrix-multiply -->
+Worked, with $A$ of shape $(2, 3)$ and $B$ of shape $(3, 2)$:
+
+$$A = \begin{bmatrix} 1 & 0 & 2 \\ 3 & 1 & -1 \end{bmatrix}, \quad
+B = \begin{bmatrix} 4 & 1 \\ 0 & 2 \\ -1 & 5 \end{bmatrix}$$
+
+The inner dimensions are both $3$, so the product is defined and has shape
+$(2, 2)$ - the surviving outer dimensions. Four entries, four dot products:
+
+$$(AB)_{11} = (1)(4) + (0)(0) + (2)(-1) = 4 + 0 - 2 = 2$$
+$$(AB)_{12} = (1)(1) + (0)(2) + (2)(5) = 1 + 0 + 10 = 11$$
+$$(AB)_{21} = (3)(4) + (1)(0) + (-1)(-1) = 12 + 0 + 1 = 13$$
+$$(AB)_{22} = (3)(1) + (1)(2) + (-1)(5) = 3 + 2 - 5 = 0$$
+
+$$AB = \begin{bmatrix} 2 & 11 \\ 13 & 0 \end{bmatrix}$$
+
+$BA$ is also defined here - $(3,2)$ times $(2,3)$ gives $(3,3)$ - and is a
+different object of a different size. Same two matrices, different composition,
+different function.
+
+```beat
+id: u0-b4
+type: completion
+concept: c-matmul
+# variants: blank (AB)_11 and (AB)_21 instead, which tests column-of-B
+#           selection rather than row-of-A selection.
+prompt: |
+  Fill the blanks. $A = \begin{bmatrix} 2 & 1 & 0 \\ 1 & 0 & 3 \end{bmatrix}$
+  with shape $(2,3)$, $B = \begin{bmatrix} 1 & 2 \\ 4 & 0 \\ 1 & 1 \end{bmatrix}$
+  with shape $(3,2)$.
+
+      (AB)_11 = (2)(1) + (1)(4) + (0)(1) = 6
+      (AB)_12 = (2)(2) + (1)(0) + (0)(1) = ____      <- A
+      (AB)_21 = (1)(1) + (0)(4) + (3)(1) = 4
+      (AB)_22 = (1)(2) + (0)(0) + (3)(1) = ____      <- B
+
+  Answer with the two values in order, comma-separated, like `7, 9`.
+answer: "4, 5"
+check: exact
+
 ## The dot product is the whole game
 
 Given two vectors $a, b \in \mathbb{R}^{n}$, the dot product is one number:
@@ -231,6 +303,7 @@ the angle between the two vectors. So the dot product mixes two things: how long
 the vectors are, and how aligned their directions are. Large and positive means
 "pointing the same way"; zero means perpendicular; negative means opposed.
 
+<!-- fade: dot-product -->
 Numbers. Take $a = \begin{bmatrix} 3 \\ 4\end{bmatrix}$ and
 $b = \begin{bmatrix} 4 \\ 3\end{bmatrix}$:
 
@@ -279,6 +352,94 @@ prompt: |
 
   Answer in the form `[s1, s2, s3]`.
 answer: "[5, 2, 4]"
+check: exact
+```
+
+## What the dot product is not
+
+<!-- canon-only -->
+
+Two readings of that one number come pre-installed from tooling you use
+every day, and both fail on the same three vectors.
+
+<!-- refutes: U0-M2 -->
+You probably read that as a similarity score - a bigger dot product means "more
+similar", the way cosine similarity does in every vector database you have used.
+Here is the prediction that fails: under that belief, scaling a vector without
+rotating it cannot change how similar it is to anything, since its direction is
+unchanged. Take $q = [3, 0]$ and two keys pointing in identical directions,
+$k_1 = [0.6, 0.8]$ and $k_2 = [6, 8]$. Cosine similarity is $0.6$ for both. But
+$q \cdot k_1 = 1.8$ and $q \cdot k_2 = 18$ - ten times the score for zero change
+in direction.
+
+The belief is appealing because your tooling normalizes for you: embedding
+databases store unit-length vectors, and on unit vectors the dot product and the
+cosine are literally the same number. That is a property of the normalization,
+not of the dot product.
+
+What is actually true: the dot product is cosine similarity multiplied by both
+magnitudes, so it conflates "points the same way" with "is large". Nothing
+inside a transformer normalizes before the dot product, which matters twice - it
+is why attention scores need a $1/\sqrt{d_k}$ correction (u3), and why a single
+high-magnitude key can dominate an attention distribution regardless of
+direction.
+
+```beat
+id: u0-b2
+type: predict
+concept: c-dotprod
+prompt: |
+  Same three vectors: $q = [3, 0]$, $k_1 = [0.6, 0.8]$, $k_2 = [6, 8]$, with
+  $k_1$ and $k_2$ pointing in identical directions.
+
+  Before reading on, predict: which of $k_1$, $k_2$ is physically *closer* to
+  $q$ in the plane, and does the ranking by distance agree with the ranking by
+  dot product? Commit to an answer before you compute anything.
+answer: |
+  $k_1$ is much closer - $\lVert q - k_1 \rVert \approx 2.53$ against
+  $\lVert q - k_2 \rVert \approx 8.54$ - and the two rankings disagree
+  completely. $k_1$ is the nearer vector and scores $1.8$; $k_2$ is over three
+  times farther away and scores $18$. The dot product is not a distance and is
+  not even a decreasing function of distance.
+rubric: |
+  Pass requires both: (1) $k_1$ identified as the closer vector (exact
+  distances not required - "the short one, obviously" is fine); (2) an explicit
+  statement that the distance ranking and the dot-product ranking disagree.
+  Partial = (1) with no statement about the disagreement, or a hedge that they
+  "usually" agree.
+  Fail and what it diagnoses: predicting that $k_2$ is closer because it scores
+  higher, or that the rankings must agree = U0-M6, and it means the next
+  paragraph must be delivered rather than skipped.
+check: llm
+```
+
+<!-- refutes: U0-M6 -->
+The neighboring instinct, that a bigger dot product means "closer", fails on the
+same example and harder. Proximity would mean the score shrinks as vectors move
+apart. Measure it: $\lVert q - k_1 \rVert \approx 2.53$ while
+$\lVert q - k_2 \rVert \approx 8.54$, so $k_2$ is over three times farther away
+and scores ten times higher. The two quantities are related by
+$\lVert u - v \rVert^2 = \lVert u \rVert^2 - 2(u \cdot v) + \lVert v \rVert^2$,
+which agrees on ranking only when all norms are equal - the unit-sphere case
+your vector database quietly enforces and a transformer does not.
+
+```beat
+id: u0-b3
+type: completion
+concept: c-dotprod
+# variants: blank lines 1 and 3 instead of 2 and 3; or blank all three products
+#           and keep the sum, which tests componentwise pairing rather than
+#           sign handling and summation.
+prompt: |
+  Fill the blanks. $q = [4, -2, 1]$, $k = [3, 5, 2]$.
+
+      (4)(3)   = 12
+      (-2)(5)  = ____      <- A
+      (1)(2)   = 2
+      q . k    = ____      <- B
+
+  Answer with the two values in order, comma-separated, like `7, 9`.
+answer: "-10, 4"
 check: exact
 ```
 
@@ -640,6 +801,66 @@ prompt: |
   Answer in the form `[df/da, df/db]`.
 answer: "[7, -4]"
 check: exact
+```
+
+## Gradients of matrices
+
+<!-- canon-only -->
+
+For a scalar loss $L$ and a weight matrix $W$, the symbol
+$\partial L / \partial W$ - also written $\nabla_W L$ - denotes the collection
+of partial derivatives of $L$ with respect to each entry of $W$.
+
+<!-- refutes: U0-M3 -->
+You probably think of that symbol as a slope: one number saying which way the
+loss is heading. Here is the prediction that fails: the update rule
+$W \leftarrow W - \eta \, \partial L / \partial W$, where $\eta$ is the learning
+rate, would then be subtracting a scalar from a matrix, moving every weight by
+the identical amount in the identical direction forever. Training would be a
+single global dial.
+
+The belief is appealing because that is what a derivative is in one-variable
+calculus, which is the last place most engineers used one.
+
+What is actually true, and it is the most useful fact in this section: **the
+gradient has the same shape as the thing you differentiate with respect to.** If
+$W$ has shape $(768, 3072)$, so does $\partial L / \partial W$. Entry $(i,j)$
+answers one narrow question - nudge $W_{ij}$ up by a hair, change nothing else,
+how much does $L$ go up? The update subtracts the whole gradient matrix from the
+whole weight matrix entrywise, so every weight gets its own step. That shape
+correspondence is called denominator layout, and every ML framework uses it
+because it makes the update rule shape-correct by construction. (Some math texts
+use numerator layout, where the gradient comes out transposed. When a paper's
+shapes look transposed from what the code does, this is usually why.)
+
+
+```beat
+id: u0-b6
+type: self-explain
+concept: c-notation
+prompt: |
+  In your own words, in two or three sentences: a transformer's MLP has a weight
+  matrix $W$ of shape $(d_{\text{model}}, d_{\text{ff}})$. What shape is
+  $\partial L / \partial W$, and what does one single entry of it tell you?
+answer: |
+  Same shape as $W$, namely $(d_{\text{model}}, d_{\text{ff}})$. Entry $(i,j)$
+  is the partial derivative of the scalar loss with respect to the single weight
+  $W_{ij}$: how much $L$ changes per unit increase in that one weight, holding
+  all other weights fixed. Matching shapes is what makes the entrywise update
+  $W \leftarrow W - \eta \, \partial L / \partial W$ well-defined.
+rubric: |
+  Must contain both: (1) the gradient has the SAME shape as $W$,
+  $(d_{\text{model}}, d_{\text{ff}})$ - stating the shape correctly is required,
+  not merely "same shape"; (2) one entry is the sensitivity of the scalar loss
+  to one individual weight (partial derivative w.r.t. $W_{ij}$).
+  Pass = both. Partial = (1) only, or (2) phrased as "how much that weight
+  matters" without the derivative/sensitivity idea.
+  Fail conditions and what they diagnose: calling the gradient a scalar or a
+  single direction = U0-M3. Giving the transposed shape
+  $(d_{\text{ff}}, d_{\text{model}})$ = numerator/denominator layout confusion,
+  re-teach the layout paragraph. Describing an entry as "the value the weight
+  should become" rather than a sensitivity = confusing gradient with update.
+check: llm
 ```
 
 ## The chain rule

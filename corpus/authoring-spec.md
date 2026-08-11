@@ -29,6 +29,50 @@ matrix calculus and ML notation. Therefore, always:
   with actual numbers that compute cleanly.
 - Hyphens only, no em/en dashes. LaTeX in `$...$` / `$$...$$`.
 
+## Chapter ordering (behavior first, symbols last)
+
+Sequencing rules, derived from the open-courseware survey and the
+learning-science evidence pass (2026-08-10; see DESIGN-ui.md commit trail).
+Section ORDER in canon.md is what every learner gets - the author LLM can
+rewrite prose but never reorder - so ordering mistakes cannot be repaired
+downstream.
+
+1. **Open with a contract and a concrete artifact, never a definition.** A
+   short preamble (before the first `## `) states what the reader will be
+   able to do or explain. The first section starts from observed behavior,
+   real input/output, or a specific question - definitions may not appear
+   above the fold.
+2. **Contrasting cases before mechanism.** The opening section presents
+   concrete cases engineered so the mechanism's absence is felt, plus a
+   commit-first beat asking the reader to attempt them, then resolves. A
+   posed-but-unanswered problem is the load-bearing element; a motivating
+   story is not a substitute.
+3. **No formal symbol in the first fifth of a chapter**, and never more than
+   one new symbol per paragraph. Symbols appear just-in-time, in a sentence,
+   at the exact point of first need, with shape stated in place.
+4. **No up-front notation tables.** At most 3-5 named components with
+   one-line plain-language groundings may open a chapter. The full symbol
+   reference lives in a closing `## Notation ...` section (canon-only, no
+   depth variants) - a lookup aid, never the reading path.
+5. **Single element before matrix form.** Every mechanism is shown once for
+   one concrete element (one token, one row, real numbers, or a short loop)
+   before its batched/matrix form, and the matrix form arrives with an
+   explicit "same computation, all n at once" bridge.
+6. **Baseline-then-delta.** No component is introduced before the reader has
+   seen the specific failure it fixes. If the failure cannot be named, the
+   component is in the wrong chapter.
+7. **Declare simplifications and name where they return** ("ignoring
+   positions for now; u3 section 4 brings them back") - deferred rigor is
+   fine, silent omission is not.
+8. Material that EXPLAINS anomalies (tokenization pathologies, numerics,
+   interpretability) goes late, where an anomaly exists to be explained -
+   not first as a prerequisite.
+
+Robustness note: depth variants swap section prose wholesale, so content
+that must survive any depth (opening beats, notation references,
+misconception corrections transplanted between units) belongs in beats or
+in canon-only sections with no depth-variant heading.
+
 ## canon.md structure
 
 1. **Front matter** (YAML): `unit`, `title`, `concepts` (IDs from syllabus.yaml),

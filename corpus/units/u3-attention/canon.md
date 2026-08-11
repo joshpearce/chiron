@@ -16,18 +16,28 @@ assumes:
   - c-softmax
 ---
 
+This is the unit the book exists to reach. By the end you will have computed
+attention by hand on real numbers, derived every piece of the equation from a
+requirement rather than memorized it, and be able to say exactly what the
+causal mask forbids and why.
+
 ## The problem: mix information across a sequence with no recurrence
 
-You have a sequence of $n$ token vectors. Call the stack of them $X$, a matrix
-of shape $n \times d_{model}$, where $n$ is the number of tokens and
-$d_{model}$ is the width of each token's vector (its dimensionality). Row $i$
-of $X$, written $x_i$, is a $d_{model}$-dimensional vector holding everything
-known about position $i$ so far.
+Whether `bank` means a riverbank or a financial institution is decided by
+other tokens in the sentence - `river` three words back, or `approved the
+loan` just after. But u1 ended with each position carrying a vector built
+from that position's token alone: the embedding row for `bank` is the same
+vector in both sentences, and nothing computed so far has looked sideways.
+Every fact a token needs in order to mean anything sits in *other* positions.
+Some operation has to move information between positions.
 
-Right now those rows are independent. The vector at position 5 was computed
-without ever seeing position 2. That is useless for language: whether "bank"
-means a riverbank or a financial institution is decided by other tokens in the
-sentence. Some operation has to move information between positions.
+Give the data a name before designing that operation. You have a sequence of
+$n$ token vectors. Call the stack of them $X$, a matrix of shape
+$n \times d_{model}$, where $n$ is the number of tokens and $d_{model}$ is the
+width of each token's vector (its dimensionality). Row $i$ of $X$, written
+$x_i$, is a $d_{model}$-dimensional vector holding everything known about
+position $i$ so far - and right now, that means position $i$'s token and
+nothing else.
 
 The constraints on that operation are what make the problem interesting:
 
