@@ -91,11 +91,26 @@ or as a dead end (a paper page with no way to mark confidence).
 
 ## E-ink UI language
 
-Plain black on white, serif for content, no animation, big tap targets.
-Page turns are explicit buttons, not gestures - the full page surface belongs
-to the pen once ink capture exists. Refresh pacing belongs to xochitl on the
-Paper Pro (homebrew has no refresh control yet), so nothing in the UI should
-depend on fast redraws.
+Treat the panel as print, not as a slow LCD. Plain black on white, serif for
+content, no animation, big tap targets - a missed tap costs a refresh, not
+just a retry. Page turns are explicit buttons, not gestures - the full page
+surface belongs to the pen once ink capture exists. Refresh pacing belongs
+to xochitl on the Paper Pro (chiron-ink's qtfb channel is the one exception),
+so nothing in the UI should depend on fast redraws.
+
+Two conventions from the wider e-ink dev community (HN discussion,
+2026-08-11) worth holding:
+
+- Black-to-white transitions refresh substantially faster and ghost less
+  than gray-to-gray. Pure black ink and pure B/W controls are not just a
+  legibility choice (the #555 rule below) - anything that repaints often
+  should avoid gray entirely.
+- If a surface ever shows LLM output incrementally (the /teach
+  conversational path is the candidate), never stream token-by-token:
+  buffer and paint at semantic finality moments (sentence or block
+  boundaries), lay text out so nothing already painted ever reflows, and
+  paginate discretely while generating. Retroactive repositioning is the
+  worst-case e-ink workload.
 
 ## Small courtesies that turned out to be load-bearing
 
