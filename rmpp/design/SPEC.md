@@ -39,8 +39,8 @@ results wall entirely.
 |---|---|---|
 | ink | #000000 | body text, box borders, fills of selected controls, gate fill |
 | gray-2 | #444444 | running heads, folio, deks, beat-box labels |
-| gray-3 | #777777 | micro-labels, confidence tags, whisper, captions |
-| gray-4 | #BBBBBB | disabled borders/labels, muted controls, leaders |
+| gray-3 | #777777 | micro-labels, confidence tags, whisper, captions, disabled/muted controls (the e-ink floor - see DESIGN-ui.md) |
+| gray-4 | #BBBBBB | print variant only - washes out on the panel, never for on-device UI |
 | hairline | #CCCCCC | entry separators |
 | paper | #FFFFFF | background everywhere |
 | accent | #8A3D30 | ONLY: miss ✗ marks, miscalibrated tags, error asterisk. Never decoration. |
@@ -90,11 +90,11 @@ Native prose on placement/waits uses Source Serif 4 at page sizes.
 ### 0.7 Native control state matrix (all heights 64, corners square, flat)
 | control | default | selected | muted (IDK active) | disabled | pressed |
 |---|---|---|---|---|---|
-| Confidence pill | white, 2px #000 border, label 26/600 #000, pad-x 28 | fill #000, label #FFF | 1px #BBB border, label #BBB (pad-x 29 to hold width) | — | invert |
+| Confidence pill | white, 2px #000 border, label 26/600 #000, pad-x 28 | fill #000, label #FFF | 1px #777 border, label #777 (pad-x 29 to hold width) | — | invert |
 | I don't know | white, 1px #666 border, label 26/500 #444, pad-x 28 | fill #000, 2px #000 border, label #FFF (pad-x 27) | — | — | invert |
-| MCQ letter | 64×64, 2px #000, letter 30/700 | fill #000, letter #FFF | 1px #BBB, letter #BBB | — | invert |
-| Action (Check in / Next chapter / Try again) | 2px #000 border, label 28/600 #000, pad-x 36 | — | — | 1px #BBB border, label #999 (pad-x 37) | invert |
-| Page turn | 64×64, 1px #666, glyph #333 | — | — | 1px #CCC, glyph #BBB | invert |
+| MCQ letter | 64×64, 2px #000, letter 30/700 | fill #000, letter #FFF | 1px #777, letter #777 | — | invert |
+| Action (Check in / Next chapter / Try again) | 2px #000 border, label 28/600 #000, pad-x 36 | — | — | 1px #777 border, label #777 (pad-x 37) | invert |
+| Page turn | 64×64, 1px #666, glyph #333 | — | — | 1px #777, glyph #777 | invert |
 | Rating row | 1400×112, 1px #666 border; number cell 96 wide, right divider 1px #666; label pad-x 28 | fill #000, 2px #000 border, all text #FFF, divider #555 | — | — | invert |
 "Pressed" = momentary inversion on the next partial refresh; no animation.
 Selection changes repaint the control's own rect only (partial refresh);
@@ -138,7 +138,9 @@ All controls vertically centered in their row; side insets 30 from box inner edg
 - **Constructed (one row, strip 120):** IDK button left-aligned; confidence
   group [unsure][shaky][confident][sure] right-aligned, 12px gaps.
 - **MCQ (two rows, strip 196):** rows of 64px with 16px between, 26px top/bottom pad.
-  Row 1: letter buttons left-aligned (64×64, 12 gaps), count = option count; IDK right-aligned.
+  Row 1: IDK button left-aligned - the SAME position it holds on constructed
+  rows, so the exit never moves between questions - then letter buttons
+  (64×64, 12 gaps, count = option count) after a 24px gap.
   Row 2: confidence group right-aligned.
 - **Selection logic:** IDK and the 4 confidence levels are mutually exclusive
   (5-way). Tapping a confidence level clears IDK and vice versa. For MCQ,

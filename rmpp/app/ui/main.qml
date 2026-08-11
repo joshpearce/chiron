@@ -137,7 +137,7 @@ Rectangle {
         width: pillText.implicitWidth + 56 * root.ps
         color: pill.selected !== pillArea.pressed ? "#000000" : "#FFFFFF"
         border.width: pill.muted && !pill.selected ? root.bw(1) : root.bw(2)
-        border.color: pill.muted && !pill.selected ? "#BBBBBB" : "#000000"
+        border.color: pill.muted && !pill.selected ? "#777777" : "#000000"
         Text {
             id: pillText
             anchors.centerIn: parent
@@ -145,7 +145,7 @@ Rectangle {
             font.family: fontSansSemi.name
             font.pixelSize: 26 * root.ps
             color: pill.selected !== pillArea.pressed ? "#FFFFFF"
-                 : (pill.muted ? "#BBBBBB" : "#000000")
+                 : (pill.muted ? "#777777" : "#000000")
         }
         MouseArea { id: pillArea; anchors.fill: parent; onClicked: pill.tapped() }
     }
@@ -180,14 +180,14 @@ Rectangle {
         height: 64 * root.ps
         color: lb.selected !== lbArea.pressed ? "#000000" : "#FFFFFF"
         border.width: lb.muted && !lb.selected ? root.bw(1) : root.bw(2)
-        border.color: lb.muted && !lb.selected ? "#BBBBBB" : "#000000"
+        border.color: lb.muted && !lb.selected ? "#777777" : "#000000"
         Text {
             anchors.centerIn: parent
             text: lb.letter
             font.family: fontSansBold.name
             font.pixelSize: 30 * root.ps
             color: lb.selected !== lbArea.pressed ? "#FFFFFF"
-                 : (lb.muted ? "#BBBBBB" : "#000000")
+                 : (lb.muted ? "#777777" : "#000000")
         }
         MouseArea { id: lbArea; anchors.fill: parent; onClicked: lb.tapped() }
     }
@@ -201,14 +201,14 @@ Rectangle {
         width: abText.implicitWidth + 72 * root.ps
         color: ab.active && abArea.pressed ? "#000000" : "#FFFFFF"
         border.width: ab.active ? root.bw(2) : root.bw(1)
-        border.color: ab.active ? "#000000" : "#BBBBBB"
+        border.color: ab.active ? "#000000" : "#777777"
         Text {
             id: abText
             anchors.centerIn: parent
             text: ab.label
             font.family: fontSansSemi.name
             font.pixelSize: 28 * root.ps
-            color: ab.active ? (abArea.pressed ? "#FFFFFF" : "#000000") : "#999999"
+            color: ab.active ? (abArea.pressed ? "#FFFFFF" : "#000000") : "#777777"
         }
         MouseArea {
             id: abArea
@@ -292,13 +292,13 @@ Rectangle {
         height: 64 * root.ps
         color: pt.active && ptArea.pressed ? "#000000" : "#FFFFFF"
         border.width: root.bw(1)
-        border.color: pt.active ? "#666666" : "#CCCCCC"
+        border.color: pt.active ? "#666666" : "#777777"
         Text {
             anchors.centerIn: parent
             text: pt.glyph
             font.family: fontSans.name
             font.pixelSize: 34 * root.ps
-            color: pt.active ? (ptArea.pressed ? "#FFFFFF" : "#333333") : "#BBBBBB"
+            color: pt.active ? (ptArea.pressed ? "#FFFFFF" : "#333333") : "#777777"
         }
         MouseArea {
             id: ptArea
@@ -1011,10 +1011,11 @@ Rectangle {
 
     // Per-item controls mapped into each answer box's reserved strip
     // (SPEC §2.3; regions come from the pages meta - the server enforces
-    // the same geometry it publishes). Constructed: one centered row, IDK
-    // left, confidence right. MCQ: letters left + IDK right, then a
-    // confidence row, both right-group aligned. Side insets 30 from the
-    // box's inner edges.
+    // the same geometry it publishes). IDK is ALWAYS the leftmost control
+    // so the exit never moves between questions. Constructed: one centered
+    // row, IDK+Type left, confidence right. MCQ: IDK then letters in row 1,
+    // confidence row 2 right-aligned. Side insets 30 from the box's inner
+    // edges.
     Repeater {
         model: root.mode === "reading" && root.layoutC !== null
                ? root.itemsForPage(root.page) : []
@@ -1030,7 +1031,7 @@ Rectangle {
             IdkButton {
                 id: idkBtnStrip
                 selected: ik
-                x: mcq ? parent.width - width - 30 * root.ps : 30 * root.ps
+                x: 30 * root.ps
                 y: mcq ? 26 * root.ps : (parent.height - height) / 2
                 onTapped: root.tapIdk(it.item)
             }
@@ -1045,7 +1046,7 @@ Rectangle {
             Row {
                 visible: mcq
                 spacing: 12 * root.ps
-                x: 30 * root.ps
+                x: idkBtnStrip.x + idkBtnStrip.width + 24 * root.ps
                 y: 26 * root.ps
                 Repeater {
                     model: mcq ? it.options : 0
@@ -1662,7 +1663,7 @@ Rectangle {
             text: "Still writing — Chiron checks every few seconds."
             font.family: fontSerif.name
             font.pixelSize: 26 * root.ps
-            color: "#999999"
+            color: "#777777"
         }
         ActionButton {
             id: tryAgainBtn
@@ -1681,7 +1682,7 @@ Rectangle {
             font.family: fontSans.name
             font.pixelSize: 22 * root.ps
             font.letterSpacing: 22 * 0.06 * root.ps
-            color: "#999999"
+            color: "#777777"
         }
         QuietButton {
             label: "Close"

@@ -4,5 +4,6 @@
     "entry": "/ui/main.qml",
     "id": "dev.mjbraun.chiron",
     "supportsScaling": true,
+    "disablesWindowedMode": true,
     "canHaveMultipleFrontends": false
 }
