@@ -337,6 +337,11 @@ Rectangle {
     // contents or a browsed chapter is left.
     property string homeUnit: ""
     property int savedPage: 0
+    // Reading position to restore after the next loadMeta, honored only if
+    // the chapter comes back unchanged (same unit and page hash).
+    property int pendingRestorePage: -1
+    // One reload per stale-page 404, so a persistent failure cannot loop.
+    property bool pageErrorReloading: false
     // Pacing (SPEC §6): the server suggests breaks from reported reading
     // time; actual break minutes ride the next check-in.
     property var breakSuggestion: null
@@ -485,6 +490,9 @@ Rectangle {
                     mode = "error"
                     return
                 }
+                // Restore the reading position only when the chapter truly
+                // did not change underneath the reader.
+                const unchanged = m.unit === chapterUnit && m.hash === pagesHash
                 chapterTitle = m.title
                 subjectTitle = m.subject_title || ""
                 chapterUnit = m.unit
@@ -493,7 +501,9 @@ Rectangle {
                 itemPages = m.items || []
                 screener = m.screener || null
                 layoutC = m.layout || null
-                page = 0
+                page = unchanged && pendingRestorePage >= 0 ? pendingRestorePage : 0
+                pendingRestorePage = -1
+                pageErrorReloading = false
                 if (!browsing) {
                     homeUnit = m.unit
                     chapterStartMs = Date.now()
@@ -547,17 +557,17 @@ Rectangle {
     }
 
     // A tap on a written contents row opens that chapter: the current one
-    // resumes where reading left off, cleared ones open read-only.
+    // resumes where reading left off, cleared ones open read-only. The home
+    // chapter ALWAYS goes through loadMeta - after a check-in the delivered
+    // chapter has changed, and resuming a cached meta once composited a
+    // previous check's answer strips over the new chapter's pages. The
+    // reading position survives when the chapter really is unchanged.
     function contentsGoto(row) {
         if (!row || row.state === "unwritten") return
         if (row.unit === homeUnit) {
             browseUnit = ""
-            if (chapterUnit === homeUnit) {
-                page = savedPage
-                mode = "reading"
-            } else {
-                loadMeta()
-            }
+            pendingRestorePage = savedPage
+            loadMeta()
             return
         }
         browseUnit = row.unit
@@ -613,6 +623,16 @@ Rectangle {
             : ""
         asynchronous: true
         cache: true
+        // The server refuses page requests carrying a stale chapter hash
+        // (404). That means this client's meta is out of date: refresh it
+        // instead of showing a blank page under live answer strips.
+        onStatusChanged: {
+            if (status === Image.Error && root.mode === "reading"
+                && !root.pageErrorReloading) {
+                root.pageErrorReloading = true
+                root.loadMeta()
+            }
+        }
     }
 
     Canvas {

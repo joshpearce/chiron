@@ -1,9 +1,12 @@
 package httpapi
 
 import (
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mjbraun/chiron/server/corpus"
@@ -87,5 +90,40 @@ func TestResetArchivesInsteadOfDeleting(t *testing.T) {
 	w = do(t, s, "POST", "/reset", `{"subject":"ai"}`, "")
 	if w.Code != 422 {
 		t.Fatalf("unconfirmed reset: %d", w.Code)
+	}
+}
+
+// Page URLs are content-addressed: a client holding an old chapter's hash
+// must get a refusal, never the CURRENT chapter's pixels under the stale
+// URL - that is how new prose ended up underneath a previous check's
+// answer strips.
+func TestStalePageHashRefused(t *testing.T) {
+	s := newServer(t, "")
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, httptest.NewRequest("POST", "/exchange",
+		strings.NewReader(`{"subject":"ai","phase":"start"}`)))
+	if w.Code != 200 {
+		t.Fatalf("start exchange: %d", w.Code)
+	}
+	w = httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/pages/ai", nil))
+	if w.Code != 200 {
+		t.Fatalf("pages meta: %d", w.Code)
+	}
+	var meta struct {
+		Hash string `json:"hash"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &meta); err != nil || meta.Hash == "" {
+		t.Fatalf("no hash in meta: %v %q", err, w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/pages/ai/0?v=deadbeef", nil))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("stale hash served: %d, want 404", w.Code)
+	}
+	w = httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, httptest.NewRequest("GET", "/pages/ai/0?v="+meta.Hash, nil))
+	if w.Code != 200 {
+		t.Fatalf("current hash refused: %d", w.Code)
 	}
 }

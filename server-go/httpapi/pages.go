@@ -313,6 +313,14 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "page out of range", http.StatusNotFound)
 		return
 	}
+	// Content addressing cuts both ways: a request carrying another
+	// chapter's hash must fail, never silently receive the CURRENT
+	// chapter's pixels - a client with stale meta would composite its old
+	// answer regions over them.
+	if want := r.URL.Query().Get("v"); want != "" && want != res.Hash {
+		http.Error(w, "stale page hash", http.StatusNotFound)
+		return
+	}
 	w.Header().Set("Content-Type", "image/png")
 	// Pages are content-addressed by chapter hash, so clients can cache hard.
 	w.Header().Set("Cache-Control", "max-age=86400")
