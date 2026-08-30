@@ -1,0 +1,682 @@
+# v7 notary: pretest + terminal check bank.
+# Solo fade items: v7-q3 (v7-detection-ztest), v7-q6 (v7-watermark-density),
+# v7-q8 (v7-bonferroni-threshold). Each is the third appearance of a procedure
+# worked in canon prose and drilled as a completion beat.
+#
+# Running design used across several items:
+#   25 published fictitious-knowledge watermarks, 4 attributes each = 100
+#   detection questions; 250 never-published controls = 1,000 control questions.
+#   Controls return 100 hits, so p_0 = 0.10; published returns k = 25.
+#   mu_0 = 10, sigma_0 = 3, z = 5.00, one-sided p = 2.9e-7.
+#
+# One-sided normal tail used throughout (also printed in canon section 3):
+#   1.645 -> 0.05 | 2.00 -> 0.023 | 2.33 -> 0.010 | 2.88 -> 0.0020
+#   3.02 -> 0.00125 | 3.29 -> 0.00050 | 3.48 -> 0.00025
+#   4.00 -> 3.2e-5 | 4.50 -> 3.4e-6 | 5.00 -> 2.9e-7
+
+pretest:
+  - id: v7-p1
+    concept: d-canary-design
+    prompt: |
+      You publish a specialist journal. You believe a commercial model was
+      trained on your archive. You have no access to the developer, no access
+      to the weights, and no access to token probabilities - only a paid chat
+      API.
+
+      Design a test that would let a third party state a chance of being wrong.
+      Say what the test measures and where its false-positive rate comes from.
+    answer: |
+      The test needs something the model definitely did not see, produced by the
+      same process as something it might have.
+
+      Concretely: some months ago, publish 25 articles about research
+      instruments that do not exist, each with four specific attributes, in the
+      journal's ordinary house style. From the same key, generate 250 more of
+      identical construction and never publish them. Today, ask the model a
+      factoid question about each attribute of each entity - 100 questions on
+      the published set, 1,000 on the unpublished set - and count how often the
+      model returns the value the generator assigned.
+
+      The false-positive rate comes from the unpublished set and nowhere else.
+      Those entities exist only in a file on your disk, so any hit on them is
+      coincidence, and their hit rate is a direct measurement of the coincidence
+      rate. That measured rate is the null distribution: it tells you how far
+      above it the published set would have to score before the coincidence
+      story stops fitting.
+
+      What makes it work through a chat API is that the statistic is a count of
+      correct string matches, not a loss. No probabilities are required.
+    check: llm
+    rubric: |
+      Expected to fail at pretest; nothing gates on it.
+      Pass requires: (1) some form of content planted in advance, (2) matched
+      content held back and never published, and (3) an explicit statement that
+      the held-back set is where the false-positive rate comes from.
+      (1) and (2) without (3) = partial, do not pass; the learner has the
+      honeypot idea and not the null, which is the unit's central content.
+      An answer that proposes measuring the model's loss on the archive and
+      comparing against similar articles = fail, diagnosing D2; the null is
+      unsamplable and section 2 must be delivered in full.
+      An answer that proposes a unique random string as the plant = fail,
+      diagnosing D18; deliver the failure catalogue in section 4 without
+      compression.
+      An answer that says no such test exists = fail; the construction is the
+      unit.
+
+  - id: v7-p2
+    concept: d-precommitment
+    prompt: |
+      An audit service runs one detection test per client collection against
+      each model release. This quarter it covered 40 collections. One came back
+      at p = 0.003, comfortably under the conventional 0.05.
+
+      Is that proof that the client's data was used? Answer yes or no and
+      justify in two or three sentences.
+    answer: |
+      No, and there are two independent reasons before anyone looks at the
+      arithmetic.
+
+      First, 40 tests at a 0.05 threshold produce about two false positives per
+      quarter by construction. Holding the chance of any false positive across
+      the family at 0.05 requires dividing the threshold by the family size:
+      0.05 / 40 = 0.00125. A p of 0.003 does not clear that. The
+      family-adjusted value is 40 x 0.003 = 0.12.
+
+      Second, and independent of the correction: a p-value only means anything
+      if the test, the threshold, the family size and the key were all fixed
+      before anyone saw the model. If any of them was chosen afterwards, the
+      stated false-positive rate describes a procedure nobody ran.
+    check: llm
+    rubric: |
+      Expected to fail. Pass requires "no" WITH at least one of: (1) the
+      multiple-testing correction with the family size of 40, or (2) the
+      pre-commitment requirement. Both = full credit.
+      Answering "yes, p < 0.05" = fail, diagnosing D19, and section 7 must be
+      delivered in full rather than summarized.
+      Answering "no" with only vague appeals to needing more evidence = fail;
+      the learner has the instinct without either mechanism, and neither will
+      transfer.
+      An answer that says the correction makes the result "weaker but still
+      suggestive" = fail, diagnosing D19 in its most durable form; that exact
+      phrase is what the pre-commitment exists to make unwritable.
+
+  - id: v7-p3
+    concept: d-audit-landscape
+    prompt: |
+      Can a zero-knowledge proof establish, to a third party, what data a
+      1-billion-parameter model was trained on? Answer yes, no, or not yet, and
+      give the reasoning that would let someone check your answer.
+    answer: |
+      No, and the gap is four-plus orders of magnitude rather than a few years
+      of engineering.
+
+      The check: the floating-point cost of a training run is about six times
+      the parameter count times the token count. At a compute-optimal 20 tokens
+      per parameter, a 1B model needs 6 x 1e9 x 2e10 = 1.2e20 FLOP. The best
+      published throughput for zero-knowledge proof-of-training is around 0.4
+      GFLOP/s of proved computation, so 1.2e20 / 4e8 = 3e11 seconds, about 9,500
+      years - for a model three orders of magnitude smaller than a frontier one.
+
+      Two adjacent things are also worth having straight. Proof-of-Learning,
+      the cheap alternative built on published checkpoint chains, has been
+      spoofed at a fraction of honest training cost. And trusted-execution
+      attestation is real and runs at roughly compute parity, but proves only
+      that a committed binary consumed a committed dataset - it says nothing
+      about what was in that dataset, and nothing at all about a trainer who
+      declines to enroll.
+    check: llm
+    rubric: |
+      Expected to fail. Pass requires "no" plus a quantitative or structural
+      reason - either the throughput gap in orders of magnitude, or the
+      observation that cryptography can only prove things about a computation
+      one was permitted to observe.
+      Answering "not yet, but it is improving" = fail, diagnosing D14. This is
+      the answer most engineers give and it is the one that loses a room to an
+      informed investor; deliver the graveyard section with the arithmetic
+      shown.
+      Answering "yes, via blockchain provenance or attestation" = fail,
+      diagnosing D14 compounded with V7-M3.
+
+check:
+  - id: v7-q1
+    concept: d-canary-design
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Explain why the never-published control set is the null distribution
+      rather than a baseline or a sanity check. Then state the two properties
+      the controls must have for that claim to hold, and for each one name what
+      goes wrong if it fails.
+    answer: |
+      The controls are the null distribution because a p-value is defined as the
+      chance of a measurement at least as extreme as yours WHEN THE NULL IS
+      TRUE, and computing that chance requires the spread of the measurement
+      under the null. The control items are content the model provably never
+      saw, measured the same way as the published items, so their hit rate and
+      its spread are literally the distribution the published count is compared
+      against. Remove them and there is no p-value at all - only a number.
+
+      Property one: they must come from the same generator as the published
+      items. A single keyed process producing both is what guarantees the two
+      sets differ in exactly one respect, whether they were published. If the
+      controls come from somewhere else - a different journal, a different
+      period, a different style - then topic, register, length and date all
+      differ too, and any of them can produce the gap. That is the failure that
+      sank the retrospective attacks, which were largely detecting publication
+      date rather than membership.
+
+      Property two: they must have been sealed before the training run, and the
+      split into published and control must have been fixed by the key rather
+      than chosen. Controls generated or selected after seeing the model let you
+      pick the split that maximizes the gap, which is choosing your own null.
+      The technical fix is a timestamped public hash of the key and protocol,
+      which fixes everything without disclosing anything.
+    check: llm
+    rubric: |
+      Must contain: (1) the p-value requires the distribution of the statistic
+      under the null, and the controls supply it by construction; (2) same
+      generator, so the two sets differ only in publication - with a named
+      consequence of matching failure; (3) sealed and fixed in advance, with the
+      post-hoc split as the named failure.
+      (1) plus either (2) or (3) = pass. All three = full credit.
+      An answer describing the controls as "a comparison group" or "a way to
+      check the detector is not firing spuriously" without (1) = fail; that is
+      exactly the baseline framing the item is testing against, and it will not
+      survive the first question from an opposing expert.
+      An answer that says the controls establish the false-positive RATE from a
+      single run = fail; one control set is a measurement of p_0, not a
+      demonstration of the rate.
+    difficulty: core
+
+  - id: v7-q2
+    concept: d-canary-design
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      A rightsholder wants to embed something in their archive now that will
+      later support a membership claim. Which design has the best chance of
+      surviving a modern data pipeline AND producing a measurable signal?
+    check: choice
+    options:
+      - text: "Twenty-five articles describing research instruments that do not exist, each with four specific attributes, written in the publication's normal style."
+        correct: true
+        explain: "Correct, and it clears both constraints at once, which is the hard part. It reads as ordinary domain prose, so a quality classifier keeps it and a normalizer leaves it alone; the twenty-five documents are distinct passages rather than one repeated span, so a deduplicator has nothing to collapse; and because the content is false, a model that answers questions about it correctly can only have read it. Detection is a factoid question through the plain API."
+      - text: "A unique 48-character random identifier appended as a footer to every article in the archive."
+        misconception: D18
+        explain: "The honeypot instinct, and it dies twice. A high-entropy blob inside running prose is precisely what a quality classifier scores as machine-generated junk; and if it survives that, the same footer on every article is a duplicated span, which near-duplicate detection is built to collapse - destroying the repetition count detection depends on. Its conspicuousness is the reason it is deleted."
+      - text: "A watermark embedded by biasing the token selection of the publication's own AI writing assistant, so all generated text carries a keyed signal."
+        misconception: D15
+        explain: "This is output watermarking, and the direction is wrong. An output watermark is inserted by the model owner at inference and proves that text came OUT of a model; a data watermark is inserted by the data owner before scraping and proves content went INTO one. They share a z-test on a count statistic and nothing else. The one real connection - watermarked text staying detectable when scraped downstream - is a provenance product for synthetic-data producers, not an answer to this rightsholder's question."
+      - text: "A high-entropy canary repeated exactly ninety times, since ninety occurrences is the published threshold for robust detection."
+        misconception: V7-M2
+        explain: "It takes a number from the power side of the design and applies it to a design whose validity problem is elsewhere. Ninety occurrences is roughly where hash-style canaries became robustly detectable given that they survive the pipeline - and a high-entropy string repeated ninety times is a duplicated span facing both the quality filter and the deduplicator. Optimizing detection strength while leaving the survival problem unsolved buys nothing."
+    difficulty: warmup
+
+  - id: v7-q3
+    concept: d-canary-design
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      An engagement planted 48 fictitious-knowledge watermark entities, four
+      attributes each, and generated 480 never-published control entities from
+      the same key.
+
+      Control questions asked: 1,920. Answered with the generator's value: 480.
+      Published detection questions asked: 192. Answered with the generator's
+      value: 75.
+
+      Compute the detection statistic z, using the null mean n*p_0 and the null
+      standard deviation sqrt(n*p_0*(1-p_0)).
+
+      Give one number to two decimal places.
+    answer: 4.50
+    check: numeric(0.01)
+    difficulty: core
+
+  - id: v7-q4
+    concept: d-canary-design
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A client proposes three canary designs. For each, say whether it produces
+      usable evidence, and name the specific pipeline stage or statistical
+      property that decides the outcome.
+
+      (a) The client's name rendered with a Cyrillic lookalike character,
+          throughout the archive.
+      (b) One distinctive but perfectly ordinary sentence inserted into forty
+          articles.
+      (c) A medium-length trap sequence repeated one hundred times across the
+          corpus.
+
+      Then state the one design property that all three lack.
+    answer: |
+      (a) No. Unicode normalization runs in the first stage of extraction,
+      before the document is even a document. The signal is gone before any
+      filter, deduplicator or tokenizer sees it. This is the design that feels
+      cleverest and has the shortest life.
+
+      (b) No. It survives the pipeline exactly because it is ordinary, and then
+      there is nothing to measure: a sentence built out of ordinary language
+      produces an ordinary loss. This and (a) are opposite ends of one axis -
+      conspicuous enough to be deleted, or unremarkable enough to be invisible.
+
+      (c) No, and this one is settled empirically rather than by argument.
+      Medium-length traps injected a hundred times each were flat out
+      undetectable in controlled tests; pushing to long sequences with heavy
+      repetition reached an AUC of about 0.75, meaning a quarter of judgements
+      wrong in a setting where the experimenter controlled everything.
+
+      What all three lack: none of them has a constructible null. Even if one
+      produced a signal, there is no matched, never-published twin generated by
+      the same process, so there is no way to say how often that signal appears
+      by coincidence. They are detection ideas without false-positive rates,
+      which is the same defect as the retrospective methods they were meant to
+      replace.
+    check: llm
+    rubric: |
+      Must contain: all three judged as not usable, with at least two correct
+      mechanisms from {Unicode normalization for (a); no measurable signal or
+      regression to typical loss for (b); measured undetectability for (c)}.
+      AND the missing property must be the absence of a constructible null or
+      matched unpublished controls.
+      Both halves = pass. The second half alone = fail; the mechanisms are what
+      let the learner evaluate a design they have not seen before.
+      An answer that rates (c) as usable because a hundred repetitions sounds
+      like a lot = fail, diagnosing D18; deliver the failure catalogue with the
+      measured result stated.
+      An answer that names only survival problems and never reaches the null =
+      partial, do not pass; surviving the pipeline is necessary and not
+      sufficient, and a learner stopping there will build a detector with no
+      p-value.
+    difficulty: core
+
+  - id: v7-q5
+    concept: d-paired-tests
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      In a paired rephrasing design, several keyed rewrites of a document are
+      generated, exactly one is published, and the rest are kept private. What
+      do the private rewrites contribute?
+    check: choice
+    options:
+      - text: "They are the per-document null: matched on topic, length and style, so the difference between the published version and its own siblings removes the document-to-document variation that dominates an unpaired comparison."
+        correct: true
+        explain: "Correct, and the size of the effect is the point. On the worked numbers the effect stays at 0.10 nats per token while the standard error drops from 0.060 to 0.012, so z goes from 1.67 to 8.33 - a factor of exactly the ratio of the two spreads. Buying that back with volume instead would take 2,500 published documents rather than 100, since precision improves with the square root of n while pairing improves it linearly."
+      - text: "They increase the amount of watermarked content in the corpus, raising the effective occurrence count and therefore the memorization signal."
+        misconception: V7-M2
+        explain: "It confuses the two axes. The private rewrites are never published, so they add exactly zero occurrences and cannot raise memorization at all. What they raise is precision, by shrinking the denominator of the test rather than growing its numerator - a validity-preserving improvement rather than a power-by-volume one."
+      - text: "They give the auditor a set of documents to test the model on after the fact, so a control can be produced at detection time if the published result looks weak."
+        misconception: V7-M4
+        explain: "The mechanics are half right and the timing is fatal. Controls chosen or generated after seeing the model let the analyst select the split that maximizes the gap, which is choosing one's own null. The siblings and the choice of which one to publish must be fixed by the key, under a public timestamped commitment, before the training run."
+      - text: "They let the auditor recover the model's token probabilities for the published version by comparing outputs, which is what the likelihood test requires."
+        misconception: V7-M1
+        explain: "This assumes the audit must reach probabilities somehow, and invents a route to them. The paired design does use likelihoods where they are available, but the reason the watermark family is a product at all is that the fictitious-knowledge variant needs no probabilities whatsoever - a factoid question and a string match. Access requirement is a design choice, not a constraint the method imposes."
+    difficulty: core
+
+  - id: v7-q6
+    concept: d-canary-design
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A publisher holds a 900,000,000-token archive. Watermark documents run
+      180 tokens each. The plan calls for 25 distinct watermarks at the 0.1%
+      density floor.
+
+      First: how many occurrences of each distinct watermark does that plan
+      produce?
+
+      Second: the next model generation will train on five times as many
+      tokens. Holding detectability fixed under the rule that required
+      occurrences scale with corpus size, how many occurrences of each
+      watermark does the revised plan need?
+
+      Answer with two integers, comma-separated, no spaces.
+      Example format: `50,250`
+    answer: "200,1000"
+    check: exact
+    difficulty: core
+
+  - id: v7-q7
+    concept: d-paired-tests
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      An audit covers 225 published documents. Training lowers the model's
+      per-token surprise on a document by 0.05 nats. The document-to-document
+      standard deviation of per-token surprise is 0.45. Under a paired design,
+      the standard deviation of the within-document differences is 0.15.
+
+      Compute the unpaired z and the paired z. Then compute how many documents
+      an unpaired design would need to match the paired design's precision, and
+      explain in one sentence why that number is not simply three times 225.
+    answer: |
+      Unpaired: the standard error is 0.45 / sqrt(225) = 0.45 / 15 = 0.03, so
+      z = 0.05 / 0.03 = 1.67.
+
+      Paired: the standard error is 0.15 / 15 = 0.01, so z = 0.05 / 0.01 = 5.00.
+
+      To match by volume: solve 0.45 / sqrt(n) = 0.01, so sqrt(n) = 45 and
+      n = 2,025 documents - nine times the paired design's 225.
+
+      Why not three times: precision improves with the square root of the sample
+      size, so buying a factor of 3 in the standard error costs a factor of 3^2
+      = 9 in documents. Pairing improves precision linearly in the amount of
+      nuisance variance it removes. That asymmetry is the whole argument for
+      pairing, and it gets worse as the nuisance variance grows.
+    check: llm
+    rubric: |
+      Required: unpaired z = 1.67 (accept 1.66 to 1.68), paired z = 5.00,
+      n = 2,025.
+      All three numbers plus the sqrt-versus-linear explanation = pass.
+      Numbers correct but the explanation says the factor is 3 because the SDs
+      differ by 3 = fail; the learner has the arithmetic and not the scaling
+      law, which is the transferable part and the part that sizes a budget.
+      Computing the standard errors without dividing by sqrt(n) - reporting
+      z = 0.11 and 0.33 - = fail, and re-deliver the standard error definition;
+      the same error makes every power calculation in the unit wrong.
+    difficulty: core
+
+  - id: v7-q8
+    concept: d-precommitment
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      An audit service runs one pre-registered detection per client collection
+      against each model release, covering 200 collections, and holds the
+      chance of any false positive across the family at 0.05.
+
+      Using Bonferroni, and the one-sided normal tail table from the unit, what
+      z must a single collection's result reach to clear the corrected
+      threshold?
+
+      Give one number to two decimal places.
+    answer: 3.48
+    check: numeric(0.05)
+    difficulty: core
+
+  - id: v7-q9
+    concept: d-precommitment
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      You are on the stand. Your report states a detection at z = 5.00, a
+      one-sided p of 2.9e-7, across an engagement covering 40 client
+      collections against one model release.
+
+      Opposing counsel's expert makes three attacks: (1) you ran this test many
+      times, (2) your tests are not independent of one another, (3) you picked
+      your threshold once you knew the answer.
+
+      Answer each. For the one you cannot fully answer, say what you can honestly
+      claim instead.
+    answer: |
+      Attack one is answerable with arithmetic. The family size was 40 and was
+      committed in the protocol before the model was queried. Holding the
+      family-wide false-positive chance at 0.05 requires a per-test threshold of
+      0.05 / 40 = 0.00125, which corresponds to z = 3.02. The observed 2.9e-7 is
+      smaller than that by more than three orders of magnitude, and the
+      family-adjusted p-value is 40 x 2.9e-7 = 1.2e-5. The correction costs the
+      finding nothing, which is a property of the design having headroom rather
+      than of the correction being lenient.
+
+      Attack three is answerable with a document. The threshold, the statistic,
+      the family size, the correction, the detection prompts, the decoding
+      settings and the stopping rule were all in a protocol document whose hash
+      was published with a trusted timestamp before the model in question
+      existed. The key was committed in the same hash. Anyone can verify that
+      the protocol executed is the protocol committed, and can regenerate both
+      the published and control item sets from the revealed key.
+
+      Attack two is the one that cannot be fully answered, and saying so is the
+      correct move. Bonferroni assumes 40 independent tests. These are not:
+      clients syndicate to and quote each other, so their content overlaps, and
+      all 40 tests were run against a single model and therefore share one
+      training seed, one data order and one checkpoint. There is no clean
+      correction for arbitrary dependence. What can honestly be claimed: the
+      dependence structure is reported explicitly, with the content overlap
+      between clients measured by near-duplicate clustering; and Bonferroni is
+      conservative under positive dependence, so the direction of the error is
+      known even where its size is not. The claim is bounded rather than exact,
+      and the report says which.
+    check: llm
+    rubric: |
+      Must contain: (1) the family correction with 0.05/40 = 0.00125 and the
+      observation that the result clears it by orders of magnitude; (2) the
+      timestamped commitment as the answer to the threshold attack, naming what
+      the commitment covered; (3) an explicit concession on dependence, with
+      BOTH a named source of dependence (shared content across clients or a
+      shared model and seed) and the honest partial claim (report the structure;
+      Bonferroni conservative under positive dependence).
+      All three = pass. Anything less = fail; this item is the unit's product,
+      and a learner who cannot answer all three cannot sell the report.
+      An answer that claims dependence is handled by Bonferroni = fail; that
+      overclaim is the one an opposing expert will convert into a finding of
+      unreliability.
+      An answer that concedes attack three by offering to re-run the analysis
+      with a properly chosen threshold = fail, and re-deliver section 7: a
+      threshold chosen after the fact cannot be repaired retrospectively, only
+      replaced by a new commitment against a future model.
+    difficulty: stretch
+
+  - id: v7-q10
+    concept: d-precommitment
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      Put the six steps of the pre-commitment ledger in order, and for the two
+      steps whose position in the sequence matters most, state the specific
+      manipulation that becomes available if they move later.
+    answer: |
+      The order:
+
+      1. Register the corpus - its extent, a content fingerprint, and the legal
+         entity it belongs to.
+      2. Generate, from one key, the watermarks that will be published, the
+         controls that will not, and the assignment of which is which.
+      3. Publish a timestamped commitment: a hash of the key together with the
+         protocol document, which contains the statistic, threshold, family size
+         and correction, the exact detection prompts, the decoding settings and
+         the stopping rule.
+      4. Publish the watermarked content and wait.
+      5. Run the pre-registered test, unchanged, against a named model at a
+         named version on a named date.
+      6. Emit a signed report a third party can re-run from the revealed key.
+
+      The two positions that matter most are steps 2 and 3, and both must
+      precede step 4 as well as step 5.
+
+      If step 2 moves later, the split between published and control items is
+      chosen rather than derived, which means the analyst selects their own
+      null - the exact failure the whole construction exists to prevent. It also
+      opens key search: try candidate keys until one produces a large gap and
+      present that key as the original.
+
+      If step 3 moves later, there is no public artifact predating the training
+      run, so nothing distinguishes a protocol that was committed from one that
+      was written to fit the result. Every element in the protocol document
+      becomes a degree of freedom: the statistic, the threshold, the prompts and
+      the stopping rule can each be selected to make the test fire, and no
+      arithmetic in the report can rule that out.
+    check: llm
+    rubric: |
+      Must contain: the six steps in the right order, with generation-from-key
+      before commitment before publication before test before report; AND the
+      manipulation opened by moving step 2 later (choosing the split, or key
+      search) AND by moving step 3 later (no artifact predates the run, so every
+      protocol element becomes a free parameter).
+      Correct order plus both manipulations = pass.
+      Correct order with no manipulations = fail; the ordering memorized without
+      the reasons will not survive an unfamiliar variant, and the reasons are
+      what the learner sells.
+      An answer that places the commitment after publishing the watermarked
+      content = fail; the training run may begin at any time after publication,
+      and a commitment made after the run cannot bind anything.
+      An answer that says the key must be published rather than hashed at step 3
+      = fail, diagnosing V7-M4 in reverse; a published key lets the trainer
+      regenerate and filter the watermarks.
+    difficulty: core
+
+  - id: v7-q11
+    concept: d-audit-landscape
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      A developer trains inside attested confidential computing and publishes
+      the attestation binding binary hash, dataset hash and weight hash. What
+      has a rightsholder learned?
+    check: choice
+    options:
+      - text: "That a specific binary consumed a specific set of bytes and produced specific weights - and nothing whatsoever about what was in those bytes, or about any developer who declines to enroll."
+        correct: true
+        explain: "Correct, and the limitation is structural rather than a gap in current hardware. The hash commits to bytes; checking those bytes for a catalogue requires being handed the dataset, which is the thing that will not happen in an adversarial setting. This makes attestation a licensing-integrity feature for cooperating counterparties - a real product with a real buyer, sitting beside exclusion certification rather than beside the adversarial notary."
+      - text: "That the training data was what the developer's public summary says it was, so the provenance question is settled for that model."
+        misconception: V7-M3
+        explain: "The attestation does make the summary checkable against the dataset the developer holds, which is a genuine compliance benefit and the reason the mechanism has a buyer. It settles nothing about contents from outside: a rightsholder still cannot look inside the committed bytes, and the developer has no obligation to let them."
+      - text: "Nothing at all - attested training is a marketing exercise with no verifiable content."
+        misconception: V7-M2
+        explain: "The overcorrection, and it costs the friendliest sale in the space. Confidential computing on current datacenter GPUs runs at roughly compute parity, with federated variants reporting under 12% overhead, and the binding it produces is unforgeable. What it cannot do is compel or describe a party who never enrolled. Discarding a valid narrow guarantee because it is not a broad one is the same error as discarding a valid test because it lacks power."
+      - text: "That a zero-knowledge proof of the training computation has been produced, so the run is cryptographically verified end to end."
+        misconception: D14
+        explain: "Different mechanism entirely. Attestation is a hardware root of trust asserting what ran; a zero-knowledge proof is a mathematical object verifying a computation without re-running it. The latter is four-plus orders of magnitude out of reach: at the best published throughput of about 0.4 GFLOP/s of proved computation, a 1B-parameter model at 6ND with 20 tokens per parameter needs roughly 9,500 years of prover time."
+    difficulty: warmup
+
+  - id: v7-q12
+    concept: d-audit-landscape
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A rightsholder brings you a developer's fully compliant Article 53
+      training-content summary and asks what it tells them about whether their
+      catalogue was used.
+
+      Answer the question from the template's actual mechanics. Then name the
+      two products that exist because of the answer, and say which of the two
+      is the easier sale and why.
+    answer: |
+      It tells them essentially nothing about their catalogue, and the reasons
+      are in the form rather than in the developer's conduct. Training data size
+      is reported in three broad buckets. Scraped domains are disclosed only as
+      the top 10% by volume, or the top 5% or 1,000 domains for a small or
+      medium enterprise. Public datasets must be named only above 3% of that
+      modality's public data. Unless the rightsholder is one of the largest
+      domains in the corpus, there is no field they appear in.
+
+      And the regulator said so. The explanatory notice states that supervision
+      happens without a work-by-work assessment or checks whether specific
+      content has been used, and the rightsholder query mechanism it provides is
+      voluntary. So the regime is mandatory, coarse, self-reported, refreshed
+      every six months, and unverified, with a query channel nobody is obliged
+      to answer.
+
+      Two products live in that gap. Disclosure conformance checking, sold to
+      developers, verifying that a summary meets the template on buckets, domain
+      coverage, named datasets and refresh timing. And the adversarial notary,
+      sold to rightsholders, producing pre-committed keyed-watermark evidence
+      that answers the question the template does not ask.
+
+      Conformance checking is far the easier sale, and exclusion certification
+      is easier still: the buyer is the developer, they want the artifact, they
+      cooperate and grant access, and they pay again at every six-month refresh.
+      The notary sells to a party with a grievance against a counterparty who
+      has no obligation to cooperate.
+    check: llm
+    rubric: |
+      Must contain: (1) at least two concrete template mechanics that make the
+      summary uninformative for an individual rightsholder - the three size
+      buckets, the top-10% domain threshold, the 3% dataset-naming threshold, or
+      the SME variant; (2) the explicit no-work-by-work-assessment position and
+      the voluntary nature of the query mechanism; (3) two products, with the
+      developer-facing one identified as the easier sale AND the reason being
+      that the buyer is cooperative and pays on a recurring compliance cadence.
+      All three = pass.
+      Missing (3) = fail; this item is the market-placement check and the
+      ordering of the sales motions is the content.
+      An answer that says a compliant summary would let a rightsholder confirm
+      usage if they read it carefully = fail; the form has no field for them and
+      no amount of care produces one.
+      An answer that treats the regulation as the forcing function that makes
+      the notary an easy sale = fail; the regulation forces disclosure, not
+      verification, and it is the same document that closes the verification
+      door.
+    difficulty: core
+
+  - id: v7-q13
+    concept: d-audit-landscape
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A client's archive was scraped in 2021. They want to know whether a model
+      released in 2024 was trained on it, and they are willing to pay well.
+
+      Say plainly what you can and cannot sell them, and why the limitation is
+      permanent rather than a matter of current technique. Then describe the
+      engagement you would actually run, and what each part of it produces.
+    answer: |
+      What you cannot sell them: proof. A keyed watermark protects only content
+      published after the watermark was embedded, and the archive in question
+      was scraped three years before anyone spoke to you. There is no
+      construction that reaches backwards, because the whole method rests on
+      having arranged for matched unpublished controls to exist before the
+      training run, and that arrangement cannot be made retroactively without
+      being exactly the retrofitting an opposing expert is looking for.
+
+      Why permanent: the limitation is not about technique. To make a
+      retrospective claim at a stated confidence you need the distribution of
+      your statistic under "this model was not trained on my data", and
+      obtaining it means having a model trained identically minus that data.
+      That experiment belongs to the developer and will not be run for you.
+      Better methods do not create the counterfactual; only prior arrangement
+      does.
+
+      What the engagement actually is, in three parts. First, retrospective
+      screening, sold honestly as triage rather than proof: dataset inference
+      over the collection rather than per-document decisions, using naturally
+      occurring structurally random strings - hashes, shortened URLs - as an
+      unlimited supply of same-distribution null items. It produces leads and a
+      direction, not an exhibit. Second, an extraction attempt: cheap, worth
+      budgeting in every engagement, expected to fire rarely, and the strongest
+      evidence in existence when it does, because courts have credited direct
+      output comparison. It fires only on heavily duplicated works, so its
+      silence means nothing. Third, and this is the actual sale, prospective
+      protection going forward: register the archive, embed keyed watermarks
+      under a committed key from this quarter onward, and be in a position to
+      answer the same question about the next model generation with a number
+      that has a false-positive rate.
+
+      The honest sentence to say out loud in the first meeting is that the past
+      is triage and the future is proof.
+    check: llm
+    rubric: |
+      Must contain: (1) a clear refusal to promise proof for the 2021 archive;
+      (2) the reason stated as the unsamplable null / no retroactive controls,
+      explicitly framed as permanent rather than a technique gap; (3) a
+      three-part engagement including screening sold as triage, an extraction
+      attempt with its rarity acknowledged, and prospective watermarking as the
+      forward sale.
+      (1) and (2) plus any two parts of (3) = pass.
+      An answer that offers a membership-inference audit as the deliverable =
+      fail, diagnosing D2 and D19 together; that is selling a number with no
+      false-positive rate to a paying client, which is the failure mode this
+      volume exists to prevent.
+      An answer that declines the engagement entirely = fail; there is a real,
+      honest, saleable engagement here, and refusing it means the learner cannot
+      distinguish triage from proof, which is the distinction that makes the
+      screening layer legitimate.
+      An answer that promises the watermark will cover the 2021 archive if
+      embedded now = fail; deliver the limitation section again, first sentence.
+    difficulty: stretch

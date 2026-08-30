@@ -1,0 +1,38 @@
+# Unit-local misconception additions for v7 (notary).
+# Same schema as corpus-v2/misconception-bank.yaml. IDs are namespaced V7-M*
+# so they never collide with the global D* bank or with vol-1's M* namespace.
+# Referenced by distractors in v7/questions.yaml and by refutation blocks in
+# v7/canon.md.
+
+misconceptions:
+  - id: V7-M1
+    name: auditor-needs-the-weights
+    wrong_model: "Running a training-data audit requires the model's weights, or at minimum a logprob endpoint - so only open-weight models can be audited, and the closed commercial models everyone cares about are out of reach."
+    why_appealing: "Every membership-inference paper the reader has skimmed reports loss-based or perplexity-based statistics, and a loss needs token probabilities. Major APIs have progressively restricted logprob access, which reads as the door closing. The inference from 'the published methods need probabilities' to 'auditing needs probabilities' is one step and feels like none."
+    failing_prediction: "If probabilities were required, no audit of a closed commercial model would be possible at all and the entire addressable market would be open-weight releases. But a fictitious-knowledge watermark is detected by asking the model a factoid question and string-matching the answer against what the generator wrote: 25 entities with four attributes each is 100 chat completions, and the statistic is a count of correct matches. Roughly three quarters of planted attributes came back correctly in the reported runs, through plain text-in-text-out access."
+    correction: "Detection method and access requirement are separate design choices, and the strongest prospective design deliberately picks the weakest access requirement. Ask questions, count hits, compare against hits on never-published controls. This is the single most important product property in the unit: the models anyone wants audited are exactly the ones that expose nothing but text, so a scheme requiring logits has no customers."
+    units: [v7]
+
+  - id: V7-M2
+    name: stronger-attack-is-a-better-audit
+    wrong_model: "A more powerful detection method makes a better audit - rank the options by detection performance (AUC, true-positive rate at low false-positive rate, detection floor) and take the top one."
+    why_appealing: "The entire literature is organized around detection performance, so the leaderboard is right there and reads like a ranking of audit quality. It is also how you would correctly choose a spam filter or an intrusion detector, where the base rates are known and nothing has to survive cross-examination."
+    failing_prediction: "Under that ranking, the strongest membership-inference attack would make a better audit than a weaker one, and any attack would beat a scheme with no attack in it. Neither holds. The strongest retrospective attacks produce no defensible false-positive rate at all, because their null cannot be sampled - their power is power at a stated confidence of unknown. Meanwhile the paired watermark design wins a factor of five in z by removing nuisance variance from a null it already had, which is not the same kind of improvement at all."
+    correction: "An audit has two independent properties. Validity is whether the stated false-positive rate is the real one, and it comes entirely from the null and the pre-commitment. Power is whether a real effect is found, and it comes from design and sample size. Power without validity is a number with no interpretation. Improve power only along axes that leave validity intact - pairing, more items, more occurrences, larger control sets - and treat any technique that buys detection strength by weakening the null as a downgrade however good its reported curve."
+    units: [v7, v9]
+
+  - id: V7-M3
+    name: attestation-proves-the-data
+    wrong_model: "Trusted-execution attestation of a training run proves what the training data was, so a lab that trains inside attested confidential computing has solved provenance."
+    why_appealing: "The attestation is real cryptography, the hardware is real and runs at roughly compute parity, and the artifact genuinely does bind a binary, a dataset and a set of weights together in a way nobody can forge. Everything about it is sound, which makes the overreach hard to see: the mechanism is trustworthy, so its conclusion feels trustworthy too."
+    failing_prediction: "Read the guarantee literally and the gap is in the sentence: a binary with hash X consumed a dataset with hash Y and produced weights with hash Z. Nothing there says anything about what is IN dataset Y. A rightsholder cannot check for their catalogue without being handed the dataset, which is the thing that will not happen. And a trainer who simply never enrolls is untouched by the entire mechanism - which is every adversarial case."
+    correction: "Attestation proves that a cooperating party ran what they said they ran on the bytes they committed to. That is a genuine licensing-integrity feature with a genuine buyer, and it sits beside exclusion certification - both sell to willing developers. It is structurally incapable of being an enforcement tool, because cryptography proves things about computations you were permitted to observe, and adversarial verification is defined by not having been permitted. Dismissing attestation as useless is the opposite error and costs you the friendliest sale in the space."
+    units: [v7]
+
+  - id: V7-M4
+    name: commit-means-reveal
+    wrong_model: "Committing to the key in advance means publishing it in advance, which would let a trainer filter the watermarks out - so the key must stay secret until the test is run, and there is nothing to publish beforehand."
+    why_appealing: "The tension is real and correctly perceived: a published key does let an adversary regenerate and drop the watermarks, which would destroy the scheme. Given a choice between 'publish the key and be defeated' and 'keep it secret and be accused of retrofitting', secrecy looks like the lesser evil, and the reader reaches for it because they have correctly identified the attack."
+    failing_prediction: "It treats commitment and disclosure as the same act. Publish a hash of the key together with the protocol document, timestamped: the adversary learns nothing usable, because a hash of a 32-byte key is not invertible, while you have irrevocably fixed the key, the published set, the control set, the statistic, the threshold and the prompts. At detection time you reveal the key, and anyone can check it against the commitment and regenerate both sets deterministically."
+    correction: "The commitment fixes the protocol without disclosing it; the reveal happens once, at detection, and is what makes the report independently reproducible. A scheme with no public artifact predating the training run has no answer to the only question an opposing expert needs to ask, which is when each element of the protocol came into existence. Secrecy is not the alternative to commitment - it is what commitment protects while still binding you."
+    units: [v7]
