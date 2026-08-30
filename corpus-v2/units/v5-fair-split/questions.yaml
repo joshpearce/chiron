@@ -1,0 +1,640 @@
+# v5 fair-split: pretest + terminal check bank.
+# Solo fade items: v5-q3 (v5-shapley-by-hand), v5-q9 (v5-shell-recompute).
+# Each is the third appearance of a procedure that was worked in canon prose
+# and drilled as a completion beat.
+#
+# Running table used across several items (thousandths of a bit per byte of
+# held-out text, relative to a model trained on none of the sources):
+#   none 0; A 50; B 50; C 20; A+B 70; A+C 90; B+C 90; A+B+C 100
+#   Shapley 35 / 35 / 30. Banzhaf 37.5 / 37.5 / 32.5 (sums to 107.5).
+#   Leave-one-out 10 / 10 / 30 (sums to 50).
+
+pretest:
+  - id: v5-p1
+    concept: d-coop-game
+    prompt: |
+      Three data sources were licensed together for $100. Somebody trained a
+      model on every combination and measured how much better each one got at
+      predicting a fixed held-out set. Bigger is better; the units do not
+      matter.
+
+        none 0 | A 50 | B 50 | C 20
+        A+B 70 | A+C 90 | B+C 90 | A+B+C 100
+
+      Split the $100 among A, B and C. Give three figures summing to 100, and
+      state the rule you used in one sentence.
+    answer: |
+      The defensible answer is $35, $35, $30, and almost nobody produces it
+      cold.
+
+      What the table says: A and B are each worth 50 alone but only 70
+      together, so 30 units of what they carry is shared between them. C is
+      worth 20 alone but takes A from 50 to 90, so in company it is worth 40.
+
+      The three rules people reach for all fail on this table. Splitting in
+      proportion to solo value (50:50:20) bills A and B each for the whole
+      30-unit overlap, so the licensee pays for it twice, and pays C $16.66 for
+      being small. Splitting in proportion to leave-one-out (10, 10, 30) gives
+      figures summing to 50 against a pool of 100, and the renormalization that
+      patches that doubles C's measured 30 into a paid 60. Splitting equally
+      ignores the measurements entirely.
+
+      The rule that works averages each source's marginal contribution over
+      every order in which the sources could have arrived, and it is the only
+      rule satisfying four requirements every party would sign.
+    check: llm
+    rubric: |
+      This is a calibration item and is expected to fail; nothing gates on it.
+      Pass requires $35/$35/$30 or within a dollar, WITH a rule that references
+      averaging over arrival orders or over coalitions. The figures alone,
+      guessed, are not a pass.
+      Answering 41.67/41.67/16.66 = fail, diagnosing the double-counting of
+      redundancy - deliver section 1 in full.
+      Answering 20/20/60 = fail, diagnosing V5-M4 (leave-one-out treated as an
+      allocation). This is the most common answer from anyone who read the
+      counterfactual unit, and the leave-one-out refutation must be delivered
+      rather than compressed.
+      Answering 33.33 each = fail; the learner has not engaged with the table.
+
+  - id: v5-p2
+    concept: d-shapley-axioms
+    prompt: |
+      Two rightsholders, P and Q, license byte-identical corpora - the same
+      catalogue through two channels. Training on either one alone reaches the
+      same held-out score; training on both reaches the same score again.
+
+      Using leave-one-out - retrain without a source and see what is lost - what
+      is each one's measured contribution? Is that a defensible basis for
+      splitting a payment between them? Justify in two sentences.
+    answer: |
+      Each one's leave-one-out contribution is exactly zero: remove P and the
+      model is unchanged, because Q supplies the same text, and symmetrically
+      for Q.
+
+      It is not a defensible basis, and the failure is worse than harsh. Two
+      sources that between them carry the entire corpus are each assigned
+      nothing, the two figures sum to zero against a nonzero pool, and the
+      renormalization step that allocation rules use to patch a shortfall
+      divides by zero. The rule does not give a severe answer; it stops giving
+      an answer. Leave-one-out measures replaceability, and in a redundant
+      corpus everyone is replaceable while the corpus is not.
+    check: llm
+    rubric: |
+      Expected to fail at pretest. Pass requires BOTH: (1) each leave-one-out
+      value is zero, and (2) an explicit statement that this cannot be an
+      allocation, ideally naming the zero sum or the division by zero.
+      (1) alone = fail; computing the zero and then defending it as "correct,
+      neither is necessary" is exactly the confusion, and diagnoses V5-M4.
+      An answer that each gets half because they are symmetric = partial; the
+      conclusion is right and the reasoning has skipped the mechanism, so
+      deliver the section but compress the arithmetic.
+
+  - id: v5-p3
+    concept: d-semivalue-family
+    prompt: |
+      You want an exact fair split across 12 data sources, computed by
+      averaging each source's marginal contribution over every possible order
+      in which the 12 could have arrived.
+
+      How many models do you have to train? Give a number and say what
+      determines it.
+    answer: |
+      4,096 - that is $2^{12}$, one per distinct combination of sources.
+
+      The number of ORDERS is $12! = 479{,}001{,}600$, and that is the number
+      most people give. It is not the number of models, because a source's
+      marginal contribution depends only on WHICH sources arrived before it,
+      never on the order they arrived in. Two orders leaving the same set in
+      the room before source $i$ hand it the identical marginal contribution,
+      computed from the identical pair of trained models. So you train each of
+      the $2^n$ coalitions once, cache the number, and every one of the 479
+      million orders is answered by lookup.
+
+      At roughly a minute per run for a 20-million-parameter model on 200
+      million tokens, 4,096 runs is about 68 GPU-hours - a few hundred dollars
+      as of mid-2026.
+    check: llm
+    rubric: |
+      Expected to fail. Pass requires 4,096 or $2^n$, AND the reason: marginal
+      contribution depends on the predecessor SET, not the order, so coalitions
+      are cached and reused across orders.
+      Answering 479,001,600 or "12 factorial" = fail, diagnosing V5-M1, and
+      section 5 must be delivered in full.
+      Answering "infeasible, this is the exponential blow-up everyone cites" =
+      fail, diagnosing V5-M1 compounded with D7; the learner has imported the
+      per-document infeasibility result into a source-level setting where it
+      does not apply.
+      Answering 4,096 with no reason = partial; the learner may have memorized
+      the figure without the caching argument, which is the transferable part.
+
+check:
+  - id: v5-q1
+    concept: d-coop-game
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A colleague proposes paying each data source in proportion to its
+      leave-one-out contribution - retrain without that source, measure how
+      much worse the model gets, and divide the pool in those proportions.
+
+      Give the two specific ways this fails as an allocation rule. For each,
+      give a concrete numeric case. Then say what leave-one-out IS good for, so
+      your answer does not overcorrect.
+    answer: |
+      Failure one: the values do not sum to the pool. On the running table the
+      three leave-one-out values are 100 - 90 = 10 for A, 10 for B, and
+      100 - 70 = 30 for C, summing to 50 against a pool of 100. Half the money
+      is unassigned and the rule has no view on who gets it. The standard patch
+      is to renormalize by 100/50, which doubles C's measured 30 into a paid 60
+      - a move that changes one party's payment for reasons found nowhere in
+      the measurements. The shortfall is not a quirk of these numbers: it is
+      guaranteed whenever any content is supplied by more than one source,
+      because content two sources both supply is credited to neither.
+
+      Failure two: perfect substitutes are each assigned zero. Two sources P
+      and Q holding byte-identical corpora each have leave-one-out zero, since
+      removing either leaves the model unchanged. They between them carry the
+      whole corpus, the sum of their values is zero, and the renormalization
+      divides by zero. The rule does not degrade gracefully at this point; it
+      ceases to be defined.
+
+      What it is good for: leave-one-out is the correct answer to "what happens
+      to this model if this source disappears," which is exactly the number a
+      licensee needs for a renewal decision, and it is the counterfactual ground
+      truth that every cheaper attribution method in this book is scored
+      against. It measures replaceability. Replaceability is a real quantity
+      and it is not a share.
+    check: llm
+    rubric: |
+      Must contain: (1) the values do not sum to the pool, with the 10/10/30
+      against 100 case or an equivalent, (2) perfect substitutes both score
+      zero, with the duplicate-corpus case, (3) a statement that leave-one-out
+      remains valid as a counterfactual measurement or ground truth.
+      (1) and (2) = pass. All three = full credit.
+      Missing (3) = pass but flag: the learner has overcorrected against the
+      previous unit's ground truth and will discount it in v8, where it is the
+      reference the cheap methods are ranked against.
+      An answer defending renormalization as adequate = fail, diagnosing V5-M4.
+      Renormalizing a shortfall of unknown structure is a second, unstated rule
+      doing undisclosed work.
+    difficulty: core
+
+  - id: v5-q2
+    concept: d-coop-game
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      A split satisfies the efficiency axiom. What does that guarantee?
+    check: choice
+    options:
+      - text: "That the shares sum to exactly the value of the full corpus - nothing more. It is an accounting constraint with no fairness content."
+        correct: true
+        explain: "Correct, and the 'nothing more' is the load-bearing half. Efficiency does real work - it is what makes the output an allocation rather than a set of scores, which is something no gradient attribution method produces - but a split handing the entire pool to one source satisfies it exactly. The fairness comes from symmetry, the null player condition, and additivity."
+      - text: "That no source is over-paid or under-paid relative to what it contributed."
+        misconception: V5-M2
+        explain: "The word is doing this. In ordinary use an efficient allocation is a well-distributed one, and 'efficiency' at the head of a list of fairness axioms reads like the axiom that delivers fairness. Test it: 100 to A, 0 to B, 0 to C sums to the pool and satisfies efficiency in full. The requirement has no opinion about it."
+      - text: "That each source receives what would be lost if it were removed from the corpus."
+        misconception: V5-M4
+        explain: "This is the leave-one-out rule, and it is not efficient - it is the standard example of a rule that violates efficiency, since its values sum to less than the pool in any corpus with redundancy. Confusing the two conflates a measurement with an accounting property."
+      - text: "That the computation avoids the factorial blow-up in the number of arrival orders."
+        misconception: V5-M1
+        explain: "This reads 'efficiency' as computational efficiency. The axiom is about arithmetic on the output, not about the cost of producing it. The cost question has a separate and better answer: you train 2^n coalitions and cache them, so the n! orders never cost anything at all."
+    difficulty: warmup
+
+  - id: v5-q3
+    concept: d-shapley-axioms
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A three-source corpus with this value table:
+
+        none 0 | A 30 | B 40 | C 25
+        A+B 52 | A+C 43 | B+C 55 | A+B+C 61
+
+      Compute the Shapley value of each source. Average each source's marginal
+      contribution over all six arrival orders, or equivalently weight its four
+      coalition-form terms by 1/3, 1/6, 1/6, 1/3.
+
+      Answer with three integers, comma-separated, in the order A, B, C.
+      Example format: `10,20,30`
+    answer: "17,28,16"
+    check: exact
+    difficulty: core
+
+  - id: v5-q4
+    concept: d-shapley-axioms
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      You are drafting the schedule to a licensing agreement. Write the four
+      requirements the split will satisfy, in language a rightsholder can read,
+      and for each one name the specific thing that becomes possible if it is
+      dropped.
+    answer: |
+      1. Efficiency: the shares sum to exactly the value of the whole corpus.
+         Dropped, the rule leaves money unassigned or overdrawn and needs a
+         second, unstated rule to finish - leave-one-out values summing to 50
+         against a pool of 100, patched by a renormalization nobody agreed to.
+
+      2. Symmetry: two sources that make the identical difference to every
+         coalition receive identical shares. Dropped, the split can pay for
+         things absent from the measurements - catalogue size, the name on the
+         letterhead, who signed first, who has the better lawyer. This is also
+         the requirement that makes the split auditable from the value table
+         alone, without access to the model or the code.
+
+      3. Null player: a source that changes no coalition's value receives
+         nothing. Dropped, the cheapest way to be paid is to be large. A source
+         adds half a million words of generated boilerplate and collects in
+         proportion to its token count, a quantity it controls unilaterally.
+
+      4. Additivity: splitting two evaluations separately gives the same result
+         as splitting them together. Dropped, the accounting period becomes a
+         negotiating lever - quarterly versus annual settlement, or scoring two
+         held-out domains in one run versus two, changes what everyone is paid,
+         and every party acquires an interest in the calendar rather than in
+         the data.
+
+      The reason to write exactly these four: they admit exactly one rule. Any
+      counterparty who wants a different number has to say which of the four
+      they are giving up.
+    check: llm
+    rubric: |
+      Must contain all four requirements, each stated correctly, each with a
+      consequence of dropping it. Wording is free; the consequences must be
+      specific rather than "it would be unfair."
+      Four correct requirements with at least three specific consequences =
+      pass. All four consequences plus the uniqueness observation = full credit.
+      Stating efficiency as a fairness guarantee = fail on that item,
+      diagnosing V5-M2.
+      Omitting the null player requirement = fail regardless of the rest; it is
+      the one that closes the cheapest attack, and a schedule without it is
+      gameable on day one.
+      Describing the four as the definition of fairness rather than as terms
+      the parties adopt = pass on content, flag V5-M3 for the closing sections.
+    difficulty: core
+
+  - id: v5-q5
+    concept: d-shapley-axioms
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      A counterparty's counsel asks why the agreement adopts these four
+      properties and not some other set. What is the correct answer?
+    check: choice
+    options:
+      - text: "They are a choice this contract makes. Their merit is that they are legible enough to read, agree to, and be bound by - and alternatives exist that drop one (Banzhaf drops efficiency for noise robustness) or add one (fragmentation-invariance, to defeat shell entities)."
+        correct: true
+        explain: "Correct, and it is a stronger negotiating position than the alternative. Presenting the four as terms the parties adopt invites the counterparty into the design; presenting them as fact invites the first person who asks 'why not guaranteed minimums' to take the room."
+      - text: "They are the mathematical definition of fairness, so any scheme producing a different number is incorrect."
+        misconception: V5-M3
+        explain: "Attractive because the uniqueness theorem is real and strong - four sentences forcing one function feels like discovery. But serious alternatives drop and add axioms on purpose: the Banzhaf value trades efficiency for robustness to training noise, and the fix for the shell-company attack requires a fifth requirement the four do not contain and cannot accommodate without weakening one of them."
+      - text: "Because efficiency guarantees nobody is shortchanged, and the other three are technical refinements on top of it."
+        misconception: V5-M2
+        explain: "Efficiency guarantees only that the pool is fully distributed. A split of 100/0/0 satisfies it. Every fairness claim in the set comes from the other three, so this answer inverts which axiom is doing the work - and it will fall apart the moment counsel constructs exactly that 100/0/0 counterexample, which takes them about ten seconds."
+      - text: "Because these are the four that remain tractable at source granularity; at document granularity a different and weaker set has to be used."
+        misconception: D7
+        explain: "The axioms have nothing to do with granularity - they are properties of an allocation over whatever the players are, and they hold identically for 12 sources or a million documents. What changes with granularity is the COST of computing the rule, which is 2^n and collapses when the players are sources. Conflating the fairness argument with the feasibility argument gives away the strongest part of the position."
+    difficulty: core
+
+  - id: v5-q6
+    concept: d-semivalue-family
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      You have 16 tagged sources. You plan an exact enumeration - every
+      coalition trained, three seeds each, averaged before any allocation
+      arithmetic. One training run takes 45 seconds on one H100.
+
+      How many GPU-hours is the sweep? Give one number to one decimal place.
+    answer: 2457.6
+    check: numeric(1.0)
+    difficulty: core
+
+  - id: v5-q7
+    concept: d-semivalue-family
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A reviewer writes: "This method averages over n! permutations. At 12
+      sources that is 479 million evaluations. The approach is infeasible and
+      the paper should say so."
+
+      Answer the reviewer. Give the count that is actually incurred, the
+      structural reason the permutation count does not become a cost, and the
+      version of their objection that IS correct along with why it does not
+      apply here.
+    answer: |
+      The incurred count is 2^12 = 4,096 trained models, not 479 million
+      evaluations.
+
+      The structural reason: a source's marginal contribution depends only on
+      WHICH sources precede it, never on the order they arrived in. The orders
+      "B, C, A" and "C, B, A" both hand A the quantity v(A,B,C) - v(B,C),
+      because A walks into a room containing exactly {B,C} in both. Every term
+      in the formula is a difference of two entries in a table with 2^n rows.
+      Train each coalition once, cache it, and all n! orders are answered by
+      lookup. At roughly a minute per run for a 20M-parameter model on 200M
+      tokens, 4,096 runs is about 68 GPU-hours, a few hundred dollars as of
+      mid-2026.
+
+      The version of the objection that is correct concerns granularity, not
+      permutations. At per-DOCUMENT granularity n is in the millions, 2^n is
+      beyond astronomical, and no caching, sampling, or hardware budget
+      rescues it. That critique stands and has never been answered. It does not
+      apply here because the unit of attribution is chosen to match the unit of
+      payment: a royalty system pays a publisher, a catalogue, or a feed - a
+      legal entity with a bank account - and there is no cheque made out to a
+      document. Group-level valuation with groups as players has been in the
+      literature since the original 2019 paper. The real cliff is the doubling:
+      cost is 2^n, which is a weekend at 12 sources, a week at 15, and a
+      research grant at 20.
+    check: llm
+    rubric: |
+      Must contain: (1) 2^n = 4,096 rather than n!, (2) the caching reason -
+      marginal contribution depends on the predecessor SET, so orders share
+      coalitions, (3) the granularity version of the objection acknowledged as
+      correct, and the unit-of-payment argument for why source granularity is
+      the right choice.
+      (1) and (2) = pass. All three = full credit.
+      An answer that only asserts "it is 2^n" without the predecessor-set
+      reason = partial; the assertion does not survive a follow-up question.
+      An answer conceding that the method is infeasible, or proposing sampling
+      as the answer at 12 sources = fail, diagnosing V5-M1. Sampling at 12
+      sources trades an exact answer for an approximate one at no saving worth
+      having, and it hands a critic something to attack that need not exist.
+      An answer that dismisses the granularity critique rather than granting it
+      = fail; it is correct where it was made, and granting it is what makes the
+      source-level argument credible.
+    difficulty: core
+
+  - id: v5-q8
+    concept: d-semivalue-family
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      At 30 sources you switch from exact Shapley to Banzhaf values estimated
+      by maximum sample reuse. The 30 shares sum to 1.08 times the pool. What
+      is going on?
+    check: choice
+    options:
+      - text: "Expected. Banzhaf weights every coalition equally rather than weighting cardinality classes equally, and constant weights do not make marginal contributions telescope. It is not efficient. Renormalize, and disclose in the schedule that you did."
+        correct: true
+        explain: "Correct. Efficiency is the one axiom Banzhaf gives up, deliberately, in exchange for equal weights that provably maximize robustness to training noise - no single unlucky run on an extreme coalition can dominate a share the way it can under Shapley's uneven weights. The gap is the defining trade, not an error."
+      - text: "A bug. Any correct valuation sums to the pool by construction, so the estimator or the caching has an indexing error."
+        misconception: V5-M2
+        explain: "This treats efficiency as a property valuations have rather than as an axiom one particular rule satisfies. Efficiency holds identically for the Shapley value and fails by design for Banzhaf, so the sum check that correctly catches indexing bugs in an exact Shapley computation is not applicable here. Check the sum against a small exact case instead."
+      - text: "Approximation error. Banzhaf is an approximation of the Shapley value, and 8% is the sampling error; more samples will drive the sum to the pool."
+        misconception: V5-M3
+        explain: "Banzhaf is a different rule, not an approximation of Shapley - they are two members of the semivalue family with different weight profiles. Its efficiency gap does not shrink with any sampling budget, because it is a property of the exact Banzhaf value. Sampling error affects each share; it does not cause the gap."
+      - text: "Accumulated seed noise. Thousands of noisy coalition values summed with positive weights biased the total upward by 8%."
+        misconception: D16
+        explain: "Seed noise is real and this is not it. Seed noise is zero-mean, so it inflates the variance of each share without biasing the sum in a consistent direction, and it would not produce a stable 8% surplus that persists across reruns. Diagnosing an axiom violation as noise is how a real property of the estimator gets hidden inside an error bar."
+    difficulty: warmup
+
+  - id: v5-q9
+    concept: d-split-gaming
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A two-source corpus:
+
+        none 0 | P 60 | Q 40 | P+Q 80
+
+      Honestly split, P receives 50 and Q receives 30.
+
+      P now registers as two subsidiaries P1 and P2, both licensing the
+      identical catalogue. The value table for the three-player game is read
+      off the two-player one, since duplicate shells add no content: any
+      coalition containing at least one shell has the value it had with P in
+      it.
+
+      Compute P's total take across both shells. Weight each shell's four
+      coalition-form terms by 1/3, 1/6, 1/6, 1/3.
+
+      Give one number to two decimal places.
+    answer: 53.33
+    check: numeric(0.05)
+    difficulty: core
+
+  - id: v5-q10
+    concept: d-split-gaming
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A rightsholder inflates its payout by registering as several entities
+      licensing the identical catalogue, and every share is computed correctly
+      throughout.
+
+      Explain why none of the four requirements prevents this. Then give the
+      two layers of defence, say which of the four requirements the
+      mathematical layer has to weaken, and identify which other participants
+      pay for the attack and why.
+    answer: |
+      Why the axioms are silent: all four are statements about one game with
+      one fixed set of players. Symmetry compares two sources within a game.
+      The null player condition tests a source within a game. Efficiency and
+      additivity likewise. Registering as several entities does not violate any
+      of them - it replaces the game with a different game on a different
+      player set, and nothing in the axiom system relates values across games.
+      The rule is not being broken; it is being applied correctly to a
+      different room. That silence is structural, so no amount of care in
+      applying the rule fixes it.
+
+      Layer one, in the math: add a fifth requirement, that a group's total
+      share does not depend on how the group is partitioned into registered
+      entities. Faithful Group Shapley constructs a value with provable
+      immunity to fragmentation. Since the original four already forced a
+      unique answer, adding a fifth means abandoning one of them - additivity
+      is the one that weakens, because the fragmentation-invariant value can no
+      longer be a linear function of the value function across differing player
+      sets.
+
+      Layer two, and the one to ship: an identity constraint outside the math.
+      Fingerprint every registrant's corpus, estimate pairwise content overlap,
+      and merge any pair above a threshold into a single player before the game
+      is played. Identical shells have overlap 1 and merge unconditionally.
+      This is the corpus pipeline's duplicate-cluster detection pointed at
+      registrants instead of documents, and the threshold belongs in the
+      contract schedule rather than in a config file, because it moves money
+      between named parties.
+
+      Who pays: the pool is fixed and efficiency holds throughout, so the
+      attacker's gain is a transfer from the other sources - and it comes
+      overwhelmingly from the attacker's closest substitutes, the sources whose
+      content most overlaps its own. Their position was already weak because
+      their material could be had elsewhere; adding a second copy of the
+      attacker makes them more replaceable still, and the rule charges them for
+      it. A complementary source that overlaps nobody barely moves. So the
+      attack concentrates its damage on small rightsholders crowded into the
+      same subject as a large one.
+    check: llm
+    rubric: |
+      Must contain: (1) the axioms are statements about a fixed player set and
+      say nothing across games, so splitting is not a violation, (2) a
+      fingerprint-and-merge identity layer as the practical defence, (3) the
+      cost falls on the attacker's substitutes, with the replaceability reason.
+      (1) and (2) = pass. All three = full credit. Naming additivity as the
+      axiom the fragmentation-invariant construction weakens is a bonus, not a
+      requirement.
+      An answer proposing to detect the attack by auditing corporate ownership
+      records = partial. It is a real control and it fails against a determined
+      counterparty and across jurisdictions, whereas content fingerprinting
+      tests the thing that actually matters and works on the data you already
+      have.
+      An answer claiming the symmetry axiom catches it, because the shells are
+      symmetric to each other = fail. Symmetry is satisfied - the shells DO get
+      equal shares, which is exactly the problem.
+      An answer asserting the four axioms make the rule attack-proof = fail,
+      diagnosing V5-M3.
+    difficulty: stretch
+
+  - id: v5-q11
+    concept: d-semivalue-family
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Your per-run seed noise is 5 units of held-out bits per byte
+      (thousandths). You average 4 seeds per coalition. In a three-source game
+      a share has standard deviation $0.745\,\sigma$, where
+      $\sigma = \sigma_{\text{run}}/\sqrt{k}$.
+
+      Compute the standard deviation of one share. Compare it against the
+      standard deviation of a single leave-one-out difference from the same
+      table, which is $1.414\,\sigma$. Then say what that comparison implies
+      about where to spend an additional training run, given that all eight
+      coalitions were enumerated exactly.
+    answer: |
+      Sigma per table entry is 5 / sqrt(4) = 2.5 units.
+
+      A share's standard deviation is 0.745 x 2.5 = 1.86 units.
+      A leave-one-out difference's is 1.414 x 2.5 = 3.54 units.
+
+      The share is about half as noisy as the leave-one-out number underneath
+      it. That is not a coincidence: the share is an average over arrival
+      orders, and averaging suppresses noise, so the combinatorics that look
+      like the expensive part of the method also buy precision back. The
+      leave-one-out number is a single difference of two noisy entries and gets
+      no such benefit.
+
+      Where the extra run goes: into a seed. With all eight coalitions
+      enumerated, the combinatorial approximation error is exactly zero -
+      nothing is being sampled or estimated - so every remaining unit of
+      uncertainty is seed noise, and seed noise falls as 1/sqrt(k) in every
+      term simultaneously. There is nothing else for the run to buy.
+    check: llm
+    rubric: |
+      Required: sigma = 2.5; share SD = 1.86 (accept 1.85-1.87); leave-one-out
+      SD = 3.54 (accept 3.53-3.55).
+      Must also state that the extra run buys a seed, BECAUSE full enumeration
+      has already driven the combinatorial error to zero.
+      All three numbers plus the correct spending conclusion = pass. Noting that
+      averaging over orders is what suppresses the noise upgrades to full
+      credit.
+      Dividing by k rather than sqrt(k) = fail; that error makes every error bar
+      look half its true width and every result more significant than it is.
+      An answer that spends the run on more coalitions = fail; there are no more
+      coalitions, all eight were enumerated, and the learner has not connected
+      exact enumeration to zero approximation error.
+    difficulty: core
+
+  - id: v5-q12
+    concept: d-split-gaming
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      Your completed sweep gives a spread of shares across sources of 2.6 units
+      and a per-share standard deviation of 2.0 units, so the measured
+      signal-to-noise ratio is 1.3 against a customary bar of 2. What is the
+      right next move?
+    check: choice
+    options:
+      - text: "Report the measured ratio, state that at this corpus and scale the welfare-optimal contract is a flat fee, and price the seed count that would reach 2. Either side of the threshold is a publishable result."
+        correct: true
+        explain: "Correct. The threshold result says that below a signal-to-noise bar the optimal contract collapses to a flat fee, and that no estimator improvement crosses it - only more signal does. Leading with the measured ratio pre-empts the first question an informed counterparty asks, and quoting the seed count and its GPU-hour cost converts a negative result into a priced decision."
+      - text: "Switch to a better attribution estimator; the noise is a methods problem and the field is improving quickly."
+        misconception: D20
+        explain: "This is the pitch-fatal one. The threshold is about how much signal exists in the measurement, not about how cleverly it is processed, so no estimator crosses it. The industry's convergence on flat fees is consistent with the bar not being cleared rather than with laziness, and the person across the table may already know the result exists."
+      - text: "Train a larger model for longer; contribution estimates stabilize once the model is properly converged."
+        misconception: D16
+        explain: "Contribution is a random variable at every scale. Seed variation comes from initialization and data order, both intrinsic, and a source's measured marginal contribution can swing by more than its own magnitude across seeds regardless of model size. The lever is repetition, not scale - and moving to a larger model makes repetition unaffordable, which is worse on both axes."
+      - text: "Drop the split and report leave-one-out instead; it is measured directly from two runs and does not accumulate noise across thousands of coalitions."
+        misconception: V5-M4
+        explain: "Backwards on both counts. A leave-one-out difference is noisier than a share computed from the same table - roughly twice as noisy at three sources - because it is a single difference of two noisy numbers with no averaging. And leave-one-out is not an allocation: its values do not sum to the pool. Retreating to it trades a noisy split for a noisier non-split."
+    difficulty: core
+
+  - id: v5-q13
+    concept: d-coop-game
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      Make the strongest available argument that this entire method is
+      arbitrary, using the unit's own arithmetic as evidence rather than
+      appealing to authority. Then give the honest response, and be explicit
+      about what the response does and does not fix.
+    answer: |
+      The argument: everything here is measured relative to a held-out set, and
+      the additivity axiom shows exactly how much that choice matters. Adding a
+      second held-out domain to the running example - clinical text, on which
+      only source A carries anything - moved A's share from 35 to 55 and left
+      the others unchanged. That is the axiom working correctly, and it is also
+      a lever: whoever picks the held-out set picks the split, and the pick is
+      defensible under many different choices. The critique that
+      semivalue-based valuation is "arbitrary and gameable" because small
+      defensible changes to the utility move valuations substantially is not a
+      vague worry - it is a direct consequence of linearity, which is one of
+      the four axioms the method is sold on.
+
+      What makes the argument sharper: there is no axiom about choosing the
+      value function and there cannot be one, because the choice is a business
+      decision wearing a technical costume - what is this model for, therefore
+      what should it be good at. The rule is auditable given a value function.
+      The value function is not.
+
+      The honest response is procedural, not mathematical. Publish the held-out
+      set's construction, its decontamination procedure and its size, and commit
+      to all of it before any run, exactly as a pre-registration commits a test
+      before the data is seen. Additivity then becomes an asset rather than only
+      a liability: because shares over a combined held-out set are exactly the
+      sum of shares over its parts, you can publish a per-domain decomposition
+      instead of one contested aggregate, and let a counterparty see how the
+      answer moves with the domain mix.
+
+      What that does not fix: someone still chose the domains, and the weights
+      implied by their relative sizes are still a choice. The regress terminates
+      in disclosure, not in objectivity. A second limit belongs in the same
+      breath: every number here comes from actually retraining models, so the
+      claim is bounded to the scale where the counterfactual is computable, and
+      nothing in this unit establishes that a frontier lab's corpus can be split
+      this way.
+    check: llm
+    rubric: |
+      Must contain: (1) the value function is an unconstrained choice and it
+      moves the answer substantially, ideally citing the additivity worked
+      example where A went from 35 to 55, (2) the defence is pre-commitment and
+      disclosure rather than a mathematical fix, (3) an explicit statement of
+      what disclosure does not fix - the choice remains a choice.
+      (1) and (2) = pass. All three = full credit; the per-domain decomposition
+      as a use of additivity is a bonus.
+      An answer that defends the method by asserting the axioms make it
+      objective = fail, diagnosing V5-M3, and it is the answer most likely to
+      lose a room.
+      An answer that concedes the method is worthless = fail in the other
+      direction. The output is still a normalized allocation with an argument a
+      counterparty can check without trusting the code, which nothing else in
+      the book produces, and abandoning that over a disclosure problem is an
+      overcorrection.
+    difficulty: stretch

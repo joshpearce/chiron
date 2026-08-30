@@ -1,0 +1,38 @@
+# Unit-local misconception additions for v5 (fair-split).
+# Same schema as corpus-v2/misconception-bank.yaml. IDs are namespaced V5-M*
+# so they never collide with the global D* bank or with vol-1's M* namespace.
+# Referenced by distractors in v5/questions.yaml and by refutation blocks in
+# v5/canon.md.
+
+misconceptions:
+  - id: V5-M1
+    name: cost-is-the-permutation-count
+    wrong_model: "The rule averages over all n! arrival orders, so computing it costs n! training runs and it becomes infeasible past about eight sources."
+    why_appealing: "The permutation form is the one that makes the rule comprehensible, so it is the form everybody carries, and it has n! written directly into it. The factorial blow-up is real and immediate: 12! is 479 million. The related critique about per-document valuation is also correct, which lends the wrong version borrowed credibility."
+    failing_prediction: "If cost were the order count, the orders 'B, C, A' and 'C, B, A' would need different training runs. They do not: A's marginal contribution is v(ABC) - v(BC) = 10 in both, because A walked into a room containing exactly {B,C} both times. Every quantity in the formula is a difference of two entries in a table with 2^n rows, and the marginal contribution depends only on the SET that arrived first, never the order it arrived in."
+    correction: "Train each coalition once and cache it: 2^n runs, and all n! orders are answered by lookup. At 12 sources that is 4,096 runs against 479,001,600 orders - about 68 GPU-hours and a few hundred dollars as of mid-2026. Cost doubles per source added, so the real cliff is at n around 15, and it is a cliff about coalitions, not orders."
+    units: [v5]
+
+  - id: V5-M2
+    name: efficiency-means-fair
+    wrong_model: "The efficiency axiom is the one that makes the split fair - an efficient allocation is a well-distributed one."
+    why_appealing: "The word carries that meaning in ordinary use, and 'efficiency' sitting at the top of a list of fairness axioms reads like the axiom that delivers fairness. Efficiency also does real and large work: it is what turns a set of scores into an allocation, which no gradient-based attribution method produces."
+    failing_prediction: "If efficiency implied fairness, no efficient split could be obviously unfair. Allocate the entire pool to one source and nothing to the others: the shares sum to v(N), efficiency is satisfied exactly, and the split is indefensible. Nothing in the requirement objects."
+    correction: "Efficiency is an accounting constraint - the pool is fully distributed and not overdrawn - and carries no fairness content at all. Every fairness claim comes from symmetry, the null player condition, and additivity. Dropping efficiency deliberately, as the Banzhaf value does to buy noise robustness, costs you the accounting and not the fairness; you renormalize by hand and disclose that you did."
+    units: [v5]
+
+  - id: V5-M3
+    name: axioms-are-natural-law
+    wrong_model: "The four axioms are what fairness IS, so the rule they force is the fair split and any scheme doing something else is wrong."
+    why_appealing: "They are called axioms, they appear in a theorem, and the uniqueness result really is strong - four sentences a counterparty would sign admit exactly one function. When statements you already agree with force a single answer, it feels like discovery rather than choice. The axioms are also unusually easy to defend, which is precisely why they are the right ones to open a negotiation with."
+    failing_prediction: "If the four were forced, no serious alternative would drop one. The Banzhaf value drops efficiency on purpose, because constant weights maximize robustness to training noise, and practitioners renormalize and say so. In the other direction, the fix for the shell-company attack ADDS a fifth requirement - invariance to how a group is partitioned into registered entities - which none of the four constrains, and which cannot be added without weakening one of them. The set is neither minimal nor closed."
+    correction: "The axioms are a choice a contract adopts, not a fact about the world. Their power is legibility: a counterparty reads four sentences, agrees, and is bound by the number that follows. That is a mechanism-design property. Present it as 'here are the four properties your split will have, and here is what you trade for a different set' - never as 'this is the fair number', which loses the room to the first person who asks why efficiency and not guaranteed minimums."
+    units: [v5, v9]
+
+  - id: V5-M4
+    name: loo-is-the-allocation
+    wrong_model: "Leave-one-out is the contribution, so it is also what a source should be paid: retrain without source i, and the loss in model quality is that source's share."
+    why_appealing: "It is the counterfactual, it has the cleanest possible definition, and an entire prior unit was spent computing it. It is also the ground truth every cheaper attribution method in this book is scored against, so it carries earned authority. The step from 'this is what the source contributed' to 'this is what the source is owed' feels like no step at all."
+    failing_prediction: "An allocation rule's outputs must add up to the thing being allocated. Leave-one-out values do not: on the running three-source table they are 10, 10 and 30, summing to 50 against a pool of 100, and the standard renormalization doubles a measured 30 into a paid 60 for reasons that appear nowhere in the data. Push it further with two sources holding byte-identical corpora: each has leave-one-out 0, each is individually sufficient by inspection, the sum is 0, and the renormalization divides by zero. The rule does not degrade; it stops existing."
+    correction: "Leave-one-out measures replaceability, which is the right quantity for a renewal decision and the wrong one for an allocation. In any corpus with redundancy, content supplied by two sources is credited to neither, so the sum is systematically short of the whole. Keep leave-one-out as ground truth and as a decision input; require of an allocation rule that its outputs sum to the pool by construction, which is the first of the four requirements and the one leave-one-out fails."
+    units: [v5, v8]
