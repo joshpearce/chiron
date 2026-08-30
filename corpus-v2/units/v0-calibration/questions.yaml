@@ -1,0 +1,224 @@
+# v0 is the calibration unit: one progressive series, easy to hard, across
+# the probability floor volume 2 stands on plus retention spot-checks on
+# volume 1. Delivered complete and in order; the gate always passes - the
+# point is the measurement. No pretest; the series is the unit.
+pretest: []
+check:
+- id: v0-q1
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: true
+  prompt: |
+    A fair six-sided die. What is the expected value of one roll?
+  answer: '3.5'
+  check: numeric(0.001)
+  difficulty: warmup
+- id: v0-q2
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: true
+  prompt: |
+    Two fair coin flips. What is the probability both come up heads?
+    Answer as a decimal.
+  answer: '0.25'
+  check: numeric(0.001)
+  difficulty: warmup
+- id: v0-q3
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    $\log_2(8) = $ ?
+  answer: '3'
+  check: numeric(0.001)
+  difficulty: warmup
+- id: v0-q4
+  concept: d-vol1-floor
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    A BPE tokenizer splits `strawberry` into `str`, `aw`, `berry`.
+    How many tokens is that?
+  answer: '3'
+  check: numeric(0.001)
+  difficulty: warmup
+- id: v0-q5
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: true
+  prompt: |
+    How many distinct pairs can you choose from 4 items, order ignored?
+  answer: '6'
+  check: numeric(0.001)
+  difficulty: core
+- id: v0-q6
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: true
+  prompt: |
+    A random quantity is 0 with probability 0.5, equals 2 with
+    probability 0.25, and equals 4 with probability 0.25. What is its
+    expected value?
+  answer: '1.5'
+  check: numeric(0.001)
+  difficulty: core
+- id: v0-q7
+  concept: d-vol1-floor
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    A language model assigns probability 1.0 to the token that actually
+    came next. What is that position's contribution to the cross-entropy
+    loss?
+  answer: '0'
+  check: numeric(0.001)
+  difficulty: core
+- id: v0-q8
+  concept: d-vol1-floor
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    A weight matrix $W$ has shape $64 \times 128$. What is the shape of
+    the gradient of the (scalar) loss with respect to $W$?
+    Answer in the exact form `rows x cols`.
+  answer: 64 x 128
+  check: exact
+  difficulty: core
+- id: v0-q9
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: true
+  prompt: |
+    Measurements have mean 100 and standard deviation 10. What is the
+    z-score of the value 85?
+  answer: '-1.5'
+  check: numeric(0.001)
+  difficulty: core
+- id: v0-q10
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: true
+  prompt: |
+    100 fair coin flips. Give the expected number of heads AND the
+    standard deviation of that count, comma-separated, like `40, 3`.
+    (Standard deviation of a fair-coin count: $\sqrt{n \cdot 0.5 \cdot 0.5}$.)
+  answer: '50, 5'
+  check: exact
+  difficulty: core
+- id: v0-q11
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: true
+  prompt: |
+    You run 1,000 independent significance tests on pure noise, using a
+    p < 0.01 threshold. About how many "significant" results do you
+    expect by chance alone?
+  answer: '10'
+  check: numeric(0.5)
+  difficulty: core
+- id: v0-q12
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: true
+  prompt: |
+    In two or three sentences: a detection method reports z = -5 relative
+    to a null distribution. What is the null distribution here, and what
+    does the z = -5 roughly claim?
+  answer: |
+    The null distribution is the spread of the test statistic in the world
+    where the effect is absent (here: the model was NOT trained on the
+    marked data) - what values you would see from chance alone. z = -5
+    says the observed statistic sits five standard deviations below the
+    null's mean, i.e. an outcome so unlikely under chance (p on the order
+    of 1 in a few million, one-sided) that the null is rejected.
+  rubric: |
+    Must contain: (1) the null = distribution of the statistic when the
+    effect/membership is absent, chance alone; (2) z = -5 means five
+    standard deviations from the null mean, extremely unlikely under the
+    null (any reasonable magnitude language passes; the exact p-value is
+    not required).
+    Pass = both. Partial = (2) only, or (1) phrased as "the baseline"
+    with no absence-of-effect content.
+    Fail and diagnose: saying z = -5 is "the probability the data was
+    used" or "95%+ confidence the hypothesis is true" = V0-M1, the
+    p-value-as-truth-probability confusion - deliver v6 slowly.
+  check: llm
+  difficulty: stretch
+- id: v0-q13
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: true
+  prompt: |
+    Two training runs of the same model differ only in random seed and
+    score 3.41 and 3.44 on the same held-out metric. Across many seeds,
+    the seed-to-seed standard deviation of this metric is 0.03. A
+    colleague says the first configuration is better. In one or two
+    sentences: is that established, and why?
+  answer: |
+    Not established. The observed gap (0.03) is the same size as one
+    standard deviation of pure seed noise, so a difference this large
+    happens routinely between identical configurations; you would need
+    more seeds per configuration (and a gap comfortably larger than the
+    noise) before calling either one better.
+  rubric: |
+    Must contain: (1) no - not established; (2) the reason: the gap is
+    within (about the same size as) seed noise, so chance alone produces
+    it. Mentioning a remedy (more seeds, averaging) is a bonus, not
+    required.
+    Fail: any answer that accepts the difference as real, or that argues
+    from the direction of the gap rather than its size vs noise.
+  check: llm
+  difficulty: stretch
+- id: v0-q14
+  concept: d-vol1-floor
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    Gradient descent updates a weight $w$ using the gradient
+    $\partial L / \partial w = -2$. With learning rate 0.1, does $w$
+    increase or decrease, and by how much? Answer like `increases, 0.2`.
+  answer: increases, 0.2
+  check: exact
+  difficulty: stretch
+
+# Self-placement, asked before the series. The answer selects a
+# calibration_sets entry; it is never graded for correctness.
+screener:
+  id: v0-s1
+  concept: d-prob-basics
+  kind: constructed
+  check: screener
+  difficulty: warmup
+  prompt: >
+    Before the questions: how would you rate your current comfort with
+    probability and statistics - expectation, variance, z-scores,
+    p-values, combinations?
+  options:
+    - text: Absolute novice
+    - text: Seen the words, could not compute
+    - text: Could work through it slowly
+    - text: Comfortable
+    - text: Expert - I could teach it
+
+# Pre-computed series per self-rating: novices skip the hardest tail,
+# experts skip the warmups. Each list is delivered complete, in order.
+calibration_sets:
+  1: [v0-q1, v0-q2, v0-q3, v0-q4, v0-q5, v0-q6, v0-q7, v0-q9]
+  2: [v0-q1, v0-q2, v0-q3, v0-q4, v0-q5, v0-q6, v0-q7, v0-q8, v0-q9, v0-q10]
+  3: [v0-q1, v0-q2, v0-q4, v0-q5, v0-q6, v0-q7, v0-q8, v0-q9, v0-q10, v0-q11, v0-q12, v0-q13]
+  4: [v0-q4, v0-q5, v0-q6, v0-q7, v0-q8, v0-q9, v0-q10, v0-q11, v0-q12, v0-q13, v0-q14]
+  5: [v0-q6, v0-q8, v0-q9, v0-q10, v0-q11, v0-q12, v0-q13, v0-q14]

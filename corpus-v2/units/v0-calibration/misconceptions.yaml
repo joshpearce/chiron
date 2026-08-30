@@ -1,0 +1,19 @@
+# Unit-local misconceptions surfaced by the v0 calibration series.
+# Same schema as the global bank (corpus-v2/misconception-bank.yaml).
+
+misconceptions:
+  - id: V0-M1
+    name: p-value-is-truth-probability
+    wrong_model: "A p-value (or z-score) is the probability that the hypothesis is true (or false)."
+    why_appealing: "It is the number attached to the claim, and 'p < 0.05' gets spoken as '95% sure'."
+    failing_prediction: "If p were the probability the hypothesis is true, it could not be computed without a prior - yet the test never asked for one. p is computed entirely from the null: it is the probability of data this extreme GIVEN the effect is absent."
+    correction: "A p-value conditions on the null, not on the world: 'if nothing were there, chance would produce this less than p of the time.' Small p licenses rejecting the null - it never measures the probability that your favored explanation is right."
+    units: [v0, v6, v7]
+
+  - id: V0-M2
+    name: expectation-is-typical-value
+    wrong_model: "The expected value is the most likely (or a possible) outcome."
+    why_appealing: "'Expected' in English means 'what you expect to happen'."
+    failing_prediction: "The expected roll of a fair die is 3.5 - an outcome the die cannot produce. A quantity that is 0 half the time and large occasionally has an expectation nothing like its typical value; a handful of pathological training examples can dominate an average loss the same way."
+    correction: "Expectation is the probability-weighted mean, a center of mass - not a mode, not a typical draw. Every training objective in this book is such an average, which is exactly why rare heavy items can dominate it."
+    units: [v0, v3, v4]
