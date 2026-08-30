@@ -69,6 +69,7 @@ rubric: |
   An answer that includes dataset quality, architecture choice, or model
   capability as a cost input = fail, and diagnose V3-M1. That is the belief
   this section exists to break.
+check: llm
 ```
 
 Here are the invoices. As of mid-2026, an 8xH100 node rents for $12-16/hour on
@@ -338,6 +339,7 @@ rubric: |
   reach the same loss = fail, and diagnose V3-M1. That may be true of the
   QUALITY you get, but the question fixed the token count; the budget is
   determined by the integers you chose, not by the outcome you wanted.
+check: llm
 ```
 
 ```beat
@@ -521,6 +523,7 @@ rubric: |
   substitution will produce a number that cannot survive review.
   An answer that rejects branching entirely as invalid = partial. It is a
   legitimate screening tool and refusing it costs real money.
+check: llm
 ```
 
 ## What repeating data actually costs
@@ -643,6 +646,7 @@ rubric: |
   An answer that computes the blanks correctly but claims one epoch is
   methodologically safer or more honest = fail; it is neither, it is just a
   four-times-smaller experiment.
+check: llm
 ```
 
 ## The laptop and the node
@@ -778,6 +782,7 @@ rubric: |
   trustworthy attribution = fail. One model of any quality gives zero
   counterfactual information; the ground truth is a difference across runs and
   does not exist below 21 of them.
+check: llm
 ```
 
 ## Evaluation without self-deception
@@ -874,6 +879,7 @@ rubric: |
   An answer that divides by ln 2 in the wrong direction (multiplying instead)
   = fail; check the direction by sanity: bits are SMALLER units than nats, so
   a value in bits is LARGER than the same value in nats.
+check: llm
 ```
 
 **Now the harder half: is the difference real?**
@@ -922,6 +928,8 @@ Note what that gives at $n = 2$, the ablation-methodology standard: $\sigma
 difference is exactly one single-run standard deviation.** Two seeds does not
 buy you precision; it buys you the ability to *estimate* $\sigma$ and to know
 that you have not bought precision.
+
+<!-- fade: v3-seed-noise-check -->
 
 **Worked.** You measure seed noise for your 30M-parameter configuration and find
 $\sigma = 0.0040$ bpb. You then run two conditions, two seeds each: the full
@@ -990,6 +998,7 @@ rubric: |
   An answer treating step 4's z = 2.4 as "proof" rather than as clearing a
   pre-set bar = pass on the arithmetic, but flag D19 for v6 and v7; a z-score
   is evidence against a null, not a proof.
+check: llm
 ```
 
 **The ablation discipline, in four rules.** These are lifted directly from the
@@ -1114,6 +1123,7 @@ rubric: |
   reduce noise = fail, diagnosing D16. Noise is not a defect that goes away
   with a better run; contribution is a random variable at every scale, and the
   remedy is seeds, not size.
+check: llm
 ```
 
 ## What you can now do

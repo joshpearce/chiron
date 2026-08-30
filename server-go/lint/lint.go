@@ -25,7 +25,7 @@ import (
 var (
 	numericSpec   = regexp.MustCompile(`^numeric\(([\d.eE+-]+)\)$`)
 	refutesMarker = regexp.MustCompile(`<!--\s*refutes:\s*([A-Za-z0-9_-]+)\s*-->`)
-	machineAnswer = regexp.MustCompile(`^(?:[-+0-9A-Fa-f.eE/×x,;\[\]() ]+|[A-Za-z0-9 _.\-/|]{1,24})$`)
+	machineAnswer = regexp.MustCompile(`^(?:[-+0-9A-Fa-f.eE/×x,;|\[\]() ]+|[A-Za-z0-9 _.\-/|]{1,24})$`)
 )
 
 type Report struct {

@@ -58,6 +58,7 @@ func TestToleranceCheckMirrorsTheGrader(t *testing.T) {
 func TestMachineAnswerAcceptsRealAnswers(t *testing.T) {
 	for _, ok := range []string{
 		"249", "-4", "[7, -4]", "4 x 7", "w|i|d|est_", "0xB2,0x00,0x2F",
+		"4,7,6|2,7,10|1|2|4", "0,0|9,1467|10",
 		"4, 1; 11, 6", "1.5e-3",
 	} {
 		if !isMachineAnswer(ok) {

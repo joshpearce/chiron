@@ -144,27 +144,26 @@ geometry, the footer is classified as furniture and dropped, and math is
 emitted as markup rather than as glyph soup:
 
 ```
-# Sparse Retrieval for Long-Context Summarization
+TITLE     Sparse Retrieval for Long-Context Summarization
+AUTHORS   Ana Ruiz (Institute for Text Systems)
+          Wei Chen (Northlake University)
 
-Ana Ruiz (Institute for Text Systems), Wei Chen (Northlake University)
-
-## Abstract
-
+SECTION   Abstract
 We present a retrieval scheme that selects blocks by a scoring function
 computed once per document, avoiding the quadratic cost of re-ranking at
 query time. [...]
 
-## 3 Model architecture
-
+SECTION   3 Model architecture
 [...] where $q_i$ is the query vector for block $i$ and
 $K \in \mathbb{R}^{n \times d}$ is the key matrix. We set
 $\epsilon = 10^{-6}$ to avoid division by zero. Table 2 reports ablations
 over $\epsilon$ and the block size.
 
-### 3.2 Training
-
+SECTION   3.2 Training
 All models were fine-tuned for 3 epochs on 8 A100s. The learning rate was
 2e-5 with linear decay and a significant warmup.
+
+DROPPED   page-footer: "Proceedings of the 41st Conference, page 4"
 ```
 
 Same page. Different training data. The gap between those two blocks is the
