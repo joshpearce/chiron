@@ -1,0 +1,169 @@
+# Misconception bank for volume 2: data, attribution, and proof.
+# Same contract as vol 1: every MCQ distractor MUST cite one of these IDs.
+# IDs are D* to keep the namespace disjoint from vol-1's M*.
+#
+# The target learner is an expert engineer AND a would-be founder in this
+# space: several entries here are misconceptions he must not carry into a
+# pitch, because the person across the table may know better (D10, D12,
+# D13, D20).
+
+misconceptions:
+  - id: D1
+    name: citation-is-attribution
+    wrong_model: "When an AI cites a source, that source is where the answer came from."
+    why_appealing: "Citations look like provenance; every AI search product presents them that way."
+    failing_prediction: "If citations traced causation, two systems trained on disjoint corpora could not emit identical citations for the same answer - but RAG citation attributes to the CONTEXT WINDOW, chosen by a retriever seconds ago. Swap the retrieval index and the citations change while the model, and everything it learned, stays identical."
+    correction: "Citation is corroborative (this source supports the claim); attribution is contributive (this data caused the capability). Deployed commercial systems do the former. A compensation scheme built on citations pays for retrieval placement, not training contribution."
+    units: [v1, v9]
+
+  - id: D2
+    name: mia-can-prove-training
+    wrong_model: "A membership-inference attack can prove a model was trained on my data."
+    why_appealing: "Papers report AUC numbers that look like detector performance; 'the model's loss on my text is suspiciously low' feels like evidence."
+    failing_prediction: "A proof needs a false-positive rate, which needs the distribution of your test statistic under 'the model was NOT trained on my data' - and you cannot sample that null without retraining the model. Also: on properly matched benchmarks, classifiers that never query the model at all beat published attacks; the attacks were detecting the date, not membership."
+    correction: "Post-hoc MIA gives suggestive evidence at best, collapses under paraphrase fine-tuning, and per-sample decisions flip with the training seed. Sound alternatives: dataset inference over collections, and pre-inserted keyed canaries, where the null is constructible by design."
+    units: [v6, v7]
+
+  - id: D3
+    name: verbatim-is-the-test
+    wrong_model: "If the model can't reproduce my text verbatim, my data wasn't used (or didn't matter)."
+    why_appealing: "Verbatim regurgitation is the visible, screenshot-able failure; lawsuits lead with it."
+    failing_prediction: "A filter that perfectly blocks all verbatim n-gram emission is defeated by asking for the same content in a different style - the knowledge is intact, only the surface form changed. And influence measured at scale becomes MORE abstract: large models are shaped by documents sharing no n-grams with the outputs they influence."
+    correction: "Verbatim match is a measurement artifact and a lower bound. Most of what training data contributes is semantic and never resurfaces verbatim - which is exactly why attribution is hard and why lexical tools must be labeled as the corroborative baseline they are."
+    units: [v6, v9]
+
+  - id: D4
+    name: model-contains-copies
+    wrong_model: "Model weights contain copies of the training documents (or: contain none)."
+    why_appealing: "Both litigation postures push a clean story; engineers reach for 'it's a compressed archive' or 'it's just statistics.'"
+    failing_prediction: "Capacity is ~3.6 bits per parameter - far too small to store the corpus, so 'it's an archive' fails. But 'it stores nothing' also fails: some heavily duplicated books are extractable near-completely from open-weight models, prompted with a few words."
+    correction: "Memorization is real, bounded by capacity, concentrated on high-duplication and high-entropy content, and varies enormously by model and document. Both extreme positions are empirically wrong; the honest statement is a distribution, not a verdict."
+    units: [v6]
+
+  - id: D5
+    name: influence-equals-entailment
+    wrong_model: "The document that taught the model a fact is the document attribution methods will surface."
+    why_appealing: "'Which data is responsible' sounds like one question; you expect one answer."
+    failing_prediction: "At 8B-parameter scale with a full 160B-token corpus, plain BM25 lexical search beats gradient-influence methods at finding the document that CONTAINS a fact - because influence measures what moved the loss, not what entails the claim. The two rankings systematically disagree."
+    correction: "Attribution has two distinct targets: influence (changed the model) and entailment (contains the fact). A royalty system must pick one, defend the choice, and expect the cheap lexical method to win at the other."
+    units: [v8, v9]
+
+  - id: D6
+    name: attribution-works-at-scale
+    wrong_model: "Gradient-based attribution is basically solved; scaling it to frontier models is engineering."
+    why_appealing: "Big-lab papers run influence functions at 52B parameters; libraries ship 8B examples."
+    failing_prediction: "Measured against ground truth (actual retraining), the scalable methods perform no better than random guessing on a 2B model, while the method that does correlate (rho=0.97) costs 3-5 training runs PER QUERY and cannot scale. Correcting a single systematic error (assuming SGD when models train with AdamW) changes published results by 10-300%."
+    correction: "The central dilemma: methods that scale don't demonstrably correlate with ground truth; the method that correlates doesn't scale. Any honest attribution claim at scale must carry its own measured correlation against counterfactual truth - which is only affordable at small scale."
+    units: [v4, v8]
+
+  - id: D7
+    name: valuation-needs-every-document
+    wrong_model: "Data valuation means valuing every document, so Shapley is hopeless (2^n over millions)."
+    why_appealing: "The famous infeasibility critique is real - at per-datum granularity."
+    failing_prediction: "The unit a royalty system pays is the SOURCE (publisher, catalogue, feed), not the document. At n=12 sources, all 4,096 coalitions are exactly enumerable for a few hundred dollars of small-model training - no approximation for a critic to attack. The cliff is at n~15, not n~10^6."
+    correction: "Choose the attribution unit to match the payment unit and the combinatorics collapse. Group-level Shapley has been in the literature since the original 2019 paper; per-document valuation is the wrong problem."
+    units: [v5]
+
+  - id: D8
+    name: more-data-beats-better-data
+    wrong_model: "Model quality is about corpus size; more tokens always help."
+    why_appealing: "Scaling-law headlines are about size; 15T > 1.3T."
+    failing_prediction: "A 1.3T-token quality-filtered corpus beats its own 15T-token superset on knowledge benchmarks; the single biggest factor in the leading data benchmark is a filtering classifier, worth more than any architecture change tested."
+    correction: "Past a floor, data QUALITY dominates - and quality is a classifier, which means the highest-leverage knob in the pipeline is engineering, not math. This is also why per-source value differs enough to be worth measuring at all."
+    units: [v2, v3]
+
+  - id: D9
+    name: dedup-is-hygiene
+    wrong_model: "Deduplication is neutral cleanup - drop the copies, keep one, nothing of substance decided."
+    why_appealing: "In every other pipeline dedup IS hygiene; nobody audits which copy survives."
+    failing_prediction: "When two sources contain the same passage and you keep one, you just chose which source gets credit for everything that passage teaches the model. At web scale this decision is made silently millions of times; in a royalty system it moves money."
+    correction: "Dedup is a payout decision. Record the duplicate cluster and its source membership; make credit assignment for shared content an explicit, auditable policy rather than an accident of pipeline order."
+    units: [v2, v5]
+
+  - id: D10
+    name: spotify-model-is-fair
+    wrong_model: "Pro-rata pooling (the Spotify model) pays providers in proportion to how much they were used."
+    why_appealing: "It's the incumbent template; 'share of streams' sounds like 'share of use.'"
+    failing_prediction: "Under pro-rata, your subscription is distributed by PLATFORM-WIDE share, not your usage - money flows from your pocket to artists you never played. 99.8% of artists receive effectively nothing, and the design invites farming; the AI analogue (citation farms) is cheaper than stream farms because plausible citable text costs nothing to generate."
+    correction: "Pro-rata pooling imports cross-subsidy, winner-take-most concentration, and gaming incentives. Any pooled design needs to answer these by construction - and the incumbent standards body has already hired economists to build exactly the naive version."
+    units: [v1, v9]
+
+  - id: D11
+    name: blocking-protects-content
+    wrong_model: "Blocking crawlers at my origin keeps my content out of training sets."
+    why_appealing: "The 402 wall is visible and satisfying; the gatekeeper dashboards show blocked requests."
+    failing_prediction: "Your content syndicates: wire copies, aggregators, quote-heavy coverage, scraped mirrors - a hundred copies that never touch your CDN. Labs source the same text from any of them; the loudest publisher complaint in the ecosystem is exactly this leakage, and no product addresses it."
+    correction: "Origin blocking is necessary leverage, not protection. Protection requires knowing where your content's copies live (near-duplicate detection at web scale) and evidence machinery that survives the copy having come from elsewhere."
+    units: [v1, v7]
+
+  - id: D12
+    name: training-rights-are-the-market
+    wrong_model: "AI companies buy content mainly for training, so training rights are where the money is."
+    why_appealing: "The original scraping scandal was about training; 'training data licensing' is the headline phrase."
+    failing_prediction: "Only ~40% of recent content deals include training rights (down from near-universal), while inference-time/RAG access deals grow ~2x year over year - and the expert-labeled-data market (where labs actually spend billions) dwarfs all disclosed content licensing combined."
+    correction: "The paid market is moving to inference-time access and expert data. A training-attribution product must either target where money already flows (verification, audit, procurement) or carry the burden of creating a market no buyer has yet joined."
+    units: [v1, v9]
+
+  - id: D13
+    name: courts-will-force-royalties
+    wrong_model: "Copyright litigation will force AI labs into ongoing royalty payments for training data."
+    why_appealing: "A $1.5B settlement sounds like the dam breaking."
+    failing_prediction: "That settlement priced ACQUISITION of pirated copies - roughly $3,000 per work, once - after the same court held that training on lawfully acquired copies is fair use. Three jurisdictions have now converged on that line. The rational lab response is to buy one clean copy, not to enter a royalty relationship."
+    correction: "Current case law pushes toward one-time clean-copy purchases. The theories that could force ongoing payment (output substitution, market harm) are unresolved - which is precisely why the space reprices when they resolve, and why building for verification (needed under any outcome) beats betting on royalties (needed under one)."
+    units: [v1, v7]
+
+  - id: D14
+    name: crypto-can-prove-training
+    wrong_model: "Cryptography (zero-knowledge proofs, blockchain provenance) can prove what a model was trained on."
+    why_appealing: "ZK proofs verify computation; training is computation; QED. Investors love it."
+    failing_prediction: "The best published zero-knowledge proof-of-training throughput is ~0.4 GFLOP/s - a 1B-parameter model would take on the order of 10,000 years to prove. Proof-of-Learning, the cheaper alternative, has been spoofed at a fraction of honest training cost. And TEE attestation only proves what a COOPERATING trainer volunteered to run."
+    correction: "No cryptographic mechanism lets a third party detect unlicensed data in weights. Attestation is a licensing-integrity feature for willing counterparties; adversarial verification must come from statistics on the model's behavior (canaries, extraction), not from proofs about its construction."
+    units: [v7]
+
+  - id: D15
+    name: output-watermarks-solve-provenance
+    wrong_model: "Output watermarking (SynthID etc.) addresses the training-data provenance problem."
+    why_appealing: "Both are called 'watermarking'; both involve models and hidden signals."
+    failing_prediction: "An output watermark is inserted by the MODEL OWNER at inference time and proves 'this text came from my model.' It carries zero bits about which training documents shaped the output - the direction is model-to-output, not data-to-model."
+    correction: "Two different problems: output watermarks prove authorship of generated text; data watermarks (inserted by the DATA owner before scraping) prove training-set membership. They share statistical machinery (keyed nulls, z-tests) and nothing else - though watermarked outputs scraped into a corpus do leak a detectable residue downstream."
+    units: [v7]
+
+  - id: D16
+    name: training-is-deterministic-enough
+    wrong_model: "A source's measured contribution is a stable property - measure once, bill forever."
+    why_appealing: "Engineering intuition: same inputs, same outputs. Loss curves look smooth."
+    failing_prediction: "Retrain with a different seed and a single source's marginal contribution to held-out loss can swing by more than its own magnitude; per-document membership decisions flip like coins under training randomness alone; data ORDER introduces the largest variation in influence measurements."
+    correction: "Contribution is a noisy random variable. Any billing-grade number needs seeds averaged, a reported noise floor, and the honesty that below a signal-to-noise threshold the welfare-optimal contract is a flat fee - measuring your own SNR is the result, not a caveat."
+    units: [v3, v4, v5]
+
+  - id: D17
+    name: epochs-are-cheating
+    wrong_model: "Repeating training data is useless or harmful - only fresh tokens count."
+    why_appealing: "Overfitting folklore; 'the model just memorizes repeats.'"
+    failing_prediction: "Measured carefully, repeating a fixed corpus for up to ~4 epochs costs almost nothing versus fresh tokens, with diminishing returns to ~16 - which is exactly what lets a 500M-token specialist corpus honestly support a 2B-token training run."
+    correction: "In the data-constrained regime, moderate repetition is nearly free. This is load-bearing for any small-corpus experiment - and it interacts with memorization: repetition is also what makes content extractable, so the same knob tunes capability and evidence."
+    units: [v3, v6]
+
+  - id: D18
+    name: any-weird-string-is-a-canary
+    wrong_model: "To prove training-set membership later, just hide any unusual string in your content."
+    why_appealing: "Honeypot intuition from security work; 'unique string = unique evidence.'"
+    failing_prediction: "Random strings get stripped by dedup and quality filters, regress toward typical loss when in-distribution, and medium-length traps repeated 100x were flat-out undetectable in controlled tests. Homoglyph tricks die to Unicode normalization. Meanwhile a properly designed watermark - coherent fictitious knowledge, multiple attributes, keyed with never-published controls - reaches z~5 at under 0.1% of the corpus and survives instruction tuning."
+    correction: "Canary design is the whole game: the null must be constructible (keyed generation with private controls), the content must survive the pipeline (coherent prose, not noise), and detection must be pre-registered. The difference between a working watermark and a useless one is design, not luck."
+    units: [v7]
+
+  - id: D19
+    name: significant-means-proven
+    wrong_model: "We got p < 0.05 on a detection, so we have proof."
+    why_appealing: "The p-value is the headline number; small = good."
+    failing_prediction: "Test 10,000 documents and ~500 clear p<0.05 by chance; correlated documents inflate significance further; and a threshold chosen after seeing the data proves nothing. An opposing expert attacks the procedure, not the arithmetic."
+    correction: "Evidence = a valid null + multiple-testing correction + honesty about dependence + a test, threshold, and key committed BEFORE seeing the model. The pre-commitment ledger is what turns a statistic into an exhibit; that discipline, not the z-test, is the product."
+    units: [v6, v7]
+
+  - id: D20
+    name: noise-just-needs-better-methods
+    wrong_model: "Attribution noise is a temporary methods problem; pay-per-contribution just needs refinement."
+    why_appealing: "Optimism bias of the builder; the demo pie chart looks so definite."
+    failing_prediction: "There is a proven threshold: when the attribution estimator's signal-to-noise is below it, the welfare-optimal payment contract collapses to a flat fee - no better estimator changes the contract, only more signal does. The industry's convergence on flat fees and metered access is consistent with the bar not being cleared, not with laziness."
+    correction: "Whether contribution-proportional payment beats a flat fee is an empirical question about YOUR corpus, YOUR model scale, and YOUR noise floor. Measure the SNR and report which side of the threshold you are on - either answer is a real result."
+    units: [v5, v9]

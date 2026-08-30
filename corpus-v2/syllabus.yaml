@@ -1,0 +1,218 @@
+# Syllabus: "Where the Words Come From" - data, attribution, and proof.
+# Volume 2 of the Chiron book. Fixed spine, dynamic depth, no deadline:
+# this runs alongside other work at whatever pace it gets.
+#
+# FIRST-PRINCIPLES RULE (see DATABOOK-ROADMAP.md section 4): vol-1
+# concepts are never referenced as known. Every concept a unit needs is
+# re-derived compactly at point of use; `prereqs` and calibration dial
+# how BRIEF the re-derivation gets, never whether it happens. A learner
+# with large gaps must be able to read any unit cold.
+#
+# Every unit's capstone beats are PoC build steps (interleaved design):
+# finishing the book produces the pitch artifact.
+
+learner:
+  name: Matt
+  profile: >
+    Experienced pragmatic software engineer (systems, infra, Elixir/Python/
+    Go/Rust, Fly.io). Read volume 1 (transformer internals) but assumes
+    large gaps in his own retention - treat every math concept as needing
+    compact first-principles re-derivation at point of use. Pre-calculus
+    baseline; vol-1 gave working exposure to gradients, loss, and tokens.
+    Expert on the code/systems axis: never explain a loop, a hash, a cache,
+    or a data structure. Goal: build a training-data attribution +
+    verification proof of concept credible enough to pitch. High-confidence
+    partial mental models expected - refutation structure is the primary
+    rhetorical tool.
+  session: >
+    Ongoing evening/weekend sessions on the reMarkable client, 20-25 min
+    chunks. No deadline; milestones are a sequence, not a schedule.
+
+defaults:
+  mastery_gate: 0.80
+  extension_trigger: 0.90
+  check_min_items: 8
+  check_constructed_fraction: 0.6
+  check_callback_fraction: 0.4
+  chunk_minutes: [20, 25]
+
+units:
+  - id: v0
+    slug: calibration
+    title: "Calibration: where you actually are"
+    minutes: 20
+    prereqs: []
+    concepts:
+      - {id: d-prob-basics, name: "Expectation, variance, and what a distribution is"}
+      - {id: d-vol1-floor, name: "Vol-1 floor: loss, gradients, tokens (retention check)"}
+    notes: >
+      Baseline quiz across the probability axis (new ground) and the vol-1
+      floor (retention). Per the first-principles rule the results dial
+      COMPRESSION of re-derivations, never omission. Seeds the profile.
+
+  - id: v1
+    slug: closing-web
+    title: "The closing web and the correlation problem"
+    minutes: 30
+    prereqs: [v0]
+    concepts:
+      - {id: d-contributive-corroborative, name: "Contributive vs corroborative attribution - the book's organizing split"}
+      - {id: d-data-market, name: "The training-data market as it actually is: deals, gatekeepers, litigation"}
+      - {id: d-compensation-schemes, name: "Compensation designs: flat fee, citation counting, causal attribution - and what each misallocates"}
+    notes: >
+      Behavior-first opening: a real HTTP 402 from a gated site, real deal
+      numbers, the Bartz price-per-book. Contrasting cases across the three
+      compensation schemes on one worked example. States the skeptical case
+      in strongest form. Source: research/ecosystem.md.
+
+  - id: v2
+    slug: corpus-pipeline
+    title: "From glob to corpus"
+    minutes: 45
+    prereqs: [v1]
+    concepts:
+      - {id: d-extraction-filtering, name: "Extraction and quality filtering; why a classifier is the biggest lever"}
+      - {id: d-dedup-provenance, name: "Deduplication as a payout decision; provenance manifests"}
+      - {id: d-tokenizer-training, name: "Training a tokenizer; vocabulary sizing for a domain corpus"}
+      - {id: d-mixing-packing, name: "Data mixing, shuffling, and document-masked packing"}
+    notes: >
+      Almost all systems engineering - lean on the SE axis hard. Capstone
+      beats build the tagged peS2o corpus with duplicate-cluster recording
+      and the shard->doc->source manifest. Source: research/pipeline.md.
+
+  - id: v3
+    slug: training-runs
+    title: "Training runs you can afford"
+    minutes: 40
+    prereqs: [v2]
+    concepts:
+      - {id: d-compute-budget, name: "C ~ 6ND: budgeting any training run in one line"}
+      - {id: d-training-recipes, name: "LR schedules as recipes; WSD and branchable checkpoints"}
+      - {id: d-data-constrained, name: "Data-constrained scaling: what repeating data really costs"}
+      - {id: d-eval-noise, name: "Evaluation at small scale: bits-per-byte, seeds, and the noise floor"}
+    notes: >
+      The FineWeb ablation discipline (two seeds, low-variance metrics) is
+      the unit's spine - the noise floor is the enemy of every attribution
+      claim later. Capstone: 10-30M model trained overnight on the Mac,
+      with honest error bars. Source: research/pipeline.md.
+
+  - id: v4
+    slug: ground-truth
+    title: "Ground truth: the counterfactual"
+    minutes: 35
+    prereqs: [v3]
+    concepts:
+      - {id: d-counterfactual, name: "Leave-one-out as the definition of contribution"}
+      - {id: d-subset-regression, name: "Datamodels: subset-inclusion regression and the LDS"}
+      - {id: d-noise-floor, name: "Seed noise vs signal: when a contribution is real"}
+    notes: >
+      No new math - subtraction and linear regression. Produces the truth
+      every later method is judged against. Capstone: the leave-one-source-
+      out table with seed-noise bars. Sources: research/pipeline.md,
+      research/tda.md.
+
+  - id: v5
+    slug: fair-split
+    title: "The fair split: Shapley from scratch"
+    minutes: 50
+    prereqs: [v4]
+    concepts:
+      - {id: d-coop-game, name: "Coalitions and value functions: v(S) for data sources"}
+      - {id: d-shapley-axioms, name: "The Shapley axioms and why they force one formula"}
+      - {id: d-semivalue-family, name: "Banzhaf, Monte Carlo estimation, exact enumeration at small n"}
+      - {id: d-split-gaming, name: "Gaming the split: the shell-company attack, diagnostics, and the SNR/flat-fee threshold"}
+    notes: >
+      The Tier-2 math unit - combinatorics and expectation over
+      permutations, no calculus anywhere. The axioms are the argument a
+      rightsholder or lawyer can audit. Capstone: exact Shapley over the
+      tagged sources + the shell-company attack demonstrated then fixed.
+      Source: research/tda.md.
+
+  - id: v6
+    slug: model-memory
+    title: "What the model remembers, and what counts as evidence"
+    minutes: 45
+    prereqs: [v3]
+    concepts:
+      - {id: d-memorization, name: "Memorization scaling: bits per parameter, duplication, extraction"}
+      - {id: d-mia-limits, name: "Why membership inference cannot prove training: the unsampleable null"}
+      - {id: d-dataset-inference, name: "Dataset inference: collections as the unit of evidence"}
+      - {id: d-evidence-discipline, name: "What converts a number into evidence: nulls, multiple testing, dependence, pre-registration"}
+    notes: >
+      The Tier-1 stats unit, organized around retrospective vs prospective
+      evidence. Capstone: reproduce a membership-inference failure AND an
+      extraction success on the v3 model - feel both limits. Sources:
+      research/verification.md, research/tda.md.
+
+  - id: v7
+    slug: notary
+    title: "The notary: proving it, and selling the proof"
+    minutes: 50
+    prereqs: [v6]
+    concepts:
+      - {id: d-canary-design, name: "Canaries and fictitious-knowledge watermarks: constructing the null"}
+      - {id: d-paired-tests, name: "Paired designs (STAMP): private controls as the null distribution"}
+      - {id: d-precommitment, name: "The pre-commitment ledger: keys, timestamps, third-party-verifiable reports"}
+      - {id: d-audit-landscape, name: "The audit market: EU Art. 53 mechanics, exclusion certification, what is dead (zkML, PoL)"}
+    notes: >
+      The audit-product unit - the commercially open slot. Capstone: plant
+      keyed watermarks in one source with a committed key, detect via QA
+      with a pre-registered z-test, emit the signed report. Source:
+      research/verification.md.
+
+  - id: v8
+    slug: gradient-tracing
+    title: "Tracing by gradient"
+    minutes: 45
+    prereqs: [v4, v5]
+    concepts:
+      - {id: d-gradient-similarity, name: "Gradient dot products as 'pushed the model the same way'"}
+      - {id: d-tracin, name: "TracIn: influence as a sum over checkpoints"}
+      - {id: d-influence-vs-entailment, name: "Influence is not entailment: what BM25 wins and why"}
+      - {id: d-inrun-shapley, name: "In-Run Data Shapley: the royalty ledger inside a single run"}
+    notes: >
+      The Tier-3 unit - re-derives gradients from first principles
+      (compactly; vol-1 exposure helps but is not assumed). Capstone:
+      TracIn scores rank-correlated against the v4 ground truth - the
+      number that says whether cheap attribution can be trusted.
+      Source: research/tda.md.
+
+  - id: v9
+    slug: artifact
+    title: "The artifact and the argument"
+    minutes: 40
+    prereqs: [v5, v7, v8]
+    concepts:
+      - {id: d-retrieval-attribution, name: "Retrieval surfaces: suffix arrays, verbatim tracing, and their honesty"}
+      - {id: d-demo-assembly, name: "Assembling the three-layer demo: copied vs shaped vs paid"}
+      - {id: d-pitch-economics, name: "The pitch: open slots, Spotify pathologies, and leading with measured SNR"}
+    notes: >
+      Synthesis unit in the vol-1 u9 style: nothing new, everything
+      connected. Verification leads the story; the royalty split is the
+      vision slide. Sources: all four research files.
+
+  # Extensions - unlock above 90% mastery of the named unit.
+  - id: x1
+    slug: influence-functions
+    title: "Influence functions properly: Hessians, EK-FAC, and the critiques"
+    unlocks_after: {unit: v8, mastery: 0.90}
+    concepts:
+      - {id: d-hessian-influence, name: "Second-order influence: the formula, the approximations, the failure evidence"}
+  - id: x2
+    slug: source-aware
+    title: "Source-aware training: attribution from the weights"
+    unlocks_after: {unit: v8, mastery: 0.90}
+    concepts:
+      - {id: d-source-aware, name: "Document-ID tokens and intrinsic citation"}
+  - id: x3
+    slug: audit-stack
+    title: "The audit stack in depth"
+    unlocks_after: {unit: v7, mastery: 0.90}
+    concepts:
+      - {id: d-attestation, name: "TEE attestation, C2PA's real scope, and the graves of zkML and Proof-of-Learning"}
+  - id: x4
+    slug: scale-attribution
+    title: "Attribution at real scale: the fine-tune experiment"
+    unlocks_after: {unit: v9, mastery: 0.90}
+    concepts:
+      - {id: d-finetune-attribution, name: "Continued-pretraining attribution on an open 7B; post-cutoff controls"}
