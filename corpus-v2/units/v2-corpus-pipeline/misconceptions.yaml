@@ -1,0 +1,46 @@
+# Unit-local misconception additions for v2 (corpus-pipeline).
+# Same schema as corpus-v2/misconception-bank.yaml. IDs are namespaced V2-*
+# so they never collide with the global D* bank or with vol-1's M*/U*-M* IDs.
+# Referenced by distractors in v2/questions.yaml and by refutation blocks in
+# v2/canon.md.
+
+misconceptions:
+  - id: V2-M1
+    name: extraction-is-a-commodity
+    wrong_model: "Text extraction is a solved, commoditized step - install a library, call it, and the text you get is the text that was there. Extractor choice is a matter of taste."
+    why_appealing: "It genuinely is solved for the input most engineers meet: single-column, well-formed, recent HTML. The libraries are mature, the API is one function call, and small samples of the output look fine. Nothing in the pipeline ever reports an extraction error, because there is no error to report - the extractor did exactly what it was asked."
+    failing_prediction: "If extraction were commoditized, extractor choice would be a wash and two teams building the same corpus with different libraries would land on equivalent data. Instead the two most-used HTML extractors differ by 5 points of content recall (74.5% vs 69.5%) and by more than 3x in retained boilerplate (22.8% vs 6.6%), and swapping extraction quality alone - holding every other stage and the training recipe fixed - moved a 13-benchmark average by 1.08 points at 62B tokens. On two-column PDFs the naive extractor does not degrade, it fabricates: column interleaving welds the end of every left-column line to the start of the corresponding right-column line, producing sentences no human wrote at a rate of tens per page."
+    correction: "Extraction is the highest-variance stage in the pipeline and its failures are silent and fluent enough to survive every downstream quality heuristic. It also has an attribution dimension no quality metric captures: interleaving corrupts the source tag at sub-document granularity, and inlined page furniture creates enormous cross-source duplicate clusters out of typesetting artifacts. Choose the extractor deliberately, record the extraction method per document as an attribute, and where the source structure still exists upstream (arXiv LaTeX source), read it instead of reconstructing it."
+    units: [v2]
+
+  - id: V2-M2
+    name: pii-scrubbing-is-grep
+    wrong_model: "PII removal is a pattern-matching pass. Run regexes for emails, phone numbers, IP addresses and account numbers, replace the matches, and the corpus contains no personal information."
+    why_appealing: "Recall on formatted identifiers really is high, the pass produces a satisfying auditable report of what it removed, and it is what the standard toolkits ship (Dolma does regex email and IP anonymization). The failure mode is invisible: nothing in the pipeline ever logs 'did not detect a person.'"
+    failing_prediction: "If personal information were a lexical pattern, a document with every regex-matchable string removed would contain none. Take an acknowledgements section with the emails stripped: 'we thank the third-year PhD student in the Northlake speech group who ran the 2019 pilot.' No pattern matches; the person is identified. Identifiability is a property of attribute COMBINATIONS, and combinations multiply out of a population fast - institution times subfield times year times career stage exceeds the number of researchers alive."
+    correction: "Regex is a high-precision, low-recall pass over formatted identifiers, and it is worth running. Quasi-identifiers are not lexical and are not solvable by matching. For a scholarly corpus the defensible position is a scope statement - 'formatted identifiers removed; this is public scholarly text whose authors are named by design' - not the claim 'we scrubbed PII,' which is exactly the sentence an opposing expert enjoys taking apart."
+    units: [v2, v7]
+
+  - id: V2-M3
+    name: bigger-vocab-is-better
+    wrong_model: "A larger tokenizer vocabulary is straightforwardly better - more merges, better compression, shorter sequences - and its only cost is some extra embedding parameters. Copy the frontier models: 100K to 200K entries."
+    why_appealing: "The frontier numbers are public and large, compression really does improve monotonically with vocabulary size, and the parameter cost is invisible in a 70B model where the embedding table is a couple of percent of the whole."
+    failing_prediction: "If bigger were better at every scale, a 128K vocabulary would beat a 16K one on a 30M-parameter model. Price it: the embedding table is V x d_model, so at d_model = 384 a 128,256-entry vocabulary is 49,250,304 parameters - 1.6 times the size of the entire model - for a table of starting positions. Meanwhile compression gain grows only logarithmically in V (merges are chosen in frequency order, so the tail is progressively rarer) while table cost grows linearly. And each row is updated only when its token appears: on 500M tokens the rarest rows of a 128K vocabulary see a few hundred updates from random initialization and finish training untrained."
+    correction: "Optimal vocabulary size grows with compute budget but SHRINKS when data-bottlenecked (Tao et al., NeurIPS 2024). For a 10-30M parameter model on 300M-1B tokens of a single domain the range is 16K to 32K. The right comparison is never vocabulary size against vocabulary size; it is characters-per-token measured on YOUR held-out domain text against the parameter and update-frequency cost of the table. A domain-trained 32K vocabulary beats an off-the-shelf 100K one on both axes at once."
+    units: [v2, v3]
+
+  - id: V2-M4
+    name: packing-is-just-batching
+    wrong_model: "Concatenating documents into fixed-length training sequences is a buffer-filling detail. The EOS separator marks the boundary, attention learns to respect it, and the packed sequence is equivalent to the documents it contains."
+    why_appealing: "It genuinely almost does not matter for loss, and people have shipped it this way for years. The separator token is right there and looks semantically sufficient. Packing efficiency is a real measurable win that everyone optimizes, so the pressure is all in one direction."
+    failing_prediction: "If the separator handled it, a sequence containing the tail of document 1 and the head of document 2 would be equivalent to two shorter sequences. The causal mask does not know about the separator: a token in document 2 attends to every earlier position including all of document 1, and gradients flow from document 2's loss through attention placed on document 1's tokens. With document 1 filling half a sequence of length L, that is L^2/4 cross-document attention pairs, all of them training the model to use one source's text as context for another's."
+    correction: "Use intra-document causal masking (arXiv:2402.13991), which forbids attention across document boundaries within a packed sequence so the sequence behaves exactly like the concatenation of independent shorter ones. It costs a document-boundary array and a mask construction, and it is independently a small quality win. For attribution it is close to mandatory: every gradient-based method computes a per-sequence gradient and calls it 'what this training example did,' so a sequence blending two sources yields a blended gradient that no later decomposition can split - the contributions were summed inside a nonlinear function of shared parameters before any loggable quantity existed. Masking fixes the input; it does NOT fix which documents get co-packed, so per-sequence composition still has to be recorded in the manifest."
+    units: [v2, v8]
+
+  - id: V2-M5
+    name: global-dedup-is-strictly-better
+    wrong_model: "Deduplicating across the whole corpus is strictly better than deduplicating within each partition - same algorithm, larger candidate pool, more duplicates found, cleaner corpus. Aggressiveness is a direction to push."
+    why_appealing: "It is obviously more thorough, and 'found more duplicates' reads as an unambiguous improvement. In every other deduplication context - storage, logs, warehouse tables - a larger scope really is strictly better."
+    failing_prediction: "FineWeb ran both, deduplicating each Common Crawl snapshot independently versus globally across all snapshots, and the per-snapshot version produced the BETTER model. What global dedup is more thorough at is deleting material that got re-crawled every month - and durable, widely re-hosted material is disproportionately the good material. Ephemeral junk appears once and survives untouched, so its share of the corpus rises."
+    correction: "Multiplicity across crawls is a quality signal nobody put there on purpose, and global dedup flattens it by construction. Dedup aggressiveness has an interior optimum, not a direction: it is a tuning parameter to be ablated like any other. This also generalizes past web crawls - any time you collapse a multiplicity, check whether the multiplicity was carrying information before you delete it."
+    units: [v2]

@@ -189,10 +189,10 @@ check:
   callback_eligible: false
   prompt: |
     Gradient descent updates a weight $w$ using the gradient
-    $\partial L / \partial w = -2$. With learning rate 0.1, does $w$
-    increase or decrease, and by how much? Answer like `increases, 0.2`.
-  answer: increases, 0.2
-  check: exact
+    $\partial L / \partial w = -2$ and learning rate 0.1. What is the
+    SIGNED change applied to $w$? (A positive answer means $w$ grows.)
+  answer: '0.2'
+  check: numeric(0.001)
   difficulty: stretch
 
 # Self-placement, asked before the series. The answer selects a

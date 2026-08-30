@@ -1,0 +1,30 @@
+# Unit-local misconception additions for v3 (training-runs).
+# Same schema as corpus-v2/misconception-bank.yaml. IDs are namespaced V3-M*
+# so they never collide with the global D* bank or with vol-1's M* namespace.
+# Referenced by distractors in v3/questions.yaml and by refutation blocks in
+# v3/canon.md.
+
+misconceptions:
+  - id: V3-M1
+    name: cost-tracks-quality
+    wrong_model: "The price of a training run is a price for the result: good models are expensive because they are good, and a worse corpus or a sloppier recipe would change what the run costs."
+    why_appealing: "Frontier runs cost hundreds of millions and produce the best models, so cost and quality are perfectly correlated across the only examples that make the news. And in nearly every other engineering domain the expensive version IS the good version, because the money buys better components."
+    failing_prediction: "Train the same 561M-parameter configuration twice on the same token count, once on a filtered corpus and once on raw scrape. One produces a coherent chat model and one produces gibberish. Both cost $92 to the cent and both finish at the same minute. Run a 124M configuration with a data-loader bug that feeds one shard four hundred times: same $9-16. The invoice is blind to every property of the artifact."
+    correction: "Run cost is fully determined by two integers chosen before the run - parameters and tokens - times a hardware constant and a market price. C ~= 6ND contains no term for data quality, architecture, or outcome. Two consequences: quality is free at fixed compute, which is why a filtering classifier outvalues any architecture change; and because cost is linear in model size, shrinking the model by 20x shrinks an entire 550-run research program by 20x. That is what makes counterfactual ground truth affordable at all."
+    units: [v3, v4]
+
+  - id: V3-M2
+    name: loss-curve-is-evidence
+    wrong_model: "A smoothly descending training loss curve means the run is working - the data is good, the model is learning, and the configuration is sound."
+    why_appealing: "The loss curve is the only thing that updates in real time. It sits on the screen for hours, it looks like a progress bar, and progress bars are trustworthy. The habit is also partly earned: when a run genuinely breaks - divergence, NaN, optimizer blowup - the curve does show it immediately."
+    failing_prediction: "Two failures, both routine. Under a cosine schedule the loss drops noticeably in the last 10% of EVERY run, including deliberately sabotaged ones, because the learning rate is going to zero and the model is settling; if that late drop were evidence of learning it would not appear identically in a broken run. And a data-loader bug that repeats one shard four hundred times produces a smoother, LOWER curve than the correct run, because the model is faithfully learning boilerplate and being scored on more of the same."
+    correction: "The training loss curve is a diagnostic for optimizer health and nothing else - spikes, plateaus at initialization value, divergence, NaNs are all real signals worth acting on. Data quality, model quality, and whether one condition beats another are not readable from it, because a training curve compares a model to its own past on data it trained on. Every claim in this book compares a model to a DIFFERENT model, which requires held-out bits-per-byte on text chosen before the run, across multiple seeds."
+    units: [v3]
+
+  - id: V3-M3
+    name: mfu-is-vanity
+    wrong_model: "Model FLOPs Utilization is a leaderboard number that infrastructure teams put on slides - adjacent to the real work, optimized because it is measurable rather than because it matters."
+    why_appealing: "MFU is reported alongside genuinely vain numbers (peak TFLOPs, parameter counts, benchmark rankings) and is usually reported by the people whose work it evaluates. In most software an engineer has written, utilization percentages really were diagnostic curiosities rather than line items."
+    failing_prediction: "If MFU were decorative, changing it would not change anything anyone cares about. Run a $92 job at 20% MFU instead of 40%: the weights are bit-identical, the loss curve is identical, the evaluation is identical, and the invoice reads $184. On a 550-run counterfactual sweep the same halving moves the budget from $51-136 to $102-272 for identical science."
+    correction: "C ~= 6ND yields floating-point operations; operations are not hours and hours are not dollars. MFU is the exchange rate, and it is the only term in the budget that engineering effort can move - you cannot shrink N or D without changing the experiment, but you can double throughput and halve the bill. Quote it with the hardware peak it is measured against, since MFU alone is meaningless."
+    units: [v3]

@@ -1,0 +1,29 @@
+# Unit-local misconception additions for v1 (closing-web).
+# Same schema as corpus-v2/misconception-bank.yaml. IDs are namespaced V1-* so
+# they never collide with the global D* bank or with vol-1's M*. Referenced by
+# distractors in v1/questions.yaml and by refutation blocks in v1/canon.md.
+
+misconceptions:
+  - id: V1-M1
+    name: posted-price-is-market-price
+    wrong_model: "Content has an established market price, because the prices are posted: crawler-price headers, RSL terms, per-crawl rate cards."
+    why_appealing: "A number in a protocol header looks like a quote on an exchange, and the whole point of standardizing the syntax was to make it look like one. Supply-side adoption is genuinely broad - roughly 1,500 media organizations endorsing RSL, blocking on by default at around 20% of websites - and broad adoption reads as a functioning market."
+    failing_prediction: "If these were market prices, there would be recorded trades at them. There are none that matter: Pay Per Crawl never left private beta, no frontier lab participates in any per-crawl or per-inference payment scheme, and there is no confirmation that any AI company has agreed to pay under RSL terms. A price with no bid is an ask. Note also that a posted price cannot be discovered by observation the way a clearing price can - you cannot infer demand from the seller's rate card."
+    correction: "Expressing preferences and posting prices is standardized, cheap, and widely adopted; enforcing them belongs to the gatekeeper; getting paid is unsolved. When you see a price in this ecosystem, ask who has paid it. In a pitch, quoting posted rates as evidence of market size is the fastest way to lose someone who tracks the demand side."
+    units: [v1]
+
+  - id: V1-M2
+    name: deal-value-is-content-value
+    wrong_model: "A headline licensing deal number tells you what the content was worth, so dividing it by words, articles, or documents gives a defensible unit price."
+    why_appealing: "The deal figures are the only public numbers in the whole market, and building any market model requires unit prices. Dividing a big number by a document count feels like bottom-up estimation rather than what it is."
+    failing_prediction: "If deal values priced content, deals for comparable corpora would cluster. They differ by orders of magnitude per document, because a lump sum bundles content, product placement, ongoing product relationships, exclusivity, and litigation peace in proportions nobody discloses. And if the value reached creators, flow-through would be measurable: across 73 public deals, the majority of value accrues to aggregators, with documented creator royalties rounding to zero."
+    correction: "Read every deal figure with three questions: what is the unit (corpus, feed, query, work), who is the counterparty (creator or aggregator holding the rights), and what fraction flows through to the people who wrote it. The public answer to the third is usually unstated and the measured answer is approximately none. Deal totals are evidence about negotiating leverage, not about the value of text."
+    units: [v1, v9]
+
+  - id: V1-M3
+    name: gatekeeper-is-neutral-plumbing
+    wrong_model: "The CDN chokepoint is neutral infrastructure - plumbing - so a marketplace or attribution product can be built on top of it on level terms."
+    why_appealing: "Every individual layer really is open: the crawler-identity signature scheme is an IETF draft, the content signals are plain text anyone can read and implement, the robots.txt conventions are public. Open specifications feel like open markets, and CDNs have historically behaved as neutral transport."
+    failing_prediction: "If it were neutral plumbing, a competing marketplace could reach the same publishers on the same terms. It cannot. One party now owns the chokepoint, crawler identity, the preference vocabulary, the payment rails as Merchant of Record, a content index, and - since the Human Native acquisition in January 2026 - the marketplace layer. A competitor either transacts on the incumbent's rails or addresses the roughly 80% of the web with no enforcement point at all."
+    correction: "The specifications are open and the enforcement point is not, and enforcement is the only layer with pricing power. Publishers already use the word vendor-locked. Position adjacent to the gatekeeper - verification, leakage tracking, buy-side procurement - rather than in its lane, and never assume the open spec implies an open market."
+    units: [v1]
