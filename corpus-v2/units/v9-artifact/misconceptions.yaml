@@ -1,0 +1,31 @@
+# Unit-local misconception additions for v9 (the artifact and the argument).
+# Same schema as corpus-v2/misconception-bank.yaml. IDs are namespaced V9-M*
+# so they never collide with the global D* bank or with vol-1's M* namespace.
+# Referenced by distractors in v9/questions.yaml and by refutation blocks in
+# v9/canon.md.
+#
+# v9 is the synthesis unit, so most of its refutation load is carried by the
+# global bank: D1 (citation is attribution) and D3 (verbatim is the test) in
+# the retrieval section, D6 (attribution works at scale) in the honesty
+# section, D10 (pro-rata pooling is fair) and D20 (noise is a methods problem)
+# in the economics section, D12 and D13 compressed alongside them. Only the
+# two entries below are genuinely new, and both are failures of PRESENTATION
+# rather than of mechanism - which is exactly what a unit whose deliverable is
+# a demo and a memo has to add.
+
+misconceptions:
+  - id: V9-M1
+    name: legible-panel-is-the-strong-panel
+    wrong_model: "The verbatim-span panel is the most convincing part of the demo, so it is the demo's strongest evidence - and labeling it correctly in the header is enough to keep the presentation honest."
+    why_appealing: "The panel is legible in a way nothing else on the screen is: it highlights real words in the real answer and links to a real document, and a viewer can verify it themselves in ten seconds. It is also the cheapest thing to build and the only exact one. Every instinct from ordinary interface work says to lead with the artifact that is immediate, checkable and self-evident, and the correct disclaimer really is sitting in the header, so the presentation feels covered."
+    failing_prediction: "If a header sentence were sufficient, then a viewer shown all three panels would, an hour later, describe the system's evidence in the terms the headers used. Test it on a colleague: they describe the verbatim panel, and they describe it as showing what the model used. The label did not survive the hour. Belief is allocated by legibility, not by markup, so the panel making the weakest claim collects the strongest conviction - and the conviction it collects is exactly the D1 inference the header disclaimed."
+    correction: "Presentation dominance is a structural problem with structural fixes, not a wording problem. Put the ground-truth disagreement inside the contributive panel at full type size so the two panels visibly contradict each other and the contradiction is the exhibit. Order the layout by claim strength rather than by how convincing each panel looks. Refuse to render any panel whose uncertainty field is empty, so honesty is a property of the code rather than of your discipline in the room. And rehearse the sentence said aloud while the panel is up: this is what the corpus contains, and it is here so you can see how different it is from what moved the model. A demo whose strongest visual carries its weakest claim is only honest if the contrast is the point."
+    units: [v9]
+
+  - id: V9-M2
+    name: negative-result-is-a-weak-pitch
+    wrong_model: "Measuring a below-threshold signal-to-noise ratio on your own attribution is a bad outcome to be buried, softened into a caveat, or postponed until more seeds move it - because a pitch needs the mechanism to work."
+    why_appealing: "It is a below-threshold result on the central mechanism, arrived at by your own measurement, and it says in writing that the pie chart on the vision slide is not a payment schedule. Founder instinct treats a self-inflicted negative as a wound. The soft version - report the split and add a caveat underneath - feels like the reasonable compromise between honesty and momentum, and it is what almost everyone does."
+    failing_prediction: "The belief assumes the audience is comparing your measured number against somebody else's better one. There is no better one. No deployed system in this market documents an attribution algorithm at all, and nobody publishes a correlation against counterfactual truth or a measured SNR, because at frontier scale neither is computable and at small scale nobody bothered. The comparison is between a measured 1.37 and an unmeasured assertion. And the threshold result is published: a listener who knows it exists reads an uncaveated pie chart as evidence you do not, which converts your strongest technical credential into the opposite."
+    correction: "The measurement is the asset and it is an asset in both directions. State it as a priced decision: this corpus at this scale has SNR 1.37, below the threshold at which contribution-proportional payment beats a flat fee, so the correct contract here is a flat fee, and reaching SNR 2 costs a stated seed count and a stated number of dollars. That is a complete result. Note also that the soft version fails on its own terms: a caveat under a pie chart is not the same claim as a flat-fee recommendation, and the difference is exactly what an opposing expert or a diligence process will find. Lead with the measured SNR whichever way it lands."
+    units: [v9]

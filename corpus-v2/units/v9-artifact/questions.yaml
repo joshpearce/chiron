@@ -1,0 +1,696 @@
+# v9 artifact: pretest + terminal check bank.
+#
+# This is the synthesis unit, so it introduces no new mathematical procedure
+# and therefore adds no new fade sequence. The two arithmetic items below
+# (v9-q4, v9-q7) are third appearances of procedures faded in earlier units:
+# the pro-rata-versus-Shapley split (v5-shapley-by-hand) and the SNR verdict
+# (v5-snr-threshold). Everything else tests claim discipline, assembly order,
+# and the argument.
+#
+# Running numbers used across several items, all carried from earlier units so
+# nothing here requires a fresh computation the learner has not already seen:
+#   Three-source value table: v(none)=0, v(A)=50, v(B)=50, v(C)=20,
+#     v(AB)=70, v(AC)=90, v(BC)=90, v(ABC)=100.
+#     Shapley 35 / 35 / 30. Pro-rata by solo value 41.67 / 41.67 / 16.67.
+#   Shares spread across sources 2.36; SD(phi_i) at 3 seeds 1.72; SNR 1.37.
+#   Gradient tracer against counterfactual table: rho = 0.61, 12 sources,
+#     3 seeds.
+#   Notary footnote: z = 4.5, one-sided p = 3.4e-6, family size m = 25,
+#     corrected p = 8.5e-5.
+#
+# The four claim types, which most rubrics below key against:
+#   corroborative (changed by rebuilding the index)
+#   contributive  (changed by retraining the model)
+#   allocation    (changed by changing the value function)
+#   proof         (changed by nothing after the commitment)
+
+pretest:
+  - id: v9-p1
+    concept: d-demo-assembly
+    prompt: |
+      You have a small language model you trained yourself, and you have the
+      corpus it was trained on, tagged into twelve named sources.
+
+      Design the screen that a person types a question into and that shows them
+      where the answer came from. Say what you would put on it, and for each
+      element say precisely what claim it licenses.
+    answer: |
+      Three panels and a footnote, each labeled with the claim it makes, because
+      the failure mode of this screen is a viewer sliding between claim types.
+
+      A corroborative panel: a suffix-array index over the corpus, returning the
+      maximal verbatim spans of the answer that occur in it, ranked by rarity
+      rather than length, each linked to a document and a source. It licenses
+      exactly this: these documents contain this text, this many times. It does
+      not license causation, and the header says so.
+
+      A contributive panel: per-source influence scores from a gradient method,
+      with the rank correlation against a counterfactual leave-one-source-out
+      table printed next to them at the same size, along with the seed count and
+      source count that correlation was measured at, and an explicit line naming
+      where the ranking and the ground truth disagree. It licenses: these sources
+      moved the model, ranked, and here is how well that ranking tracked actual
+      retraining on this corpus at this scale.
+
+      An allocation panel: a share of a notional fixed pool per source, with the
+      measured signal-to-noise ratio and the resulting verdict underneath. It
+      licenses: given this value function and four fairness requirements, this is
+      the unique split - and whether the differences between sources are
+      resolvable at all.
+
+      A footnote: a membership proof from a keyed watermark whose test and key
+      were committed before the model was trained, reported with its statistic,
+      family size, and corrected p-value. It licenses the word proven, at a
+      stated false-positive rate, for one source.
+    check: llm
+    rubric: |
+      Expected to fail at pretest; nothing gates on it.
+      Pass requires: (1) at least two structurally different evidence types on
+      the screen, not one method presented three ways; (2) an explicit,
+      per-element statement of what each licenses; (3) at least one uncertainty
+      figure attached to at least one element.
+      A screen consisting only of verbatim matches or only of citations = fail,
+      diagnosing D1, and the retrieval section must be delivered in full.
+      A screen showing influence scores with no correlation against ground truth
+      = fail, diagnosing D6; the trust number is the deliverable.
+      A screen showing a pie chart with no error bar or verdict = fail,
+      diagnosing D20 and V9-M2, and the economics section must not be compressed.
+
+  - id: v9-p2
+    concept: d-pitch-economics
+    prompt: |
+      As of mid-2026: who is actually paying money for training data, to whom,
+      and for what? Name the largest flows you can, and say where a
+      training-attribution product would sit in that picture.
+    answer: |
+      Four flows, in rough order of size, and one absence.
+
+      Expert and labeled data is the largest by a wide margin. A single vendor
+      in that market does roughly $2B annualized, about 90% of it from labs, and
+      one lab paid $14.3B for 49% of another. This spending dwarfs all disclosed
+      content licensing combined and has nothing to do with published articles or
+      papers.
+
+      Content licensing is bilateral, lump sum, and comparatively small: around
+      91 publicly announced deals since 2023, the largest disclosed at $250M over
+      five years, with the whole private training-rights market estimated at $75
+      to 100M a year. Only about 40% of recent deals include training rights at
+      all, down from near-universal, while deals for inference-time and
+      retrieval-time access grew several-fold over the same period.
+
+      Access metering is the gatekeeper's business: default crawler blocking for
+      about a fifth of websites, a payment rail, an identity standard and a
+      marketplace, all in one company.
+
+      Placement is the answer engines' business: publisher pools paying on
+      citations, visits and grounding events.
+
+      The absence: nobody pays for measured training contribution. No deployed
+      system documents an attribution algorithm. So a training-attribution
+      product does not sit in any existing flow; it either targets verification,
+      leakage tracking or procurement - where money already moves - or it has to
+      create a market that has no buyer yet.
+    check: llm
+    rubric: |
+      Expected to fail. Pass requires naming at least two distinct flows AND
+      stating that no money currently flows for measured training contribution.
+      An answer that treats training-data licensing as the main market = fail,
+      diagnosing D12; the deals section must be delivered without compression.
+      An answer that expects litigation to create the flow = fail, diagnosing
+      D13.
+      An answer that names only Spotify-style pooling as the destination = fail,
+      diagnosing D10.
+
+  - id: v9-p3
+    concept: d-pitch-economics
+    prompt: |
+      State the strongest argument against building anything in this space at
+      all. Make it as strong as you can, then say whether you have an answer to
+      it.
+    answer: |
+      Three parts, all of them true.
+
+      There is no buyer: no frontier lab has agreed to pay into any marketplace
+      by any mechanism anywhere, the leading supply-side licensing standard has
+      around 1,500 endorsing organizations and zero confirmed AI licensees, and
+      the gatekeeper's per-crawl payment scheme never left private beta.
+
+      The law is removing the forcing function: the largest settlement priced
+      one-time acquisition of pirated copies at roughly $3,000 per work, after
+      the court held that training on lawfully acquired copies is fair use, and
+      three jurisdictions have converged on that line. The rational lab response
+      is to buy one clean copy.
+
+      The technical claim does not reach frontier scale, and the incumbent owns
+      the chokepoint, the identity standard, the preference standard, the payment
+      rail and a marketplace.
+
+      The answer is not a rebuttal of any of them. It is that the measurement
+      layer is needed under every branch - clean-copy purchasing needs provenance,
+      an output-substitution ruling needs an auditable allocation, and the status
+      quo leaves a mandatory disclosure regime that is explicitly unverified.
+      Verification is the only slot with a regulatory deadline rather than a
+      voluntary buyer, and the artifact is a publishable contribution regardless
+      of what any lab decides.
+    check: llm
+    rubric: |
+      Expected to fail at pretest; it is the closing argument of the volume.
+      Pass requires two of the three objections stated accurately AND a response
+      that concedes rather than disputes them.
+      An answer that disputes the settlement's terms or predicts courts will
+      force royalties = fail, diagnosing D13.
+      An answer with no objections, only enthusiasm = fail; the strongest case
+      against is load-bearing in this volume and the section must be delivered
+      in full.
+
+check:
+  - id: v9-q1
+    concept: d-retrieval-attribution
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      Panel 1 of the demo shows maximal verbatim spans of the model's answer,
+      found in the training corpus by suffix-array lookup and ranked by rarity.
+
+      State (a) the header sentence this panel must carry and why, (b) the one
+      experiment that establishes the panel's claim type, and (c) why ranking by
+      rarity rather than by span length is the right engineering choice and the
+      wrong payment basis.
+    answer: |
+      (a) The header must say that these documents contain this text and are not
+      claimed to have caused it. The team that shipped the deployed version of
+      this panel over a multi-trillion-token corpus wrote that disclaimer into
+      their own paper: the retrieved documents should not be interpreted as
+      having a causal effect on the model's output. It costs nothing, the panel
+      is genuinely useful for what it does claim, and saying the limitation before
+      the audience does is the whole value of the sentence.
+
+      (b) Hold the weights fixed and rebuild the index over a different corpus,
+      or simply add documents to it. The panel changes completely while nothing
+      the model learned changed, so the panel is a fact about the index. That
+      makes it corroborative. A contributive quantity cannot move without
+      retraining.
+
+      (c) Rarity is right for information: a nine-token span occurring once
+      distinguishes a document from the corpus, while a twenty-token span of
+      boilerplate occurring 3,000 times does not, so ranking by length surfaces
+      the least informative matches first. Rarity is wrong as a payment basis
+      because it converts "nobody else wrote this" into money, and rare but
+      plausible text is the cheapest thing in this market to manufacture - it
+      does not even need a consumer, only a place in an index.
+    check: llm
+    rubric: |
+      (a) must state the containment-not-causation disclaimer. (b) must be the
+      swap-or-extend-the-index experiment with the correct conclusion that the
+      panel is corroborative. (c) must give both halves: rarity carries
+      information, and rarity as a payout rule rewards manufacturing rare
+      plausible text.
+      Pass = (a) and (b). Full credit = all three.
+      Answering (b) with "inspect which documents the model attended to" = fail;
+      that measures use of a context window and does not touch training data.
+      An answer that concludes the panel should not be built = fail; it is the
+      cheapest, most exact, most legible thing on the screen and the unit's
+      position is that it must be built and labeled, not omitted.
+    difficulty: core
+
+  - id: v9-q2
+    concept: d-retrieval-attribution
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      You leave the model's weights completely untouched and rebuild the
+      suffix-array index over a different corpus. Which panels of the demo can
+      change?
+    options:
+      - text: "Only the corroborative verbatim-span panel."
+        correct: true
+        explain: "Right. The span panel is a function of the output string and the indexed corpus; you changed the corpus. The influence scores come from gradients of weights that did not move, the allocation comes from a ledger accumulated during a training run that did not happen again, and the watermark test queries the same model. This is the cheapest discriminator between corroborative and contributive evidence, and it is the experiment a skeptic proposes first."
+      - text: "The verbatim-span panel and the influence ranking, since both describe where the answer came from."
+        misconception: D1
+        explain: "This is citation-is-attribution in its most durable form. The two panels do not describe the same thing: one describes what strings live in an index, the other describes what moved a set of weights. If rebuilding an index could change an influence score, the influence score would not be a claim about training at all."
+      - text: "All three panels, because the retrieval index is what the model was trained on."
+        misconception: D1
+        explain: "The index and the training corpus are separate objects that happen to have been built from the same text here. Nothing about training reads the index, and nothing about the index is consulted during a forward pass. Conflating them is precisely the error a retrieval-augmented product invites."
+      - text: "None of them, because verbatim matching is a lexical artifact that carries no real information."
+        misconception: D3
+        explain: "Overcorrection. Verbatim matching is a lower bound and a measurement artifact, and it is also exact for what it claims and the only panel with no noise of its own. The correct move is to label it, not to disbelieve it."
+    difficulty: warmup
+
+  - id: v9-q3
+    concept: d-demo-assembly
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Name the artifact each of these produces and the single thing that becomes
+      impossible without it: the corpus pipeline, the training run, the
+      counterfactual sweep, the notary run.
+
+      Then name the two decisions in the whole chain that cannot be repaired by
+      re-running anything, and say why each is unrepairable.
+    answer: |
+      Corpus pipeline: the shards plus the provenance manifest - one row per
+      document with doc_id, source_id, shard_id, offset, length, cluster_id and
+      the attribute set. Without it you cannot answer "which spans belong to
+      source k" in one pass, which every later step is a query against.
+
+      Training run: the checkpoints plus sigma, the standard deviation of
+      held-out bits per byte across seeds. Without sigma you cannot say whether
+      any measured difference downstream is real, because every significance
+      claim in the book divides by a standard error built from it.
+
+      Counterfactual sweep: the twelve-row table of contribution, standard error
+      and z, plus the cached (S, v(S)) pairs. Without it there is no truth to
+      grade any cheap method against, and the split has no utility table to run
+      over without retraining.
+
+      Notary run: the signed report, the verifier script, and the
+      negative-control report. Without it the demo has no claim that uses the
+      word proven at a stated false-positive rate.
+
+      Unrepairable, first: the pre-commitment. The key and protocol hash must be
+      timestamped before the model is trained. Committing afterwards is not a
+      weaker commitment, it is no commitment - the stated false-positive rate
+      then describes a procedure nobody ran.
+
+      Unrepairable, second: the source partition and the recording of duplicate
+      clusters with source membership. Once duplicates are collapsed without
+      recording which sources were in the cluster, the credit decision has been
+      made silently and the information needed to revisit it no longer exists.
+    check: llm
+    rubric: |
+      All four artifacts must be named correctly: manifest, sigma, the
+      contribution table with its cached utility pairs, and the signed report
+      with its verifier. Sigma's consequence must be about significance or the
+      noise floor, not about model quality.
+      Both unrepairable decisions must be named with a reason.
+      Pass = three of four artifacts plus one unrepairable decision with its
+      reason. Full credit = all four plus both.
+      Naming the trained model or the demo page as unrepairable = fail;
+      retraining is exactly what this program budgets for, and the question is
+      about decisions that re-running cannot undo.
+    difficulty: core
+
+  - id: v9-q4
+    concept: d-pitch-economics
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Value table over three sources, in thousandths of a bit per byte of
+      held-out improvement:
+
+      | S    | none | A  | B  | C  | AB | AC | BC | ABC |
+      | v(S) | 0    | 50 | 50 | 20 | 70 | 90 | 90 | 100 |
+
+      Split a $1.00 pool two ways: pro-rata by each source's solo value, and by
+      Shapley. Give both splits in cents. Then explain, from the table itself,
+      which source pro-rata misallocates and by what mechanism - and say why the
+      mechanism generalizes beyond this table.
+    answer: |
+      Pro-rata by solo value: the solo values are 50, 50 and 20, summing to 120,
+      so A gets 50/120 = 41.67 cents, B gets 41.67 cents, and C gets
+      20/120 = 16.67 cents.
+
+      Shapley, averaging each source's marginal contribution over all six arrival
+      orders: 35, 35 and 30 cents.
+
+      Pro-rata underpays C, by 13.33 cents against Shapley, which is a 44%
+      shortfall relative to what the fair rule assigns. The mechanism is visible
+      in the table. Alone, C adds 20. Added to A, it takes 50 to 90, a marginal
+      contribution of 40; added to B, the same. C is a complement: its value lives
+      in what it unlocks in combination rather than in what it does by itself, and
+      a rule that reads only solo usage cannot see the 40 at all.
+
+      This generalizes because pro-rata pays for volume of surfaced use, so it
+      systematically underpays sources whose contribution is interaction and
+      systematically overpays whatever is most surfaced. That is the same
+      pathology the music literature calls hidden influencers - material that
+      drives utility without resembling the outputs - and it is a structural
+      property of the rule, not a quirk of these eight numbers.
+    check: llm
+    rubric: |
+      Both splits must be correct: 41.67 / 41.67 / 16.67 and 35 / 35 / 30.
+      The mechanism must be C's marginal contribution of 40 in combination
+      versus 20 alone, read off the table.
+      Pass = both splits plus a correct identification of C as underpaid.
+      Full credit adds the generalization - pro-rata underpays complements and
+      overpays whatever is most surfaced.
+      An answer that reports the raw values 50/50/20 as the split = has not
+      normalized to the pool.
+      An answer claiming pro-rata is fine because C really did contribute least
+      in isolation = fail, diagnosing D10; the whole content of the item is that
+      isolation is the wrong measurement.
+    difficulty: core
+
+  - id: v9-q5
+    concept: d-demo-assembly
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      Your influence panel correlates with the counterfactual table at
+      Spearman rho = 0.61, measured over 12 sources at 3 seeds on a
+      561-million-parameter model. Which statement is defensible in a pitch?
+    options:
+      - text: "On this corpus at this scale, the cheap tracer's ranking tracks retrained truth at rho = 0.61 over 12 sources at 3 seeds; nothing here licenses the same figure at another scale."
+        correct: true
+        explain: "Right, and it is stronger than a larger claim with no number, because nobody else in this market publishes a correlation against counterfactual truth at all - at frontier scale it is not computable and at small scale nobody bothered. The scope conditions are the credential."
+      - text: "The tracer is 61% accurate, and scaling to a frontier model is an engineering problem."
+        misconception: D6
+        explain: "Two errors. A rank correlation is not an accuracy percentage. And the scale claim fails on measurement: against actual retraining on a 2-billion-parameter model, the scalable gradient methods came out no better than random guessing, while the method that correlates costs several full training runs per query."
+      - text: "Rho = 0.61 is too low to report; wait until the method improves before showing a number."
+        misconception: V9-M2
+        explain: "The comparison is not against somebody's better number, because there is no better number in this market. A measured 0.61 with its seed and source counts beats an unmeasured assertion, and withholding it discards the one credential the build produced."
+      - text: "Since the panel's top-ranked source also appears in the verbatim-span panel, the 0.61 understates it."
+        misconception: D3
+        explain: "Agreement with a verbatim panel is not evidence about a contributive ranking; it is agreement with a lexical lower bound that is blind to semantic contribution by construction. Using it to adjust a measured correlation replaces the measurement with the thing the measurement was checking."
+    difficulty: core
+
+  - id: v9-q6
+    concept: d-pitch-economics
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Name the three commercially open slots in this market, and for each say
+      who the buyer is and what forces them to buy.
+
+      Then state which slot the artifact from this book is a working instance
+      of, which ones it is only adjacent to, and what specifically it has not
+      built for those.
+    answer: |
+      Independent verification and audit. The buyer is the buy side - developers
+      and the parties who must rely on developers' claims - and the forcing
+      function is regulatory: the training-content disclosure obligation carries
+      enforcement from August 2, 2026 with fines up to EUR 15M or 3% of global
+      revenue, refreshes every six months, and the regulator has stated in
+      writing that it will supervise without performing a work-by-work assessment
+      or checking whether specific content was used. Mandatory, coarse,
+      self-reported, and explicitly unverified.
+
+      Leakage and syndication tracking. The buyer is publishers, and what forces
+      them is that blocking their own origin is worthless when their content
+      syndicates to crawlable copies that never touch their CDN. It is the loudest
+      unaddressed complaint in the ecosystem and it is tractable today with
+      near-duplicate detection at web scale.
+
+      Buy-side data procurement. The buyer is labs, and what forces them is that
+      they demonstrably spend billions on data acquisition with no systematic way
+      to establish that what they bought is what they think they bought - rights
+      clearance, provenance, indemnification.
+
+      The artifact is a working instance of verification: the signed report with
+      its committed key, its corrected p-value and its negative-control run is
+      exactly that slot's deliverable, and the pre-commitment ledger behind it is
+      the defensible asset. It is adjacent to the other two through the corpus
+      pipeline's fingerprinting layer, and it has built neither - leakage tracking
+      needs web-scale near-duplicate infrastructure the build never touched, and
+      procurement is a sales and indemnification business rather than a
+      measurement one.
+    check: llm
+    rubric: |
+      All three slots must be named with a buyer. The verification slot must
+      carry the regulatory forcing function, and the answer must convey that the
+      regime is mandatory and explicitly unverified - that combination is what
+      makes the slot open.
+      The placement half must claim verification and disclaim the other two,
+      with a specific reason for each disclaimer.
+      Pass = three slots with buyers, plus verification correctly claimed.
+      Full credit adds both disclaimers with their specific gaps.
+      Claiming the artifact demonstrates all three = fail; overclaiming coverage
+      is the failure mode this item exists to catch.
+      Naming answer-engine citation revenue sharing as an open slot = fail; that
+      lane is crowded and funded, and it is corroborative attribution with a
+      payment attached.
+    difficulty: core
+
+  - id: v9-q7
+    concept: d-pitch-economics
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Your allocation across sources has a spread of 2.36 units, and one share
+      has a standard deviation of 1.72 units from seed noise at three seeds.
+
+      Compute the signal-to-noise ratio, state the verdict against a bar of 2,
+      and write the headline sentence for the memo. Then say what the headline
+      would be if the per-share standard deviation had been 1.10 instead, and
+      what stays the same across both cases.
+    answer: |
+      SNR = 2.36 / 1.72 = 1.37, below the bar of 2. At this seed count the
+      differences between sources are not resolvable against seed noise, so the
+      correct contract for this corpus at this scale is a flat fee.
+
+      Headline: we measured our attribution signal-to-noise at 1.37, below the
+      threshold at which contribution-proportional payment beats a flat fee, so
+      the correct contract for this corpus at this scale is a flat fee; reaching
+      an SNR of 2 requires a stated seed count at a stated cost. That converts a
+      negative result into a priced decision.
+
+      With per-share SD of 1.10 the SNR is 2.36 / 1.10 = 2.15, above the bar. The
+      headline becomes the split itself, reported with its error bars, and the SNR
+      becomes the credential that says the error bars were checked.
+
+      What stays the same in both cases: the headline is the measured SNR, not
+      the pie chart. Nobody else in this market publishes one, and the threshold
+      result is published, so a listener who knows it exists reads an uncaveated
+      split as evidence that you do not.
+    check: llm
+    rubric: |
+      Required: 1.37 (accept 1.4) identified as below the bar with the flat-fee
+      verdict, and 2.15 (accept 2.1 to 2.2) identified as above it.
+      Both numbers plus the flat-fee verdict = pass. Naming the remedy as more
+      seeds or more signal, never a better estimator, upgrades to full credit,
+      as does the observation that the SNR leads in both directions.
+      Proposing a better attribution method to fix a below-threshold SNR = fail,
+      diagnosing D20; the threshold is a property of the signal available, not
+      of how cleverly it is processed.
+      Reporting the split with a caveat instead of a flat-fee recommendation =
+      fail, diagnosing V9-M2; a caveat under a pie chart is not the same claim.
+    difficulty: core
+
+  - id: v9-q8
+    concept: d-demo-assembly
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      For each of the three panels and the footnote, say where noise enters and
+      what quantity on the screen reports it. Be specific about the panel whose
+      noise enters twice, and say why a correlation measured against a noisy
+      target is not simply "the method's accuracy."
+    answer: |
+      The corroborative span panel introduces no noise of its own. Given the
+      corpus and the output string, the spans are a deterministic function.
+      Changing the training seed changes the output string, so the panel's
+      contents change, but the panel added nothing - and it is the only panel
+      about which that can be said.
+
+      The contributive panel carries noise twice. The scores come from a model
+      that is one draw from a distribution over training seeds. And the trust
+      number itself was measured against a counterfactual table whose entries
+      each carry a standard error built from sigma. The quantity that reports it
+      is the rank correlation, quoted with its seed count and source count.
+
+      The allocation panel's noise propagates through the Shapley sum, reported
+      as the per-share standard deviation and summarized by the signal-to-noise
+      ratio printed beneath the chart. Averaging over arrival orders averages over
+      noise too, so the shares are less noisy than the leave-one-out numbers
+      underneath them - less noisy, not noiseless.
+
+      The footnote's noise is the only kind that was constructed rather than
+      suffered: the never-published control set defines the null, so the
+      false-positive rate is a designed property, reported as z, the family size
+      and the corrected p-value.
+
+      Why the correlation is not accuracy: a correlation measured against a noisy
+      target is attenuated. Part of the gap between the measured value and 1.0 is
+      the method being wrong and part is the target being fuzzy, and sources that
+      sat below the noise floor in the ground-truth table contribute rank
+      information that is itself noise. The honest report says which sources those
+      were.
+    check: llm
+    rubric: |
+      Must contain: (1) the span panel adds no noise of its own; (2) the
+      influence panel's noise is doubled - training seed plus the noise in the
+      target the correlation was measured against; (3) the allocation's noise is
+      reported by the per-share SD and summarized by the SNR; (4) the footnote's
+      null is constructed, so its error rate is designed rather than estimated.
+      Pass = three of four. Full credit = all four plus the attenuation point.
+      Claiming the span panel is noisy because the model is stochastic = partial;
+      the model's noise reaches the panel through the output string, but the
+      panel is deterministic given that string, and the distinction is the point.
+      Claiming the footnote's p-value is invalidated by seed noise = fail; the
+      controls define the false-positive rate and do not depend on the seed.
+    difficulty: core
+
+  - id: v9-q9
+    concept: d-pitch-economics
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      A $1.5B settlement in this space received final approval in mid-2026, at
+      roughly $3,000 per work across about 500,000 works. What did it price, and
+      what does that imply for a royalty product?
+    options:
+      - text: "It priced one-time acquisition of pirated copies, after the same court held that training on lawfully acquired copies is fair use - so the rational lab response is to buy one clean copy, not to enter a royalty relationship."
+        correct: true
+        explain: "Right, and three jurisdictions have converged on that line. This is why a measurement layer needed under every legal outcome is a better bet than a royalty layer needed under one - and why the unresolved output-substitution theories are the thing to watch, since they are what would reprice the space."
+      - text: "It priced ongoing use of the works in training, so it establishes a per-work royalty rate the market can build on."
+        misconception: D13
+        explain: "It priced acquisition, once. Reading a one-time settlement as a rate schedule is the error that makes a pitch fall apart in the room, because the person across the table has usually read the terms."
+      - text: "It shows training rights are where the money is, since this dwarfs the disclosed licensing deals."
+        misconception: D12
+        explain: "A settlement is not a market. Only about 40% of recent deals include training rights, down from near-universal, while inference-time access deals grow several-fold; and the expert-labeled-data market, where labs actually spend billions, is larger than all disclosed content licensing combined."
+      - text: "It shows that pooled pro-rata distribution is now the settled mechanism for compensating authors."
+        misconception: D10
+        explain: "The settlement's distribution mechanics are not a design endorsement, and pro-rata pooling carries its own pathologies - cross-subsidy, winner-take-most concentration, and farming incentives - which are the reason the incumbent template transfers badly here."
+    difficulty: warmup
+
+  - id: v9-q10
+    concept: d-pitch-economics
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A prospective investor says: "Verification is a services business with a
+      small ceiling. The royalty exchange is the venture-scale idea. Lead with
+      that."
+
+      Argue the opposite ordering. Give the reasons verification leads and the
+      split is the vision slide, and name what you concede to their point.
+      Answer in a form you could deliver in ninety seconds.
+    answer: |
+      Four reasons for the ordering, and one concession.
+
+      First, verification needs nobody's permission. The royalty exchange
+      requires a frontier lab to agree to pay into a marketplace, and no lab has
+      agreed to pay into any marketplace by any mechanism anywhere - the leading
+      supply-side standard has thousands of endorsers and zero AI licensees.
+      Verification requires only a regulated party with a deadline.
+
+      Second, verification has a forcing function rather than a hope. Disclosure
+      is mandatory, enforcement is live from August 2026 with fines up to 3% of
+      global revenue, it refreshes every six months, and the regulator has stated
+      in writing that it will not check whether specific content was used. That
+      combination - compulsory, recurring, and declared unverified - is the gap.
+
+      Third, its deliverable is a document a stranger can check, not a number
+      they have to trust. A signed report, a revealed key, a verifier script and a
+      negative-control run is a different kind of sale from a ranking.
+
+      Fourth, the measurement layer is needed under every branch of the legal and
+      market outcome, while the exchange is needed under one. That makes it the
+      lower-variance path to the same destination rather than a retreat from it.
+
+      The concession: they are right that the ceiling on any single audit
+      engagement is bounded, and right that the exchange is the larger prize. So
+      it stays on the slide as the vision, with the measured signal-to-noise
+      ratio underneath it saying honestly whether it works yet. What I will not do
+      is lead with a mechanism whose counterparty does not exist, because that is
+      the pitch a fund has seen many times and can place in thirty seconds.
+    check: llm
+    rubric: |
+      Must contain at least three of: (1) no buyer exists for the exchange;
+      (2) the regulatory forcing function with its mandatory-but-unverified
+      character; (3) the deliverable is a checkable document; (4) measurement is
+      needed under every branch, the exchange under one.
+      Must also contain a genuine concession rather than a dismissal.
+      Three reasons plus the concession = pass. Four plus the concession, with
+      the split retained as a vision slide carrying its measured SNR = full
+      credit.
+      An answer that abandons the split entirely = fail; it is the part with a
+      fairness argument a non-technical counterparty can agree to, and no
+      gradient method supplies one.
+      An answer that claims the exchange is close because litigation will force
+      it = fail, diagnosing D13.
+    difficulty: stretch
+
+  - id: v9-q11
+    concept: d-retrieval-attribution
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      Audit this competitor demo. It shows, beside every generated sentence, a
+      ranked list of source documents with percentage weights summing to 100%,
+      labeled "training data attribution," and it pays publishers monthly in
+      proportion to those percentages.
+
+      Classify what they are almost certainly measuring, give two independent
+      experiments that would settle it, say what the 100% sum tells you on its
+      own, and state the one change that would make the product honest without
+      changing the engineering.
+    answer: |
+      Almost certainly corroborative: a normalized score over a retrieved or
+      matched document set, not a measurement of what moved the weights.
+
+      Experiment one: hold the weights fixed and change the retrieval index or
+      the indexed corpus, then re-ask. If the percentages move, they were about
+      the index. A contributive number cannot move without retraining.
+
+      Experiment two: turn retrieval off and ask something the model knows
+      anyway. If it answers and the percentages vanish or collapse, the
+      percentages were about retrieval placement. A third variant: ask for the
+      same content in a different style, so no verbatim span survives; a lexical
+      system's percentages collapse while the model's knowledge is unchanged.
+
+      The 100% sum is informative by itself. It says the denominator is a small
+      fixed set. Contributive attribution over a full training corpus is defined
+      against thousands or millions of sources, the measured contributions do not
+      naturally sum to a clean total, and at least some of them fall below the
+      noise floor. A tidy normalized split over a handful of documents is a strong
+      signal that the denominator is the retrieved or matched set.
+
+      The honest change is the label and the header, not the code. Call it what it
+      is - metering surfaced use, which is a real product with real buyers - drop
+      the word attribution, and state that the documents are not claimed to have
+      caused the output. Everything else can stay, including the payments, as long
+      as what is being paid for is named accurately.
+    check: llm
+    rubric: |
+      Must contain: (1) the classification as corroborative; (2) two genuinely
+      independent experiments, at least one of which is index-swap or
+      retrieval-off; (3) the normalization argument - a clean sum over few
+      documents implies the retrieved set is the denominator; (4) the fix is the
+      label, not the mechanism.
+      Pass = (1), (2) and either (3) or (4). Full credit = all four.
+      Concluding that the product should not exist = fail; metering is honest
+      when labeled, and the diagnosis this unit teaches is of claims rather than
+      of businesses.
+      Accepting the label because the vendor says the percentages are computed
+      with gradients = fail, diagnosing D1; the test is the experiment, not the
+      method name.
+    difficulty: stretch
+
+  - id: v9-q12
+    concept: d-demo-assembly
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      The demo's footnote reads: "Source 7 membership: proven. z = 4.5,
+      one-sided p = 3.4e-6; family-corrected p = 8.5e-5 at family size m = 25.
+      Key commitment sha256:9c41...e07a, timestamped before this model was
+      trained."
+
+      What does that footnote license?
+    options:
+      - text: "That a test fixed before the model existed fired at a stated false-positive rate, for this source, on this model."
+        correct: true
+        explain: "Right, and every clause of the footnote is doing work: the family correction answers the multiple-testing objection, and the pre-model timestamp answers the only question an opposing expert needs to ask, which is when each element of the protocol came into existence."
+      - text: "That p is small, so the result is proven regardless of when the test was designed."
+        misconception: D19
+        explain: "A p-value only means anything if the test, threshold, family size and key were fixed before anyone saw the model. Chosen afterwards, the stated false-positive rate describes a procedure nobody ran - and the correction matters too: 25 tests at a 0.05 threshold produce false positives by construction."
+      - text: "That the model's loss on source 7 is anomalously low, which is what membership evidence means."
+        misconception: D2
+        explain: "That is post-hoc membership inference, and its null - models that did not train on this data - cannot be sampled. The footnote's strength comes from the opposite construction: a control set generated under the same key and never published, which can be sampled as often as you like."
+      - text: "That the detection method used here is stronger than the alternatives, since z = 4.5 is a large value."
+        misconception: V7-M2
+        explain: "Detection power and validity are independent properties. A larger z from a design with no constructible null is power at a confidence of unknown. What licenses the word proven here is the null and the commitment, not the magnitude."
+    difficulty: core
