@@ -1,0 +1,594 @@
+# v8 gradient-tracing: pretest + terminal check bank.
+# Solo fade items: v8-q2 (v8-gradient-dotproduct), v8-q3
+# (v8-tracin-checkpoints). Each is the third appearance of a procedure that was
+# worked in canon prose and drilled as a completion beat.
+
+pretest:
+  - id: v8-p1
+    concept: d-tracin
+    prompt: |
+      You have a trained language model, every checkpoint saved from its
+      training run, and the tagged corpus it was trained on. A user asks why
+      the model produced a particular sentence.
+
+      Can you answer that question without training anything new? Say what you
+      can produce, and state what your answer would be worth to a skeptic.
+    answer: |
+      You can produce an estimate, not an answer. From the saved checkpoints
+      you can compute, for each training example or source, a
+      learning-rate-weighted dot product between its gradient and the
+      gradient of the output in question, and rank sources by the result. That
+      is cheap - one backward pass per query after a one-time indexing sweep.
+
+      What it is worth to a skeptic is a separate question with an empirical
+      answer: exactly the rank correlation between that estimate and an actual
+      counterfactual, measured on a corpus small enough to retrain. Without
+      that number the ranking is unfalsifiable, and the published measurements
+      are unkind - against retraining ground truth on a 2-billion-parameter
+      model, the methods that scale come out no better than random guessing,
+      while the method that reaches 0.97 costs three to five training runs per
+      query.
+    check: llm
+    rubric: |
+      Pass requires both: (1) yes, an estimate is computable from gradients and
+      saved checkpoints without new training, and (2) its value to a skeptic is
+      a measured correlation against a counterfactual, not the plausibility of
+      the method.
+      Answering "yes, gradient attribution solves this" with no mention of
+      needing validation = fail, diagnosing D6. This is the primary calibration
+      item for the unit and is expected to fail.
+      Answering "no, you would have to retrain" = partial; the learner has the
+      right skepticism and has not seen that a graded estimate is a real
+      product.
+
+  - id: v8-p2
+    concept: d-gradient-similarity
+    prompt: |
+      Two training documents are compared by taking the dot product of their
+      gradients - each document's gradient being the direction in parameter
+      space that most reduces that document's loss. The dot product comes out
+      near zero at every checkpoint.
+
+      What does that tell you about the two documents' content? Justify.
+    answer: |
+      Nothing reliable. The dot product measures whether the two documents push
+      the model's parameters in the same direction, which is a fact about the
+      model's current mechanism rather than about what the documents say. Two
+      documents stating identical facts can be near-orthogonal, because one is
+      phrased in a construction the model has already mastered so its gradient
+      is small and points elsewhere. Two documents on unrelated subjects can be
+      strongly aligned because both push the same low-level machinery - a
+      numeral format, a citation style.
+
+      The sharpest evidence: at 52-billion-parameter scale, flipping the word
+      order of a key phrase collapses measured influence to near zero. Same
+      content, no influence. The estimator was tracking token-order-sensitive
+      gradient alignment.
+    check: llm
+    rubric: |
+      Pass requires the answer to deny that the dot product measures content
+      similarity, and to give some mechanism for the denial - either the
+      gradient depends on what the model already knows, or alignment can come
+      from shared low-level structure rather than shared topic.
+      Answering "the documents are about different things" or "they are
+      unrelated in meaning" = fail, diagnosing V8-M1. Expected to fail.
+      Answering "nothing, because zero could be a coincidence" without a
+      mechanism = partial.
+
+  - id: v8-p3
+    concept: d-influence-vs-entailment
+    prompt: |
+      A model states a fact. You want to find the training document that
+      contains that fact. Two tools are available: a production-grade gradient
+      influence method run properly at 8-billion-parameter scale over the full
+      160-billion-token training corpus, and BM25, a term-overlap retrieval
+      score from the 1990s that has no idea a model exists.
+
+      Which finds the fact-containing document more reliably? Predict, and say
+      why.
+    answer: |
+      BM25 wins, and the reason is that the two tools answer different
+      questions. BM25 scores lexical overlap, which is directly a proxy for
+      "this document contains this claim". The gradient method scores which
+      training data moved the loss on that output, which is a causal claim
+      about the model and is systematically NOT the same document - influence
+      surfaces the data that shaped the format, the register, the reasoning
+      step, and returns little for a document stating the fact in a phrasing
+      the model had already mastered.
+
+      This is the measured result from a full-corpus run at that scale, and it
+      recurs across the benchmark suites: cheap lexical and embedding baselines
+      match or beat expensive gradient attribution on fact-finding tasks.
+    check: llm
+    rubric: |
+      Pass requires predicting BM25 AND naming the two-target distinction:
+      influence measures what moved the loss, entailment measures what contains
+      the claim.
+      Predicting the gradient method = fail, diagnosing D5. Expected to fail,
+      and it is the failure the unit's entailment section is built to correct.
+      Predicting BM25 for the reason "gradient methods are noisy" or "8B is too
+      big" = partial; right answer, wrong mechanism, and the learner will still
+      conflate the two targets when designing a payment rule.
+
+check:
+  - id: v8-q1
+    concept: d-gradient-similarity
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A training example $z$ and a query point $z_q$ have gradients $g_z$ and
+      $g_{z_q}$ at the current parameters. The optimizer takes one
+      gradient-descent step on $z$ alone with learning rate $\eta$.
+
+      Write the first-order prediction for how much the query's loss changes,
+      define every symbol, state what the sign of the prediction means, and say
+      what governs how accurate the prediction is.
+    answer: |
+      The step moves the parameters by $\Delta\theta = -\eta\, g_z$. To first
+      order the query's loss changes by $g_{z_q} \cdot \Delta\theta$, so
+
+        change in query loss = -eta * (g_zq . g_z)
+
+      where $g_z$ is the gradient of the loss on the single training example
+      $z$ (same shape as the parameters), $g_{z_q}$ is the gradient of the loss
+      on the query point at the same parameters, $\eta$ is the learning rate,
+      and the dot product multiplies matching components and sums.
+
+      Sign: a positive dot product means the query's loss went DOWN - the two
+      examples are allies, and a step on the training example helped the query.
+      Negative means rivals. Zero means the step left the query untouched to
+      first order.
+
+      Accuracy: the prediction is a straight-line approximation to a curved
+      loss surface, so its error is second order in $\eta$. Halve the learning
+      rate and the error falls by roughly a factor of four. Everything built on
+      this - the checkpoint sum, the in-run ledger - inherits that dependence.
+    check: llm
+    rubric: |
+      Must contain: (1) the expression $-\eta (g_{z_q} \cdot g_z)$ or
+      equivalent, with the step rule $\Delta\theta = -\eta g_z$ visible or
+      implied; (2) every symbol defined, including that gradients have the same
+      shape as the parameters; (3) sign convention stated - positive dot
+      product means the query's loss fell; (4) accuracy governed by step size,
+      error second order in $\eta$.
+      (1), (2), (3) = pass. All four = full credit.
+      Omitting the learning rate from the expression = fail; dropping the
+      learning-rate weight is one of the two standard implementation bugs and
+      it changes rankings.
+      An answer that describes the dot product as measuring similarity of the
+      two examples' content = flag V8-M1 and do not pass, even if the formula
+      is right.
+    difficulty: core
+
+  - id: v8-q2
+    concept: d-gradient-similarity
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      A two-parameter model predicts $\hat y = w_1 x_1 + w_2 x_2$ and is scored
+      by $\ell = (\hat y - y)^2$, so a single example's gradient is
+      $g = 2(\hat y - y)\,(x_1, x_2)$.
+
+      Parameters are $w = (1, 2)$. Two examples:
+
+        U: x = (2, 1), y = 5
+        V: x = (1, 1), y = 1
+
+      Compute $g_U \cdot g_V$.
+
+      Answer with the single integer, digits and sign only.
+    answer: "-24"
+    check: exact
+    difficulty: core
+
+  - id: v8-q3
+    concept: d-tracin
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      Compute a TracIn score over two checkpoints. At each checkpoint the
+      contribution is the learning rate times the dot product of the query
+      gradient with the training example's gradient; the score is the sum.
+
+        Checkpoint 1, eta = 0.2
+          g_q = (1, -1, 2)
+          g_S = (3,  1, 0)
+
+        Checkpoint 2, eta = 0.05
+          g_q = (2,  0, 1)
+          g_S = (1,  4, 2)
+
+      Answer with the single number, to two decimal places.
+    answer: 0.60
+    check: numeric(0.005)
+    difficulty: core
+
+  - id: v8-q4
+    concept: d-tracin
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      TracIn is described in this unit as the honest baseline of the gradient
+      attribution family. Which statement gives the correct reason?
+    check: choice
+    options:
+      - text: "Its assumptions are checkable and boundable: it needs the training trajectory, which you have, and a first-order step approximation whose error shrinks with the learning rate. It requires no convexity, no converged optimum, and no second-derivative matrix."
+        correct: true
+        explain: "Correct, and the emphasis belongs on 'checkable'. TracIn can be wrong - it is a first-order approximation along one trajectory - but every source of its error is something you can name and, in the case of the step approximation, shrink. That is what makes a negative result about TracIn informative rather than mysterious."
+      - text: "It is the most accurate gradient method available, which is why the Hessian-corrected alternatives have not displaced it."
+        misconception: D6
+        explain: "Accuracy is not what earns TracIn the label, and no gradient method in this family has demonstrated accuracy against ground truth at scale - the scalable ones measure at chance. TracIn is honest because its failure modes are legible, not because it wins. Assuming a method is good because it is the standard one is exactly the inference this unit's reckoning section exists to break."
+      - text: "It produces scores on an absolute scale, so a score from one model can be compared directly against a score from another."
+        misconception: V8-M3
+        explain: "The opposite is true. A TracIn score is a sum of learning-rate-weighted dot products in one model's parameter space; change the model, the schedule, or the projection seed and the number moves. There is no shared zero and no units. Only rankings within one model, graded against ground truth, carry information."
+      - text: "Because it dots gradients directly, it finds the training documents that most closely resemble the output, which is what attribution means."
+        misconception: V8-M1
+        explain: "This conflates gradient alignment with content similarity. Gradient alignment is about whether two examples push the parameters the same way; at 52B scale, flipping the word order of a key phrase collapses influence to near zero while the content is unchanged. It also conflates influence with entailment - resemblance is the question BM25 answers, and answers better."
+    difficulty: core
+
+  - id: v8-q5
+    concept: d-tracin
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Your gradient index projects every 561-million-component gradient down to
+      4,096 components with a random matrix before storing it.
+
+      Explain why that is safe for computing dot products, state the one
+      condition that has to hold across every vector in the index, and describe
+      precisely what goes wrong if that condition is violated - including why
+      the failure is hard to notice.
+    answer: |
+      Why it is safe: you never need the gradients, only their dot products.
+      For a random matrix P with rows drawn from a Gaussian and scaled by
+      1/sqrt(d), the projected dot product (Pu).(Pv) approximates u.v, and the
+      dimension d needed for a given accuracy depends on how MANY vectors you
+      are preserving, not on how long they are. The parameter count does not
+      appear. Each row of P gives one noisy but unbiased estimate of u.v and
+      the d rows average, so the error falls like 1/sqrt(d) - about 1.6% of the
+      product of the two vectors' lengths at d = 4,096.
+
+      The condition: every vector that will ever be dotted against another must
+      pass through the SAME projection - the same matrix, meaning in practice
+      the same seed. That covers training gradients against each other, query
+      gradients against source accumulators, and everything within a
+      checkpoint.
+
+      What goes wrong: a different draw of P is a different random map into a
+      different space. Dot products taken across two different projections
+      approximate nothing; they are the inner product of two unrelated random
+      shadows. The failure is hard to notice because the result is still a
+      finite, well-ordered set of numbers that produces a plausible-looking
+      ranking. Nothing raises an error, nothing is obviously out of range, and
+      every downstream claim is noise wearing a result's clothes. The matrix is
+      larger than the model so it is regenerated rather than stored, which
+      makes recording the seed a load-bearing manifest entry.
+    check: llm
+    rubric: |
+      Must contain: (1) only dot products are needed, and random projection
+      approximately preserves them with error falling like 1/sqrt(d), with the
+      target dimension independent of the parameter count; (2) the same
+      projection - in practice the same seed - must be used for every vector
+      that gets dotted; (3) mismatched projections make the dot products
+      meaningless; (4) the failure is silent, producing plausible numbers with
+      no error.
+      (2), (3) and (4) = pass. All four = full credit.
+      An answer that has (1) and (2) but not (4) = partial, do not pass; the
+      silence of the failure is the operationally important half and is why the
+      seed belongs in the manifest rather than in a comment.
+      An answer claiming the projection is lossless = fail; it is lossy in a
+      specific and useful way, and the loss falls hardest on near-orthogonal
+      pairs, which is why projected TracIn resolves top contributors and not
+      the tail.
+    difficulty: core
+
+  - id: v8-q6
+    concept: d-tracin
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      A 2026 result found that the dominant error in trajectory-based
+      attribution methods was that the literature assumed SGD while the models
+      were trained with AdamW, and that correcting it moved published results
+      by 10 to 300%.
+
+      Show exactly where the assumption enters a TracIn derivation, write the
+      corrected summand, and explain why the correction changes rankings rather
+      than merely rescaling every score by a constant.
+    answer: |
+      Where it enters: the derivation says the parameters move by
+      delta-theta, so the query's loss changes by g_zq . delta-theta. That part
+      is just the first-order expansion and is fine for any optimizer. The next
+      line substitutes delta-theta = -eta * g_z, which is the SGD update rule -
+      step directly along the negative gradient - and that substitution is what
+      turns the expression into a plain dot product.
+
+      AdamW does not step along the gradient. It divides each coordinate by a
+      running estimate of that coordinate's typical magnitude:
+
+        delta-theta_j = -eta * g_z,j / (sqrt(v_j) + epsilon)
+
+      where v_j is the optimizer's second-moment estimate for parameter j and
+      epsilon prevents division by zero. Substituting that instead gives a
+      WEIGHTED dot product:
+
+        sum over j of  g_zq,j * g_z,j / (sqrt(v_j) + epsilon)
+
+      Why it changes rankings: if the weights were the same for every
+      coordinate, the correction would be a scalar multiple and every score
+      would move together, leaving the order untouched. They are not. Across a
+      transformer's parameters v_j spans orders of magnitude, so the weighting
+      down-weights coordinates the optimizer had learned to distrust and
+      up-weights the quiet ones. An example whose gradient mass sits in
+      low-variance coordinates is promoted relative to one whose mass sits in
+      high-variance coordinates, and their relative order flips.
+
+      Practically: save the optimizer's second-moment state alongside each
+      checkpoint and use the weighted form. It is a few lines, and without it
+      you have implemented TracIn's derivation for an optimizer nobody used.
+    check: llm
+    rubric: |
+      Must contain: (1) the assumption enters at the substitution
+      delta-theta = -eta*g_z, which is the SGD update rule, not at the
+      first-order expansion; (2) the corrected summand is a per-coordinate
+      weighted dot product with weights 1/(sqrt(v_j) + epsilon); (3) rankings
+      change rather than rescale BECAUSE the weights vary across coordinates -
+      a uniform weight would be a scalar multiple and preserve order.
+      All three = pass. (3) is the discriminating part; an answer with the
+      formula but no account of why a non-uniform weighting reorders = partial,
+      do not pass.
+      Attributing the 10-300% figure to AdamW being "a better optimizer" or to
+      general numerical imprecision = fail; the mechanism is a wrong update
+      rule in the derivation, not a quality difference between optimizers.
+      Locating the error in the first-order expansion itself = fail; the
+      expansion is optimizer-agnostic and correct.
+    difficulty: stretch
+
+  - id: v8-q7
+    concept: d-tracin
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      A colleague reports: "Source 7 scores 0.42 on our 10M-parameter model and
+      0.31 on the 561M model, so its influence dropped by about a quarter as we
+      scaled."
+
+      What can you conclude?
+    check: choice
+    options:
+      - text: "Nothing. The two numbers are sums of learning-rate-weighted dot products in different parameter spaces under different schedules and different projections; they have no shared units and no shared zero. Only rankings within one model, graded against ground truth, carry information."
+        correct: true
+        explain: "Correct. Four independent choices - model, learning-rate schedule, projection seed, and whether the dot product is optimizer-preconditioned - each rescale the number arbitrarily. Comparing them is like comparing two voltages with no stated reference. The comparable object is the ranking, and even that needs the query gradient's norm divided out before it travels across queries."
+      - text: "Source 7's influence genuinely fell by about 26%, which is worth reporting as a scaling trend."
+        misconception: V8-M3
+        explain: "This treats the score as a measured quantity with units. It is not. The 561M model's parameter space has a different dimension, its schedule sets different eta_c weights, and if the projection seed differs the two numbers are shadows of different random maps. A 'trend' assembled from two incomparable numbers is an artifact of the reporting, not a finding."
+      - text: "Influence is known to become more abstract with scale, so the drop confirms that the larger model relies less on any single source."
+        misconception: V8-M1
+        explain: "The abstraction finding is real - larger models match concepts rather than surface tokens - but it is a claim about WHAT influence attaches to, not about the magnitude of a raw score. Invoking it here dresses an incomparable pair of numbers in a real result, which is more dangerous than an obvious error because it survives a first round of questions."
+      - text: "The drop is within the expected variation from training stochasticity, so both numbers should be reported with seed error bars and then compared."
+        misconception: D16
+        explain: "Seed noise is real and error bars are right, but adding them does not make these two numbers comparable - it makes two incomparable numbers each carry an interval. The problem is not precision, it is that there is no common scale. Error bars fix the question 'is this number stable'; they cannot fix 'is this number the same kind of thing as that one'."
+    difficulty: core
+
+  - id: v8-q8
+    concept: d-influence-vs-entailment
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      You are designing the payment rule for a royalty system and must choose
+      what it pays for: influence or entailment.
+
+      State what each target measures, name which measurement tool answers each
+      and roughly what it costs, and then state the specific way each choice
+      misallocates money. Finish with the choice you would defend and the
+      sentence you would defend it with.
+    answer: |
+      Influence: which training data moved the loss on this output. Measured
+      definitionally by leave-one-out retraining, approximated cheaply by
+      gradient dot products over checkpoints. Cost: a training run per
+      question for the exact version, or tens of dollars once plus milliseconds
+      per query for the gradient approximation.
+
+      Entailment: which document contains or supports the claim. Measured by
+      lexical retrieval - BM25, suffix arrays, embedding similarity. Cost:
+      milliseconds, no GPU, and it beats gradient influence at this task at
+      8-billion-parameter scale.
+
+      How each misallocates. Paying for entailment pays for lexical
+      resemblance, so it systematically underpays the sources that shaped the
+      model without resembling its outputs - the hidden influencers - and it
+      builds a corroborative system while claiming a contributive one. Paying
+      for influence pays a quantity that is defensible but unintuitive to the
+      recipient, who sees a document bearing no relationship to the output;
+      it is also only as trustworthy as its measured correlation against
+      retraining, which cannot be measured at the scale the product runs at.
+
+      The defence: I would pay for influence, because contribution is what a
+      royalty is for and entailment answers a different question - and I would
+      ship the lexical surface next to it, labelled as corroboration, because
+      it is the thing a rightsholder can check by eye. The sentence: "We pay
+      for measured contribution, we report the correlation between our
+      estimator and retraining ground truth on a corpus where retraining is
+      affordable, and the verbatim matches you see are evidence of overlap, not
+      the basis of your payment."
+    check: llm
+    rubric: |
+      Must contain: (1) influence defined as moved-the-loss and entailment as
+      contains-the-claim; (2) the correct tool for each, with lexical methods
+      cheap and winning at the entailment task; (3) a specific misallocation
+      for EACH choice - entailment underpays non-resembling shapers, influence
+      pays an unintuitive quantity that is only as good as its measured
+      correlation; (4) a defended choice.
+      (1), (2), (3) = pass. All four = full credit.
+      An answer that claims one tool can serve both targets = fail, diagnosing
+      D5; the two rankings systematically disagree and this is the measured
+      result, not a limitation of current implementations.
+      An answer choosing entailment because it is cheap and verifiable, with
+      the underpayment of hidden influencers explicitly acknowledged and
+      accepted, = pass; that is a defensible product decision honestly stated,
+      which is the standard this item is testing.
+      Choosing entailment while calling it contributive attribution = fail, and
+      flag D1.
+    difficulty: core
+
+  - id: v8-q9
+    concept: d-inrun-shapley
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      Your in-run ledger accumulates, per source, the learning-rate-weighted
+      dot product of each example's gradient with the validation gradient, at
+      every training step. Two of your twelve sources hold near-identical
+      content.
+
+      What does the ledger report for those two, and what does that tell you?
+    check: choice
+    options:
+      - text: "It credits each of them in full for material only one of them needed to supply, because the per-step game is additive by construction and cannot see redundancy. The ledger is a Shapley value of a per-step, first-order, single-trajectory game - not of the coalition game."
+        correct: true
+        explain: "Correct, and the distinction is the whole content of the method's honest claim. The first-order derivation makes each example's contribution its own term with no dependence on any other player, which is what makes the Shapley value trivial to compute - and is exactly the additivity that redundancy violates. The coalition sweep handles duplicates by construction; the in-run ledger structurally cannot."
+      - text: "It splits the shared value between them, because Shapley values satisfy the symmetry axiom and interchangeable players are paid equally."
+        misconception: V8-M4
+        explain: "Symmetry does hold - in the game the ledger actually plays, where players are examples in one batch and value is that step's validation-loss reduction. That game says nothing about what would happen if a source were absent from the corpus, which is a different trajectory. Two duplicates appear in mostly different batches and are each credited independently; nothing splits anything."
+      - text: "It reports both at approximately zero, since each is individually replaceable and the model loses nothing when either is removed."
+        misconception: V5-M4
+        explain: "That is the leave-one-out failure mode, imported into a method that does not compute leave-one-out. The ledger never removes anything - it accumulates gradient alignment along the trajectory that happened, and both duplicates were present and contributing on that trajectory. Two different rules, two different pathologies, and confusing them means predicting the wrong bug."
+      - text: "The ledger is unreliable here, which is why source-level Shapley over coalitions is infeasible past a handful of sources and flat fees are the only defensible option."
+        misconception: D7
+        explain: "The first clause is right and the rest does not follow. Source-level coalition Shapley is feasible precisely because the unit is the source: 12 sources means 4,096 cached coalitions, not 2^n over millions of documents. The cliff is around n=15. A limitation of the cheap in-run method is an argument for grading it against the coalition sweep, not for abandoning both."
+    difficulty: core
+
+  - id: v8-q10
+    concept: d-inrun-shapley
+    kind: constructed
+    congruent: true
+    callback_eligible: true
+    prompt: |
+      Make the strongest argument you can that nobody should ship gradient-based
+      attribution for royalty payments at all. Use the actual evidence, not
+      generic caution.
+
+      Then answer it - or concede it. Whichever you do, say what measurement
+      would settle the question, and what result would change your mind.
+    answer: |
+      The case against, at full strength. First, the only method ever measured
+      to correlate with retraining ground truth costs three to five training
+      runs per query and is an oracle, not a system; every method that scales
+      measured no better than random guessing on a 2-billion-parameter model
+      when someone finally checked. Second, the field's own dominant error went
+      unnoticed for years - the derivations assumed SGD while models trained
+      with AdamW, and correcting it moved published results by 10 to 300%,
+      which means the prior numbers were not measuring what their authors
+      believed. Third, the deepest-math branch of the family has the weakest
+      record: influence functions estimate a different object than
+      leave-one-out, and three independent groups report them as poor for deep
+      networks. Fourth, a term-overlap score from the 1990s beats gradient
+      influence at the task users actually recognize. Fifth, none of it is
+      incentive-compatible - attribution scores are demonstrably inflatable by
+      a participant acting adversarially - so a payment system built on them
+      invites the attack. Sixth, and worst for the business case: if the
+      estimator's signal-to-noise sits below a known threshold, the
+      welfare-optimal contract is a flat fee, and no better estimator changes
+      that - only more signal does.
+
+      The answer, which is partly a concession. Points one through four are
+      arguments against shipping an UNGRADED gradient method, and they are
+      correct. They are not arguments against shipping a graded one. The
+      response is to measure the rank correlation against a counterfactual
+      table on a corpus small enough to retrain, publish it with its design,
+      and let the number set the claim: at a high correlation you have a cheap
+      instrument with a stated warrant, and at a low one you have a real
+      negative result and you ship the coalition split instead. Point five is a
+      genuine concession - it is not solvable inside the math and needs an
+      identity and registration layer outside it. Point six is not a defeat
+      either way, because measuring which side of the threshold you are on is a
+      publishable result in both directions.
+
+      What would settle it: the rank correlation and the Linear Datamodeling
+      Score of the cheap method against the leave-one-source-out table, with
+      the design stated, plus the same measurement repeated at a second, larger
+      model scale to see whether it holds.
+
+      What would change my mind: a correlation near zero on my own corpus at
+      the scale where I can measure it. That would mean the cheap column has no
+      warrant at all, and the honest product becomes the coalition split plus
+      the lexical surface, with the gradient layer removed rather than
+      relabelled.
+    check: llm
+    rubric: |
+      The case against must cite at least three distinct pieces of real
+      evidence from: the near-random result for scalable methods against
+      ground truth; the cost of the one method that correlates; the SGD/AdamW
+      mismatch moving results 10-300%; the influence-function record; BM25
+      beating influence at fact-finding; adversarial inflatability; the flat-fee
+      SNR threshold. Generic caution ("models are complex", "more research is
+      needed") does not count.
+      The answer must distinguish shipping an UNGRADED method from shipping a
+      graded one, and must name the rank correlation or LDS against a
+      counterfactual as the settling measurement.
+      Must state a falsifier - a result that would change the position.
+      Three pieces of evidence + the graded/ungraded distinction + a falsifier =
+      pass.
+      An answer that argues gradient attribution is fine because the papers are
+      published and the libraries exist = fail, diagnosing D6.
+      An answer that concedes entirely and proposes flat fees without measuring
+      SNR = fail, diagnosing D20 in reverse; the threshold argument says
+      measure and report, and conceding without measuring throws away the
+      result.
+    difficulty: stretch
+
+  - id: v8-q11
+    concept: d-tracin
+    kind: constructed
+    congruent: true
+    callback_eligible: false
+    prompt: |
+      Size a gradient index. The corpus has $4 \times 10^6$ training sequences
+      tagged into $K = 8$ sources. Gradients are projected to $d = 2{,}048$
+      components stored as 16-bit floats (2 bytes each), and you save 3
+      checkpoints.
+
+      Compute (a) the storage in GB if you kept one projected gradient per
+      SEQUENCE at a single checkpoint, and (b) the storage in KB if you keep
+      one accumulated vector per SOURCE at every one of the 3 checkpoints.
+
+      Use 1 GB $= 10^9$ bytes and 1 KB $= 10^3$ bytes. Answer as two numbers,
+      comma-separated: the GB figure to one decimal place, then the KB figure
+      to the nearest whole number. Format like `12.3, 456`.
+    answer: "16.4, 98"
+    check: exact
+    difficulty: warmup
+
+  - id: v8-q12
+    concept: d-tracin
+    kind: mcq
+    congruent: false
+    callback_eligible: false
+    prompt: |
+      You currently sum TracIn over 4 checkpoints spread across the
+      constant-learning-rate phase of training. You have budget to save 16
+      instead, evenly spaced across the same phase. What should you expect?
+    check: choice
+    options:
+      - text: "Little change in the scores for four times the storage and four times the gradient compute, because checkpoints close together in a stable phase have nearly identical parameters and contribute nearly the same dot product repeatedly."
+        correct: true
+        explain: "Correct. What a checkpoint buys is coverage of a distinct phase of training, since an example's relationship to a query changes as the model moves - which is why signs flip across widely separated checkpoints. Sixteen samples of one phase is one sample, paid for sixteen times. Spacing across the trajectory is the knob; count is not."
+      - text: "A materially better estimate, since the sum over checkpoints approximates a sum over steps and a finer grid converges to it."
+        misconception: V8-M2
+        explain: "The Riemann-sum intuition is the right instinct for numerical integration and the wrong one here, because it assumes the samples are informative independently. Consecutive checkpoints in a stable phase are near-duplicates; averaging near-duplicates reduces no error. The original TracIn work uses a handful of checkpoints by design, not by budget."
+      - text: "Better resolution of which training documents most resemble the query, since more checkpoints means more chances to catch the lexical match."
+        misconception: V8-M1
+        explain: "Two errors stacked. Checkpoint count does not change what the dot product measures, and what it measures is not resemblance - it is whether two examples push the parameters the same way. At scale, identical content with flipped word order collapses influence to near zero, which is not a resolution problem."
+      - text: "Reduced sensitivity to the training seed, since averaging over more checkpoints averages away the stochasticity in any single one."
+        misconception: D16
+        explain: "Seed sensitivity is real and it is the right thing to worry about, but the wrong lever is being pulled. All 16 checkpoints come from ONE training run and therefore one seed; they share every random choice that run made. Averaging within a trajectory cannot average across trajectories. Reducing seed sensitivity requires more runs, not more checkpoints."
+    difficulty: warmup
