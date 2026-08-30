@@ -1,0 +1,38 @@
+# Unit-local misconception additions for v4 (ground-truth).
+# Same schema as corpus-v2/misconception-bank.yaml. IDs are namespaced V4-M*
+# so they never collide with the global D* bank or with vol-1's M* namespace.
+# Referenced by distractors in v4/questions.yaml and by beat rubrics in
+# v4/canon.md.
+
+misconceptions:
+  - id: V4-M1
+    name: contribution-is-additive
+    wrong_model: "Per-source contributions add up: measure each source's leave-one-out delta, sum them, and you have the model's total, so each source's share is its delta divided by that sum."
+    why_appealing: "It is how every other ledger works, and the arithmetic is so natural it does not feel like an assumption at all - a pie chart requires the slices to sum to the pie. It is also what every deployed allocation rule silently assumes, so nobody is contradicting you."
+    failing_prediction: "Take two sources that carry substantially the same material, which any corpus assembled from a preprint server and a journal will contain. Remove the first: the model barely notices, because the second still covers it, so its delta comes in near 0.002 bpb. Remove the second: same thing, 0.002. Remove both: the model loses 0.020 bpb. The individual deltas sum to 0.004 against a joint effect of 0.020 - off by a factor of five, in the case that is most common rather than most contrived. Additivity also fails in the other direction for complementary sources, where the whole is worth less than the parts."
+    correction: "The leave-one-out delta is a source's marginal contribution to the FULL corpus, and marginal contributions do not sum to the total whenever sources interact. The gap is measurable rather than theoretical: fit the subset regression, compare each c_i against the corresponding Delta_i, and the difference is a direct readout of that source's interaction with everything else, at zero additional runs. Proportional-to-delta payout is therefore a choice that has to be defended, not a definition - and v5 exists because the axioms that force a unique fair split are the defence, while the sum-of-deltas rule cannot provide one."
+    units: [v4, v5]
+
+  - id: V4-M2
+    name: subset-runs-substitute-for-seeds
+    wrong_model: "Seed noise is beaten by averaging, and any extra runs average it, so 600 random-subset runs at one seed each will tighten the leave-one-out contribution table just as well as more seeds would - and give you the subset regression for free."
+    why_appealing: "The averaging instinct is correct in general and correct for the regression specifically, where more runs really do shrink the coefficient's error bar as 2*sigma/sqrt(M). Having just been told that seed noise is the enemy and that averaging is the remedy, spending the compute on the design that produces more runs per dollar looks like straightforward optimization."
+    failing_prediction: "Write down SE_delta = sigma*sqrt(2/n) and look for M in it. There is no M. Delta_i is a difference between exactly two condition means of n runs each, and no quantity of runs on other subsets enters that expression - train ten thousand subset models and the leave-one-out error bar is unchanged to the last digit. The check is direct: an engineer who spends the budget this way finds the same eight sources below the noise floor afterwards as before."
+    correction: "Averaging shrinks the error of the estimator that does the averaging. Subset regression averages across runs, so runs help it; the leave-one-out delta reads two condition means and nothing else, so only seeds help it. The two are also not estimates of the same quantity - c_i is an average marginal effect at the subset density you sampled and Delta_i is the marginal effect at full density, and they coincide only under additivity. Report both, use the disagreement as an interaction diagnostic, and never use one to justify not paying for the other."
+    units: [v4]
+
+  - id: V4-M3
+    name: negative-contribution-means-bad-data
+    wrong_model: "A negative contribution means the source is bad: noisy, low quality, or corrupted. The right response is to inspect it, and probably to drop it from the corpus."
+    why_appealing: "The sign reads as a verdict, and quality filtering really is the highest-leverage knob in a pipeline, so 'the measurement found bad data' is both a familiar story and one where the obvious remedy is satisfying. It also flatters the method: an attribution table that identifies junk sounds more useful than one that merely ranks."
+    failing_prediction: "Take a source that is a clean, well-formed mirror of material another source already carries, and measure it under a fixed token budget. Its delta comes out negative, because its tokens displaced tokens that would have taught something the held-out set rewards - nothing about it is low quality and reading a hundred of its documents will find nothing wrong. Now remove its duplicate partner as well and re-measure: the sign flips positive. A property of the data cannot depend on which OTHER source is present, so the negative sign was never a property of the data."
+    correction: "A negative delta says the source's marginal token was worth less than the token that replaced it, in this corpus, at this budget, against this held-out set. Three distinct causes produce it: redundancy with another source under a fixed budget, content that is off-distribution for the evaluation, and noise if the magnitude is inside the floor. Only the second is close to 'bad data' and even that is a statement about the yardstick rather than the source. Diagnose before acting: check the duplicate-cluster record from the pipeline, check |z| against the noise floor, and check whether the source's subject matter appears in the held-out set at all."
+    units: [v4, v5]
+
+  - id: V4-M4
+    name: ground-truth-is-scale-free
+    wrong_model: "Ground truth is ground truth. A counterfactual measured by actually retraining is the true contribution, full stop - the model scale it was measured at is an implementation detail of how the number was obtained, not part of what the number means."
+    why_appealing: "The word 'ground truth' does the damage on its own, and the epistemics really are different from every approximate method: this number was not estimated, it was computed by doing the experiment. Having spent a unit learning that everything else in the field is a guess, treating the one exact quantity as unqualified feels like the correct update rather than an overcorrection."
+    failing_prediction: "If contribution were scale-free, the ranking of sources measured at 10M parameters would hold at 8B. It does not reliably: influence at small scale is crisp and top-heavy, while at frontier scale it becomes a long tail where per-document effects round to zero, and influence also becomes more abstract with scale - small models match surface tokens where large ones match concepts. A source that is valuable because it teaches surface regularities and a source that is valuable because it teaches transferable structure will trade places somewhere between the two scales."
+    correction: "The counterfactual is exact for the configuration that produced it: this architecture, parameter count, token budget, protocol, held-out set, and source list. That is a scope statement rather than a weakness, and it is one almost no competing method makes at all. State it in the header block beside the table, and note the consequence that makes it tractable: because the measurement is exact within its scope, whether it transfers is a well-defined experiment with a known price - repeat one scale up and compare the rankings - rather than a matter of opinion."
+    units: [v4, v8]
