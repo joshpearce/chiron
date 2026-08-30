@@ -1,0 +1,35 @@
+# Unit-local misconception additions for v6 (model-memory).
+# Same schema as the global bank (corpus-v2/misconception-bank.yaml). IDs are
+# namespaced V6-* so they never collide with the global D* bank or with other
+# units' V<n>-M* entries. Referenced by distractors in v6/questions.yaml and by
+# refutation blocks in v6/canon.md.
+#
+# The global entries this unit refutes in canon are D2 (mia-can-prove-training),
+# D3 (verbatim-is-the-test), D4 (model-contains-copies) and D19
+# (significant-means-proven). V0-M1 (p-value-is-truth-probability) recurs
+# throughout and is referenced rather than re-refuted.
+
+misconceptions:
+  - id: V6-M1
+    name: auc-is-accuracy
+    wrong_model: "An AUC of 0.7 means the detector is right about 70% of the time, so it is a usable-but-imperfect detector."
+    why_appealing: "It is a single number between 0.5 and 1 attached to a detector, and 0.7 reads as a passing grade in every other context where numbers in that range appear. It is also the number the papers put in the abstract."
+    failing_prediction: "If AUC were accuracy, a detector at 0.70 would accuse wrongly about 30% of the time - unpleasant but workable. Compute its behaviour at the operating point an accusation actually requires and it collapses: real detectors at AUC ~0.7 commonly deliver a true-positive rate in the low single digits when the false-positive rate is held to 1%. A detector flagging 1.2% of members while flagging 1% of non-members is doing almost nothing, and its 0.7 came entirely from permissive thresholds where it flags half of everything."
+    correction: "AUC is the probability that a randomly chosen member outscores a randomly chosen non-member - an average over every threshold, including all the ones nobody would operate at. Nothing you do with a detector is an average over thresholds; you pick one, and for an accusation you pick a strict one. Report TPR at a fixed low FPR. For calibration: published membership attacks in practical settings sit below AUC 0.7, while a well-designed planted canary reaches roughly 50% TPR at 1% FPR - two different kinds of object that an AUC column makes look adjacent."
+    units: [v6, v7]
+
+  - id: V6-M2
+    name: alignment-removes-memorization
+    wrong_model: "A model that refuses to reproduce copyrighted text has had that content removed by alignment, so a refusal is evidence the content is not in the weights."
+    why_appealing: "Refusal is the only signal a user can see, it is genuinely the mechanism labs shipped for this problem, and it works for ordinary use - you ask, it declines, and the fix appears to have taken."
+    failing_prediction: "Under this belief no prompting strategy recovers the text, because nothing is left to recover. A divergence attack that pushes the model off its aligned distribution and back toward raw continuation raised the emission rate of training data by two orders of magnitude and produced over ten thousand distinct memorized examples for a few hundred dollars of API spend. On one heavily memorized novel, three frontier models gave three different refusal behaviours - over 95% recall once jailbroken, over three quarters with no jailbreak at all, and near-total refusal - and the refusal behaviour predicted nothing about what was in the weights."
+    correction: "Alignment reshapes the output distribution over the prompts alignment anticipated. It does not edit weights toward forgetting. A refusal is evidence about the safety layer and about nothing else. Operationally: never accept a refusal as a negative result in an audit, and never report your own model's refusal as evidence of non-memorization, because the first competent adversary produces the contradicting transcript."
+    units: [v6]
+
+  - id: V6-M3
+    name: heldout-means-unseen
+    wrong_model: "Any text the model was not trained on is a valid control set - 'held out' just means 'not in the training data'."
+    why_appealing: "In supervised learning you construct the split yourself, so the only difference between train and test really is which side of the split a sample landed on. The phrase carries that guarantee everywhere else it is used."
+    failing_prediction: "If all non-members were interchangeable as controls, swapping one confirmed non-member set for another would leave the result unchanged. It does not. Benchmarks built from pre-cutoff text as members and post-cutoff text as non-members confounded membership with date; a blind classifier that never queries the model at all beat published membership attacks across eight datasets, and matched-distribution evaluations put the same attacks barely above random."
+    correction: "A control set is valid only if it matches the test set in every respect that moves the statistic, with membership the single difference. Date is the confound that broke this field, and topic, register, formatting, source and length are all available to break it again. Constructing a matched control is an experimental-design problem, not a data-collection problem: when you cannot construct one, you do not have a test. The 2026 fixes - synthetic held-out sets, natural identifiers drawn from a known random space - are advances in control construction, not in attack strength."
+    units: [v6, v7]
