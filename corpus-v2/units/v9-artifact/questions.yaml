@@ -217,6 +217,7 @@ check:
   - id: v9-q2
     concept: d-retrieval-attribution
     kind: mcq
+    check: choice
     congruent: false
     callback_eligible: false
     prompt: |
@@ -348,6 +349,7 @@ check:
   - id: v9-q5
     concept: d-demo-assembly
     kind: mcq
+    check: choice
     congruent: false
     callback_eligible: false
     prompt: |
@@ -531,6 +533,7 @@ check:
   - id: v9-q9
     concept: d-pitch-economics
     kind: mcq
+    check: choice
     congruent: false
     callback_eligible: false
     prompt: |
@@ -671,6 +674,7 @@ check:
   - id: v9-q12
     concept: d-demo-assembly
     kind: mcq
+    check: choice
     congruent: false
     callback_eligible: false
     prompt: |

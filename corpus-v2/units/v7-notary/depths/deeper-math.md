@@ -96,13 +96,15 @@ is exactly binomial:
 $$\Pr(K = j) = \binom{n}{j} p_0^{\,j} (1 - p_0)^{\,n - j}, \qquad
 p = \Pr(K \geq k) = \sum_{j = k}^{n} \binom{n}{j} p_0^{\,j} (1-p_0)^{\,n-j}$$
 
-At $n = 100$, $p_0 = 0.10$, $k = 25$, the exact upper tail is about
-$1.1 \times 10^{-5}$, against the normal approximation's $2.9 \times 10^{-7}$.
-The exact value is two orders of magnitude larger, because the binomial's right
+At $n = 100$, $p_0 = 0.10$, $k = 25$, the exact upper tail is
+$1.31 \times 10^{-5}$, against the normal approximation's $2.9 \times 10^{-7}$.
+The exact value is larger by a factor of about 45, because the binomial's right
 tail is heavier than the normal's out at four to five standard deviations, and
-the approximation degrades exactly where you most want it. Report the exact tail
-in any document that will be read adversarially; use the normal approximation to
-think with.
+the approximation degrades exactly where you most want it. The finding is still
+overwhelming - one in seventy-six thousand rather than one in three and a half
+million - and the point is that you would have overstated it by a factor of 45
+for no reason. Report the exact tail in any document that will be read
+adversarially; use the normal approximation to think with.
 
 The usual validity condition for the approximation is $n p_0 (1-p_0) \geq 9$,
 which the worked example meets exactly ($100 \times 0.1 \times 0.9 = 9$) - that

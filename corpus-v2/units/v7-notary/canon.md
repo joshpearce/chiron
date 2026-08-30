@@ -337,6 +337,26 @@ method in this literature has the simplest statistics in it, and that is not a
 coincidence: methods are sound when their nulls are constructed, and constructed
 nulls are simple by construction.
 
+Before any notation, the shape of what is about to happen, because the
+arithmetic is easier to follow if you already know where it is going.
+
+You are going to ask the model a fixed set of questions about the entities you
+published, and count how many it answers the way your generator wrote them.
+That count on its own means nothing, because some questions get answered
+correctly by luck. So you ask the same kind of questions about the entities you
+never published, and count those too. That second count is the luck rate,
+measured rather than assumed.
+
+Then you need one more thing before the comparison means anything: how much the
+luck count itself bounces around. Not every batch of unseen entities produces
+the same number of lucky hits. If the typical bounce is small, a modest excess
+is remarkable; if the bounce is large, the same excess is nothing. So the final
+number is the excess expressed in units of the bounce, and everything below is
+that sentence written down carefully.
+
+Three quantities, then: the luck rate, the size of the bounce, and how many
+bounces you are away from luck. Everything else in this section is bookkeeping.
+
 **The design.** You planted 25 watermark documents. Each describes one invented
 entity with four attributes - inventor, institution, year, operating wavelength.
 That gives $4 \times 25 = 100$ detection questions, where each question asks the
@@ -416,6 +436,16 @@ raise the hit rate, never lower it.
 So $z = 5.00$ gives $p = 2.9 \times 10^{-7}$: about three in ten million. If this
 model had never seen your journal, a hit rate this far above the coincidence
 rate would happen roughly once in three and a half million audits.
+
+One caution about that last figure, because it is the number that goes in a
+document somebody will attack. The normal curve is an approximation to a sum of
+coin flips, it is excellent in the middle and optimistic in the far tail, and out
+at five standard deviations it overstates the case. Summing the exact
+coin-flip probabilities instead gives $1.3 \times 10^{-5}$, about one in
+seventy-six thousand - still overwhelming, and forty-five times less
+overwhelming than the approximation claimed. The sum is a one-line computation
+with no tradeoff attached, so compute it. Use the $z$ to think with and put the
+exact tail in the report.
 
 **Step 5: decide.** Against a pre-registered threshold - and section 7 is about
 why the word "pre-registered" is doing more work in that sentence than the rest
