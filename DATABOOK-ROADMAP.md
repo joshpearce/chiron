@@ -213,15 +213,18 @@ Shapley -> OLMoTrace -> the economics papers (SNR/flat-fee threshold,
 73-deals analysis, semivalue critiques) -> ecosystem primary sources
 (Cloudflare announcements, RSL spec, Bartz settlement, EU AI Act Art. 53).
 
-**Milestones**
-1. Wk 1-2: tagged mini-corpus + 10M model trains on the Mac overnight.
-2. Wk 3-4: LOO ground-truth table with seed-noise bars (first real result).
-3. Wk 5-7: exact Shapley split + diagnostics + shell-company demo.
-4. Wk 8-10: 561M artifact + three-layer attribution demo.
-5. Wk 11-12: writeup: measured SNR, method-vs-ground-truth correlations,
-   the pitch narrative. (NeurIPS ATTRIB workshop, Sydney, Dec 11-12 2026;
-   idea-track deadline Sep 5 is likely too tight - the main deadline
-   passed - but the workshop is the room this audience is in.)
+**Milestones** (a sequence, not a schedule - this runs alongside other
+work at whatever pace it gets)
+1. Tagged mini-corpus + 10M model trains on the Mac overnight.
+2. LOO ground-truth table with seed-noise bars (first real result).
+3. Watermarks planted with committed key; detection with a sound p-value
+   (first verification-product result).
+4. Exact Shapley split + diagnostics + shell-company demo.
+5. 561M artifact + the full demo, verification leading.
+6. Writeup: the notary story, measured SNR, method-vs-ground-truth
+   correlations, the pitch narrative. (NeurIPS ATTRIB workshop, Sydney,
+   Dec 2026, is the room this audience is in - a target of opportunity,
+   not a deadline.)
 
 ## 4. Book outline (volume 2, working title: "Where the Words Come From")
 
@@ -264,35 +267,49 @@ beats ARE PoC build steps - the book produces the artifact.
   the shell-company attack, gameability critiques, the MTM diagnostic,
   and the SNR/flat-fee threshold - when the honest answer is "don't build
   the royalty scheme." Capstone: the exact Shapley split + attack demo.
-- **v6 - What the model remembers, and what you can prove** (50 min).
-  The Tier-1 stats unit, organized around the book's second great split:
-  retrospective vs prospective evidence. Memorization scaling laws
-  (~3.6 bits/param capacity; frequency relative to corpus size governs),
-  extraction attacks (the strongest legal evidence, available for almost
-  nothing), why membership inference fails (no sampleable null;
-  coin-flip decision instability; blind baselines beat published
-  attacks) and what works instead: dataset inference at collection
-  level, then the prospective family - canaries, fictitious-knowledge
-  watermarks, paired-rephrasing designs (STAMP) - where the null is
-  constructed and the p-value is sound. Courts to date credit
-  acquisition records and verbatim extraction, never statistical MIA;
-  a keyed watermark is the only statistical evidence built to survive
-  expert challenge. Capstone: plant fictitious-knowledge watermarks in
-  one source with a timestamped key commitment, detect via QA with a
-  pre-registered z-test.
-- **v7 - Tracing by gradient** (45 min). The Tier-3 unit, direct sequel
+- **v6 - What the model remembers, and what counts as evidence**
+  (45 min). The Tier-1 stats unit, organized around the book's second
+  great split: retrospective vs prospective evidence. Memorization
+  scaling laws (~3.6 bits/param capacity; frequency relative to corpus
+  size governs), extraction attacks (the strongest legal evidence,
+  available for almost nothing), why membership inference fails (no
+  sampleable null; coin-flip decision instability; blind baselines beat
+  published attacks), dataset inference at collection level as the
+  honest retrospective fallback. THE concept: what it means to sample
+  from a null, and the four disciplines that convert a number into
+  evidence (valid nulls, multiple-testing correction, dependence,
+  pre-registration). Capstone: reproduce a membership-inference failure
+  and an extraction success on the v3 model - feel both limits.
+- **v7 - The notary: proving it, and selling the proof** (50 min).
+  The audit-product unit. The prospective family: canaries,
+  fictitious-knowledge watermarks (coherent invented-entity statements
+  that survive dedup, filtering, and instruction tuning), paired-
+  rephrasing designs (STAMP) - constructed nulls, sound p-values, the
+  z-test as the whole detector. Courts credit acquisition records and
+  verbatim extraction, never statistical MIA; a keyed watermark is the
+  only statistical evidence built to survive expert challenge. The
+  product mechanics: the pre-commitment ledger (register corpus, keyed
+  watermarks + never-published controls, timestamped key commitment,
+  third-party-verifiable signed reports); exclusion certification
+  (PRISM) and EU Art. 53 conformance checking as the friendly first
+  sales; TEE attestation as the cooperative complement; zkML and
+  Proof-of-Learning as the marked graves. Capstone: plant watermarks in
+  one source with a committed key, detect via QA with a pre-registered
+  z-test, emit the signed report.
+- **v8 - Tracing by gradient** (45 min). The Tier-3 unit, direct sequel
   to vol-1 u5: gradients as directions, dot products as "pushed the same
   way," TracIn over checkpoints, projections (JL intuition), why
   influence != entailment (TrackStar/BM25), what MAGIC's verdict means
   for trust, In-Run Shapley as the practical convergence. Capstone:
   TracIn scores rank-correlated against v4 ground truth - the number
   that says whether cheap attribution can be trusted.
-- **v8 - The artifact and the argument** (40 min). Retrieval surface
+- **v9 - The artifact and the argument** (40 min). Retrieval surface
   (suffix arrays, OLMoTrace's honesty about causality), assembling the
-  three-layer demo, then the business argument: the ecosystem map, the
-  three open slots, Spotify's pathologies transferred, what the VC
-  meeting needs (the measured-SNR headline, the attack-and-fix, the
-  contrast demo). Synthesis unit in the vol-1 u9 style.
+  demo - verification leading, royalty split as the vision - then the
+  business argument: the ecosystem map, the three open slots, Spotify's
+  pathologies transferred, what the VC meeting needs (the notary
+  demo, the measured-SNR headline, the attack-and-fix). Synthesis unit
+  in the vol-1 u9 style.
 - **Extensions** (unlock > 90%): x-v1 influence functions properly
   (Tier-5 math: Hessians, EK-FAC, and the critique literature);
   x-v2 source-aware training (document-ID tokens - the "labs build it
@@ -309,23 +326,17 @@ NYT complaint's verbatim-output exhibit (agent sources conflicted) and
 the precise disposition of Getty v. Stability UK (corroborated by a
 second agent, but confirm against the judgment itself).
 
-## 5. Open questions for discussion
+## 5. Decisions (settled 2026-08-30)
 
-1. **PoC framing**: three candidates sharing one substrate (the tagged
-   corpus + small trained models): (a) the original Spotify-royalty demo
-   (Shapley split - crowded lane, but the honest-SNR version is
-   unoccupied science); (b) the verification notary (watermark +
-   pre-commitment ledger - the regulator-named gap, Tier-1 math only,
-   friendlier first sales); (c) both, as one "measurement layer" story.
-   The build cost of (c) is barely more than either alone.
-2. **Sequencing**: book-then-build, build-then-book, or interleaved as
-   drafted (capstones = build steps)? Interleaved is the design above.
-3. **Corpus domain**: research papers (peS2o - clean licenses, matches
-   the original "library of research papers" framing) vs a news-like
-   corpus (closer to where the money and litigation are)?
-4. **Scope of v6**: the verification material could grow into the
-   book's center of gravity (it is the commercially open slot) or stay
-   one unit. How hard to lean?
-5. **Timeline pressure**: NYT v. OpenAI trial (late 2026) is the event
-   most likely to reprice this space. Does the PoC aim to exist before
-   a ruling?
+1. **PoC framing: both demos on the shared substrate, verification
+   leading.** The pitch narrative: the verification notary is the
+   product a solo founder can ship into a regulator-named gap; the
+   royalty split is the vision slide - where the measurement layer goes
+   once it is trusted. The royalty science stays honest-SNR-first.
+2. **Sequencing: interleaved.** Unit capstones ARE the PoC build steps.
+3. **Corpus: research papers** (peS2o / CC-licensed subset).
+4. **Verification grows to two spine units** (v6 evidence, v7 audit
+   product) - reflected in the outline above.
+5. **No deadline pressure.** This runs alongside other work; milestones
+   are a sequence, not a schedule. External events (NYT v. OpenAI
+   ruling, EU enforcement actions) get monitored, not raced.
