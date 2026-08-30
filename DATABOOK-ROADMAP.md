@@ -229,8 +229,17 @@ work at whatever pace it gets)
 ## 4. Book outline (volume 2, working title: "Where the Words Come From")
 
 Same corpus format, same pedagogy (vol-1 authoring spec + ordering rules).
-Assumes vol-1 spine concepts (`assumes:` per unit). Every unit's capstone
-beats ARE PoC build steps - the book produces the artifact.
+
+**First-principles rule (primer style): assume nothing is retained.**
+Vol-1 concepts are never referenced as known - every concept a unit
+needs is re-derived compactly from first principles at its point of use,
+even where vol 1 taught it. `assumes:` links serve sequencing and the
+planner's compression decisions only; calibration (v0) dials how BRIEF
+the re-derivation gets, never whether it happens. A learner with large
+gaps must be able to read any unit cold and lose nothing but time.
+
+Every unit's capstone beats ARE PoC build steps - the book produces the
+artifact.
 
 - **v0 - Calibration** (20 min). Measures retention of vol-1 gradients/
   loss/tokens + Tier-1 probability baseline. Placement decides how much
