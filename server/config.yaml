@@ -4,6 +4,10 @@ subjects:
     title: "How AI Works"
     corpus_dir: ../corpus
     state_dir: ../state/ai
+  - id: data
+    title: "Where the Words Come From"
+    corpus_dir: ../corpus-v2
+    state_dir: ../state/data
 static_dir: static
 katex_dir: ../ipad-app/Chiron/Resources/katex
 fonts_dir: ../assets/fonts

@@ -307,8 +307,10 @@ Rectangle {
         }
     }
 
-    // "loading" | "reading" | "submitting" | "results" | "error"
+    // "loading" | "reading" | "submitting" | "results" | "error" | "books"
     property string mode: "loading"
+    // The library: every book the server carries, from GET /subjects.
+    property var bookshelf: []
     property string errorText: ""
     property string subjectTitle: ""
     property string chapterTitle: ""
@@ -541,6 +543,57 @@ Rectangle {
         xhr.send()
     }
 
+    // Boot: ask the server which book was last open and reopen on it. A
+    // server that cannot answer (older build, network blip) costs nothing -
+    // the default subject stands and loadMeta proceeds as before.
+    function boot() {
+        mode = "loading"
+        const xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return
+            if (xhr.status === 200) {
+                try {
+                    const b = JSON.parse(xhr.responseText)
+                    bookshelf = b.subjects || []
+                    if (b.active) subject = b.active
+                } catch (e) {}
+            }
+            loadMeta()
+        }
+        xhr.open("GET", tok(serverBase + "/subjects"))
+        xhr.send()
+    }
+
+    // The bookshelf: fetched fresh each open so progress lines are current.
+    function openBooks() {
+        const xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return
+            if (xhr.status !== 200) return
+            bookshelf = JSON.parse(xhr.responseText).subjects || []
+            mode = "books"
+        }
+        xhr.open("GET", tok(serverBase + "/subjects"))
+        xhr.send()
+    }
+
+    // Switching books drops everything that belongs to the open one - answer
+    // state, ink, reading position - and loads the other from its own server
+    // state. A never-started book bootstraps through the normal 404 path.
+    function switchBook(id) {
+        if (id === subject) { openContents(); return }
+        subject = id
+        closeKb()
+        inkByPage = ({}); idkByItem = ({}); selByItem = ({}); confByItem = ({})
+        textByItem = ({})
+        checkinResult = null; resultsMeta = null; resultsPage = 0
+        contentsMeta = null; browseUnit = ""; homeUnit = ""
+        chapterUnit = ""; pagesHash = ""; page = 0
+        savedPage = 0; pendingRestorePage = -1
+        bootstrapTried = false
+        loadMeta()
+    }
+
     // Contents / spine: fetch the rendered page and the row map, remembering
     // where reading left off.
     function openContents() {
@@ -575,7 +628,7 @@ Rectangle {
     }
 
     Component.onCompleted: {
-        loadMeta()
+        boot()
         const en = new XMLHttpRequest()
         en.onreadystatechange = function() {
             if (en.readyState !== XMLHttpRequest.DONE || !en.responseText) return
@@ -585,7 +638,7 @@ Rectangle {
             if (val.indexOf("http") === 0) {
                 serverBase = val
                 bootstrapTried = false
-                loadMeta()
+                boot()
             }
             drive.running = true
         }
@@ -1257,6 +1310,7 @@ Rectangle {
         function execInner(c) {
             if (c.cmd === "dump")
                 console.log("[drive]", JSON.stringify({mode: root.mode, page: root.page,
+                    subject: root.subject,
                     sel: root.selByItem, idk: root.idkByItem, conf: root.confByItem,
                     items: root.itemPages.length, server: root.serverBase,
                     w: root.width, h: root.height, ps: root.ps,
@@ -1277,6 +1331,8 @@ Rectangle {
             else if (c.cmd === "ink" && c.stroke) { root.strokesForPage(root.page).push(c.stroke); ink.requestFull() }
             else if (c.cmd === "next") root.advance()
             else if (c.cmd === "contents") root.openContents()
+            else if (c.cmd === "books") root.openBooks()
+            else if (c.cmd === "book") root.switchBook(c.id)
             else if (c.cmd === "type") {
                 const tid = c.item || driveItem(c.slot || 0)
                 root.setMap("textByItem", tid, c.text || "")
@@ -1299,7 +1355,7 @@ Rectangle {
                             row = root.contentsMeta.rows[gi]
                 root.contentsGoto(row)
             }
-            else if (c.cmd === "server") { root.serverBase = c.url; root.bootstrapTried = false; root.loadMeta() }
+            else if (c.cmd === "server") { root.serverBase = c.url; root.bootstrapTried = false; root.boot() }
             else if (c.cmd === "reload") { root.bootstrapTried = false; root.loadMeta() }
             // "shot" and unknown commands just ack with a screenshot
         }
@@ -1546,11 +1602,95 @@ Rectangle {
         onTapped: root.close()
     }
     QuietButton {
+        id: contentsResetBtn
         visible: root.mode === "contents"
         label: "Start over"
         x: contentsCloseBtn.x + contentsCloseBtn.width + 24 * root.ps
         y: root.ny0 + 2078 * root.ps
         onTapped: root.mode = "confirmReset"
+    }
+    QuietButton {
+        // Only a shelf with something else on it earns a button.
+        visible: root.mode === "contents" && root.bookshelf.length > 1
+        label: "Bookshelf"
+        x: contentsResetBtn.x + contentsResetBtn.width + 24 * root.ps
+        y: root.ny0 + 2078 * root.ps
+        onTapped: root.openBooks()
+    }
+
+    // The bookshelf: every book the server carries, the open one marked,
+    // the others a tap away. Native and static, like the reset screen.
+    Item {
+        visible: root.mode === "books"
+        anchors.fill: parent
+        Text {
+            id: shelfDinkus
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: root.ny0 + 560 * root.ps
+            text: "✱ ✱ ✱"
+            font.family: fontSerif.name
+            font.pixelSize: 36 * root.ps
+            font.letterSpacing: 26 * root.ps
+            color: "#000000"
+        }
+        Text {
+            id: shelfStatement
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: shelfDinkus.y + shelfDinkus.height + 56 * root.ps
+            text: "The bookshelf"
+            font.family: fontSerifIt.name
+            font.italic: true
+            font.pixelSize: 40 * root.ps
+            color: "#000000"
+        }
+        Column {
+            x: root.nx0 + (1620 * root.ps - width) / 2
+            y: shelfStatement.y + shelfStatement.height + 96 * root.ps
+            spacing: 56 * root.ps
+            Repeater {
+                model: root.bookshelf
+                Item {
+                    width: 1100 * root.ps
+                    height: shelfTitle.height + shelfSub.height + 10 * root.ps
+                    Text {
+                        id: shelfTitle
+                        x: (parent.width - width) / 2
+                        text: modelData.title
+                        font.family: fontSerif.name
+                        font.pixelSize: 44 * root.ps
+                        color: "#000000"
+                    }
+                    Text {
+                        id: shelfSub
+                        x: (parent.width - width) / 2
+                        y: shelfTitle.height + 10 * root.ps
+                        text: {
+                            if (modelData.id === root.subject) return "Open now"
+                            if (modelData.units_cleared > 0)
+                                return modelData.units_cleared + " of "
+                                     + modelData.units_total + " chapters cleared"
+                            return modelData.current_unit ? "In progress" : "Unopened"
+                        }
+                        font.family: modelData.id === root.subject
+                                     ? fontSerifIt.name : fontSerif.name
+                        font.italic: modelData.id === root.subject
+                        font.pixelSize: 28 * root.ps
+                        color: "#555555"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -16 * root.ps
+                        onClicked: root.switchBook(modelData.id)
+                    }
+                }
+            }
+        }
+        QuietButton {
+            label: "Back"
+            x: root.nx0 + 110 * root.ps
+            y: root.ny0 + 2078 * root.ps
+            onTapped: root.mode = "contents"
+        }
     }
 
     // Starting over asks first, and says what actually happens: the old

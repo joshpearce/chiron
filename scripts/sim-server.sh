@@ -31,13 +31,13 @@ case "${1:-start}" in
   *) echo "usage: $0 [start|reset|stop]" >&2; exit 1 ;;
 esac
 
-mkdir -p "$STATE/state/ai"
+mkdir -p "$STATE/state/ai" "$STATE/state/data"
 
 # The real config, with subject state redirected at the throwaway dir.
 # Everything else (corpus, static, upstreams, session tuning) should stay
 # faithful to server/config.yaml so sim behaviour matches the real thing.
 sed -e "s|corpus_dir: ../corpus|corpus_dir: $ROOT/corpus|" \
-    -e "s|state_dir: ../state/ai|state_dir: $STATE/state/ai|" \
+    -e "s|state_dir: ../state/|state_dir: $STATE/state/|" \
     -e "s|static_dir: static|static_dir: $ROOT/server/static|" \
     -e "s|katex_dir: ../ipad-app|katex_dir: $ROOT/ipad-app|" \
     -e "s|fonts_dir: ../assets|fonts_dir: $ROOT/assets|" \

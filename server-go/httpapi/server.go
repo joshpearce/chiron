@@ -138,6 +138,13 @@ type Server struct {
 	mu       sync.RWMutex
 	subjects map[string]*Subject
 
+	// The book the reader last had open, so the client can reopen on it.
+	// Persisted beside the subject state dirs: the client has no writable
+	// storage and the server suspends between sessions.
+	activeMu   sync.Mutex
+	active     string
+	activePath string
+
 	jobsMu sync.Mutex
 	jobs   map[string]*Job
 
@@ -172,7 +179,40 @@ func New(cfg *Config, root string) (*Server, error) {
 		}
 	}
 	s.Discover()
+	if len(cfg.Subjects) > 0 {
+		dir := filepath.Dir(resolve(root, cfg.Subjects[0].StateDir))
+		s.activePath = filepath.Join(dir, "active-subject")
+		if raw, err := os.ReadFile(s.activePath); err == nil {
+			if id := strings.TrimSpace(string(raw)); id != "" {
+				if _, ok := s.subject(id); ok {
+					s.active = id
+				}
+			}
+		}
+	}
 	return s, nil
+}
+
+// markActive records id as the open book. Best-effort persistence: a failed
+// write only costs the reopen-on-last-book nicety after a restart.
+func (s *Server) markActive(id string) {
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+	if s.active == id {
+		return
+	}
+	s.active = id
+	if s.activePath != "" {
+		if err := os.WriteFile(s.activePath, []byte(id+"\n"), 0o644); err != nil {
+			log.Printf("active-subject: %v", err)
+		}
+	}
+}
+
+func (s *Server) activeSubject() string {
+	s.activeMu.Lock()
+	defer s.activeMu.Unlock()
+	return s.active
 }
 
 // resolve interprets a config path relative to the config file, leaving an
@@ -402,7 +442,10 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 			Debt:         len(sub.Learner.OpenDebt()),
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"subjects": out})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"subjects": out,
+		"active":   s.activeSubject(),
+	})
 }
 
 func (s *Server) subjectParam(r *http.Request) string {

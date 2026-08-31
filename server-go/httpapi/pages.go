@@ -79,6 +79,9 @@ func (s *Server) handlePagesMeta(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown subject", http.StatusNotFound)
 		return
 	}
+	// Every open of a book performs this fetch, so it is where "the book the
+	// reader has open" is observed.
+	s.markActive(sub.ID)
 	ch, err := requestChapter(sub, r)
 	if err != nil {
 		if building, buildErr := sub.buildStatus(); building || buildErr != "" {
