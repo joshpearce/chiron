@@ -360,3 +360,28 @@ remains is UI and policy, in this order when the time comes:
   a toggle, not the default, and the typed path must be excellent.
 - `TeachView` and the bundled book are carried, not improved; if they rot,
   they are removed rather than repaired.
+
+## 10. Status (2026-09-01)
+
+Phases 0 through 4 are built and verified in the Simulator on both
+`chiron-ipad-15` (iOS 15.5, iPad mini 4 shape) and `chiron-ipad` (iOS 26.5):
+unit tests green on both, `scripts/sim-verify.sh` walks every screen on
+both in light and dark at the default and accessibility-extra-large text
+sizes, and the self-test completes placement, series, results, and the next
+chapter on both books. Server changes A, B, C are in (commits 1be81ca,
+00332a6) plus the ink check-in marking the book active and a drive-mode stub
+transcriber (43aceb8). None of it is on the sprite yet.
+
+Still open:
+- Phase 5 device milestone: install on the mini 4, one chapter and one check
+  on the device, Wi-Fi to the sprite. Needs the iPad and Matt.
+- Deploy the server (commits since e24f73e) to the sprite: the iPad needs
+  `async` exchanges, `GET /chapter`, `results_doc`, and the reveal `correct`
+  fix. Needs Matt's go-ahead.
+- Phase 4 measurements on the A8 (chapter load, results render) and the
+  KaTeX font subsetting, if the numbers call for it.
+- Split View and rotation checked by hand in the Simulator (no simctl for
+  either); the layout is size-class driven and all four orientations are on.
+- The pretest still reveals the reference answer per item after commit, as
+  the flight-era app did; the plan's "reveal only on teaching-unit checks"
+  is read as "never on the calibration series", which holds.

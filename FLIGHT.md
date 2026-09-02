@@ -1,3 +1,8 @@
+> Historical (July 2026 flight). The transports described here - the USB
+> bridge on port 8081 and the Wi-Fi soft AP - are gone from the iPad app as of
+> 2026-09-01: it talks HTTP to the book server (the sprite, or a dev server),
+> see `IPAD-PLAN.md`. Kept for the record of what was learned.
+
 # Flight-day runbook
 
 ## STATUS
