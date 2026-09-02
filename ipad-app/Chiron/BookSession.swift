@@ -93,6 +93,19 @@ final class BookSession: ObservableObject {
             }
             return
         }
+        // The server's copy of the chapter wins over the cache whenever it
+        // is reachable: a chapter re-authored server-side (or still being
+        // written) must reach the reader, and the cache is only for reading
+        // detached.
+        if let status = try? await service.chapter(subject: subjectID) {
+            if status.authoring, pendingAuthoring == nil {
+                pendingAuthoring = status.chapter?.unit ?? chapter?.unit
+            } else if let fresh = status.chapter,
+                      chapter == nil || fresh.unit != chapter?.unit || fresh.html != chapter?.html {
+                setChapter(fresh)
+                persist()
+            }
+        }
         // The wait clears before anything below runs an exchange: an
         // exchange refuses to start while one is marked in flight.
         wait = nil
@@ -305,6 +318,10 @@ final class BookSession: ObservableObject {
         if let unit = resp.authoring { pendingAuthoring = unit }
         if let b = resp.breakSuggestion { pendingBreak = b }
         persist()
+        // The exchange is over; what follows may need one of its own (an
+        // authoring wait that ends in a fresh start), and that must not be
+        // refused as a duplicate of this one.
+        wait = nil
 
         if let doc = resp.resultsDoc, let gate = resp.gate {
             screen = .results(doc, gate)

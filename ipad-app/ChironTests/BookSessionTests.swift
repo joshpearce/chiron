@@ -64,7 +64,13 @@ final class BookSessionTests: XCTestCase {
     /// graded series returns results with u1 authoring, and /chapter has u1.
     private func scriptFreshBook() {
         fake.onState = { [unowned self] _ in self.fixture(BookState.self, "state") }
-        fake.onChapter = { [unowned self] _ in self.fixture(ChapterStatus.self, "chapter") }
+        // Like a real server: no chapter until a graded series has had u1
+        // authored, then u1.
+        fake.onChapter = { [unowned self] _ in
+            self.fake.exchanges.contains { $0.checkResponses.count > 1 }
+                ? self.fixture(ChapterStatus.self, "chapter")
+                : ChapterStatus(chapter: nil, authoring: false, authoringError: "")
+        }
         fake.onExchange = { [unowned self] req in
             if req.phase == "start" { return self.fixture(ExchangeResponse.self, "exchange-start") }
             if req.checkResponses.count == 1, req.checkResponses[0].itemId == "u0-s1" {
@@ -180,7 +186,7 @@ final class BookSessionTests: XCTestCase {
 
         // After the break, the remediation chapter that was authoring.
         await s.breakFinished(minutes: 5)
-        XCTAssertNotNil(fake.exchanges.last?.breakMinutes)
+        XCTAssertTrue(fake.exchanges.contains { $0.breakMinutes != nil }, "the break was reported")
         guard case .reading = s.screen else { return XCTFail("\(s.screen)") }
         XCTAssertEqual(s.chapter?.unit, "u1")
 
@@ -385,5 +391,42 @@ final class BookSessionTests: XCTestCase {
             ItemResponse(itemId: $0.id, response: nil, selectedIndex: nil, confidence: 1, idk: true)
         })
         XCTAssertNil(fake.exchanges.last?.chunkMinutes)
+    }
+
+    func testTheServersChapterReplacesTheCachedOneOnOpen() async {
+        scriptFreshBook()
+        fake.onExchange = { [unowned self] _ in self.deliversU1() }
+        let s = session()
+        await s.open()
+        XCTAssertEqual(s.chapter?.unit, "u1")
+        let oldHTML = s.chapter!.html
+
+        // Re-authored server-side: same unit, new prose.
+        fake.onChapter = { [unowned self] _ in
+            let ch = self.fixture(ChapterStatus.self, "chapter").chapter!
+            let json = try! JSONEncoder().encode(ch)
+            var obj = try! JSONSerialization.jsonObject(with: json) as! [String: Any]
+            obj["html"] = "<p>rechained</p>"
+            let fresh = try! JSONDecoder().decode(ChapterPayload.self, from: try! JSONSerialization.data(withJSONObject: obj))
+            return ChapterStatus(chapter: fresh, authoring: false, authoringError: "")
+        }
+        let s2 = session()
+        await s2.open()
+        guard case .reading = s2.screen else { return XCTFail("\(s2.screen)") }
+        XCTAssertEqual(s2.chapter?.html, "<p>rechained</p>")
+        XCTAssertNotEqual(s2.chapter?.html, oldHTML)
+        XCTAssertTrue(fake.exchanges.filter { $0.phase == "start" }.count == 1, "no second start: the server already had the chapter")
+
+        // Still being rewritten: the wait screen, then the new chapter.
+        var polls = 0
+        fake.onChapter = { [unowned self] _ in
+            polls += 1
+            if polls < 2 { return ChapterStatus(chapter: nil, authoring: true, authoringError: "") }
+            return self.fixture(ChapterStatus.self, "chapter")
+        }
+        let s3 = session()
+        await s3.open()
+        guard case .reading = s3.screen else { return XCTFail("\(s3.screen)") }
+        XCTAssertEqual(polls, 2)
     }
 }
