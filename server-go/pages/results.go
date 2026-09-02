@@ -28,16 +28,29 @@ type ResultsEntry struct {
 }
 
 type ResultsDoc struct {
-	Unit              string         `json:"unit"`
-	HeadLeft          string         `json:"head_left"`
-	Calibration       bool           `json:"calibration,omitempty"`
-	Score             float64        `json:"score"` // 0..1
-	GatePct           float64        `json:"gate"`  // 0..1
-	Passed            bool           `json:"passed"`
-	ExtensionUnlocked bool           `json:"extension_unlocked,omitempty"`
-	Action            string         `json:"action"` // native button label
-	Dek               string         `json:"dek"`
-	Entries           []ResultsEntry `json:"entries"`
+	Unit              string  `json:"unit"`
+	HeadLeft          string  `json:"head_left"`
+	Calibration       bool    `json:"calibration,omitempty"`
+	Score             float64 `json:"score"` // 0..1
+	GatePct           float64 `json:"gate"`  // 0..1
+	Passed            bool    `json:"passed"`
+	ExtensionUnlocked bool    `json:"extension_unlocked,omitempty"`
+	Action            string  `json:"action"` // native button label
+	Dek               string  `json:"dek"`
+	// Headline and Tally are the typeset page's own words, filled by
+	// Summarize so a client rendering the document natively says the same.
+	Headline string         `json:"headline"`
+	Tally    string         `json:"tally,omitempty"` // calibration only
+	Entries  []ResultsEntry `json:"entries"`
+}
+
+// Summarize fills the derived text fields from the score and entries.
+func (d *ResultsDoc) Summarize() {
+	d.Headline = d.headline()
+	d.Tally = ""
+	if d.Calibration {
+		d.Tally = d.tally()
+	}
 }
 
 func (d *ResultsDoc) headline() string {

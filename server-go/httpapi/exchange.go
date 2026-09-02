@@ -55,6 +55,10 @@ type Exchange struct {
 	Choice           string         `json:"choice,omitempty"`
 	ChunkMinutes     float64        `json:"chunk_minutes,omitempty"`
 	BreakMinutes     float64        `json:"break_minutes,omitempty"`
+	// Async returns a graded check at once, with the next chapter authored
+	// in the background and fetched from /chapter/{subject}: a client whose
+	// request dies when the OS suspends it cannot wait minutes for a model.
+	Async bool `json:"async,omitempty"`
 }
 
 type Result struct {
@@ -590,7 +594,29 @@ func (s *Server) handleExchange(w http.ResponseWriter, r *http.Request) {
 	// Every exchange is the reader working in this book; a client that
 	// never fetches rendered pages has no other way to say which is open.
 	s.markActive(sub.ID)
-	writeJSON(w, http.StatusOK, s.processExchange(sub, ex, false))
+	writeJSON(w, http.StatusOK, s.processExchange(sub, ex, ex.Async))
+}
+
+// handleChapter is the JSON client's view of the current chapter and of the
+// authoring that may be producing the next one: {chapter, authoring,
+// authoring_error}. The chapter is null until one exists; ?unit= reads any
+// persisted chapter without touching learner state.
+func (s *Server) handleChapter(w http.ResponseWriter, r *http.Request) {
+	sub, ok := s.subject(r.PathValue("subject"))
+	if !ok {
+		http.Error(w, "unknown subject", http.StatusNotFound)
+		return
+	}
+	building, buildErr := sub.buildStatus()
+	out := map[string]any{
+		"chapter":         nil,
+		"authoring":       building,
+		"authoring_error": buildErr,
+	}
+	if ch, err := requestChapter(sub, r); err == nil {
+		out["chapter"] = ch
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // processExchange is the whole boundary contract - grade, gate, plan, author,
@@ -776,6 +802,7 @@ func (s *Server) processExchange(sub *Subject, ex Exchange, asyncAuthor bool) ma
 	// the client lands on finished pages.
 	if gate != nil && gate.Score != nil {
 		if doc := s.buildResultsDoc(sub, ex, results, gate); len(doc.Entries) > 0 {
+			out["results_doc"] = doc
 			if err := persistResults(sub, doc); err != nil {
 				log.Printf("persist results %s: %v", ex.Unit, err)
 			}
@@ -893,6 +920,7 @@ func (s *Server) buildResultsDoc(sub *Subject, ex Exchange, results []Result, ga
 	sort.SliceStable(doc.Entries, func(i, j int) bool {
 		return doc.Entries[i].N < doc.Entries[j].N
 	})
+	doc.Summarize()
 	return doc
 }
 

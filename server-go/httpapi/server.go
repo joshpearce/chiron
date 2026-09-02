@@ -337,6 +337,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /subjects", s.handleSubjects)
 	mux.HandleFunc("GET /state", s.handleState)
 	mux.HandleFunc("GET /review-schedule", s.handleReviewSchedule)
+	mux.HandleFunc("GET /chapter/{subject}", s.handleChapter)
 	mux.HandleFunc("GET /pages/{subject}", s.handlePagesMeta)
 	mux.HandleFunc("GET /pages/{subject}/{page}", s.handlePage)
 	mux.HandleFunc("GET /pages/{subject}/results", s.handleResultsMeta)
