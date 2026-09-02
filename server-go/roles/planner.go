@@ -69,6 +69,18 @@ Principles:
 const defaultNextAction = "Read the chapter and work every beat before its reveal."
 
 // PlanDirectives chooses depth, refutation targets and any rewrites.
+// selfRatingLine carries the learner's own placement into every planning
+// call, not just the one after calibration. The claim and the calibration's
+// per-band record together are what tell a planner how much first-principles
+// re-derivation this learner needs.
+func selfRatingLine(rating int) string {
+	if rating <= 0 {
+		return "(not asked)"
+	}
+	return fmt.Sprintf("level %d of 5 (1 = absolute novice, 3 = can work through it slowly, "+
+		"5 = expert); the calibration's per-band record says whether the claim held", rating)
+}
+
 func PlanDirectives(chain llm.Chain, l *state.Learner, unit *corpus.Unit, checkSummary string) Directives {
 	active := l.ActiveMisconceptions()
 	snapshot := l.Snapshot()
@@ -124,6 +136,7 @@ ACTIVE MISCONCEPTIONS: %s
 FRAGILE CONCEPTS (recently shaky/low-confidence): %s
 OPEN DEBT: %s
 SESSION: %.0f min elapsed, fatigue_flag=%t
+SELF-RATED START: %s
 
 LAST CHECK:
 %s
@@ -139,6 +152,7 @@ Concepts: %s`,
 		orNone(strings.Join(l.FragileConcepts(), ", ")),
 		orNone(strings.Join(debtUnits, ", ")),
 		l.SessionMinutes(), snapshot.Pacing.FatigueFlag,
+		selfRatingLine(snapshot.Profile.SelfRating),
 		lastCheck,
 		unit.ID, unit.Title, unit.Minutes,
 		orNone(unit.Notes),

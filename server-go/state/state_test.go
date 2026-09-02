@@ -248,3 +248,43 @@ func splitLines(s string) []string {
 	}
 	return out
 }
+
+// Calibration series now open with floor probes - band 1 and 2 items that
+// test arithmetic and recognition, not the concept itself. Two correct floor
+// answers must not certify a concept as mastered, or a novice who can
+// multiply and add walks into u1 with c-dotprod "mastered" and the planner
+// compresses the one section they most needed. Floor items still count as
+// evidence: a miss on one is a miss.
+func TestFloorProbesNeverCertifyMastery(t *testing.T) {
+	l := newLearner(t)
+	apply := func(verdict string, band int) {
+		if _, err := l.Apply(Event{Kind: "item_graded", Concept: "c-x",
+			Item: "q1", Verdict: verdict, Band: band}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	apply("pass", 1)
+	apply("pass", 2)
+	apply("pass", 2)
+	if got := l.ConceptLevel("c-x"); got != "shaky" {
+		t.Errorf("three correct floor answers -> %q, want shaky (floor probes are not the concept)", got)
+	}
+	apply("pass", 3)
+	if got := l.ConceptLevel("c-x"); got != "mastered" {
+		t.Errorf("a correct band-3 answer on top of shaky -> %q, want mastered", got)
+	}
+	apply("fail", 1)
+	if got := l.ConceptLevel("c-x"); got != "shaky" {
+		t.Errorf("a floor miss after mastery -> %q, want shaky (a miss is a miss)", got)
+	}
+	// Teaching units carry no band; the ladder is unchanged there.
+	l2 := newLearner(t)
+	for range 2 {
+		if _, err := l2.Apply(Event{Kind: "item_graded", Concept: "c-y", Item: "q2", Verdict: "pass"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := l2.ConceptLevel("c-y"); got != "mastered" {
+		t.Errorf("unbanded ladder -> %q, want mastered", got)
+	}
+}

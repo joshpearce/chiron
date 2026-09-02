@@ -125,8 +125,11 @@ type Event struct {
 	ItemsMissed      []string `json:"items_missed,omitempty"`
 	Reason           string   `json:"reason,omitempty"`
 	Minutes          *float64 `json:"minutes,omitempty"`
-	Text             string   `json:"text,omitempty"`
-	Ref              any      `json:"ref,omitempty"`
+	// Band is the calibration band (1-5) of a graded item; zero outside
+	// calibration units.
+	Band int    `json:"band,omitempty"`
+	Text string `json:"text,omitempty"`
+	Ref  any    `json:"ref,omitempty"`
 }
 
 type Learner struct {
@@ -353,6 +356,10 @@ func (l *Learner) onItemGraded(ev Event) {
 	case ok && (cur == "unseen" || cur == "exposed"):
 		// One correct answer never jumps straight to mastered from cold.
 		l.setLevel(ev.Concept, "shaky", ev.N, "correct on "+ev.Item)
+	case ok && cur == "shaky" && ev.Band > 0 && ev.Band < 3:
+		// A floor probe - arithmetic, recognition, a spelled-out recipe -
+		// is evidence the learner is not lost, never that the concept is
+		// held. Mastery waits for an item at the level of the concept itself.
 	case ok && cur == "shaky":
 		l.setLevel(ev.Concept, "mastered", ev.N, "correct on "+ev.Item)
 	case !ok && cur == "mastered":

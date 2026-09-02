@@ -201,3 +201,35 @@ func TestElicitTurnNeverEndsWithNothingToAnswer(t *testing.T) {
 		t.Errorf("an unfinished turn must end in a question, got %q", got.ReplyMD)
 	}
 }
+
+// capturingChain records the planner prompt and then fails like a dead
+// model, so the fallback path stays exercised.
+type capturingChain struct{ user string }
+
+func (c *capturingChain) Structured(role, system, user string, schema map[string]any, name string, out any) error {
+	c.user = user
+	return llm.Errorf("captured")
+}
+func (capturingChain) Status() llm.Status { return llm.Status{} }
+
+// The self-rating was recorded in the state and never shown to the planner:
+// after calibration every later unit was planned as if the learner had
+// never been asked where they stood.
+func TestPlannerSeesTheSelfRating(t *testing.T) {
+	c, l := fixtures(t)
+	sc := 1.0
+	if _, err := l.Apply(state.Event{Kind: "self_rating", Score: &sc}); err != nil {
+		t.Fatal(err)
+	}
+	chain := &capturingChain{}
+	PlanDirectives(chain, l, c.Units["u1"], "Calibration u0: self-rated level 1 of 5; 40% overall. ")
+	if !strings.Contains(chain.user, "SELF-RATED START: level 1 of 5") {
+		t.Errorf("planner prompt lacks the self-rating:\n%s", chain.user)
+	}
+	chain = &capturingChain{}
+	_, l2 := fixtures(t)
+	PlanDirectives(chain, l2, c.Units["u1"], "Check u1: 50% (below gate). ")
+	if !strings.Contains(chain.user, "SELF-RATED START: (not asked)") {
+		t.Errorf("unrated learner should be marked as not asked:\n%s", chain.user)
+	}
+}

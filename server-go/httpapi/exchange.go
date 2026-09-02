@@ -173,7 +173,7 @@ func (s *Server) gradeItems(sub *Subject, responses []ItemResponse, results *[]R
 		conf := it.r.Confidence
 		if _, err := sub.Learner.Apply(state.Event{
 			Kind: "item_graded", Item: it.r.ItemID, Concept: it.q.Concept,
-			Unit: it.unitID, Verdict: g.Verdict, Confidence: &conf,
+			Unit: it.unitID, Verdict: g.Verdict, Confidence: &conf, Band: it.q.Band,
 			Misconceptions: g.Misconceptions, Evidence: g.Evidence,
 		}); err != nil {
 			return passed, len(responses)
@@ -216,6 +216,51 @@ func (s *Server) gradeBeats(sub *Subject, responses []BeatResponse, results *[]R
 		}
 		*results = append(*results, Result{ItemID: r.BeatID, Grade: g, SelfVerdict: r.SelfVerdict})
 	}
+}
+
+// calibrationSummary is the one line the planner gets about a calibration
+// series: what the learner claimed, and how each band actually went. The
+// bands are what make the claim checkable - a self-rated novice who cleared
+// bands 1 and 2 but nothing at 3 is a different learner from one who cleared
+// 3, and "40% overall" cannot tell them apart.
+func calibrationSummary(unit *corpus.Unit, rating int, score float64, results []Result) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Calibration %s: ", unit.ID)
+	if rating > 0 {
+		label := ""
+		if sc := unit.Questions.Screener; sc != nil && rating <= len(sc.Options) {
+			label = " (" + sc.Options[rating-1].Text + ")"
+		}
+		fmt.Fprintf(&b, "self-rated level %d of 5%s; ", rating, label)
+	}
+	fmt.Fprintf(&b, "%.0f%% overall", score*100)
+	byID := map[string]corpus.Question{}
+	for _, q := range unit.Questions.Check {
+		byID[q.ID] = q
+	}
+	right, total := map[int]int{}, map[int]int{}
+	for _, r := range results {
+		q, ok := byID[r.ItemID]
+		if !ok || q.Band == 0 {
+			continue
+		}
+		total[q.Band]++
+		if passedVerdict(r.Verdict) {
+			right[q.Band]++
+		}
+	}
+	var parts []string
+	for band := 1; band <= 5; band++ {
+		if total[band] > 0 {
+			parts = append(parts, fmt.Sprintf("band %d: %d/%d", band, right[band], total[band]))
+		}
+	}
+	if len(parts) > 0 {
+		fmt.Fprintf(&b, "; correct by band (1 = arithmetic floor, 3 = can do it slowly, 5 = expert): %s",
+			strings.Join(parts, ", "))
+	}
+	b.WriteString("; per-concept levels are in the state. ")
+	return b.String()
 }
 
 // parseRating reads a 1-5 self-placement from a screener response. Anything
@@ -622,7 +667,7 @@ func (s *Server) processExchange(sub *Subject, ex Exchange, asyncAuthor bool) ma
 			ExtensionUnlocked: !calibration && score >= sess.ExtensionTrigger,
 			Calibration:       calibration}
 		if calibration {
-			fmt.Fprintf(&summary, "Calibration %s: %.0f%% overall; per-concept levels are in the state. ", ex.Unit, score*100)
+			summary.WriteString(calibrationSummary(unit, sub.Learner.Data.Profile.SelfRating, score, results))
 		} else {
 			verdict := "below gate"
 			if passed {
