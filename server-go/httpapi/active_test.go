@@ -113,3 +113,26 @@ func TestExchangeMarksTheBookActive(t *testing.T) {
 		t.Fatalf("after an unknown subject, active = %q, want data", got)
 	}
 }
+
+// The ink check-in is the other way a book gets worked in; it marks the
+// book open like every exchange does.
+func TestInkCheckInMarksTheBookActive(t *testing.T) {
+	s := newTwoSubjectServer(t, t.TempDir())
+	s.transcribe = func(string, []byte) (string, error) { return "unused", nil }
+	do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start"}`, "")
+	if got := activeSubjectOf(t, s); got != "ai" {
+		t.Fatalf("active = %q, want ai", got)
+	}
+	do(t, s, "POST", "/exchange", `{"subject":"data","phase":"start"}`, "")
+	w := do(t, s, "POST", "/ink/data",
+		`{"unit":"v0","items":[{"item_id":"v0-s1","selected_index":1}]}`, "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("/ink/data -> %d: %s", w.Code, w.Body.String())
+	}
+	do(t, s, "GET", "/pages/ai", "", "")
+	do(t, s, "POST", "/ink/data",
+		`{"unit":"v0","items":[{"item_id":"v0-q1","text":"whatever"}]}`, "")
+	if got := activeSubjectOf(t, s); got != "data" {
+		t.Fatalf("after an ink check-in on data, active = %q, want data", got)
+	}
+}

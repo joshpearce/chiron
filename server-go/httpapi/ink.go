@@ -53,7 +53,19 @@ type InkSubmission struct {
 // transcriber is swappable for tests.
 type transcriber func(hint string, png []byte) (string, error)
 
+// stubTranscriber names itself and the raster it was handed, in place of a
+// vision model (dev servers only; see transcriberFor).
+func stubTranscriber(hint string, png []byte) (string, error) {
+	return fmt.Sprintf("[stub transcription of %s: %d bytes of ink]", hint, len(png)), nil
+}
+
 func (s *Server) transcriberFor() transcriber {
+	// A dev server can stand in for the vision model, so a client's
+	// handwriting path runs end to end without one; the audit trail then
+	// shows the stub's text where a transcription would be.
+	if driveEnabled() && os.Getenv("CHIRON_TRANSCRIBE") == "stub" {
+		return stubTranscriber
+	}
 	if s.cfg.Provider == "anthropic" {
 		// vision_model may still name a local model from a shared config;
 		// only claude models make sense here (empty picks the default).
@@ -96,6 +108,8 @@ func (s *Server) handleInk(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "unit is required")
 		return
 	}
+	// A check-in is the reader working in this book.
+	s.markActive(sub.ID)
 
 	transcribe := s.transcribe
 	if transcribe == nil {
@@ -182,5 +196,3 @@ func (s *Server) handleInk(w http.ResponseWriter, r *http.Request) {
 		time.Since(start).Seconds())
 	writeJSON(w, http.StatusOK, out)
 }
-
-var _ = fmt.Sprintf
