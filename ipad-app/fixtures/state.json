@@ -8,7 +8,7 @@
  "llm": {
   "connected": false
  },
- "session_minutes": 0.1193219502766927,
+ "session_minutes": 0.7769458452860515,
  "spine": [
   {
    "in_fringe": false,
@@ -19,7 +19,7 @@
   },
   {
    "in_fringe": true,
-   "score": null,
+   "score": 0,
    "status": "active",
    "title": "The core bet: next-token prediction",
    "unit": "u1"

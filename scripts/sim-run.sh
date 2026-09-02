@@ -37,6 +37,9 @@ case "$cmd" in
     exit 0 ;;
   test)
     xcrun simctl bootstatus "$UDID" -b >/dev/null
+    # The test host is reinstalled by xcodebuild; on iOS 15.5 that install
+    # fails over an existing copy (see below), so clear it first.
+    xcrun simctl uninstall "$UDID" "$BUNDLE" 2>/dev/null || true
     cd "$APPDIR"
     xcodebuild -project Chiron.xcodeproj -scheme Chiron \
       -destination "platform=iOS Simulator,id=$UDID" \

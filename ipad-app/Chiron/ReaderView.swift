@@ -2,11 +2,11 @@ import SwiftUI
 import WebKit
 
 struct ReaderContainer: View {
-    @EnvironmentObject var model: AppModel
-    /// Passed in rather than read from the model. Leaving the reader to unwrap
-    /// `model.chapter` itself crashed on the way out: backToLibrary() nils the
-    /// chapter and switches screen, and SwiftUI re-evaluated this body against
-    /// the nil chapter before the screen change took effect.
+    @EnvironmentObject var session: BookSession
+    /// Passed in rather than read from the session. Leaving the reader to
+    /// unwrap `session.chapter` itself crashed on the way out: closing the
+    /// book nils the chapter and switches screen, and SwiftUI re-evaluated
+    /// this body against the nil chapter before the screen change took effect.
     let chapter: ChapterPayload
 
     var body: some View {
@@ -15,28 +15,33 @@ struct ReaderContainer: View {
                 .ignoresSafeArea(edges: .bottom)
             Divider()
             HStack {
-                if let state = model.bookState, !state.debt.isEmpty {
+                if let state = session.bookState, !state.debt.isEmpty {
                     Button {
-                        Task { await model.catchMeUp() }
+                        Task { await session.catchMeUp() }
                     } label: {
                         Label("Catch me up", systemImage: "arrow.uturn.backward.circle")
                     }
                     .buttonStyle(.bordered)
                 }
                 Spacer()
+                Text("\(chapter.check.count) questions")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 Button {
-                    model.beginCheck()
+                    session.beginCheck()
                 } label: {
                     Label("Take the check", systemImage: "checkmark.seal")
                         .padding(.horizontal, 8)
                 }
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.return, modifiers: .command)
                 Button("Skip") {
-                    Task { await model.skipCheck() }
+                    Task { await session.skipCheck() }
                 }
                 .buttonStyle(.bordered)
                 .tint(.orange)
             }
+            .disabled(session.busy)
             .padding(12)
             .background(.bar)
         }
@@ -45,9 +50,9 @@ struct ReaderContainer: View {
 
 struct ReaderView: UIViewRepresentable {
     let chapter: ChapterPayload
-    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var session: BookSession
 
-    func makeCoordinator() -> Coordinator { Coordinator(model: model) }
+    func makeCoordinator() -> Coordinator { Coordinator(session: session) }
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -76,12 +81,12 @@ struct ReaderView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKScriptMessageHandler {
-        let model: AppModel
+        let session: BookSession
         weak var web: WKWebView?
         var loadedUnit: String?
         var pendingChapter: ChapterPayload?
 
-        init(model: AppModel) { self.model = model }
+        init(session: BookSession) { self.session = session }
 
         func userContentController(_ ucc: WKUserContentController,
                                    didReceive message: WKScriptMessage) {
@@ -100,7 +105,7 @@ struct ReaderView: UIViewRepresentable {
                     response: body["response"] as? String ?? "",
                     selfVerdict: body["selfVerdict"] as? String,
                     mechanicalVerdict: body["mechanicalVerdict"] as? String)
-                Task { @MainActor in self.model.recordBeat(r) }
+                Task { @MainActor in self.session.recordBeat(r) }
             default:
                 break
             }

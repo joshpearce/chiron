@@ -1,225 +1,7 @@
 {
+ "authoring": "u1",
  "break_suggestion": null,
- "chapter": {
-  "beats": [
-   {
-    "answer": "Barack Obama; 9; angle ACB (base angles of an isosceles triangle); the\ndrawer (Alice never saw the move).\n\nThe demands: recall a stored fact about the world; execute a sorting\nalgorithm; apply a geometric theorem; track two agents' divergent beliefs\nabout the same object. Four different kinds of capability - a fact store,\nan algorithm, deductive rule application, and a theory of other minds -\nhiding behind one uniform interface: predict the next token.\n",
-    "check": "llm",
-    "concept": "c-lm-objective",
-    "id": "u1-b9",
-    "prompt": "Fill each blank above yourself - all four are easy for you. Then, before\nreading on: for each one, state in a phrase what a system would have to be\nable to DO to fill it reliably. Are the four demands the same kind of\nthing, or four different kinds?\n",
-    "rubric": "Pass requires: (1) at least three blanks filled correctly, and (2) an\nexplicit recognition that the blanks demand different KINDS of capability\n(fact recall vs computation vs deduction vs belief tracking), in any\nwording. The exact taxonomy does not matter.\nFail if the answer says all four are \"just pattern completion\" with no\ndifferentiation - that is the misconception the section dismantles, so\ndeliver the section slowly rather than skipping.\n",
-    "type": "predict"
-   },
-   {
-    "answer": "The compression framing says loss equals bits per token, and you can only\nspend few bits on a continuation by exploiting real structure in the\ngenerating process. Taken to its endpoint - loss at the entropy floor - the\nsystem must have captured whatever structure produces the text, including\nfacts, algorithms, and agents' mental states. That is a statement about what\na hypothetically optimal predictor must contain.\n\nIt does not say that a specific architecture trained with a specific\noptimizer for a specific budget reaches that endpoint. A shallow heuristic\nthat covers 95% of a pattern lowers loss substantially while implementing\nnothing like the real mechanism. Concrete evidence the limit is unreached:\nmulti-digit arithmetic that is correct on common operands and wrong on rare\nones, or a reasoning chain that works on the textbook phrasing and fails when\nthe variable names are swapped. A system with the mechanism would not care\nabout the names.\n",
-    "check": "llm",
-    "concept": "c-lm-objective",
-    "id": "u1-b2",
-    "prompt": "In your own words, and without re-reading: explain why \"a model that predicts\ntext well must model the world that generated the text\" is an argument about\na limit, and name one concrete observation about current LLM behavior that\nshows the limit has not been reached.\n",
-    "rubric": "Must contain: (1) the link from loss to bits/compression to \"must exploit\nreal structure\", (2) an explicit acknowledgement that the conclusion holds\nat or near the entropy floor and not at arbitrary loss, (3) a concrete\nbehavioral example of heuristic-not-mechanism (arithmetic on rare operands,\nbrittleness under renaming/rephrasing, or equivalent).\nPass = all three, in any wording.\nPartial (flag for review, do not pass) = (1) and (3) but the answer treats\nthe world-modeling claim as established for current models rather than as\na limit statement.\nFail = the answer asserts the model \"just does statistics\" with no engagement\nwith why compression pressures toward mechanism. That is the opposite\novercorrection and is equally wrong.\n",
-    "type": "self-explain"
-   },
-   {
-    "answer": "Merge 1 blank: `es`   giving `l o w es t _`\nMerge 3 blank: `est_` giving `l o w est_`\nMerge 5 blank: `low`  giving `low est_`\n\n`lowest` costs 2 tokens: [`low`, `est_`].\n\nThe point: a word absent from the tokenizer's corpus still encodes compactly,\nbecause the merges compose. This is why BPE has no unknown-token problem.\n",
-    "check": "llm",
-    "concept": "c-tokens",
-    "id": "u1-b3",
-    "prompt": "Using exactly the five merges learned above, in order, tokenize the word\n`lowest`. It never appeared in the training corpus.\n\nStart:      `l o w e s t _`\nMerge 1 (e+s -> es):     `l o w ____ t _`\nMerge 2 (es+t -> est):   `l o w est _`\nMerge 3 (est+_ -> est_): `l o w ____`\nMerge 4 (l+o -> lo):     `lo w est_`\nMerge 5 (lo+w -> low):   `____ est_`\n\nFill the three blanks, then state how many tokens `lowest` costs.\n",
-    "rubric": "Required fills, exactly: blank 1 = `es`, blank 2 = `est_`, blank 3 = `low`.\nRequired token count = 2.\nAll four correct = pass. Any wrong fill = fail, and diagnose:\napplying merges out of order indicates the learner missed that the merge\nlist is ordered; answering 6 tokens indicates they did not apply merges at\nall; answering 3 indicates they dropped the end-of-word marker from `est_`.\n",
-    "type": "completion"
-   },
-   {
-    "answer": "English text under a BPE vocabulary of ~100k averages roughly 4 characters\nper token, so a byte-level tokenizer makes sequences about 4x longer.\n\nWhere it lands: attention cost grows with the square of sequence length\n(u3), so 4x tokens is roughly 16x attention compute for the same document.\nThe KV cache grows about 4x. Effective context window, measured in actual\ntext, shrinks by ~4x for a fixed token budget. And every fact the model\nmust learn now has to be composed across 4x more positions, so depth is\nunder more pressure too.\n\nThe tool proposal is the correct engineering answer, and it is a preview of\nu8: the fix for a tokenization limitation is a harness that hands the model\na different representation, not a different model.\n",
-    "check": "llm",
-    "concept": "c-tokens",
-    "id": "u1-b4",
-    "prompt": "A colleague proposes fixing character-level failures by adding a\ncharacter-count tool the model can call. Separately, a second colleague\nproposes retraining with a character-level tokenizer ($V \\approx 256$\nbytes, no merges).\n\nBefore reading on: state the main cost of the second proposal, in terms of\nsomething you already know about sequence length. Roughly what factor\nlonger do sequences get for English text, and where does that cost land?\n",
-    "rubric": "Must identify: (1) sequences get several times longer (accept 3x-5x for\nEnglish), (2) the cost is superlinear because attention is quadratic in\nsequence length, or at minimum that compute/context cost rises sharply.\nBoth = pass. Only (1) = partial, do not pass.\nAn answer claiming byte-level models cannot represent words, or that\nvocabulary size limits what the model can express, indicates U1-M3\n(vocab-size-is-word-knowledge) - fail and route to that correction.\n",
-    "type": "predict"
-   },
-   {
-    "answer": "(a) requires only a local surface regularity: inside a function whose\nparameters are named a and b, the token after \"a + \" is overwhelmingly \"b\".\nA frequency table over short contexts gets this.\n\n(b) requires the model to actually perform the addition. No surface statistic\nof the prefix contains 4760 - that exact string may never appear near \"2847\"\nanywhere in the training data. The only way to drive loss down on the general\ncase of this pattern is to implement an algorithm that computes sums.\n\nThe separator: (a) can be solved by memorizing co-occurrence, (b) cannot,\nbecause the space of (operand, operand) pairs is far larger than any corpus.\nCompression of case (b) forces the acquisition of a mechanism.\n",
-    "check": "llm",
-    "concept": "c-lm-objective",
-    "id": "u1-b1",
-    "prompt": "Two prefixes, both from a Python file the model is training on:\n\n(a) `def add(a, b):\\n    return a + `\n(b) `>>> add(2847, 1913)\\n`\n\nA model that has driven $\\mathcal{L}$ low must put high probability on `b`\nfor (a) and on `4760` for (b). Before reading on: state, in one sentence\neach, what kind of thing the model must have internalized to succeed at\n(a) versus at (b). What separates the two cases?\n",
-    "rubric": "Must identify: (1) case (a) is solvable by local co-occurrence statistics\nor pattern matching, (2) case (b) requires computing/implementing addition\nrather than recalling it, (3) some version of \"the space of possible operand\npairs exceeds what could be memorized\". Any 2 of 3 = pass.\nAnswering that (b) is also just memorization from seeing many arithmetic\nexamples, with no acknowledgement that the operand space is too large,\n= M4-style lookup-table thinking, fail.\n",
-    "type": "predict"
-   },
-   {
-    "answer": "3.1",
-    "check": "numeric(0.01)",
-    "concept": "c-notation",
-    "id": "u0-b5",
-    "prompt": "A batch of three examples produces per-example losses $0.1$, $0.2$, and\n$9.0$. Training uses the batch mean as its estimate of\n$\\mathbb{E}_{x \\sim \\mathcal{D}}[\\ell(x)]$.\n\nCompute that estimate, to two decimal places. Then notice that it is larger\nthan two of the three numbers it averages: this is what \"probability-weighted\nmean, not typical value\" looks like on real data, and it is why a handful of\npathological examples can dominate a training objective.\n",
-    "type": "compute"
-   },
-   {
-    "answer": "Similar words do land near each other, but that is a consequence, not a\nstorage mechanism. Training only ever rewards lower prediction loss. Two\ntokens that are interchangeable in context (`cat`/`dog`) produce similar\ndownstream predictions, so gradient descent has no reason to separate them\nand every reason to let the layers above treat them alike. Proximity is the\nresidue of shared predictive role.\n\n\"Stores meaning\" additionally claims the vector holds the content, portably\nand intrinsically. It does not. Three distinguishing experiments, any one\nis enough:\n\n1. Permute all d_model coordinates of E consistently, permute the input side\n   of every matrix that reads the stream and the output side of every matrix\n   that writes into it, and permute the normalization gains and biases.\n   Outputs are identical. A store whose fields can be arbitrarily relabeled\n   with no effect is not storing anything in those fields.\n2. Transplant one model's embedding row into another model. If meaning were\n   in the vector it would transfer. It produces noise.\n3. Feed `bank` in two disambiguating contexts. The input vector is the same\n   both times, yet the model's behavior differs, so the disambiguating\n   content is not in the embedding.\n",
-    "check": "llm",
-    "concept": "c-embeddings",
-    "id": "u1-b5",
-    "prompt": "A teammate says: \"Embeddings are how the model stores what words mean.\nThat's why similar words have similar vectors.\"\n\nThe second sentence is true and the first is false. Explain, in your own\nwords, how both can hold - and state one experiment that would distinguish\nthe two claims.\n",
-    "rubric": "Must contain: (1) similarity-as-consequence - near vectors arise because the\ntokens play similar predictive roles, not because meaning was written there,\n(2) at least one concrete distinguishing experiment from {coordinate\npermutation invariance, cross-model transplant fails, identical vector for\npolysemous token in two contexts}, (3) some statement that the geometry is\nrelational and model-internal.\n(1) and (2) = pass. Missing (2) = fail; an answer with no falsifiable\nexperiment has not actually separated the claims.\nExplicitly diagnose: an answer that says the vector holds meaning \"in\ncompressed form\" or \"distributed across dimensions\" is M3 surviving in\ndisguise - fail, and point at the permutation argument.\n",
-    "type": "self-explain"
-   },
-   {
-    "answer": "Step 1: 768\nStep 2: 38,597,376\nStep 3: 38,597,376 / 124,000,000 = 31%\n\nWhy: the embedding matrix scales as V x d_model, which is linear in the\nmodel's width, while the transformer stack scales roughly as\nn_layers x d_model^2, which is quadratic in width. As models get wider and\ndeeper the stack outgrows the embedding table fast. GPT-2 small is narrow\n(d=768) and shallow (12 layers), so its table dominates. Vocabulary size\nbarely matters to this comparison - width does.\n",
-    "check": "llm",
-    "concept": "c-embeddings",
-    "id": "u1-b6",
-    "prompt": "GPT-2 small has $V = 50{,}257$, $d_{model} = 768$, and 124 million total\nparameters. Unlike Llama-2, it *ties* its input and output embedding\nmatrices - the same $E$ is used at both ends, so it is counted once.\n\nStep 1. Shape of $E$:            $50{,}257 \\times$ ____\nStep 2. Parameters in $E$:       $50{,}257 \\times 768 =$ ____\nStep 3. Fraction of the model:   ____ $/\\ 124{,}000{,}000 \\approx$ ____ %\n\nFill the blanks, then answer in one sentence: why is this percentage so\nmuch larger than Llama-2-7B's 2% (input side only), given that GPT-2's\nvocabulary is *larger*?\n",
-    "rubric": "Required: blank 1 = 768; blank 2 = 38,597,376 (accept 38.6 million or\n38,597,376 exactly; reject anything off by more than 0.1%); blank 3 result\n= 31% (accept 30-32%).\nThe one-sentence answer must contain the scaling contrast: embeddings grow\nlinearly in d_model, the transformer stack grows quadratically in d_model\n(times depth). Accept \"the rest of the model grows faster with width.\"\nAll three numbers correct AND the scaling contrast = pass.\nNumbers correct but the explanation cites vocabulary size as the driver\n= fail; that misses that width, not V, is what changed.\n",
-    "type": "completion"
-   },
-   {
-    "answer": "z_0 = 0\nz_1 = 3\nz_2 = 0\nz_3 = 2\n\nz = [0, 3, 0, 2]. The winner is `\" a\"` at 3. The gap to `\" the\"` (logit 0)\nis 3.\n\nNote that the same W_U now ranks `\" a\"` first where the previous hidden\nstate ranked `\" the\"` first. The unembedding matrix is fixed; the ranking\nis entirely a function of h.\n",
-    "check": "llm",
-    "concept": "c-logits",
-    "id": "u1-b7",
-    "prompt": "Same $W_U$ as above:\n\n$$W_U = \\begin{bmatrix} 1 & 0 & 0 \\\\ 0.5 & 1 & 2 \\\\ 0 & 1 & -1 \\\\ -1 & 2 & 0 \\end{bmatrix}$$\n\nvocabulary $[\\texttt{\" the\"}, \\texttt{\" a\"}, \\texttt{\" mat\"}, \\texttt{\" quantum\"}]$,\nbut a new hidden state from a different context:\n\n$$h = \\begin{bmatrix} 0 & 1 & 1 \\end{bmatrix}$$\n\n$z_0 = (1)(0) + (0)(1) + (0)(1) =$ ____\n$z_1 = (0.5)(0) + (1)(1) + (2)(1) =$ ____\n$z_2 = (0)(0) + (1)(1) + (-1)(1) =$ ____\n$z_3 = (-1)(0) + (2)(1) + (0)(1) =$ ____\n\nFill the blanks. Then: which token wins, and what is the logit gap between\nthe winner and `\" the\"`?\n",
-    "rubric": "Required, exactly: z_0 = 0, z_1 = 3, z_2 = 0, z_3 = 2. Winner = `\" a\"`.\nGap = 3.\nAll six correct = pass. Arithmetic slips = fail (this is mechanical).\nIf the learner reports the gap as a probability or a percentage, that is\nM2 leaking early - logits are not probabilities. Fail and flag M2.\n",
-    "type": "completion"
-   },
-   {
-    "answer": "2.72",
-    "check": "numeric(0.01)",
-    "concept": "c-logits",
-    "id": "u1-b8",
-    "prompt": "A model with $V = 4$ produces logits $z = [1.0,\\ 3.0,\\ 2.0,\\ 0.5]$.\n\nUsing only the fact that a logit gap of $\\ln 2$ means one token is twice as\nlikely as another - that is, the probability *ratio* of two tokens is\n$e^{z_i - z_j}$ - compute how many times more likely the top-scoring token\nis than the second-highest.\n\nGive a single number to 2 decimal places.\n",
-    "type": "compute"
-   },
-   {
-    "answer": "12 x 256",
-    "check": "exact",
-    "concept": "c-notation",
-    "id": "u0-b1",
-    "prompt": "Row-vector convention. $X$ has shape $(12, 64)$ and $W$ has shape\n$(64, 256)$. Give the shape of $XW$.\nAnswer in the exact form `rows x cols`, for example `3 x 8`.\n",
-    "type": "compute"
-   }
-  ],
-  "check": [
-   {
-    "check": "exact",
-    "concept": "c-logits",
-    "difficulty": "core",
-    "id": "u1-q9",
-    "kind": "constructed",
-    "prompt": "A toy model has $d_{model} = 3$ and $V = 3$, with vocabulary\n[` yes`, ` no`, ` maybe`] at indices 0, 1, 2. Its unembedding matrix, one\nrow per vocabulary entry, is\n\n  W_U = [[ 2,  0, -1],\n         [ 0,  1,  1],\n         [-1, -1,  2]]\n\nThe stack produces hidden state h = [1, 2, -1].\n\nCompute the logit vector. Answer as three comma-separated numbers, no\nspaces, in vocabulary order. Example format: `4,-2,0`\n",
-    "reveal": {
-     "answer": "3,1,-5"
-    },
-    "unit": "u1"
-   },
-   {
-    "check": "exact",
-    "concept": "c-embeddings",
-    "difficulty": "core",
-    "id": "u1-q8",
-    "kind": "constructed",
-    "prompt": "Llama-3-8B has a vocabulary of 128,256 tokens and $d_{model} = 4096$.\nHow many parameters are in its input embedding matrix?\n\nAnswer with the exact integer, digits only, no separators.\n",
-    "reveal": {
-     "answer": "525336576"
-    },
-    "unit": "u1"
-   },
-   {
-    "check": "llm",
-    "concept": "c-notation",
-    "difficulty": "stretch",
-    "id": "u0-n10",
-    "kind": "constructed",
-    "prompt": "$Y = XW$, with $X$ of shape $(n, d)$ and $W$ of shape $(d, m)$. You are\nhanded $G = \\partial L / \\partial Y$, of shape $(n, m)$. Write\n$\\partial L / \\partial W$ in terms of $X$ and $G$, and give its shape.\n",
-    "reveal": {
-     "answer": "$\\partial L / \\partial W = X^T G$, of shape $(d, m)$ - the shape of $W$\nitself. $X^T$ is $(d, n)$, $G$ is $(n, m)$, and the $n$ axis contracts.\n",
-     "rubric": "Pass requires both: (1) the expression $X^T G$ - $X$ transposed, on the\nleft; (2) the shape $(d, m)$, the same as $W$.\nPartial: the shape right with the expression wrong ($X G^T$, $G X$, or\n$G^T X$), or the expression right with no shape.\nFail and what it diagnoses: a gradient whose shape is not $W$'s (a scalar,\nor $(n, m)$) = U0-M3, the gradient treated as a slope rather than one\nnumber per weight. Writing $XG$ with no transpose and calling it valid =\nU0-M4.\n"
-    },
-    "unit": "u0"
-   },
-   {
-    "check": "llm",
-    "concept": "c-matmul",
-    "difficulty": "core",
-    "id": "u0-q12",
-    "kind": "constructed",
-    "prompt": "$X$ has shape $(n, d)$ and $W$ has shape $(d, m)$. Describe entry $(i,j)$\nof $XW$ as a dot product: which vector is dotted with which?\n",
-    "reveal": {
-     "answer": "Entry $(i,j)$ is the dot product of row $i$ of $X$ - the $i$-th token's\n$d$-dimensional vector - with column $j$ of $W$, which is also\n$d$-dimensional. Both operands have length $d$, the shared inner\ndimension, which is why they can be dotted at all. The full product is an\n$n \\times m$ grid of such dot products.\n",
-     "rubric": "Must contain: (1) row $i$ of $X$ dotted with column $j$ of $W$ - the\nrow/column pairing must be correct and in the right order; (2) both\noperands have length $d$, the contracted inner dimension.\nPass = both. Partial = (1) only.\nFail and what it diagnoses: \"row $i$ of $X$ with row $j$ of $W$\" or any\npairing that ignores which axis contracts = the shape rule is being\napplied as memorized bookkeeping rather than understood, U0-M1. Answering\nwith elementwise multiplication of $X_{ij}$ and $W_{ij}$ = U0-M1 in its\nstrongest form; deliver the matmul section before any later unit.\n"
-    },
-    "unit": "u0"
-   },
-   {
-    "check": "exact",
-    "concept": "c-tokens",
-    "difficulty": "core",
-    "id": "u1-q3",
-    "kind": "constructed",
-    "prompt": "A BPE tokenizer learned exactly these five merges, in this order:\n\n  1. e + s   -> es\n  2. es + t  -> est\n  3. est + _ -> est_\n  4. l + o   -> lo\n  5. lo + w  -> low\n\nTokenize the word `widest`. Apply the merges in order to the character\nsequence `w i d e s t _`.\n\nAnswer with the final token sequence, pipe-separated, no spaces.\nExample format: `ab|cd|e`\n",
-    "reveal": {
-     "answer": "w|i|d|est_"
-    },
-    "unit": "u1"
-   },
-   {
-    "check": "numeric(0.001)",
-    "concept": "c-dotprod",
-    "difficulty": "warmup",
-    "id": "u0-q1",
-    "kind": "constructed",
-    "prompt": "Compute the dot product of $[2, 0, -3]$ and $[1, 4, 2]$. Answer with a\nsingle number.\n",
-    "reveal": {
-     "answer": "-4"
-    },
-    "unit": "u0"
-   },
-   {
-    "check": "llm",
-    "concept": "c-lm-objective",
-    "difficulty": "stretch",
-    "id": "u1-q12",
-    "kind": "constructed",
-    "prompt": "The training loss is a sum of independent per-position terms: each\nposition is scored only on the token that immediately follows it.\n\nA colleague concludes that the model must therefore be myopic - that it\ncannot set anything up in advance, because nothing in the objective\nrewards a token for helping a token 40 positions later.\n\nThe premise is exactly right and the conclusion is wrong. Explain why, and\nname a behavior that could not exist if the conclusion held.\n",
-    "reveal": {
-     "answer": "The terms of the loss are additive and independent, but the computations\nproducing them are not, because they share parameters. The gradient of the\ntotal loss with respect to theta is the sum of every position's gradient,\nso a parameter setting that makes the hidden state at position t encode\nstructure useful at position t+40 receives credit from position t+40's\nterm. The objective is decomposed per position; the credit assignment is\nnot. Backpropagation routes gradient from the late position back through\nwhatever produced the early state.\n\nThere is a second, separate reason: a token's own probability depends on\nthe context that will follow it only through what the writer of the\ntraining text did, and human text is written by processes that planned.\nPredicting it well therefore requires modeling the plan.\n\nBehavior that could not exist under the myopic conclusion: producing a\ncorrectly-scanning rhyming couplet, where the word choice at the end of\nline 1 constrains what must be available at the end of line 2. Or emitting\na matched closing delimiter after a long nested structure. Or setting up a\njoke whose punchline lands 60 tokens later. Under a genuinely myopic\nmodel, each of these would require a lucky coincidence at every step.\n",
-     "rubric": "Must contain: (1) parameter sharing - the same weights produce every\nposition, so gradient from a late position updates whatever computed the\nearly state, (2) a concrete behavior requiring commitment across many\ntokens.\nBoth = pass.\n(2) alone, arguing only from observed behavior with no mechanism, =\npartial; do not pass, since the learner cannot say WHY the objective\npermits it.\nAn answer claiming the model \"plans ahead by looking at future tokens\" =\nfail; that violates causal masking (u3) and is a distinct error worth\ncorrecting immediately.\nAn answer defending the myopic conclusion = fail, diagnosing U1-M2.\n"
-    },
-    "unit": "u1"
-   },
-   {
-    "check": "llm",
-    "concept": "c-lm-objective",
-    "difficulty": "core",
-    "id": "u1-q1",
-    "kind": "constructed",
-    "prompt": "A 4,000-token document is used as one training example. State how many\ndistinct prediction problems it contributes to the loss, and write the\nloss expression, defining every symbol you use.\n",
-    "reveal": {
-     "answer": "It contributes 4,000 prediction problems, one per position. The loss is\n\n  L = -(1/T) * sum over t = 1..T of log P_theta(x_t | x_<t)\n\nwhere T = 4000 is the document length in tokens, x_t is the token that\nactually occurred at position t, x_<t is the prefix x_1 through x_(t-1),\ntheta is the model's parameters, and P_theta(x_t | x_<t) is the single\nprobability the model assigned to the observed token at that position.\nAll T predictions are produced in one forward pass.\n",
-     "rubric": "Must contain: (1) 4,000 (not 1, not 3,999 - accept 3,999 as correct given\nthe first token has no context), (2) the negative-log-likelihood summed\nover positions, (3) conditioning on the prefix, (4) every symbol defined.\nPass = (1), (2), (3) present and at least T, x_t, and theta defined.\nAnswering \"one problem - predict the end of the document\" = fail; the\nlearner has not internalized that the training signal is per-position.\nAn answer that adds a truth, correctness, or quality term to the loss\n= fail; nothing but agreement with observed text is optimized.\n"
-    },
-    "unit": "u1"
-   },
-   {
-    "check": "numeric(0.001)",
-    "concept": "c-dotprod",
-    "difficulty": "stretch",
-    "id": "u0-n9",
-    "kind": "constructed",
-    "prompt": "$q$ and $k$ each have 64 components. All 128 components are independent,\nwith mean 0 and variance 1. What is the variance of $q \\cdot k$? Answer\nwith a single number.\n",
-    "reveal": {
-     "answer": "64"
-    },
-    "unit": "u0"
-   }
-  ],
-  "html": "<p>One idea runs this whole book: a model trained to do nothing but predict the\nnext token becomes, at sufficient scale, the systems you use every day. This\nunit states that bet precisely and walks it end to end - what a token is, how\ntext enters the model, how scores come out, and what the training objective\ndoes and does not promise. By the end you can trace <code>The cat sat on</code> from\ncharacters to a scored vocabulary, and say exactly which claims about\n&quot;understanding&quot; that loop licenses.</p>\n\n<h2>Why prediction forces world modeling</h2>\n<p>The bet is this: <em>if you make a system good enough at predicting the next symbol\nin human-generated text, you get world modeling for free, because there is no\nother way to be good at it.</em></p>\n<p>That claim deserves scrutiny rather than assent. Here is the argument in its\nstrong form, and then the honest statement of where it stops.</p>\n<p>Start from behavior, not machinery. Four fragments of ordinary text, each\ncut off one word early:</p>\n<ul>\n<li><code>The 44th president of the United States was Barack ____</code></li>\n<li><code>&gt;&gt;&gt; sorted([5, 2, 9, 1])\\n[1, 2, 5, ____</code></li>\n<li><code>Therefore, since triangle ABC is isosceles with AB = AC, angle ABC = angle ____</code></li>\n<li><code>Alice put the keys in the drawer and left. Bob moved them to the safe. When Alice returned, she looked for the keys in the ____</code></li>\n</ul>\n<div class=\"beat\" data-beat-id=\"u1-b9\"></div>\n<p>To fill those blanks a system must, respectively: hold a fact about the\nworld, execute a sorting algorithm, apply a geometric theorem, and track two\nagents' divergent beliefs about where an object is. Nothing about the\ninterface distinguishes the four cases. The same next-token question is\nsilently asking for lookup, computation, deduction, and a theory of mind -\nand human text is full of all four. Whatever gets good at this game must\ncarry some working version of each capability. The rest of this section makes\nthat argument precise, and then states honestly where it stops.</p>\n<p>The argument is about compression. Shannon's source coding theorem says that if\nyou have a probability model $Q$ over symbols, you can encode a symbol $x$ in\n$-\\log_2 Q(x)$ bits, and you cannot do better on average than the true entropy.\nThis is not a metaphor. Arithmetic coding achieves it in practice. And the\nnumber training pushes down - the loss, written $\\mathcal{L}$: the average\nover the corpus of $-\\ln$ of the probability the model gave the symbol that\nactually came next; the objective section below states it exactly - is this\nsame quantity in natural-log units. Converted to base 2, the loss <em>is</em> the\ncompressed size of the training corpus in bits per token under the model's\ncode:</p>\n<p>$$\\text{bits per token} = \\frac{\\mathcal{L}}{\\ln 2}$$</p>\n<p>A language model is therefore a compressor, and lowering its loss is literally\ncompressing the corpus harder. That reframing does the work, because compression\nhas a known lower bound tied to structure: the only way to encode a string in\nfewer bits than its length is to exploit regularity in the process that\ngenerated it.</p>\n<p>A frequency table over 5-token windows spends many bits on every one of the\nfour blanks above, and those bits show up in the loss. The corpus is full of\nsuch continuations, and the gradient pushes on every one of them.</p>\n<p>That is the argument, and it is strong. Here is where it stops, stated plainly\nbecause the overclaimed version of this argument is everywhere.</p>\n<p>The compression argument establishes a statement about the <em>limit</em>: a system with\nloss arbitrarily close to the entropy of language must model whatever generated\nthat language. It does <em>not</em> establish that a transformer trained with SGD at\nachievable loss actually acquires those mechanisms rather than a large bag of\nshallow heuristics that happen to cover most of the distribution. Those are\ndifferent claims. The first is a theorem about codes. The second is an empirical\nquestion, and the honest answer is &quot;considerably more than the skeptics\npredicted in 2019, considerably less than the marketing says.&quot; The failure modes\nyou have seen with LLM tooling - confident wrong arithmetic, brittle multi-step\nreasoning that collapses when you rename the variables - are exactly the residue\nof heuristics standing in for mechanisms.</p>\n<p>Hold both halves. The objective <em>pressures</em> toward world modeling, monotonically\nand without limit. What you get at any particular scale is an empirical fact\nabout that scale, not a guarantee.</p>\n<div class=\"beat\" data-beat-id=\"u1-b2\"></div>\n\n<h2>Tokens: BPE from scratch</h2>\n<!-- fade: bpe-tokenize -->\n<p>The model does not consume characters and does not consume words. It consumes\nintegers drawn from a fixed vocabulary of $V$ subword strings, built before\ntraining ever starts by an algorithm called byte-pair encoding. The vocabulary is\nfrozen for the model's entire life.</p>\n<p>Why not characters? A 4000-character document would be 4000 positions, and u3\nwill show that attention cost grows as the square of sequence length. Why not\nwords? The vocabulary would be unbounded, and every typo, identifier, and\nnon-English string would be an unknown symbol. BPE is the compromise: start from\ncharacters, then repeatedly glue together whichever adjacent pair occurs most\noften, until you have $V$ symbols. Frequent words become single symbols; rare\nwords decompose into pieces; nothing is ever unrepresentable.</p>\n<p>Here is the whole algorithm on a corpus small enough to do by hand. The corpus is\nfour distinct words with these counts:</p>\n<table>\n<thead>\n<tr>\n<th>word</th>\n<th>count</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>low</code></td>\n<td>5</td>\n</tr>\n<tr>\n<td><code>lower</code></td>\n<td>2</td>\n</tr>\n<tr>\n<td><code>newest</code></td>\n<td>6</td>\n</tr>\n<tr>\n<td><code>widest</code></td>\n<td>3</td>\n</tr>\n</tbody>\n</table>\n<p>Split every word into characters, with <code>_</code> marking end-of-word (so the algorithm\ncan tell a word-final <code>t</code> from a word-internal one):</p>\n<pre><code>l o w _          (5)\nl o w e r _      (2)\nn e w e s t _    (6)\nw i d e s t _    (3)\n</code></pre>\n<p><strong>Merge step.</strong> Count every adjacent pair across the corpus, weighted by word\ncount. Merge the most frequent pair into a single symbol. Repeat.</p>\n<p><em>Round 1.</em> Pair counts, every adjacent pair in the corpus: <code>(l,o)</code>=7,\n<code>(o,w)</code>=7, <code>(w,_)</code>=5, <code>(w,e)</code>=2+6=8, <code>(e,r)</code>=2, <code>(r,_)</code>=2, <code>(n,e)</code>=6,\n<code>(e,w)</code>=6, <code>(e,s)</code>=6+3=9, <code>(s,t)</code>=6+3=9, <code>(t,_)</code>=6+3=9, <code>(w,i)</code>=3, <code>(i,d)</code>=3,\n<code>(d,e)</code>=3. Three pairs tie at 9; break ties by first occurrence and take\n<code>(e,s)</code>.</p>\n<p>Merge 1: <strong><code>es</code></strong></p>\n<pre><code>l o w _          (5)\nl o w e r _      (2)\nn e w es t _     (6)\nw i d es t _     (3)\n</code></pre>\n<p><em>Round 2.</em> <code>(es,t)</code>=9 and <code>(t,_)</code>=9 tie; take <code>(es,t)</code>.</p>\n<p>Merge 2: <strong><code>est</code></strong></p>\n<pre><code>n e w est _      (6)\nw i d est _      (3)\n</code></pre>\n<p><em>Round 3.</em> <code>(est,_)</code>=9 is now the unique maximum.</p>\n<p>Merge 3: <strong><code>est_</code></strong></p>\n<pre><code>n e w est_       (6)\nw i d est_       (3)\n</code></pre>\n<p><em>Round 4.</em> Remaining maxima: <code>(l,o)</code>=7 and <code>(o,w)</code>=7. Take <code>(l,o)</code>.</p>\n<p>Merge 4: <strong><code>lo</code></strong></p>\n<p><em>Round 5.</em> <code>(lo,w)</code>=7.</p>\n<p>Merge 5: <strong><code>low</code></strong></p>\n<pre><code>low _            (5)\nlow e r _        (2)\n</code></pre>\n<p>Stop. The learned merge list, in order, is the tokenizer:</p>\n<pre><code>1. e + s    -&gt; es\n2. es + t   -&gt; est\n3. est + _  -&gt; est_\n4. l + o    -&gt; lo\n5. lo + w   -&gt; low\n</code></pre>\n<p>Three observations, because each one predicts a real behavior you have seen.</p>\n<p><strong>The tokenizer discovered a morpheme without being told morphemes exist.</strong>\n<code>est_</code> is the English superlative suffix. Nothing in the algorithm knows about\nsuffixes; it merged <code>e</code>,<code>s</code>,<code>t</code>,<code>_</code> because that byte sequence recurred. Every\npiece of linguistic structure a BPE vocabulary appears to know is an artifact of\nbyte frequency.</p>\n<p><strong>Frequency, not meaning, decides what gets its own token.</strong> <code>low</code> (count 5)\nbecame a single symbol. <code>lower</code> (count 2) did not, and now costs 4 tokens:\n<code>low</code>, <code>e</code>, <code>r</code>, <code>_</code>. Two words of near-identical meaning have wildly different\nrepresentations, purely because of how often they appeared in the tokenizer's\ntraining corpus.</p>\n<p><strong>Encoding is deterministic replay.</strong> To tokenize a new string, split it into\ncharacters and apply the merge list <em>in learned order</em>. Nothing is searched, and\nthe merge order matters.</p>\n<div class=\"beat\" data-beat-id=\"u1-b3\"></div>\n<p>Now the same picture at real scale. These are actual outputs from <code>cl100k_base</code>,\nthe tokenizer behind GPT-3.5 and GPT-4, with $V = 100{,}277$:</p>\n<table>\n<thead>\n<tr>\n<th>string</th>\n<th>tokens</th>\n<th>count</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>The cat sat on the mat.</code></td>\n<td><code>The</code>, <code> cat</code>, <code> sat</code>, <code> on</code>, <code> the</code>, <code> mat</code>, <code>.</code></td>\n<td>7</td>\n</tr>\n<tr>\n<td><code> strawberry</code> (leading space)</td>\n<td><code> strawberry</code></td>\n<td>1</td>\n</tr>\n<tr>\n<td><code>strawberry</code> (no leading space)</td>\n<td><code>str</code>, <code>aw</code>, <code>berry</code></td>\n<td>3</td>\n</tr>\n<tr>\n<td><code>tokenization</code></td>\n<td><code>token</code>, <code>ization</code></td>\n<td>2</td>\n</tr>\n<tr>\n<td><code>2847 + 1913</code></td>\n<td><code>284</code>, <code>7</code>, <code> +</code>, <code> </code>, <code>191</code>, <code>3</code></td>\n<td>6</td>\n</tr>\n</tbody>\n</table>\n<p>Note that the leading space is part of the token: <code> cat</code> and <code>cat</code> are different\nintegers. And note that <code>strawberry</code> is one symbol or three depending on whether\na space precedes it. Same word, same meaning, different atoms.</p>\n<p>The last row is the one to sit with. <code>2847</code> is not four digit symbols. It is\n<code>284</code> followed by <code>7</code>. The number <code>1913</code> is <code>191</code> followed by <code>3</code>. Digits get\ngrouped in threes from the left, which means the model's units column is not in a\nfixed position within a token, and place-value alignment between two operands is\nscrambled differently for every pair. Arithmetic in an LLM is not a hard problem\nthat got solved badly; it is a problem whose inputs arrive pre-shredded.</p>\n<!-- refutes: U1-M1 -->\n<p>The same shredding explains the character-counting failures. Asked how many <code>r</code>s\nare in <code>strawberry</code>, the model receives three integers: <code>str</code>, <code>aw</code>, <code>berry</code>.\nNowhere in its input is there a character. It has no more direct access to the\nletters of <code>strawberry</code> than you have to the individual bits of a <code>float</code> you are\nreading off a screen. Any spelling ability the model has was learned indirectly,\nfrom text <em>about</em> spelling, and it is exactly as reliable as that indirect route\nsuggests.</p>\n<p>You may find that a current model answers the strawberry question correctly. That\ndoes not refute the point. Specific famous instances get covered by training data\nand by reasoning traces that spell the word out one character at a time, which is\nthe model routing around its own tokenization. Try an unfamiliar word.</p>\n<div class=\"beat\" data-beat-id=\"u1-b4\"></div>\n\n<h2>The objective, stated exactly</h2>\n<p>Everything in this book is downstream of one training objective. Here it is, with\nevery symbol defined.</p>\n<p>A document is a sequence of $T$ discrete symbols $x_1, x_2, \\ldots, x_T$. Each\n$x_t$ is an integer in $\\{1, \\ldots, V\\}$, where $V$ is the vocabulary size (the\nnumber of distinct symbols the model can emit) - these are exactly the BPE\ntokens of the last section, integers indexing a frozen vocabulary.</p>\n<p>The probability of the whole document factors exactly, with no approximation, by\nthe chain rule of probability:</p>\n<p>$$P(x_1, x_2, \\ldots, x_T) = \\prod_{t=1}^{T} P(x_t \\mid x_1, \\ldots, x_{t-1})$$</p>\n<p>Read the right-hand side as: the probability of symbol 1, times the probability\nof symbol 2 given symbol 1, times the probability of symbol 3 given symbols 1\nand 2, and so on. The notation $x_{&lt;t}$ abbreviates $x_1, \\ldots, x_{t-1}$, the\nprefix before position $t$.</p>\n<p>This factorization is a tautology. It is true for any sequence of any kind. What\nmakes it useful is that it converts &quot;model the distribution over all documents&quot;\n(a hopeless object: there are $V^T$ possible documents) into &quot;model one\nconditional distribution over $V$ options, and apply it $T$ times.&quot;</p>\n<p>A neural network with parameters $\\theta$ (a big pile of real numbers, roughly\n$10^{10}$ of them) approximates that one conditional:</p>\n<p>$$P_\\theta(\\cdot \\mid x_{&lt;t}) \\in \\mathbb{R}^V, \\qquad \\sum_{v=1}^{V} P_\\theta(v \\mid x_{&lt;t}) = 1$$</p>\n<p>Training minimizes the average negative log probability that the model assigned\nto the symbols that actually occurred:</p>\n<p>$$\\mathcal{L}(\\theta) = -\\frac{1}{T}\\sum_{t=1}^{T} \\log P_\\theta(x_t \\mid x_{&lt;t})$$</p>\n<p>Here $\\log$ is natural log, $x_t$ is the true symbol at position $t$, and\n$P_\\theta(x_t \\mid x_{&lt;t})$ is the single number the model assigned to that\nsymbol. If the model assigned probability 1 to the correct symbol every time,\n$\\log 1 = 0$ and the loss is 0. If it assigned probability 0 to something that\nhappened, $-\\log 0 = \\infty$. The loss punishes confident wrongness without\nbound.</p>\n<p>That expression is cross-entropy loss; u5 derives its gradient and explains why\nits floor is not zero. For now, take it as: a scalar that goes down when the\nmodel is less surprised by real text.</p>\n<p>Two things are worth noticing immediately, because they are the source of most\nconfusion later.</p>\n<p>First, the sum runs over <em>every</em> position $t$. A single 4000-token training\ndocument produces 4000 prediction problems, not one. The model predicts position\n2 from position 1, position 3 from positions 1-2, and so on, all in one forward\npass. Training is not &quot;read the document, then guess the end.&quot;</p>\n<p>Second, nothing in $\\mathcal{L}$ mentions truth, helpfulness, reasoning, or\ncorrectness. The only thing being optimized is agreement with the empirical\ndistribution of the training text. Every capability the finished system has is a\nside effect of that.</p>\n<div class=\"beat\" data-beat-id=\"u1-b1\"></div>\n\n<h2>The average is a stand-in</h2>\n<!-- canon-only -->\n<p>The loss above averages over a training corpus. The quantity anyone\nactually cares about is defined over text nobody has - and papers write\nthat distinction in a notation worth owning now.</p>\n<p><strong>Expectation.</strong> $\\mathbb{E}_{x \\sim \\mathcal{D}}[f(x)]$ reads &quot;the expected\nvalue of $f(x)$ when $x$ is drawn from the distribution $\\mathcal{D}$&quot; - the\naverage of $f(x)$ over all possible $x$, weighted by how likely each $x$ is\nunder $\\mathcal{D}$. The subscript names the distribution, the brackets hold\nwhat you are averaging. You cannot compute that average, because $\\mathcal{D}$\nis &quot;the distribution of all text that could exist&quot; and you have a hard drive.\nSo every expectation in this book is estimated by a sample mean over a batch:</p>\n<p>$$\\mathbb{E}_{x \\sim \\mathcal{D}}[f(x)] \\approx \\frac{1}{b} \\sum_{i=1}^{b} f(x_i)$$</p>\n<p>where $b$ is the batch size and $x_1, \\dots, x_b$ are the examples in the batch.</p>\n<!-- refutes: U0-M5 -->\n<p>You probably read that approximation as an equality with extra ceremony, with\n$\\mathbb{E}$ meaning &quot;average of the numbers I have&quot;. Here is the prediction\nthat fails: if the objective were defined over your dataset, a model that\nmemorized the dataset would have optimally solved the stated problem, and\ngeneralization error would not exist as a concept. Every number anyone reports\nis held-out loss. The belief is appealing because the batch mean is what the\ncode computes and the dataset is the only concrete object in sight. What is\ntrue: the thing you want is an expectation over a distribution nobody can\nenumerate, the thing you compute is an unbiased but noisy estimate of it, and\nthe gap is exactly why batch size affects training stability (u5). A related\ntrap - $\\mathbb{E}$ is a probability-weighted mean, not the typical value. The\nexpected roll of a fair die is 3.5.</p>\n<div class=\"beat\" data-beat-id=\"u0-b5\"></div>\n\n<h2>Embeddings are coordinates, not contents</h2>\n<!-- refutes: M3 -->\n<p>Token IDs are integers, and integers are useless as input to a differentiable\nfunction - there is no sense in which token 5000 is &quot;between&quot; tokens 4999 and\n5001. So the first thing the model does is replace each ID with a vector.</p>\n<p>The embedding matrix is $E \\in \\mathbb{R}^{V \\times d_{model}}$, where $V$ is\nvocabulary size and $d_{model}$ is the model's internal width (4096 for a 7B-class\nmodel). Row $i$ of $E$, written $E[i,:] \\in \\mathbb{R}^{d_{model}}$, is the\nembedding of token $i$. &quot;Embedding a token&quot; is an array index. That is the entire\noperation.</p>\n<p><strong>You probably think the vector contains the word's meaning</strong> - that $E[i,:]$ is\nsomething like a struct of semantic fields, learned so that dimension 412 holds\nformality and dimension 1900 holds animacy, and that this is what &quot;semantic\nvector&quot; means.</p>\n<p><strong>Here is the specific prediction that model makes, and it fails.</strong> If meaning\nlived in the coordinates, the coordinates would have to be stable. Take a trained\nmodel, pick any permutation $\\pi$ of the $d_{model}$ coordinate indices, and\nrelabel the residual stream by it. That means four consistent edits: permute the\ncolumns of $E$; permute the input side of every weight matrix that <em>reads</em> from\nthe stream; permute the output side of every matrix that <em>writes</em> into it; and\npermute the gain and bias vectors of every normalization layer. Now every\nactivation in the network is the old activation with its coordinates shuffled by\n$\\pi$, and every read undoes the shuffle before acting on it, so the logits come\nout identical on every input. Nothing measurable changed. There are $4096!$ such\nrelabelings, all equally valid, so &quot;dimension 412 means formality&quot; cannot be a\nfact about the model - it is a fact about an arbitrary labeling that the training\nrun happened to land on. (Strip the learned gains and use RMSNorm, which divides\nby $\\lVert x \\rVert / \\sqrt{d_{model}}$ and is therefore invariant under any\nrotation, and the argument runs with an arbitrary orthogonal matrix $Q$ in place\nof a permutation - not even the axes are privileged. Real models keep a learned\nelementwise gain, which breaks the full rotational symmetry down to the\npermutations; that is why interpretability work can find axis-aligned features at\nall, and why what it reports are still directions rather than coordinates. u4\ncovers the normalization detail.)</p>\n<p>Second failing prediction, cruder and easier to check: if the vector held the\nmeaning, you could take GPT-2's row for <code>dog</code> and paste it into another model's\nembedding table. Meaning is meaning. In fact you get noise. Embeddings are not\nportable across models, across training runs, or even across two runs of the same\ncode with different seeds. Nothing survives the boundary of the model that\nlearned them.</p>\n<p>Third, and most decisive for what comes later: the row for <code>bank</code> is <em>one</em> row.\nIn <code>the river bank</code> and <code>the bank approved the loan</code>, the model's input at that\nposition is the identical vector. If the vector carried the word's meaning, it\nwould have to carry both meanings at once, unresolved, forever. Whatever\ndisambiguates them happens downstream, in attention, from context (u3). The\nembedding cannot be where meaning lives, because the embedding does not know\nwhich meaning it is.</p>\n<p><strong>Here is why the wrong model is appealing.</strong> The <code>king - man + woman = queen</code>\ndemonstration, which is genuinely striking, and a decade of &quot;semantic vector&quot;\nmarketing. Worth knowing: that demo is weaker than folklore holds. The standard\nimplementation excludes the three input words from the nearest-neighbor search.\nRemove that exclusion and the nearest vector to <code>king - man + woman</code> is usually\n<code>king</code> itself. The analogy result is partly an artifact of the search procedure.</p>\n<p><strong>Here is what is actually true.</strong> An embedding is a <em>learned position in a space\nthat the rest of the model is simultaneously learning to read</em>. The only thing\nwith meaning is the relational geometry - which vectors are close to which, which\ndirections separate which sets - and that geometry exists solely because it makes\ndownstream prediction easier. Gradient descent does not push $E[i,:]$ toward\n&quot;what token $i$ means.&quot; It pushes $E[i,:]$ wherever reduces loss, given what\nlayer 1 currently does with it. The embedding is an <em>interface</em>, co-designed with\nits consumer, and like any interface its symbols mean nothing outside the system\nthat agreed on them.</p>\n<p>The useful reframe for a systems engineer: embeddings are the model's internal\ncalling convention. Asking what <code>dog</code>'s embedding means in isolation is like\nasking what the value in register <code>rsi</code> means without knowing the ABI.</p>\n<div class=\"beat\" data-beat-id=\"u1-b5\"></div>\n\n<h2>Counting the embedding matrix</h2>\n<!-- fade: embedding-param-count -->\n<!-- refutes: M4 -->\n<p>Time to make this concrete by counting. $E$ is a matrix, so its parameter count\nis the product of its dimensions:</p>\n<p>$$|E| = V \\times d_{model}$$</p>\n<p><strong>Worked example: Llama-2-7B.</strong> Its vocabulary is $V = 32{,}000$ and its width is\n$d_{model} = 4096$.</p>\n<p>$$|E| = 32{,}000 \\times 4096 = 131{,}072{,}000$$</p>\n<p>That is 131 million parameters whose entire job is to assign each of 32,000\ntokens a starting position. Llama-2 does not tie its input and output matrices\n(the output-layer section below explains tying), so there is a second matrix of\nthe same size at the output end, for 262 million total, against a full model of\nabout 6.74 billion.\nThe embedding end is roughly 4% of the model. The other 96% is transformation.</p>\n<p>Hold onto that ratio, because it sets up a trap.</p>\n<p><strong>The embedding matrix is a genuine lookup table.</strong> One row per token, indexed by\ninteger ID, no computation. It is the only component of the model that works this\nway. If your mental model is &quot;the parameters are a compressed key-value store of\nfacts, and a bigger model has more rows,&quot; then notice what just happened: the one\npart of the model that literally <em>is</em> a table by that description contains no\nfacts about the world at all. It contains 32,000 positions. Not one of them\nencodes that Paris is in France.</p>\n<p>Everything that could be called knowledge lives in the other 96%, and that 96%\nhas no rows. It is a stack of matrices that <em>transform</em> whatever is handed to\nthem. There is no index into it, no key to look up, no row to be missing. u4\nlocates where facts appear to concentrate and u5 explains why the same mechanism\nproduces both correct generalization and confident hallucination - they are not\ntwo systems, one working and one broken. For now, just register the shape of the\nthing: 4% table, 96% function.</p>\n<div class=\"beat\" data-beat-id=\"u1-b6\"></div>\n\n<h2>The output end: hidden state to logits</h2>\n<!-- fade: hidden-to-logits -->\n<p>Skip over the middle of the model for now - u3 and u4 own it. Assume it ran, and\nthat at each position it produced a vector $h \\in \\mathbb{R}^{d_{model}}$, the\nhidden state. For generating the next token, only the hidden state at the <em>last</em>\nposition matters.</p>\n<p>That vector has to become a distribution over all $V$ tokens. One matrix does it.\nThe unembedding matrix is $W_U \\in \\mathbb{R}^{V \\times d_{model}}$ - one row per\nvocabulary entry, the same layout as $E$, which is what makes weight tying\npossible at the end of this section. With $h$ a row vector of shape\n$(1, d_{model})$ in this book's convention:</p>\n<p>$$z = h\\,W_U^T, \\qquad z \\in \\mathbb{R}^{V}$$</p>\n<p>The transpose is load-bearing, not tidying. $h$ carries $d_{model}$ on its second\naxis and $W_U$ carries $d_{model}$ on its second axis too, so nothing contracts\nuntil one of them is flipped; $W_U^T$ is $(d_{model}, V)$ and the join works.\nThis is literally what the code does - a PyTorch <code>nn.Linear</code> stores its weight as\n(out, in) and computes <code>h @ W.T</code>.</p>\n<p>Here $z$ is the vector of <strong>logits</strong>, one real number per vocabulary entry. Read\ncomponentwise, this is the part that matters:</p>\n<p>$$z_j = \\langle W_U[j,:],\\ h \\rangle = \\sum_{k=1}^{d_{model}} W_U[j,k] \\, h_k$$</p>\n<p>$W_U[j,:] \\in \\mathbb{R}^{d_{model}}$ is row $j$, token $j$'s output direction,\nand $\\langle \\cdot, \\cdot \\rangle$ is the dot product: multiply the vectors componentwise, sum. So the logit for\ntoken $j$ is the <em>similarity between the hidden state and token $j$'s stored\ndirection</em>. The output layer is $V$ dot products run in parallel: score the\nhidden state against every token's direction, keep all the scores.</p>\n<p>This is worth pausing on, because it is the same operation you will meet in u3\nunder a different name. Dot-product-against-a-set-of-stored-directions is the\nmodel's one primitive for &quot;compare this to those.&quot; Attention uses it to compare a\nquery against keys; the output layer uses it to compare a hidden state against\ntokens. Same shape, different operands.</p>\n<p><strong>Worked example.</strong> Take $d_{model} = 3$ and $V = 4$, with vocabulary\n$[\\ \\texttt{\" the\"},\\ \\texttt{\" a\"},\\ \\texttt{\" mat\"},\\ \\texttt{\" quantum\"}\\ ]$\nat indices 0-3. Suppose the stack, having processed <code>The cat sat on</code>, emitted</p>\n<p>$$h = \\begin{bmatrix} 2 &amp; -1 &amp; 0.5 \\end{bmatrix}$$</p>\n<p>and the model's unembedding matrix is</p>\n<p>$$W_U = \\begin{bmatrix} 1 &amp; 0 &amp; 0 \\\\ 0.5 &amp; 1 &amp; 2 \\\\ 0 &amp; 1 &amp; -1 \\\\ -1 &amp; 2 &amp; 0 \\end{bmatrix}$$</p>\n<p>with one row per vocabulary entry, in the order listed. Row by row:</p>\n<ul>\n<li>$z_0 = (1)(2) + (0)(-1) + (0)(0.5) = 2 + 0 + 0 = 2.0$ \u00a0 for <code>&quot; the&quot;</code></li>\n<li>$z_1 = (0.5)(2) + (1)(-1) + (2)(0.5) = 1 - 1 + 1 = 1.0$ \u00a0 for <code>&quot; a&quot;</code></li>\n<li>$z_2 = (0)(2) + (1)(-1) + (-1)(0.5) = 0 - 1 - 0.5 = -1.5$ \u00a0 for <code>&quot; mat&quot;</code></li>\n<li>$z_3 = (-1)(2) + (2)(-1) + (0)(0.5) = -2 - 2 + 0 = -4.0$ \u00a0 for <code>&quot; quantum&quot;</code></li>\n</ul>\n<p>$$z = [\\,2.0,\\ 1.0,\\ -1.5,\\ -4.0\\,]$$</p>\n<p><code>&quot; the&quot;</code> scores highest, <code>&quot; quantum&quot;</code> lowest. Sensible after <code>The cat sat on</code>.</p>\n<p>Three properties of logits, all of which cause trouble when misremembered.</p>\n<p><strong>They are unnormalized and unbounded.</strong> A logit can be any real number. Nothing\nforces them to sum to anything. Turning $z$ into a probability distribution is\nsoftmax's job, and u2 owns it; all you need here is that some function maps\n$\\mathbb{R}^V$ to a distribution.</p>\n<p><strong>Only differences are meaningful.</strong> Add the same constant $c$ to every logit and\nthe resulting distribution is unchanged: softmax divides $e^{z_j + c}$ by\n$\\sum_k e^{z_k + c}$, and the factor $e^c$ cancels top and bottom. So\n$[2.0, 1.0, -1.5, -4.0]$ and $[102.0, 101.0, 98.5, 96.0]$ are the <em>same</em> model\noutput. &quot;The logit for token X was 12&quot; is not a statement about anything. The gap\nbetween two logits is.</p>\n<p><strong>The name is about log-odds, and it is nearly literal.</strong> After softmax,\n$z_j = \\log P_j + \\text{const}$: logits are log-probabilities up to that same\nadditive constant. A gap of $\\ln 2 \\approx 0.69$ between two logits means one\ntoken is exactly twice as likely as the other, regardless of what the absolute\nvalues are.</p>\n<p>One implementation note. Many models set $W_U = E$ - the same matrix that mapped\nIDs to vectors on the way in maps hidden states to scores on the way out. This is\n<strong>weight tying</strong>, and it saves $V \\times d_{model}$ parameters (31% of GPT-2\nsmall, from the last section). It works because both directions are asking about\nthe same relationship between tokens and directions in the residual stream:\nreading in writes token $j$'s direction into the stream, and scoring out measures\nhow much of token $j$'s direction is present. Llama-2 and Llama-3 do not tie;\nGPT-2 does. It is a tradeoff, not a law.</p>\n<div class=\"beat\" data-beat-id=\"u1-b7\"></div>\n<div class=\"beat\" data-beat-id=\"u1-b8\"></div>\n\n<h2>What the bet actually claims</h2>\n<p>Assemble the pieces. Text becomes integers by a frozen frequency-derived merge\ntable. Integers become positions in a learned space by a table lookup. Something\nin the middle transforms those positions. The result is dotted against every\ntoken's direction to produce $V$ scores, which become a distribution, from which\none token is drawn. Append it, run again.</p>\n<p>That is the whole system. The bet is that this loop, scaled, produces something\nworth calling intelligence - not because anyone designed intelligence into it,\nbut because prediction has no ceiling and modeling is the only way up.</p>\n<p>Three things to carry forward, each of which is a correction you will need:</p>\n<p><strong>Nothing here is a database.</strong> 4% of the parameters form a genuine lookup table\ncontaining no facts. The remaining 96% is a function with no rows to look up. When\nu5 explains hallucination, this is why the framing &quot;it retrieved the wrong row&quot;\nhas no referent.</p>\n<p><strong>Nothing here is portable.</strong> Tokens are integers that mean something only\nrelative to one merge table. Embeddings are positions that mean something only\nrelative to one model's downstream layers. The system is internally coherent and\nexternally meaningless, which is exactly what you would expect from something\nwhose only constraint was reproducing a corpus.</p>\n<p><strong>The objective is per-token; the computation is not.</strong> Loss is summed over\npositions independently, which tempts the conclusion that the model is myopic and\ncannot plan. The next unit gives you the machinery to see why that does not\nfollow: a hidden state at position $t$ is free to encode structure that only pays\noff at position $t+40$, and gradient descent rewards it for doing so, because\nthat is where the loss went down.</p>\n<p>u2 builds the math floor - softmax properly, gradients, loss surfaces - and u3\nopens the middle of the model.</p>\n\n<h2>Notation in this unit</h2>\n<!-- canon-only -->\n<p>Reference, not reading. Return here when a symbol goes blurry; nothing\nbelow is new.</p>\n<p>The index letters are near-universal across papers. These five cover the book:</p>\n<table>\n<thead>\n<tr>\n<th>Symbol</th>\n<th>Means</th>\n<th>Typical value</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td>$b$</td>\n<td>batch size - how many independent sequences processed at once</td>\n<td>1 to 1024</td>\n</tr>\n<tr>\n<td>$n$</td>\n<td>sequence length - number of tokens in one sequence</td>\n<td>8 to 1,000,000</td>\n</tr>\n<tr>\n<td>$d_{\\text{model}}$</td>\n<td>width of the residual stream - the vector size carried between layers</td>\n<td>768 to 16384</td>\n</tr>\n<tr>\n<td>$d_k$</td>\n<td>width of one attention head's query/key vectors</td>\n<td>64 to 128</td>\n</tr>\n<tr>\n<td>$V$</td>\n<td>vocabulary size - how many distinct tokens exist</td>\n<td>~32,000 to ~200,000</td>\n</tr>\n</tbody>\n</table>\n<p>A batch of token embeddings therefore has shape $(b, n, d_{\\text{model}})$, the\nsingle most common shape in this book. Most equations drop the batch dimension,\nso you will see $X$ with shape $(n, d_{\\text{model}})$ and are expected to know\nthat everything applies per-sequence, in parallel, across the batch.</p>\n<!-- refutes: U0-M4 -->\n<p>You probably think the row-vs-column orientation of a vector is cosmetic - a\ntranspose here or there, the kind of thing you fix when the code throws. Here is\nthe prediction that fails: under that belief, a paper writing $xW$ and a\ntextbook writing $Wx$ describe the same operation with the same matrix, so a\nshape derived in one carries to the other. It does not. In $Wx$, the\nlinear-algebra-textbook form, $x$ is a column vector of shape\n$(d_{\\text{in}}, 1)$ and $W$ has shape $(d_{\\text{out}}, d_{\\text{in}})$ - input\ndimension <strong>last</strong>. In $xW$, the form nearly all ML papers and every tensor\nlibrary use, $x$ is a row vector of shape $(1, d_{\\text{in}})$ and $W$ has shape\n$(d_{\\text{in}}, d_{\\text{out}})$ - input dimension <strong>first</strong>. The same weight\nmatrix is stored transposed between the two worlds.</p>\n<p>The belief is appealing because in scalar-land orientation genuinely is\ncosmetic, and because broadcasting hides orientation errors until they surface\nthree layers downstream as a wrong-but-plausible shape.</p>\n<p>What is actually true: this book, like the papers, uses the <strong>row-vector\nconvention</strong> for every equation that carries data through a model. Data on the\nleft, weights on the right, dimensions contract at the join:</p>\n<p>$$X W = Y, \\quad X: (n, d_{\\text{in}}), \\quad W: (d_{\\text{in}}, d_{\\text{out}}), \\quad Y: (n, d_{\\text{out}})$$</p>\n<p>where $X$ holds one token vector per row, $W$ is a learned weight matrix, and\n$Y$ holds one output vector per row. The inner dimensions - the $d_{\\text{in}}$\non both sides of the join - must match, and then they vanish. The outer\ndimensions survive. That is the only shape rule you need for the rest of the\nbook.</p>\n<p>One deliberate exception, flagged now so it does not read as a contradiction\nlater. Unit u2 works its two-dimensional geometric examples - rotations,\nscalings, projections - in the textbook column form $Wx$, because that is the\nform every linear algebra text and every picture of a rotation uses, and it\nsays so at the point of use. Those are the same maps with the same weights\nstored transposed: $(Wx)^T = x^T W^T$. Outside that one section, data is on the\nleft. When you meet an unfamiliar equation, do not look at the letter order -\nlook at which index the two factors share, because that is the one that\ncontracts.</p>\n<div class=\"beat\" data-beat-id=\"u0-b1\"></div>\n",
-  "minutes": 25,
-  "next_action": "Read the chapter and work every beat before its reveal.",
-  "pretest": [],
-  "title": "The core bet: next-token prediction",
-  "unit": "u1"
- },
+ "chapter": null,
  "gate": {
   "calibration": true,
   "extension_unlocked": false,
@@ -328,6 +110,117 @@
    "verdict": "fail"
   }
  ],
+ "results_doc": {
+  "action": "Begin chapter 1",
+  "calibration": true,
+  "dek": "A measurement, not a verdict - the chapters ahead are shaped by where the sure answers stopped.",
+  "entries": [
+   {
+    "answer": "4 x 7",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 1,
+    "prompt": "A matrix has shape $(4, 7)$. How many rows does it have, and how many\ncolumns? Answer in the exact form `rows x cols`, for example `3 x 8`.\n",
+    "read_as": "4 x 7",
+    "verdict": "pass"
+   },
+   {
+    "answer": "32",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 2,
+    "prompt": "Take $[1, 2, 3]$ and $[4, 5, 6]$. Multiply them entry by entry - first\nwith first, second with second, third with third - then add the three\nproducts. Answer with a single number.\n",
+    "read_as": "32",
+    "verdict": "pass"
+   },
+   {
+    "answer": "-4",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 3,
+    "prompt": "Compute the dot product of $[2, 0, -3]$ and $[1, 4, 2]$. Answer with a\nsingle number.\n",
+    "read_as": "-4",
+    "verdict": "pass"
+   },
+   {
+    "answer": "32 x 512",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 4,
+    "prompt": "$X$ has shape $(32, 128)$ and $W$ has shape $(128, 512)$. What is the\nshape of $XW$? Answer in the exact form `rows x cols`, for example\n`3 x 8`.\n",
+    "read_as": "32 x 512",
+    "verdict": "pass"
+   },
+   {
+    "answer": "256 x 1024",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 5,
+    "prompt": "$L$ is a scalar loss and $W$ has shape $(256, 1024)$. What is the shape of\n$\\nabla_W L$? Answer in the exact form `rows x cols`, for example `3 x 8`.\n",
+    "read_as": "256 x 1024",
+    "verdict": "pass"
+   },
+   {
+    "answer": "A \u2014 $k_2$, by a factor of 10, even though the two keys point in identical directions - the dot product scales with magnitude as well as alignment.",
+    "chose": "A \u2014 '$k_2$, by a factor of 10, even though the two keys point in identical directions - the dot product scales with magnitude as well as alignment.'",
+    "confidence": 4,
+    "kind": "mcq",
+    "n": 6,
+    "prompt": "$q = [3, 0]$, $k_1 = [0.6, 0.8]$, $k_2 = [6, 8]$. Note that $k_1$ and\n$k_2$ point in exactly the same direction. Which key gets the larger raw\nattention score $q \\cdot k$, and what does that tell you?\n",
+    "verdict": "pass",
+    "why": "Correct. $q \\cdot k_1 = 1.8$ and $q \\cdot k_2 = 18$. Same direction, same angle, ten times the score. This is exactly why unnormalized attention scores can be dominated by a single large-magnitude key."
+   },
+   {
+    "answer": "6",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 7,
+    "prompt": "$A = \\begin{bmatrix} 2 & 1 \\\\ 0 & 3 \\end{bmatrix}$ and\n$B = \\begin{bmatrix} 1 & 4 \\\\ 5 & -2 \\end{bmatrix}$.\nCompute the single entry $(AB)_{12}$ - row 1, column 2 of the product.\nAnswer with a single number.\n",
+    "read_as": "6",
+    "verdict": "pass"
+   },
+   {
+    "answer": "Entry $(i,j)$ is the dot product of row $i$ of $X$ - the $i$-th token's\n$d$-dimensional vector - with column $j$ of $W$, which is also\n$d$-dimensional. Both operands have length $d$, the shared inner\ndimension, which is why they can be dotted at all. The full product is an\n$n \\times m$ grid of such dot products.\n",
+    "idk": true,
+    "kind": "constructed",
+    "n": 8,
+    "prompt": "$X$ has shape $(n, d)$ and $W$ has shape $(d, m)$. Describe entry $(i,j)$\nof $XW$ as a dot product: which vector is dotted with which?\n",
+    "verdict": "fail"
+   },
+   {
+    "answer": "$q k^T$, of shape $(1, 1)$ - a scalar. The transpose turns $k$ into a\n$(d, 1)$ column so the inner dimensions $d$ match and contract away.\n",
+    "idk": true,
+    "kind": "constructed",
+    "n": 9,
+    "prompt": "$q$ and $k$ are both row vectors of shape $(1, d)$. Write the dot product\n$q \\cdot k$ as a matrix product of $q$ and $k$, and state the shape of\nthe result.\n",
+    "verdict": "fail"
+   },
+   {
+    "answer": "24",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 10,
+    "prompt": "Let $f(x) = (3x + 1)^2$. Compute $f'(1)$, the derivative of $f$ evaluated\nat $x = 1$. Answer with a single number.\n",
+    "read_as": "24",
+    "verdict": "pass"
+   },
+   {
+    "answer": "$q \\cdot k_2 = 5 \\, (q \\cdot k_1)$: the dot product scales linearly with\nthe length of either input. The cosine similarities are identical, because\ncosine divides out both magnitudes and depends only on the angle, which is\nunchanged. The dot product measures alignment scaled by both magnitudes;\nthe cosine measures alignment alone.\n",
+    "idk": true,
+    "kind": "constructed",
+    "n": 11,
+    "prompt": "A query vector $q$ is compared against two key vectors that point in\nexactly the same direction as each other, but $k_2$ is five times as long\nas $k_1$. Compare $q \\cdot k_1$ with $q \\cdot k_2$, and compare the\ncosine similarity of $q$ with each. Explain the difference in one or two\nsentences.\n",
+    "verdict": "fail"
+   }
+  ],
+  "gate": 0.8,
+  "head_left": "HOW AI WORKS",
+  "headline": "Calibration complete \u2014 73%.",
+  "passed": true,
+  "score": 0.7272727272727273,
+  "tally": "8 CORRECT \u00b7 0 MISSED \u00b7 3 PASSED",
+  "unit": "u0"
+ },
  "results_pages": {
   "action": "Begin chapter 1",
   "count": 2,
@@ -343,7 +236,7 @@
   "llm": {
    "connected": false
   },
-  "session_minutes": 0.00024164915084838866,
+  "session_minutes": 0.00014463265736897786,
   "spine": [
    {
     "in_fringe": false,
@@ -355,7 +248,7 @@
    {
     "in_fringe": true,
     "score": null,
-    "status": "active",
+    "status": "locked",
     "title": "The core bet: next-token prediction",
     "unit": "u1"
    },

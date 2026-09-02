@@ -141,9 +141,13 @@ struct ExchangeRequest: Codable {
     var choice: String?
     var chunkMinutes: Double?
     var breakMinutes: Double?
+    // Grades come back at once; the next chapter is authored in the
+    // background and fetched from /chapter. A request that has to outlive
+    // the app being backgrounded is a request that gets lost.
+    var async: Bool = true
 
     enum CodingKeys: String, CodingKey {
-        case subject, phase, unit, override, choice
+        case subject, phase, unit, override, choice, async
         case beatResponses = "beat_responses"
         case pretestResponses = "pretest_responses"
         case checkResponses = "check_responses"
@@ -160,10 +164,75 @@ struct ExchangeResponse: Codable {
     let chapter: ChapterPayload?
     let state: BookState
     let breakSuggestion: BreakSuggestion?
+    /// The unit being authored in the background, when no chapter came.
+    let authoring: String?
+    /// The graded check as the typeset results pages say it.
+    let resultsDoc: ResultsDoc?
 
     enum CodingKeys: String, CodingKey {
-        case results, gate, chapter, state
+        case results, gate, chapter, state, authoring
         case breakSuggestion = "break_suggestion"
+        case resultsDoc = "results_doc"
+    }
+}
+
+/// GET /chapter/{subject}: the persisted current chapter, if any, and
+/// whether the server is still writing the next one.
+struct ChapterStatus: Codable {
+    let chapter: ChapterPayload?
+    let authoring: Bool
+    let authoringError: String?
+
+    enum CodingKeys: String, CodingKey {
+        case chapter, authoring
+        case authoringError = "authoring_error"
+    }
+}
+
+/// The results document: headline, framing copy, and one entry per graded
+/// item with the full audit trail. The same content the tablet typesets.
+struct ResultsDoc: Codable {
+    let unit: String
+    let headLeft: String
+    let calibration: Bool?
+    let score: Double
+    let gate: Double
+    let passed: Bool
+    let extensionUnlocked: Bool?
+    let action: String
+    let dek: String
+    let headline: String
+    let tally: String?
+    let entries: [ResultsEntry]
+
+    var isCalibration: Bool { calibration == true }
+
+    enum CodingKeys: String, CodingKey {
+        case unit, calibration, score, gate, passed, action, dek, headline, tally, entries
+        case headLeft = "head_left"
+        case extensionUnlocked = "extension_unlocked"
+    }
+}
+
+struct ResultsEntry: Codable, Identifiable {
+    let n: Int
+    let verdict: String
+    let idk: Bool?
+    let kind: String
+    let prompt: String
+    let confidence: Int?
+    let readAs: String?
+    let chose: String?
+    let answer: String?
+    let why: String?
+
+    var id: Int { n }
+    var isIDK: Bool { idk == true }
+    var passed: Bool { verdict == "pass" || verdict == "valid_alternative_path" }
+
+    enum CodingKeys: String, CodingKey {
+        case n, verdict, idk, kind, prompt, confidence, chose, answer, why
+        case readAs = "read_as"
     }
 }
 

@@ -1,4 +1,4 @@
-import json, urllib.request, sys, os
+import json, urllib.request, sys, os, time
 B = sys.argv[1] if len(sys.argv) > 1 else 'http://localhost:8084'
 OUT = sys.argv[2] if len(sys.argv) > 2 else 'fixtures'
 def get(p):
@@ -28,9 +28,32 @@ def walk(subject, save_as):
             resp.append({'item_id': it['id'], 'idk': True, 'confidence': 1})
         else:
             resp.append({'item_id': it['id'], 'response': it['reveal']['answer'], 'confidence': 4})
-    graded = post('/exchange', {'subject': subject, 'phase': 'boundary', 'unit': series['unit'], 'check_responses': resp, 'chunk_minutes': 3.5})
-    print(subject, 'gate', graded.get('gate'), 'chapter', (graded.get('chapter') or {}).get('unit'), 'extra keys', [k for k in graded if k not in ('results','gate','chapter','state','break_suggestion')])
+    # The iPad always exchanges async: grades now, the chapter from /chapter
+    # once the server stops authoring.
+    graded = post('/exchange', {'subject': subject, 'phase': 'boundary', 'unit': series['unit'], 'check_responses': resp, 'chunk_minutes': 3.5, 'async': True})
+    print(subject, 'gate', graded.get('gate'), 'authoring', graded.get('authoring'), 'extra keys', [k for k in graded if k not in ('results','gate','chapter','state','break_suggestion')])
     if save_as: save('exchange-series', graded)
+    for _ in range(600):
+        status = get('/chapter/' + subject)
+        if not status['authoring']: break
+        time.sleep(0.5)
+    assert not status['authoring_error'], status['authoring_error']
+    chapter = status['chapter']; assert chapter and chapter['unit'] == graded['authoring'], status
+    if save_as: save('chapter', status)
+    # A teaching chapter failed outright, after a long chunk: a failing gate
+    # with remediation authoring and a break suggestion in one response.
+    wrong = []
+    for it in chapter['check']:
+        if it['kind'] == 'mcq':
+            wrong.append({'item_id': it['id'], 'selected_index': 99, 'confidence': 4})
+        else:
+            wrong.append({'item_id': it['id'], 'response': 'definitely wrong', 'confidence': 4})
+    failed = post('/exchange', {'subject': subject, 'phase': 'boundary', 'unit': chapter['unit'], 'check_responses': wrong, 'chunk_minutes': 25, 'async': True})
+    print(subject, 'fail gate', failed.get('gate'), 'authoring', failed.get('authoring'), 'break', failed.get('break_suggestion'))
+    if save_as: save('exchange-fail', failed)
+    for _ in range(600):
+        if not get('/chapter/' + subject)['authoring']: break
+        time.sleep(0.5)
 
 walk('ai', True)
 walk('data', False)

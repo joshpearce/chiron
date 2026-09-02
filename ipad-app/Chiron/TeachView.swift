@@ -176,7 +176,7 @@ final class TeachModel: ObservableObject {
 }
 
 struct TeachView: View {
-    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var library: Library
     @StateObject private var teach: TeachModel
     @State private var draft = ""
     @FocusState private var inputFocused: Bool
@@ -202,7 +202,7 @@ struct TeachView: View {
             Text("Teach me something else")
                 .font(.system(size: 24, weight: .semibold, design: .serif))
             Spacer()
-            Button("Library") { model.backToLibrary() }
+            Button("Library") { library.teaching = false }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
         }
         .padding()
@@ -261,7 +261,7 @@ struct TeachView: View {
                         .foregroundStyle(job.stage == "failed" ? .red : .secondary)
                     if job.done && job.stage == "ready" {
                         Button("Open the library") {
-                            model.backToLibrary()
+                            library.teaching = false
                         }
                         .buttonStyle(.borderedProminent)
                     } else if !job.done {

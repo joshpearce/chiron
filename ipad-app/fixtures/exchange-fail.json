@@ -1,0 +1,295 @@
+{
+ "authoring": "u1",
+ "break_suggestion": {
+  "kind": "short",
+  "minutes": 5,
+  "note": "Chunk done. Five minutes, eyes off screens."
+ },
+ "chapter": null,
+ "gate": {
+  "extension_unlocked": false,
+  "gate": 0.8,
+  "passed": false,
+  "score": 0
+ },
+ "results": [
+  {
+   "confidence": 4,
+   "evidence": "",
+   "feedback_md": "No model reachable - answer stored, not graded. Compare against the reference answer shown.",
+   "item_id": "u1-q2",
+   "misconceptions": [],
+   "next_action": "Self-check against the reference, then continue.",
+   "verdict": "ungraded"
+  },
+  {
+   "confidence": 4,
+   "evidence": "",
+   "feedback_md": "Reference: -4",
+   "item_id": "u0-q1",
+   "misconceptions": [],
+   "next_action": "",
+   "verdict": "fail"
+  },
+  {
+   "confidence": 4,
+   "evidence": "",
+   "feedback_md": "Reference: 64",
+   "item_id": "u0-n9",
+   "misconceptions": [],
+   "next_action": "",
+   "verdict": "fail"
+  },
+  {
+   "confidence": 4,
+   "evidence": "",
+   "feedback_md": "No model reachable - answer stored, not graded. Compare against the reference answer shown.",
+   "item_id": "u1-q12",
+   "misconceptions": [],
+   "next_action": "Self-check against the reference, then continue.",
+   "verdict": "ungraded"
+  },
+  {
+   "confidence": 4,
+   "evidence": "",
+   "feedback_md": "No model reachable - answer stored, not graded. Compare against the reference answer shown.",
+   "item_id": "u1-q1",
+   "misconceptions": [],
+   "next_action": "Self-check against the reference, then continue.",
+   "verdict": "ungraded"
+  },
+  {
+   "confidence": 4,
+   "evidence": "",
+   "feedback_md": "No model reachable - answer stored, not graded. Compare against the reference answer shown.",
+   "item_id": "u1-q4",
+   "misconceptions": [],
+   "next_action": "Self-check against the reference, then continue.",
+   "verdict": "ungraded"
+  },
+  {
+   "confidence": 4,
+   "evidence": "",
+   "feedback_md": "No model reachable - answer stored, not graded. Compare against the reference answer shown.",
+   "item_id": "u1-q6",
+   "misconceptions": [],
+   "next_action": "Self-check against the reference, then continue.",
+   "verdict": "ungraded"
+  },
+  {
+   "confidence": 4,
+   "evidence": "",
+   "feedback_md": "No model reachable - answer stored, not graded. Compare against the reference answer shown.",
+   "item_id": "u0-n10",
+   "misconceptions": [],
+   "next_action": "Self-check against the reference, then continue.",
+   "verdict": "ungraded"
+  },
+  {
+   "confidence": 4,
+   "evidence": "",
+   "feedback_md": "No model reachable - answer stored, not graded. Compare against the reference answer shown.",
+   "item_id": "u0-q12",
+   "misconceptions": [],
+   "next_action": "Self-check against the reference, then continue.",
+   "verdict": "ungraded"
+  }
+ ],
+ "results_doc": {
+  "action": "Back to the chapter",
+  "dek": "Not yet - the chapter returns from a different angle. The reveals below are the map.",
+  "entries": [
+   {
+    "answer": "The gap: the coding theorem constrains the LIMIT. A predictor at the\nentropy floor must have captured the generating structure. It says nothing\nabout what a specific architecture, trained with a specific optimizer on a\nfinite budget, has at its actually-achieved loss. At intermediate loss a\nlarge collection of shallow heuristics that each cover most of a pattern\nlowers the bill substantially while implementing no mechanism at all. The\ntheorem gives no bound on how much of the achieved compression came from\nmechanism versus heuristic.\n\nEmpirical demonstration, any one: multi-digit arithmetic that is accurate\non operand magnitudes common in the corpus and degrades on rare ones - a\nreal addition mechanism has no frequency dependence. Or a reasoning\nproblem solved reliably in its textbook phrasing and failed when the\nvariable names or surface framing change - a real mechanism is invariant\nto renaming.\n",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 1,
+    "prompt": "Your colleague argues: \"Compression proves LLMs understand the world. Loss\nequals bits, you can only get few bits by exploiting real structure,\ntherefore GPT-4 has a world model. It's a theorem.\"\n\nThe premises are correct and the conclusion does not follow. Identify the\ngap precisely, and give one empirical observation that demonstrates the\ngap is real rather than hypothetical.\n",
+    "read_as": "definitely wrong",
+    "verdict": "ungraded",
+    "why": "No model reachable - answer stored, not graded. Compare against the reference answer shown."
+   },
+   {
+    "answer": "-4",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 2,
+    "prompt": "Compute the dot product of $[2, 0, -3]$ and $[1, 4, 2]$. Answer with a\nsingle number.\n",
+    "read_as": "definitely wrong",
+    "verdict": "fail"
+   },
+   {
+    "answer": "64",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 3,
+    "prompt": "$q$ and $k$ each have 64 components. All 128 components are independent,\nwith mean 0 and variance 1. What is the variance of $q \\cdot k$? Answer\nwith a single number.\n",
+    "read_as": "definitely wrong",
+    "verdict": "fail"
+   },
+   {
+    "answer": "The terms of the loss are additive and independent, but the computations\nproducing them are not, because they share parameters. The gradient of the\ntotal loss with respect to theta is the sum of every position's gradient,\nso a parameter setting that makes the hidden state at position t encode\nstructure useful at position t+40 receives credit from position t+40's\nterm. The objective is decomposed per position; the credit assignment is\nnot. Backpropagation routes gradient from the late position back through\nwhatever produced the early state.\n\nThere is a second, separate reason: a token's own probability depends on\nthe context that will follow it only through what the writer of the\ntraining text did, and human text is written by processes that planned.\nPredicting it well therefore requires modeling the plan.\n\nBehavior that could not exist under the myopic conclusion: producing a\ncorrectly-scanning rhyming couplet, where the word choice at the end of\nline 1 constrains what must be available at the end of line 2. Or emitting\na matched closing delimiter after a long nested structure. Or setting up a\njoke whose punchline lands 60 tokens later. Under a genuinely myopic\nmodel, each of these would require a lucky coincidence at every step.\n",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 4,
+    "prompt": "The training loss is a sum of independent per-position terms: each\nposition is scored only on the token that immediately follows it.\n\nA colleague concludes that the model must therefore be myopic - that it\ncannot set anything up in advance, because nothing in the objective\nrewards a token for helping a token 40 positions later.\n\nThe premise is exactly right and the conclusion is wrong. Explain why, and\nname a behavior that could not exist if the conclusion held.\n",
+    "read_as": "definitely wrong",
+    "verdict": "ungraded",
+    "why": "No model reachable - answer stored, not graded. Compare against the reference answer shown."
+   },
+   {
+    "answer": "It contributes 4,000 prediction problems, one per position. The loss is\n\n  L = -(1/T) * sum over t = 1..T of log P_theta(x_t | x_<t)\n\nwhere T = 4000 is the document length in tokens, x_t is the token that\nactually occurred at position t, x_<t is the prefix x_1 through x_(t-1),\ntheta is the model's parameters, and P_theta(x_t | x_<t) is the single\nprobability the model assigned to the observed token at that position.\nAll T predictions are produced in one forward pass.\n",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 5,
+    "prompt": "A 4,000-token document is used as one training example. State how many\ndistinct prediction problems it contributes to the loss, and write the\nloss expression, defining every symbol you use.\n",
+    "read_as": "definitely wrong",
+    "verdict": "ungraded",
+    "why": "No model reachable - answer stored, not graded. Compare against the reference answer shown."
+   },
+   {
+    "answer": "Addition requires aligning operands by place value - units under units,\ntens under tens - and carrying right to left. This tokenizer chunks digits\ninto runs of up to three counted from the LEFT, so where the chunk\nboundaries fall relative to the units digit depends on the digit count mod\n3. The units digit of `2847` is alone in its second token; the units digit\nof `1913` is likewise alone. Two 4-digit operands happen to align. A\n4-digit and a 5-digit operand do not: the boundaries land in different\nplaces relative to place value, so the model has to learn a different\nre-alignment for each combination of length residues.\n\nPrediction: error rates should be lowest when both operands have the same\nlength mod 3, higher when they differ, and should rise with operand\nmagnitude generally as those combinations become rarer in the corpus.\nModels that tokenize each digit separately (Llama-2 does) should show\nmarkedly better arithmetic at the cost of longer sequences.\n",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 6,
+    "prompt": "With GPT-4's tokenizer, `2847 + 1913` becomes six tokens:\n`284`, `7`, ` +`, ` `, `191`, `3`.\n\nExplain why this specific tokenization makes addition structurally\ndifficult, and predict how the difficulty varies with the number of digits\nin the two operands.\n",
+    "read_as": "definitely wrong",
+    "verdict": "ungraded",
+    "why": "No model reachable - answer stored, not graded. Compare against the reference answer shown."
+   },
+   {
+    "answer": "Procedure (any one of three):\n\n(a) Coordinate permutation. Pick a permutation of the d_model coordinates.\nApply it to the columns of E, to the input side of every matrix that reads\nthe residual stream, to the output side of every matrix that writes into\nit, and to every normalization gain and bias. Run the model.\nClaim predicts: the meaning-bearing fields are scrambled, so outputs\ndegrade.\nActual result: identical outputs on every input. d_model! parameter\nsettings implement the same function, so no coordinate can carry a fixed\nsemantic field.\n\n(b) Cross-model transplant. Copy one model's row for `dog` into another\nmodel's embedding table.\nClaim predicts: meaning transfers, behavior is roughly preserved.\nActual result: noise. The vector is meaningless outside the model whose\nlayers were co-trained to read it.\n\n(c) Polysemy. Feed `bank` in `the river bank` and `the bank approved the\nloan` and inspect the layer-0 input at that position.\nClaim predicts: different meanings imply different representations.\nActual result: identical vectors. Disambiguation happens downstream.\n\nWhat none of these rule out: that the embedding SPACE encodes a great deal\n- the relational geometry is real, and directions in it are genuinely\nmeaningful within the model. The refutation is aimed at \"the vector\ncontains the meaning, intrinsically and portably\", not at \"embeddings are\nstructured.\"\n",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 7,
+    "prompt": "Design an experiment that would falsify the claim \"the embedding vector\nfor a token contains that token's meaning.\" State the procedure, the\nresult the claim predicts, and the result you would actually get. Then\nstate what your experiment does NOT rule out.\n",
+    "read_as": "definitely wrong",
+    "verdict": "ungraded",
+    "why": "No model reachable - answer stored, not graded. Compare against the reference answer shown."
+   },
+   {
+    "answer": "$\\partial L / \\partial W = X^T G$, of shape $(d, m)$ - the shape of $W$\nitself. $X^T$ is $(d, n)$, $G$ is $(n, m)$, and the $n$ axis contracts.\n",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 8,
+    "prompt": "$Y = XW$, with $X$ of shape $(n, d)$ and $W$ of shape $(d, m)$. You are\nhanded $G = \\partial L / \\partial Y$, of shape $(n, m)$. Write\n$\\partial L / \\partial W$ in terms of $X$ and $G$, and give its shape.\n",
+    "read_as": "definitely wrong",
+    "verdict": "ungraded",
+    "why": "No model reachable - answer stored, not graded. Compare against the reference answer shown."
+   },
+   {
+    "answer": "Entry $(i,j)$ is the dot product of row $i$ of $X$ - the $i$-th token's\n$d$-dimensional vector - with column $j$ of $W$, which is also\n$d$-dimensional. Both operands have length $d$, the shared inner\ndimension, which is why they can be dotted at all. The full product is an\n$n \\times m$ grid of such dot products.\n",
+    "confidence": 4,
+    "kind": "constructed",
+    "n": 9,
+    "prompt": "$X$ has shape $(n, d)$ and $W$ has shape $(d, m)$. Describe entry $(i,j)$\nof $XW$ as a dot product: which vector is dotted with which?\n",
+    "read_as": "definitely wrong",
+    "verdict": "ungraded",
+    "why": "No model reachable - answer stored, not graded. Compare against the reference answer shown."
+   }
+  ],
+  "gate": 0.8,
+  "head_left": "1 \u00b7 THE CORE BET: NEXT-TOKEN PREDICTION",
+  "headline": "Below the gate \u2014 0%.",
+  "passed": false,
+  "score": 0,
+  "unit": "u1"
+ },
+ "results_pages": {
+  "action": "Back to the chapter",
+  "count": 4,
+  "hash": "5ac503583ed44747"
+ },
+ "state": {
+  "active_misconceptions": [],
+  "debt": [],
+  "fringe": [
+   "u1",
+   "u2"
+  ],
+  "llm": {
+   "connected": false
+  },
+  "session_minutes": 0.19399983485539754,
+  "spine": [
+   {
+    "in_fringe": false,
+    "score": 0.7272727272727273,
+    "status": "passed",
+    "title": "Calibration: where you actually are",
+    "unit": "u0"
+   },
+   {
+    "in_fringe": true,
+    "score": 0,
+    "status": "failed",
+    "title": "The core bet: next-token prediction",
+    "unit": "u1"
+   },
+   {
+    "in_fringe": true,
+    "score": null,
+    "status": "locked",
+    "title": "The math floor",
+    "unit": "u2"
+   },
+   {
+    "in_fringe": false,
+    "score": null,
+    "status": "locked",
+    "title": "Attention from first principles",
+    "unit": "u3"
+   },
+   {
+    "in_fringe": false,
+    "score": null,
+    "status": "locked",
+    "title": "The transformer block",
+    "unit": "u4"
+   },
+   {
+    "in_fringe": false,
+    "score": null,
+    "status": "locked",
+    "title": "Training: loss to aligned model",
+    "unit": "u5"
+   },
+   {
+    "in_fringe": false,
+    "score": null,
+    "status": "locked",
+    "title": "Inference: making it run",
+    "unit": "u6"
+   },
+   {
+    "in_fringe": false,
+    "score": null,
+    "status": "locked",
+    "title": "Mixture of Experts",
+    "unit": "u7"
+   },
+   {
+    "in_fringe": false,
+    "score": null,
+    "status": "locked",
+    "title": "The iron: hardware and training at scale",
+    "unit": "u10"
+   },
+   {
+    "in_fringe": false,
+    "score": null,
+    "status": "locked",
+    "title": "Harnesses and agents",
+    "unit": "u8"
+   },
+   {
+    "in_fringe": false,
+    "score": null,
+    "status": "locked",
+    "title": "Synthesis: the full trace",
+    "unit": "u9"
+   }
+  ],
+  "summary": "New session. No evidence yet; treat per the static profile."
+ }
+}

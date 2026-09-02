@@ -36,12 +36,21 @@ struct MathText: View {
             + 8
     }
 
+    /// Authored text wraps at 80 columns; a single newline is a soft break
+    /// and only a blank line means a paragraph. HTML collapses the former by
+    /// itself, SwiftUI text does not.
+    static func reflow(_ text: String) -> String {
+        text.components(separatedBy: "\n\n")
+            .map { $0.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces) }
+            .joined(separator: "\n\n")
+    }
+
     var body: some View {
         if text.contains("$") {
             MathWebView(text: text, size: size, height: $height)
                 .frame(height: height)
         } else {
-            Text(.init(text))
+            Text(.init(Self.reflow(text)))
                 .font(.system(size: size, design: .serif))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)

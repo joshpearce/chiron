@@ -2,23 +2,34 @@ import SwiftUI
 
 @main
 struct ChironApp: App {
-    @StateObject private var model = AppModel()
+    @StateObject private var library = Library()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(model)
+                .environmentObject(library)
                 .task {
                     if let server = SelfTest.serverOverride {
-                        model.sync.baseURL = server
-                        await model.sync.probe()
+                        library.sync.baseURL = server
+                        await library.sync.probe()
                     }
+                    #if DEBUG
+                    if Harness.requested {
+                        Harness.shared.start(library)
+                    }
+                    #endif
                     if SelfTest.teachRequested {
-                        model.screen = .teach
-                    } else if let screen = SelfTest.inspectScreen {
-                        SelfTest.inspect(model, screen: screen)
+                        library.teaching = true
                     } else if SelfTest.requested {
-                        await SelfTest.run(model)
+                        await SelfTest.run(library)
+                    } else {
+                        await library.openActiveAtLaunch()
+                    }
+                }
+                .onChange(of: scenePhase) { phase in
+                    if phase == .inactive || phase == .background {
+                        library.session?.persist()
                     }
                 }
         }
@@ -26,92 +37,131 @@ struct ChironApp: App {
 }
 
 struct ContentView: View {
-    @EnvironmentObject var model: AppModel
-    @State private var showSpine = false
+    @EnvironmentObject var library: Library
+
+    var body: some View {
+        Group {
+            if library.teaching {
+                TeachView(sync: library.sync, demo: SelfTest.teachDemo)
+            } else if let session = library.session {
+                BookView()
+                    .environmentObject(session)
+                    .id(session.subjectID)
+            } else {
+                BookshelfView()
+            }
+        }
+        // Fill the screen so the top-right chrome pins to the display corner.
+        // Without this the stack shrinks to its content and the badge drifts
+        // into the middle of the page on short screens.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// One open book: whichever screen its session is on, with the chrome that
+/// leads back to the contents and the shelf.
+struct BookView: View {
+    @EnvironmentObject var library: Library
+    @EnvironmentObject var session: BookSession
+    @State private var showContents = false
 
     var body: some View {
         ZStack {
-            switch model.screen {
-            case .menu:
-                LibraryView()
-            case .start:
-                StartView()
+            switch session.screen {
+            case .empty:
+                Color.clear
+            case .placement:
+                if let screener = session.chapter?.screener {
+                    PlacementView(screener: screener)
+                }
+            case .series:
+                if let ch = session.chapter {
+                    ItemFlowView(
+                        title: ch.title,
+                        subtitle: "A measurement, not a test. Answer what you can; \"I don't know\" is an answer.",
+                        items: ch.check,
+                        reveal: false,
+                        submitLabel: "Finish"
+                    ) { responses in
+                        await session.submitCheck(responses)
+                    }
+                }
             case .reading:
-                if let chapter = model.chapter {
+                if let chapter = session.chapter {
                     ReaderContainer(chapter: chapter)
-                } else {
-                    StartView()
                 }
             case .pretest:
-                if let ch = model.chapter {
+                if let ch = session.chapter {
                     ItemFlowView(
                         title: "Before you read",
                         subtitle: "You are not supposed to know these yet - answering wrong here is part of how the chapter calibrates.",
                         items: ch.pretest,
+                        reveal: true,
                         submitLabel: "Start the chapter"
                     ) { responses in
-                        await model.submitPretest(responses)
+                        await session.submitPretest(responses)
                     }
                 }
             case .check:
-                if let ch = model.chapter {
+                if let ch = session.chapter {
                     ItemFlowView(
                         title: "Comprehension check - \(ch.title)",
                         subtitle: "Closed book. Rate your confidence before each reveal.",
                         items: ch.check,
+                        reveal: true,
                         submitLabel: "Submit check",
-                        onExit: { model.screen = .reading }
+                        onExit: { session.leaveCheck() }
                     ) { responses in
-                        await model.submitCheck(responses)
+                        await session.submitCheck(responses)
                     }
                 }
-            case .gate(let gate, let results):
-                GateView(gate: gate, results: results)
+            case .results(let doc, let gate):
+                ResultsView(doc: doc, gate: gate)
+            case .authoring:
+                AuthoringView()
             case .takingBreak(let suggestion):
                 BreakView(suggestion: suggestion)
-            case .teach:
-                TeachView(sync: model.sync, demo: SelfTest.teachDemo)
+            case .error(let message):
+                ErrorView(message: message)
             }
 
-            if model.sync.busy {
-                GeneratingOverlay()
+            if let wait = session.wait {
+                WaitOverlay(text: wait.rawValue)
             }
         }
-        // Fill the screen so the top-right chrome pins to the display corner.
-        // Without this the ZStack shrinks to its content and the badge drifts
-        // into the middle of the page on short screens like the gate.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .sheet(isPresented: $showSpine) { SpineView() }
+        .sheet(isPresented: $showContents) { ContentsView() }
         .overlay(alignment: .topTrailing) {
-            if !model.isMenu && !model.isTeaching {
-                // Labelled, not bare glyphs: on the mini these were two small
-                // icons in the corner with nothing to say what they did, and
-                // the way back out of a chapter should not be a guess.
-                HStack(spacing: 10) {
-                    ConnectionBadge()
-                    Button { showSpine = true } label: {
-                        Label("Spine", systemImage: "list.bullet.rectangle")
-                            .font(.footnote)
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                    }
-                    .background(.thinMaterial, in: Capsule())
-                    Button { model.backToLibrary() } label: {
-                        Label("Library", systemImage: "books.vertical")
-                            .font(.footnote)
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                    }
-                    .background(.thinMaterial, in: Capsule())
+            // Labelled, not bare glyphs: on the mini these were two small
+            // icons in the corner with nothing to say what they did, and
+            // the way back out of a chapter should not be a guess.
+            HStack(spacing: 10) {
+                ConnectionBadge()
+                Button { showContents = true } label: {
+                    Label("Contents", systemImage: "list.bullet.rectangle")
+                        .font(.footnote)
+                        .padding(.horizontal, 10).padding(.vertical, 6)
                 }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.top, 6)
+                .background(.thinMaterial, in: Capsule())
+                .accessibilityLabel("Contents")
+                Button { library.closeBook() } label: {
+                    Label("Bookshelf", systemImage: "books.vertical")
+                        .font(.footnote)
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                }
+                .background(.thinMaterial, in: Capsule())
+                .accessibilityLabel("Bookshelf")
             }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .padding(.top, 6)
         }
     }
 }
 
-struct LibraryView: View {
-    @EnvironmentObject var model: AppModel
+/// The shelf: one card per book the server offers, the open one marked.
+struct BookshelfView: View {
+    @EnvironmentObject var library: Library
     @State private var showSettings = false
 
     var body: some View {
@@ -121,19 +171,21 @@ struct LibraryView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(height: 160)
+                    .accessibilityHidden(true)
                 Text("Chiron").font(.system(size: 52, weight: .semibold, design: .serif))
-                Text("Choose a subject. The book adapts as you read.")
+                Text("The bookshelf")
+                    .font(.title3.italic())
                     .foregroundStyle(.secondary)
             }
             VStack(spacing: 12) {
-                ForEach(model.subjects) { s in
+                ForEach(library.subjects) { s in
                     Button {
-                        Task { await model.openSubject(s.id) }
+                        Task { await library.open(s.id) }
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(s.title).font(.title3.weight(.semibold))
-                                Text(s.progressLine)
+                                Text(s.id == library.activeSubjectID ? "Open now" : s.progressLine)
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -144,43 +196,45 @@ struct LibraryView: View {
                         .background(Color.gray.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(s.title)
+                    .accessibilityHint(s.id == library.activeSubjectID ? "Open now" : s.progressLine)
+                }
+                if library.subjects.isEmpty && !library.loadingShelf {
+                    Text(library.shelfError ?? "No books on the shelf.")
+                        .foregroundStyle(.secondary)
                 }
             }
             Button {
-                model.screen = .teach
+                library.teaching = true
             } label: {
                 Label("Teach me something else", systemImage: "sparkles")
                     .font(.callout)
             }
             .buttonStyle(.bordered)
-            .disabled(!model.sync.connected)
+            .disabled(!library.sync.connected)
             HStack(spacing: 14) {
                 ConnectionBadge()
                 Button {
-                    Task { await model.refreshSubjects() }
+                    Task { await library.refresh() }
                 } label: { Image(systemName: "arrow.clockwise") }
+                    .accessibilityLabel("Refresh the shelf")
                 Button {
                     showSettings = true
                 } label: { Label("Server", systemImage: "gearshape") }
                     .font(.callout)
             }
-            if let err = model.errorMessage {
+            if let err = library.shelfError, !library.subjects.isEmpty {
                 Text(err).foregroundStyle(.red).font(.callout)
             }
         }
-        .task { await model.refreshSubjects() }
-        .sheet(isPresented: $showSettings) { ConnectionSettings(store: model.sync.servers) }
+        .task { await library.refresh() }
+        .sheet(isPresented: $showSettings) { ConnectionSettings(store: library.sync.servers) }
     }
 }
 
 /// Saved servers: pick one, add, edit, delete.
-///
-/// This lives on the library screen as well as the start screen: once a chapter
-/// has been restored the app opens straight into the reader, and the start
-/// screen - the only place these fields used to exist - is unreachable without
-/// finishing or abandoning the chapter.
 struct ConnectionSettings: View {
-    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var library: Library
     @Environment(\.presentationMode) private var presentation
     @ObservedObject private var store: ServerStore
     @State private var editing: SavedServer?
@@ -198,11 +252,8 @@ struct ConnectionSettings: View {
                     ForEach(store.servers) { server in
                         Button {
                             store.select(server)
-                            model.sync.baseURL = server.url
-                            Task {
-                                await model.sync.probe()
-                                await model.refreshSubjects()
-                            }
+                            library.sync.baseURL = server.url
+                            Task { await refresh() }
                         } label: {
                             HStack {
                                 Image(systemName: server.id == store.selectedID
@@ -219,14 +270,15 @@ struct ConnectionSettings: View {
                                     Image(systemName: "pencil")
                                 }
                                 .buttonStyle(.borderless)
+                                .accessibilityLabel("Edit \(server.name)")
                             }
                         }
                         .buttonStyle(.plain)
                     }
                     .onDelete { offsets in
                         offsets.map { store.servers[$0] }.forEach(store.delete)
-                        if let s = store.selected { model.sync.baseURL = s.url }
-                        Task { await model.sync.probe() }
+                        if let s = store.selected { library.sync.baseURL = s.url }
+                        Task { await library.sync.probe() }
                     }
                 } header: {
                     Text("Servers")
@@ -261,9 +313,9 @@ struct ConnectionSettings: View {
     }
 
     private func refresh() async {
-        if let s = store.selected { model.sync.baseURL = s.url }
-        await model.sync.probe()
-        await model.refreshSubjects()
+        if let s = store.selected { library.sync.baseURL = s.url }
+        await library.sync.probe()
+        await library.refresh()
     }
 }
 
@@ -350,72 +402,21 @@ struct ServerEditor: View {
 }
 
 struct ConnectionBadge: View {
-    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var library: Library
 
     var body: some View {
-        let t = model.sync.transport
-        Label(t, systemImage: t == "wifi" ? "wifi" : t == "usb" ? "cable.connector" : "airplane")
+        let connected = library.sync.connected
+        Label(connected ? "connected" : "offline", systemImage: connected ? "wifi" : "wifi.slash")
             .font(.caption)
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(.thinMaterial, in: Capsule())
-            .foregroundStyle(t == "offline" ? .orange : .green)
+            .foregroundStyle(connected ? .green : .orange)
+            .accessibilityLabel(connected ? "Server connected" : "Server offline")
             .task {
                 while !Task.isCancelled {
-                    await model.sync.probe()
+                    await library.sync.probe()
                     try? await Task.sleep(nanoseconds: 15_000_000_000)
                 }
             }
-    }
-}
-
-struct StartView: View {
-    @EnvironmentObject var model: AppModel
-    @State private var showSettings = false
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Text(model.currentSubjectTitle)
-                .font(.system(size: 40, weight: .semibold, design: .serif))
-            Button {
-                Task { await model.start() }
-            } label: {
-                Text(model.bookState == nil ? "Begin" : "Continue")
-                    .font(.title2).padding(.horizontal, 40).padding(.vertical, 10)
-            }
-            .buttonStyle(.borderedProminent)
-            Button("No server? Read the built-in book") {
-                model.startStatic()
-            }
-            .buttonStyle(.bordered)
-            HStack(spacing: 14) {
-                ConnectionBadge()
-                Button {
-                    showSettings = true
-                } label: {
-                    Label(model.sync.servers.selected?.name ?? "Server", systemImage: "gearshape")
-                }
-                .font(.callout)
-            }
-            Button("Back to library") { model.backToLibrary() }
-                .buttonStyle(.plain).foregroundStyle(.secondary)
-            if let err = model.errorMessage {
-                Text(err).foregroundStyle(.red).font(.callout)
-            }
-        }
-        .sheet(isPresented: $showSettings) {
-            ConnectionSettings(store: model.sync.servers)
-        }
-    }
-}
-
-struct GeneratingOverlay: View {
-    var body: some View {
-        VStack(spacing: 14) {
-            ProgressView().controlSize(.large)
-            Text("Thinking about what you need next…")
-                .font(.callout).foregroundStyle(.secondary)
-        }
-        .padding(30)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
     }
 }

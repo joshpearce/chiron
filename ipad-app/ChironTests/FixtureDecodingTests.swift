@@ -21,7 +21,7 @@ final class FixtureDecodingTests: XCTestCase {
     func testEveryExchangeFixtureDecodes() throws {
         let files = try FileManager.default.contentsOfDirectory(at: try fixtures, includingPropertiesForKeys: nil)
             .filter { $0.lastPathComponent.hasPrefix("exchange-") }
-        XCTAssertGreaterThanOrEqual(files.count, 3, "expected start, screener and series exchanges")
+        XCTAssertGreaterThanOrEqual(files.count, 4, "expected start, screener, series and fail exchanges")
         for f in files {
             XCTAssertNoThrow(try JSONDecoder().decode(ExchangeResponse.self, from: Data(contentsOf: f)), f.lastPathComponent)
         }
@@ -56,7 +56,7 @@ final class FixtureDecodingTests: XCTestCase {
         }
     }
 
-    func testGradedSeriesCarriesACalibrationGate() throws {
+    func testGradedSeriesCarriesACalibrationGateAndAuthorsAsync() throws {
         let r = try decode(ExchangeResponse.self, "exchange-series")
         let gate = try XCTUnwrap(r.gate)
         XCTAssertEqual(gate.calibration, true)
@@ -64,6 +64,45 @@ final class FixtureDecodingTests: XCTestCase {
         XCTAssertNotNil(gate.score)
         XCTAssertFalse(r.results.isEmpty)
         XCTAssertEqual(r.state.spine.first?.unit, "u0")
+        XCTAssertNil(r.chapter, "async: the chapter comes from /chapter later")
+        XCTAssertEqual(r.authoring, "u1")
+
+        let doc = try XCTUnwrap(r.resultsDoc)
+        XCTAssertTrue(doc.isCalibration)
+        XCTAssertTrue(doc.headline.hasPrefix("Calibration complete"))
+        XCTAssertNotNil(doc.tally)
+        XCTAssertEqual(doc.entries.count, r.results.count)
+        XCTAssertEqual(doc.entries.map(\.n), Array(1...doc.entries.count), "entries carry the chapter's own numbering")
+        for e in doc.entries where e.kind == "constructed" && !e.isIDK {
+            XCTAssertNotNil(e.readAs, "\(e.n): READ AS is mandatory on constructed answers")
+        }
+    }
+
+    func testFailedGateCarriesRemediationAndABreak() throws {
+        let r = try decode(ExchangeResponse.self, "exchange-fail")
+        let gate = try XCTUnwrap(r.gate)
+        XCTAssertFalse(gate.passed)
+        XCTAssertNil(r.chapter)
+        XCTAssertEqual(r.authoring, "u1", "remediation rewrites the same unit")
+        let doc = try XCTUnwrap(r.resultsDoc)
+        XCTAssertTrue(doc.headline.hasPrefix("Below the gate"))
+        XCTAssertFalse(doc.isCalibration)
+        XCTAssertNil(doc.tally)
+        XCTAssertFalse(doc.entries.filter { !$0.passed && $0.why != nil }.isEmpty, "misses explain WHY")
+        let brk = try XCTUnwrap(r.breakSuggestion)
+        XCTAssertEqual(brk.kind, "short")
+        XCTAssertGreaterThan(brk.minutes, 0)
+    }
+
+    func testChapterStatusDecodes() throws {
+        let st = try decode(ChapterStatus.self, "chapter")
+        XCTAssertFalse(st.authoring)
+        XCTAssertEqual(st.authoringError ?? "", "")
+        let ch = try XCTUnwrap(st.chapter)
+        XCTAssertEqual(ch.unit, "u1")
+        XCTAssertFalse(ch.html.isEmpty)
+        XCTAssertFalse(ch.check.isEmpty)
+        XCTAssertNotEqual(ch.isCalibration, true)
     }
 
     func testSubjectsCarryTheActiveBook() throws {
@@ -76,5 +115,14 @@ final class FixtureDecodingTests: XCTestCase {
         let st = try decode(BookState.self, "state")
         XCTAssertFalse(st.spine.isEmpty)
         XCTAssertEqual(st.spine[0].unit, "u0")
+    }
+}
+
+final class MathTextTests: XCTestCase {
+    func testSoftLineBreaksReflowAndParagraphsStay() {
+        XCTAssertEqual(MathText.reflow("Three of them are\n0.1, 0.2 and\n0.3. What is the fourth?"),
+                       "Three of them are 0.1, 0.2 and 0.3. What is the fourth?")
+        XCTAssertEqual(MathText.reflow("First line\nstill first.\n\nSecond paragraph.\n"),
+                       "First line still first.\n\nSecond paragraph.")
     }
 }

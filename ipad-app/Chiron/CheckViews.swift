@@ -1,13 +1,16 @@
 import SwiftUI
 
-/// Shared flow for pretests and terminal checks: one item at a time,
-/// confidence committed BEFORE any reveal, elaborated feedback after.
-/// Free-text items show the reference answer for self-comparison; the
-/// authoritative grade arrives with the exchange (gate screen).
+/// Shared flow for the calibration series, pretests and terminal checks:
+/// one item at a time, confidence committed BEFORE any reveal, elaborated
+/// feedback after. Free-text items show the reference answer for
+/// self-comparison; the authoritative grade arrives with the exchange (the
+/// results screen). With `reveal` off - the calibration series, which is
+/// measurement - committing moves straight to the next item.
 struct ItemFlowView: View {
     let title: String
     let subtitle: String
     let items: [CheckItem]
+    var reveal = true
     let submitLabel: String
     /// Present on the terminal check, absent on the pretest (which the learner
     /// never enters by accident - it opens itself).
@@ -47,9 +50,13 @@ struct ItemFlowView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                 }
-                Text(title).font(.title2.weight(.semibold))
+                Text(title).font(.system(.title2, design: .serif).weight(.semibold))
                 Text(subtitle).font(.callout).foregroundStyle(.secondary)
                 ProgressView(value: Double(index), total: Double(max(items.count, 1)))
+                Text("\(index + 1) of \(items.count)")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Question \(index + 1) of \(items.count)")
             }
 
             ScrollView {
@@ -106,42 +113,34 @@ struct ItemFlowView: View {
                         .frame(maxWidth: 320)
                 }
                 HStack(spacing: 16) {
-                    Button("Commit answer") {
-                        responses.append(ItemResponse(
-                            itemId: item.id,
-                            response: item.kind == "mcq" ? nil : text,
-                            selectedIndex: selected,
-                            confidence: Int(confidence)))
-                        withAnimation { revealed = true }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(item.kind == "mcq" ? selected == nil : text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
                     // Not knowing is expected - especially on pretests - and
                     // saying so is better signal than typing filler to get
-                    // past a required field.
+                    // past a required field. Always leftmost, always there.
                     Button("I don't know") {
-                        responses.append(ItemResponse(
+                        answered(ItemResponse(
                             itemId: item.id,
                             response: nil,
                             selectedIndex: nil,
                             confidence: 1,
                             idk: true))
-                        withAnimation { revealed = true }
                     }
                     .buttonStyle(.bordered)
+
+                    Button(reveal ? "Commit answer" : (index == items.count - 1 ? submitLabel : "Next")) {
+                        answered(ItemResponse(
+                            itemId: item.id,
+                            response: item.kind == "mcq" ? nil : text,
+                            selectedIndex: selected,
+                            confidence: Int(confidence)))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(item.kind == "mcq" ? selected == nil : text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             } else {
-                Button(index == items.count - 1 ? submitLabel : "Next") {
-                    if index == items.count - 1 {
-                        let out = responses
-                        Task { await onSubmit(out) }
-                    } else {
-                        index += 1
-                        text = ""; selected = nil; confidence = 2; revealed = false
-                    }
-                }
-                .buttonStyle(.borderedProminent)
+                Button(index == items.count - 1 ? submitLabel : "Next") { advance() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
             }
         }
         .padding(28)
@@ -152,6 +151,25 @@ struct ItemFlowView: View {
             Text("The check is closed-book, so answers so far are discarded - re-entering starts it fresh.")
         }
         .frame(maxWidth: 760)
+    }
+
+    private func answered(_ r: ItemResponse) {
+        responses.append(r)
+        if reveal {
+            withAnimation { revealed = true }
+        } else {
+            advance()
+        }
+    }
+
+    private func advance() {
+        if index == items.count - 1 {
+            let out = responses
+            Task { await onSubmit(out) }
+        } else {
+            index += 1
+            text = ""; selected = nil; confidence = 2; revealed = false
+        }
     }
 
     private var confidenceLabel: String {
@@ -173,71 +191,8 @@ struct ItemFlowView: View {
     }
 }
 
-struct GateView: View {
-    @EnvironmentObject var model: AppModel
-    let gate: Gate
-    let results: [GradeResult]
-
-    var body: some View {
-        VStack(spacing: 20) {
-            if let score = gate.score {
-                let isCalibration = gate.calibration == true
-                Text(isCalibration ? "Calibration complete"
-                     : gate.passed ? "Gate cleared" : "Below the gate")
-                    .font(.largeTitle.weight(.semibold))
-                Text(isCalibration
-                     ? "\(Int(score * 100))% sure-footed - the next chapter is tuned to it"
-                     : "\(Int(score * 100))% - gate is \(Int(gate.gate * 100))%")
-                    .font(.title3).foregroundStyle(.secondary)
-                if gate.extensionUnlocked {
-                    Label("Extension material unlocked", systemImage: "sparkles")
-                        .foregroundStyle(.purple)
-                }
-            }
-
-            let misses = results.filter { $0.feedbackMd != nil && !$0.passed }
-            if !misses.isEmpty {
-                ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(misses) { r in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Label(r.itemId, systemImage: "xmark.circle")
-                                .font(.caption).foregroundStyle(.secondary)
-                            Text(.init(r.feedbackMd ?? ""))
-                        }
-                        .padding(12)
-                        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
-                    }
-                }
-                }
-                .frame(maxHeight: 380)
-            }
-
-            if gate.passed {
-                Button("Continue") { Task { await model.continueAfterGate(override: false) } }
-                    .buttonStyle(.borderedProminent)
-            } else {
-                VStack(spacing: 10) {
-                    Button("Remediate - explain it differently") {
-                        Task { await model.continueAfterGate(override: false) }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Button("Override and continue anyway") {
-                        Task { await model.continueAfterGate(override: true) }
-                    }
-                    .buttonStyle(.bordered).tint(.orange)
-                    Text("Overridden material lands in your debt ledger - 'Catch me up' collects it later.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding(30)
-        .frame(maxWidth: 720)
-    }
-}
-
 struct BreakView: View {
-    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var session: BookSession
     let suggestion: BreakSuggestion
     @State private var remaining: Int = 0
     @State private var started = Date()
@@ -252,7 +207,7 @@ struct BreakView: View {
             Text("Genuinely unstimulated rest consolidates what you just learned.\nEyes closed beats a movie.")
                 .font(.callout).multilineTextAlignment(.center).foregroundStyle(.secondary)
             Button("Back to the book") {
-                Task { await model.breakFinished(minutes: Date().timeIntervalSince(started) / 60) }
+                Task { await session.breakFinished(minutes: Date().timeIntervalSince(started) / 60) }
             }
             .buttonStyle(.borderedProminent)
         }
@@ -270,22 +225,24 @@ struct BreakView: View {
     }
 }
 
-struct SpineView: View {
-    @EnvironmentObject var model: AppModel
+/// The contents: every chapter of the book with its status, what is owed,
+/// and the way to start the book over.
+struct ContentsView: View {
+    @EnvironmentObject var session: BookSession
     @Environment(\.presentationMode) private var presentation
     @State private var confirmingReset = false
 
     var body: some View {
         NavigationView {
             List {
-                if model.bookState == nil {
+                if session.bookState == nil {
                     Section {
                         Text("No progress loaded yet.")
                         Text("If the server is reachable this fills in on its own; pull to refresh otherwise.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                if let state = model.bookState {
+                if let state = session.bookState {
                     Section("Progress") {
                         ForEach(state.spine) { entry in
                             HStack {
@@ -300,7 +257,8 @@ struct SpineView: View {
                                 Spacer()
                                 if entry.inFringe && entry.status != "active" {
                                     Button("Read next") {
-                                        Task { await model.start(choice: entry.unit) }
+                                        Task { await session.start(choice: entry.unit) }
+                                        presentation.wrappedValue.dismiss()
                                     }
                                     .buttonStyle(.bordered).controlSize(.small)
                                 }
@@ -311,14 +269,17 @@ struct SpineView: View {
                         Section("Knowledge debt") {
                             Text("\(state.debt.count) unit(s) skipped or below gate")
                                 .foregroundStyle(.orange)
-                            Button("Catch me up now") { Task { await model.catchMeUp() } }
+                            Button("Catch me up now") {
+                                Task { await session.catchMeUp() }
+                                presentation.wrappedValue.dismiss()
+                            }
                         }
                     }
                     Section("Where you are") {
                         Text(state.summary).font(.callout).foregroundStyle(.secondary)
                     }
                 }
-                if let err = model.errorMessage {
+                if let err = session.errorMessage {
                     Section {
                         Text(err).foregroundStyle(.red).font(.callout)
                     }
@@ -333,9 +294,9 @@ struct SpineView: View {
                     Text("Clears every grade, gate result and debt entry for this subject.")
                 }
             }
-            .navigationTitle("The spine")
-            .refreshable { await model.refreshState() }
-            .task { await model.refreshState() }
+            .navigationTitle("Contents")
+            .refreshable { await session.refreshState() }
+            .task { await session.refreshState() }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { presentation.wrappedValue.dismiss() }
@@ -344,13 +305,11 @@ struct SpineView: View {
             .alert("Start over?", isPresented: $confirmingReset) {
                 Button("Cancel", role: .cancel) { }
                 Button("Start over", role: .destructive) {
-                    Task {
-                        await model.startOver()
-                        // The spine is a sheet over the screen startOver()
-                        // changes. Without dismissing it the reset happens and
-                        // the learner sees nothing at all.
-                        presentation.wrappedValue.dismiss()
-                    }
+                    // The contents is a sheet over the screen startOver()
+                    // changes. Without dismissing it the reset happens and
+                    // the learner sees nothing at all.
+                    presentation.wrappedValue.dismiss()
+                    Task { await session.startOver() }
                 }
             } message: {
                 Text("Every grade, gate result and debt entry for this subject is discarded. This cannot be undone from the app.")
