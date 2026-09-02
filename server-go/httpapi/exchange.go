@@ -587,6 +587,9 @@ func (s *Server) handleExchange(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "unknown subject: %s", ex.Subject)
 		return
 	}
+	// Every exchange is the reader working in this book; a client that
+	// never fetches rendered pages has no other way to say which is open.
+	s.markActive(sub.ID)
 	writeJSON(w, http.StatusOK, s.processExchange(sub, ex, false))
 }
 

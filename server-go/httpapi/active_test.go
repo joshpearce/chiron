@@ -92,3 +92,24 @@ func TestActiveSubjectFollowsTheReaderAndSurvivesRestart(t *testing.T) {
 		t.Fatalf("after restart, active = %q, want ai", got)
 	}
 }
+
+// The iPad never fetches rendered pages: opening a book there is the start
+// exchange. That must move the marker too, or the shelf on the tablet and
+// the shelf on the iPad disagree about which book is open.
+func TestExchangeMarksTheBookActive(t *testing.T) {
+	s := newTwoSubjectServer(t, t.TempDir())
+
+	w := do(t, s, "POST", "/exchange", `{"subject":"data","phase":"start"}`, "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("start exchange -> %d: %s", w.Code, w.Body.String())
+	}
+	if got := activeSubjectOf(t, s); got != "data" {
+		t.Fatalf("after a start exchange on data, active = %q, want data", got)
+	}
+
+	// Unknown subjects are rejected before anything is marked.
+	do(t, s, "POST", "/exchange", `{"subject":"nope","phase":"start"}`, "")
+	if got := activeSubjectOf(t, s); got != "data" {
+		t.Fatalf("after an unknown subject, active = %q, want data", got)
+	}
+}
