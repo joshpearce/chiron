@@ -27,6 +27,21 @@ struct ChapterPayload: Codable, Identifiable {
         case unit, title, minutes, html, beats, pretest, check, calibration
         case nextAction = "next_action"
     }
+
+    /// A chapter with no pretest arrives as `pretest: null` from some
+    /// server paths and `[]` from others; both mean none.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        unit = try c.decode(String.self, forKey: .unit)
+        title = try c.decode(String.self, forKey: .title)
+        minutes = try c.decodeIfPresent(Int.self, forKey: .minutes) ?? 0
+        html = try c.decodeIfPresent(String.self, forKey: .html) ?? ""
+        beats = try c.decodeIfPresent([JSONValue].self, forKey: .beats) ?? []
+        pretest = try c.decodeIfPresent([CheckItem].self, forKey: .pretest) ?? []
+        check = try c.decodeIfPresent([CheckItem].self, forKey: .check) ?? []
+        calibration = try c.decodeIfPresent(Bool.self, forKey: .calibration)
+        nextAction = try c.decodeIfPresent(String.self, forKey: .nextAction)
+    }
 }
 
 struct CheckItem: Codable, Identifiable {
@@ -71,6 +86,10 @@ struct ItemResponse: Codable {
     // An explicit "I don't know - move on". The server grades it as a fail
     // without a model call.
     var idk: Bool?
+    /// A handwritten answer. Never on the exchange wire: a check with any
+    /// ink goes through the ink check-in, where the server rasterizes and
+    /// transcribes it and keeps the audit trail.
+    var ink: InkAnswer?
 
     enum CodingKeys: String, CodingKey {
         case itemId = "item_id"
@@ -78,6 +97,61 @@ struct ItemResponse: Codable {
         case selectedIndex = "selected_index"
         case confidence
         case idk
+    }
+}
+
+/// Strokes as normalized polylines (0..1 in the box they were drawn in),
+/// with the box's width/height ratio so the raster is not distorted.
+struct InkAnswer: Codable, Equatable {
+    struct Point: Codable, Equatable {
+        let x: Double
+        let y: Double
+    }
+    var strokes: [[Point]]
+    var aspect: Double
+}
+
+/// POST /ink/{subject}: one item per answer, typed or inked or chosen or
+/// passed on; the response is an exchange response plus the transcripts.
+struct InkSubmission: Codable {
+    struct Item: Codable {
+        let itemId: String
+        var strokes: [[InkAnswer.Point]]
+        var selectedIndex: Int?
+        var idk: Bool?
+        var text: String?
+        var confidence: Int?
+        var aspect: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case strokes, idk, text, confidence, aspect
+            case itemId = "item_id"
+            case selectedIndex = "selected_index"
+        }
+    }
+    let unit: String
+    let items: [Item]
+    var chunkMinutes: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case unit, items
+        case chunkMinutes = "chunk_minutes"
+    }
+
+    /// Every response becomes an item; the ink travels as strokes, a typed
+    /// answer as text, a choice as its index, and a pass as the flag.
+    init(unit: String, responses: [ItemResponse], chunkMinutes: Double?) {
+        self.unit = unit
+        self.chunkMinutes = chunkMinutes
+        items = responses.map { r in
+            Item(itemId: r.itemId,
+                 strokes: r.ink?.strokes ?? [],
+                 selectedIndex: r.selectedIndex,
+                 idk: r.idk == true ? true : nil,
+                 text: r.ink == nil ? r.response : nil,
+                 confidence: r.confidence,
+                 aspect: r.ink?.aspect)
+        }
     }
 }
 

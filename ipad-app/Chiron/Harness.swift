@@ -17,7 +17,8 @@ import Network
 ///   POST /contents           toggle the contents (sidebar or sheet)
 ///   POST /chrome             toggle the reader chrome, as a tap on the page does
 ///   POST /answer {mode}      answer every item of the current chapter:
-///                            correct | idk | wrong (default correct)
+///                            correct | idk | wrong | mixed (default correct;
+///                            mixed inks one item, passes on one, types the rest)
 ///   POST /proceed            leave the results (or the break)
 ///   POST /override           override a failed gate
 ///   POST /reset              start the book over
@@ -96,6 +97,29 @@ final class Harness {
                     }
                 case "wrong":
                     responses = SelfTest.answers(for: ch, weak: true, llm: library.sync.llmConnected)
+                case "mixed":
+                    // One of each: the first constructed item inked, the
+                    // second passed on, the rest typed or chosen correctly.
+                    var inked = false, passed = false
+                    responses = SelfTest.answers(for: ch, weak: false, llm: library.sync.llmConnected).map { r in
+                        var r = r
+                        guard r.selectedIndex == nil else { return r }
+                        if !inked {
+                            inked = true
+                            r.response = nil
+                            r.idk = nil
+                            r.ink = InkAnswer(strokes: [
+                                [InkAnswer.Point(x: 0.1, y: 0.3), InkAnswer.Point(x: 0.3, y: 0.7), InkAnswer.Point(x: 0.5, y: 0.3)],
+                                [InkAnswer.Point(x: 0.6, y: 0.2), InkAnswer.Point(x: 0.6, y: 0.8)],
+                            ], aspect: InkBox.aspect)
+                        } else if !passed {
+                            passed = true
+                            r.response = nil
+                            r.idk = true
+                            r.confidence = 1
+                        }
+                        return r
+                    }
                 default:
                     responses = SelfTest.answers(for: ch, weak: false, llm: library.sync.llmConnected)
                 }

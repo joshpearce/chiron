@@ -7,6 +7,7 @@ protocol ChironService: AnyObject {
     func state(subject: String) async throws -> BookState
     func chapter(subject: String) async throws -> ChapterStatus
     func exchange(_ request: ExchangeRequest) async throws -> ExchangeResponse
+    func ink(subject: String, _ submission: InkSubmission) async throws -> ExchangeResponse
     func reset(subject: String) async throws -> BookState
 }
 
@@ -74,6 +75,12 @@ final class Sync: ObservableObject, ChironService {
     /// so a server that hangs surfaces as an error rather than a spinner.
     func exchange(_ request: ExchangeRequest) async throws -> ExchangeResponse {
         try await post("/exchange", body: try JSONEncoder().encode(request), timeout: 600)
+    }
+
+    /// The ink check-in transcribes before it grades; same budget as an
+    /// exchange.
+    func ink(subject: String, _ submission: InkSubmission) async throws -> ExchangeResponse {
+        try await post("/ink/\(subject)", body: try JSONEncoder().encode(submission), timeout: 600)
     }
 
     func reset(subject: String) async throws -> BookState {

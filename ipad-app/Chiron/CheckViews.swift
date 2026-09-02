@@ -1,4 +1,5 @@
 import SwiftUI
+import PencilKit
 
 /// Shared flow for the calibration series, pretests and terminal checks:
 /// one item at a time, confidence committed BEFORE any reveal, elaborated
@@ -20,12 +21,29 @@ struct ItemFlowView: View {
     @State private var index = 0
     @State private var text = ""
     @State private var selected: Int?
-    @State private var confidence: Double = 2
+    @State private var confidence = 2
     @State private var revealed = false
     @State private var responses: [ItemResponse] = []
     @State private var confirmingExit = false
+    /// Typed is the default; handwriting is a toggle per item (a finger on
+    /// a 7.9" screen is a poor pen, and the typed path must be excellent).
+    @State private var handwriting = false
+    @State private var drawing = PKDrawing()
+    @State private var inkAnswer: InkAnswer?
+    @FocusState private var typing: Bool
 
     var item: CheckItem { items[index] }
+
+    /// Short mechanical answers (a number, an exact form) take one line and
+    /// Return commits; explained answers take a paragraph.
+    private var singleLine: Bool { item.check != "llm" }
+    private var numeric: Bool { item.check.hasPrefix("numeric") }
+
+    private var typedAnswer: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var canCommit: Bool {
+        if item.kind == "mcq" { return selected != nil }
+        return handwriting ? inkAnswer != nil : !typedAnswer.isEmpty
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -94,11 +112,7 @@ struct ItemFlowView: View {
                             }
                         }
                     } else {
-                        TextEditor(text: $text)
-                            .frame(minHeight: 140)
-                            .padding(6)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(.quaternary))
-                            .disabled(revealed)
+                        answerEntry
                         if revealed, let reveal = item.reveal {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Reference answer").font(.headline)
@@ -116,11 +130,7 @@ struct ItemFlowView: View {
             }
 
             if !revealed {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("How confident are you? \(confidenceLabel)").font(.callout)
-                    Slider(value: $confidence, in: 1...4, step: 1)
-                        .frame(maxWidth: 320)
-                }
+                ConfidencePills(confidence: $confidence)
                 HStack(spacing: 16) {
                     // Not knowing is expected - especially on pretests - and
                     // saying so is better signal than typing filler to get
@@ -136,15 +146,11 @@ struct ItemFlowView: View {
                     .buttonStyle(.bordered)
 
                     Button(reveal ? "Commit answer" : (index == items.count - 1 ? submitLabel : "Next")) {
-                        answered(ItemResponse(
-                            itemId: item.id,
-                            response: item.kind == "mcq" ? nil : text,
-                            selectedIndex: selected,
-                            confidence: Int(confidence)))
+                        commit()
                     }
                     .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(item.kind == "mcq" ? selected == nil : text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(!canCommit)
                 }
             } else {
                 Button(index == items.count - 1 ? submitLabel : "Next") { advance() }
@@ -153,6 +159,7 @@ struct ItemFlowView: View {
             }
         }
         .padding(28)
+        .onAppear { typing = item.kind != "mcq" }
         .alert("Leave the check?", isPresented: $confirmingExit) {
             Button("Stay", role: .cancel) { }
             Button("Discard answers and go back", role: .destructive) { onExit?() }
@@ -160,6 +167,62 @@ struct ItemFlowView: View {
             Text("The check is closed-book, so answers so far are discarded - re-entering starts it fresh.")
         }
         .frame(maxWidth: 760)
+    }
+
+    /// The answer surface for a constructed item: a line or a paragraph
+    /// from the keyboard, or a box to write in by hand.
+    @ViewBuilder private var answerEntry: some View {
+        if handwriting {
+            InkBox(drawing: $drawing, answer: $inkAnswer)
+                .disabled(revealed)
+        } else if singleLine {
+            TextField(numeric ? "a number" : "your answer", text: $text)
+                .textFieldStyle(.roundedBorder)
+                .font(Typography.serif(19))
+                .keyboardType(numeric ? .numbersAndPunctuation : .default)
+                .autocapitalization(.none)
+                .disableAutocorrection(true)
+                .focused($typing)
+                .submitLabel(.done)
+                .onSubmit { if canCommit { commit() } }
+                .disabled(revealed)
+        } else {
+            TextEditor(text: $text)
+                .font(Typography.serif(19))
+                .frame(minHeight: 140)
+                .padding(6)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(.quaternary))
+                .focused($typing)
+                .disabled(revealed)
+        }
+        if !revealed {
+            HStack {
+                Toggle(isOn: $handwriting) {
+                    Label("Write by hand", systemImage: "pencil.and.outline")
+                        .font(.callout)
+                }
+                .toggleStyle(.button)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .onChange(of: handwriting) { on in typing = !on }
+                if handwriting && !drawing.strokes.isEmpty {
+                    Button("Clear") { drawing = PKDrawing() }
+                        .buttonStyle(.plain)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+        }
+    }
+
+    private func commit() {
+        answered(ItemResponse(
+            itemId: item.id,
+            response: item.kind == "mcq" || handwriting ? nil : typedAnswer,
+            selectedIndex: selected,
+            confidence: confidence,
+            ink: item.kind == "mcq" || !handwriting ? nil : inkAnswer))
     }
 
     private func answered(_ r: ItemResponse) {
@@ -178,11 +241,10 @@ struct ItemFlowView: View {
         } else {
             index += 1
             text = ""; selected = nil; confidence = 2; revealed = false
+            drawing = PKDrawing()
+            inkAnswer = nil
+            typing = !handwriting && items[index].kind != "mcq"
         }
-    }
-
-    private var confidenceLabel: String {
-        ["", "guessing", "unsure", "fairly sure", "certain"][Int(confidence)]
     }
 
     private func iconFor(_ i: Int) -> String {
@@ -197,6 +259,31 @@ struct ItemFlowView: View {
         guard let r = item.reveal?.options?[i] else { return .clear }
         if r.correct { return .green.opacity(0.12) }
         return selected == i ? .red.opacity(0.10) : .clear
+    }
+}
+
+/// Confidence before any reveal, as four pills: the second is the default,
+/// and a confident miss is the miscalibration signal the results mark.
+struct ConfidencePills: View {
+    @Binding var confidence: Int
+    private static let names = ["Unsure", "Shaky", "Confident", "Sure"]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("How confident are you?")
+                .font(.callout)
+            HStack(spacing: 8) {
+                ForEach(1...4, id: \.self) { level in
+                    Button(Self.names[level - 1]) { confidence = level }
+                        .buttonStyle(.bordered)
+                        .tint(confidence == level ? .accentColor : .secondary)
+                        .foregroundStyle(confidence == level ? Color.accentColor : .primary)
+                        .hoverEffect()
+                        .accessibilityLabel("\(Self.names[level - 1])\(confidence == level ? ", selected" : "")")
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 

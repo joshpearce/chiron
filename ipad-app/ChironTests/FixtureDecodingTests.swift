@@ -118,6 +118,21 @@ final class FixtureDecodingTests: XCTestCase {
     }
 }
 
+final class ChapterDecodingTests: XCTestCase {
+    func testNullListsMeanEmpty() throws {
+        let json = """
+        {"unit":"u1","title":"T","minutes":25,"html":"<p>x</p>","beats":null,"pretest":null,"check":null,"next_action":null}
+        """
+        let ch = try JSONDecoder().decode(ChapterPayload.self, from: Data(json.utf8))
+        XCTAssertEqual(ch.unit, "u1")
+        XCTAssertTrue(ch.pretest.isEmpty)
+        XCTAssertTrue(ch.check.isEmpty)
+        XCTAssertTrue(ch.beats.isEmpty)
+        XCTAssertFalse(ch.isCalibration)
+        XCTAssertNil(ch.screener)
+    }
+}
+
 final class MathTextTests: XCTestCase {
     func testSoftLineBreaksReflowAndParagraphsStay() {
         XCTAssertEqual(MathText.reflow("Three of them are\n0.1, 0.2 and\n0.3. What is the fourth?"),

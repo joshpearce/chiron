@@ -9,7 +9,9 @@ final class FakeService: ChironService {
     var onChapter: (String) throws -> ChapterStatus = { _ in throw URLError(.cannotConnectToHost) }
     var onExchange: (ExchangeRequest) throws -> ExchangeResponse = { _ in throw URLError(.cannotConnectToHost) }
     var onReset: (String) throws -> BookState = { _ in throw URLError(.cannotConnectToHost) }
+    var onInk: (String, InkSubmission) throws -> ExchangeResponse = { _, _ in throw URLError(.cannotConnectToHost) }
     var exchanges: [ExchangeRequest] = []
+    var inks: [InkSubmission] = []
     var chapterPolls = 0
 
     func subjects() async throws -> SubjectsResponse { try onSubjects() }
@@ -21,6 +23,10 @@ final class FakeService: ChironService {
     func exchange(_ request: ExchangeRequest) async throws -> ExchangeResponse {
         exchanges.append(request)
         return try onExchange(request)
+    }
+    func ink(subject: String, _ submission: InkSubmission) async throws -> ExchangeResponse {
+        inks.append(submission)
+        return try onInk(subject, submission)
     }
     func reset(subject: String) async throws -> BookState { try onReset(subject) }
 }
@@ -295,5 +301,55 @@ final class BookSessionTests: XCTestCase {
         await s2.open()
         XCTAssertEqual(s2.position(for: "u1"), 1234.5)
         XCTAssertEqual(s2.position(for: "u2"), 0, "an unread chapter opens at the top")
+    }
+
+    func testAnyInkSendsTheWholeCheckThroughTheInkCheckIn() async {
+        scriptFreshBook()
+        fake.onInk = { [unowned self] _, _ in self.fixture(ExchangeResponse.self, "exchange-series") }
+        let s = session()
+        await s.open()
+        await s.place(level: 3)
+        let items = s.chapter!.check
+        let strokes = [[InkAnswer.Point(x: 0.1, y: 0.2), InkAnswer.Point(x: 0.5, y: 0.6)]]
+        var responses = [
+            ItemResponse(itemId: items[0].id, response: nil, selectedIndex: nil, confidence: 3,
+                         ink: InkAnswer(strokes: strokes, aspect: 3)),
+            ItemResponse(itemId: items[1].id, response: "typed", selectedIndex: nil, confidence: 4),
+            ItemResponse(itemId: items[2].id, response: nil, selectedIndex: nil, confidence: 1, idk: true),
+        ]
+        responses += items.dropFirst(3).map {
+            ItemResponse(itemId: $0.id, response: nil, selectedIndex: 0, confidence: 2)
+        }
+        let exchangesBefore = fake.exchanges.count
+        await s.submitCheck(responses)
+
+        XCTAssertEqual(fake.exchanges.count, exchangesBefore, "handwriting never travels on the exchange")
+        let sub = try! XCTUnwrap(fake.inks.last)
+        XCTAssertEqual(sub.unit, "u0")
+        XCTAssertEqual(sub.items.count, items.count)
+        XCTAssertEqual(sub.items[0].strokes, strokes)
+        XCTAssertEqual(sub.items[0].aspect, 3)
+        XCTAssertNil(sub.items[0].text)
+        XCTAssertEqual(sub.items[1].text, "typed")
+        XCTAssertTrue(sub.items[1].strokes.isEmpty)
+        XCTAssertEqual(sub.items[2].idk, true)
+        XCTAssertEqual(sub.items[3].selectedIndex, 0)
+        guard case .results = s.screen else { return XCTFail("\(s.screen)") }
+
+        // The ink never leaks onto the exchange wire either.
+        let encoded = String(data: try! JSONEncoder().encode(responses[0]), encoding: .utf8)!
+        XCTAssertFalse(encoded.contains("strokes"))
+    }
+
+    func testTypedOnlyChecksStayOnTheExchange() async {
+        scriptFreshBook()
+        let s = session()
+        await s.open()
+        await s.place(level: 3)
+        await s.submitCheck(s.chapter!.check.map {
+            ItemResponse(itemId: $0.id, response: "x", selectedIndex: nil, confidence: 2)
+        })
+        XCTAssertTrue(fake.inks.isEmpty)
+        guard case .results = s.screen else { return XCTFail("\(s.screen)") }
     }
 }

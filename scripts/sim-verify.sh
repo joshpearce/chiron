@@ -127,9 +127,11 @@ for DEVICE in $DEVICES; do
       cmd /check
       expect check
       shot 06 check
-      cmd /answer '{"mode":"wrong"}'
+      # One inked answer (a stub transcription on a dev server), one pass,
+      # the rest typed and chosen: the results must show READ AS for all.
+      cmd /answer '{"mode":"mixed"}'
       expect results
-      shot 07 results-below-gate 2.5
+      shot 07 results-mixed 2.5
       cmd /proceed
       # A long chunk earns a break suggestion; a short one goes straight on.
       screen=$(curl -sf "$H/state" | python3 -c 'import json,sys; print(json.load(sys.stdin)["screen"])')

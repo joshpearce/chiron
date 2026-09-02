@@ -201,7 +201,17 @@ final class BookSession: ObservableObject {
         req.checkResponses = responses
         req.beatResponses = beatResponses
         req.chunkMinutes = chunkMinutes()
-        await run(req, wait: .grading)
+        if responses.contains(where: { $0.ink != nil }), let unit = chapter?.unit {
+            // Handwriting goes through the ink check-in: the server
+            // rasterizes, transcribes, keeps the audit trail, and grades
+            // the transcription exactly as it grades typed text.
+            await run(req, wait: .grading) { [service] in
+                try await service.ink(subject: req.subject,
+                                      InkSubmission(unit: unit, responses: responses, chunkMinutes: req.chunkMinutes))
+            }
+        } else {
+            await run(req, wait: .grading)
+        }
     }
 
     func skipCheck() async {
@@ -261,7 +271,10 @@ final class BookSession: ObservableObject {
 
     // MARK: - exchange
 
-    private func run(_ req: ExchangeRequest, wait kind: Wait, keepReadingOnNil: Bool = false) async {
+    /// `send` is the request on the wire - the exchange by default, the ink
+    /// check-in for handwriting; `req` describes it for the handling after.
+    private func run(_ req: ExchangeRequest, wait kind: Wait, keepReadingOnNil: Bool = false,
+                     send: (() async throws -> ExchangeResponse)? = nil) async {
         // One exchange at a time. The buttons that trigger exchanges stay on
         // screen while one is in flight, and a second tap would grade the same
         // check twice - real model cost and duplicate learner-state events.
@@ -271,10 +284,14 @@ final class BookSession: ObservableObject {
         defer { wait = nil }
         let resp: ExchangeResponse
         do {
-            resp = try await service.exchange(req)
+            if let send {
+                resp = try await send()
+            } else {
+                resp = try await service.exchange(req)
+            }
         } catch {
             fail(Self.unreachable) { [weak self] in
-                await self?.run(req, wait: kind, keepReadingOnNil: keepReadingOnNil)
+                await self?.run(req, wait: kind, keepReadingOnNil: keepReadingOnNil, send: send)
             }
             return
         }
