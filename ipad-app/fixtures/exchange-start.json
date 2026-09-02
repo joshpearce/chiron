@@ -1,0 +1,135 @@
+{
+ "break_suggestion": null,
+ "chapter": {
+  "unit": "u0",
+  "title": "Calibration: where you actually are",
+  "minutes": 20,
+  "html": "<p>One placement question, then a short series of math questions sized to your\nanswer - easy to hard, spanning everything this book leans on: dot products,\nmatrix shapes, softmax, derivatives, gradient notation, expectations. Nothing\nis taught here, and you are expected to run out of sure answers somewhere in\nthe middle - where that happens is the calibration. Answer fast, mark &quot;I\ndon't know&quot; freely, move on. The teaching starts next chapter, tuned by what\nthese answers reveal.</p>\n",
+  "beats": [],
+  "pretest": [],
+  "check": [
+   {
+    "id": "u0-s1",
+    "unit": "u0",
+    "concept": "c-notation",
+    "kind": "constructed",
+    "prompt": "Before the questions: how would you rate your current understanding of the math inside modern AI models - dot products, matrix shapes, softmax, gradients?\n",
+    "check": "screener",
+    "difficulty": "warmup",
+    "options": [
+     {
+      "text": "Absolute novice"
+     },
+     {
+      "text": "Seen the words, could not compute"
+     },
+     {
+      "text": "Could work through it slowly"
+     },
+     {
+      "text": "Comfortable"
+     },
+     {
+      "text": "Expert - I could teach it"
+     }
+    ],
+    "reveal": {}
+   }
+  ],
+  "calibration": true,
+  "next_action": "Read the chapter and work every beat before its reveal."
+ },
+ "gate": null,
+ "results": [],
+ "state": {
+  "active_misconceptions": [],
+  "debt": [],
+  "fringe": [
+   "u0"
+  ],
+  "llm": {
+   "connected": false
+  },
+  "session_minutes": 3.7952264149983725e-05,
+  "spine": [
+   {
+    "unit": "u0",
+    "title": "Calibration: where you actually are",
+    "status": "active",
+    "score": null,
+    "in_fringe": true
+   },
+   {
+    "unit": "u1",
+    "title": "The core bet: next-token prediction",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u2",
+    "title": "The math floor",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u3",
+    "title": "Attention from first principles",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u4",
+    "title": "The transformer block",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u5",
+    "title": "Training: loss to aligned model",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u6",
+    "title": "Inference: making it run",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u7",
+    "title": "Mixture of Experts",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u10",
+    "title": "The iron: hardware and training at scale",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u8",
+    "title": "Harnesses and agents",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u9",
+    "title": "Synthesis: the full trace",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   }
+  ],
+  "summary": "New session. No evidence yet; treat per the static profile."
+ }
+}

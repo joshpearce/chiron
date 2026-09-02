@@ -1,0 +1,287 @@
+{
+ "break_suggestion": null,
+ "chapter": {
+  "unit": "u0",
+  "title": "Calibration: where you actually are",
+  "minutes": 20,
+  "html": "",
+  "beats": [],
+  "pretest": [],
+  "check": [
+   {
+    "id": "u0-n7",
+    "unit": "u0",
+    "concept": "c-matmul",
+    "kind": "constructed",
+    "prompt": "A matrix has shape $(4, 7)$. How many rows does it have, and how many\ncolumns? Answer in the exact form `rows x cols`, for example `3 x 8`.\n",
+    "check": "exact",
+    "difficulty": "warmup",
+    "reveal": {
+     "answer": "4 x 7"
+    }
+   },
+   {
+    "id": "u0-n8",
+    "unit": "u0",
+    "concept": "c-dotprod",
+    "kind": "constructed",
+    "prompt": "Take $[1, 2, 3]$ and $[4, 5, 6]$. Multiply them entry by entry - first\nwith first, second with second, third with third - then add the three\nproducts. Answer with a single number.\n",
+    "check": "numeric(0.001)",
+    "difficulty": "warmup",
+    "reveal": {
+     "answer": "32"
+    }
+   },
+   {
+    "id": "u0-q1",
+    "unit": "u0",
+    "concept": "c-dotprod",
+    "kind": "constructed",
+    "prompt": "Compute the dot product of $[2, 0, -3]$ and $[1, 4, 2]$. Answer with a\nsingle number.\n",
+    "check": "numeric(0.001)",
+    "difficulty": "warmup",
+    "reveal": {
+     "answer": "-4"
+    }
+   },
+   {
+    "id": "u0-p2",
+    "unit": "u0",
+    "concept": "c-matmul",
+    "kind": "constructed",
+    "prompt": "$X$ has shape $(32, 128)$ and $W$ has shape $(128, 512)$. What is the\nshape of $XW$? Answer in the exact form `rows x cols`, for example\n`3 x 8`.\n",
+    "check": "exact",
+    "difficulty": "warmup",
+    "reveal": {
+     "answer": "32 x 512"
+    }
+   },
+   {
+    "id": "u0-q9",
+    "unit": "u0",
+    "concept": "c-notation",
+    "kind": "constructed",
+    "prompt": "$L$ is a scalar loss and $W$ has shape $(256, 1024)$. What is the shape of\n$\\nabla_W L$? Answer in the exact form `rows x cols`, for example `3 x 8`.\n",
+    "check": "exact",
+    "difficulty": "warmup",
+    "reveal": {
+     "answer": "256 x 1024"
+    }
+   },
+   {
+    "id": "u0-q3",
+    "unit": "u0",
+    "concept": "c-dotprod",
+    "kind": "mcq",
+    "prompt": "$q = [3, 0]$, $k_1 = [0.6, 0.8]$, $k_2 = [6, 8]$. Note that $k_1$ and\n$k_2$ point in exactly the same direction. Which key gets the larger raw\nattention score $q \\cdot k$, and what does that tell you?\n",
+    "check": "choice",
+    "difficulty": "warmup",
+    "options": [
+     {
+      "text": "$k_2$, by a factor of 10, even though the two keys point in identical directions - the dot product scales with magnitude as well as alignment."
+     },
+     {
+      "text": "Neither - the scores are equal, since the two keys have the same direction and the dot product measures direction agreement."
+     },
+     {
+      "text": "$k_1$, because it is much closer to $q$ in the plane, and closeness is what a similarity score rewards."
+     },
+     {
+      "text": "$k_2$, because a longer vector is a more confident match and the score is $\\lVert k \\rVert$ times the cosine of the angle, so length is the deciding factor."
+     }
+    ],
+    "reveal": {
+     "options": [
+      {
+       "text": "",
+       "correct": true,
+       "explain": "Correct. $q \\cdot k_1 = 1.8$ and $q \\cdot k_2 = 18$. Same direction, same angle, ten times the score. This is exactly why unnormalized attention scores can be dominated by a single large-magnitude key."
+      },
+      {
+       "text": "",
+       "correct": false,
+       "explain": "Attractive because on unit-length vectors - which is all your embedding database ever stores - the dot product and cosine similarity are the same number. They are not the same function. Cosine divides out both magnitudes; the dot product does not, and nothing inside a transformer normalizes before the score is taken."
+      },
+      {
+       "text": "",
+       "correct": false,
+       "explain": "Attractive because 'similar' and 'nearby' are the same word in everyday use. Check it: $\\lVert q - k_1 \\rVert \\approx 2.53$ while $\\lVert q - k_2 \\rVert \\approx 8.54$, so $k_1$ really is much closer - and it scores ten times lower. The dot product is not a distance and is not even a decreasing function of distance."
+      },
+      {
+       "text": "",
+       "correct": false,
+       "explain": "The arithmetic here is right - $k_2$ does score higher, and with $q$ fixed, ranking by $\\lVert k \\rVert \\cos\\theta$ agrees with the dot product's ranking - but the formula omits $\\lVert q \\rVert$, and the reading is wrong on both sides. The score is $\\lVert q \\rVert \\lVert k \\rVert \\cos\\theta$, scaled by BOTH magnitudes, not the key's alone. And length is not the deciding factor in general: a long vector at 90 degrees still scores zero. Magnitude and alignment both matter, multiplicatively."
+      }
+     ]
+    }
+   },
+   {
+    "id": "u0-q5",
+    "unit": "u0",
+    "concept": "c-matmul",
+    "kind": "constructed",
+    "prompt": "$A = \\begin{bmatrix} 2 & 1 \\\\ 0 & 3 \\end{bmatrix}$ and\n$B = \\begin{bmatrix} 1 & 4 \\\\ 5 & -2 \\end{bmatrix}$.\nCompute the single entry $(AB)_{12}$ - row 1, column 2 of the product.\nAnswer with a single number.\n",
+    "check": "numeric(0.001)",
+    "difficulty": "core",
+    "reveal": {
+     "answer": "6"
+    }
+   },
+   {
+    "id": "u0-q12",
+    "unit": "u0",
+    "concept": "c-matmul",
+    "kind": "constructed",
+    "prompt": "$X$ has shape $(n, d)$ and $W$ has shape $(d, m)$. Describe entry $(i,j)$\nof $XW$ as a dot product: which vector is dotted with which?\n",
+    "check": "llm",
+    "difficulty": "core",
+    "reveal": {
+     "answer": "Entry $(i,j)$ is the dot product of row $i$ of $X$ - the $i$-th token's\n$d$-dimensional vector - with column $j$ of $W$, which is also\n$d$-dimensional. Both operands have length $d$, the shared inner\ndimension, which is why they can be dotted at all. The full product is an\n$n \\times m$ grid of such dot products.\n",
+     "rubric": "Must contain: (1) row $i$ of $X$ dotted with column $j$ of $W$ - the\nrow/column pairing must be correct and in the right order; (2) both\noperands have length $d$, the contracted inner dimension.\nPass = both. Partial = (1) only.\nFail and what it diagnoses: \"row $i$ of $X$ with row $j$ of $W$\" or any\npairing that ignores which axis contracts = the shape rule is being\napplied as memorized bookkeeping rather than understood, U0-M1. Answering\nwith elementwise multiplication of $X_{ij}$ and $W_{ij}$ = U0-M1 in its\nstrongest form; deliver the matmul section before any later unit.\n"
+    }
+   },
+   {
+    "id": "u0-p7",
+    "unit": "u0",
+    "concept": "c-dotprod",
+    "kind": "constructed",
+    "prompt": "$q$ and $k$ are both row vectors of shape $(1, d)$. Write the dot product\n$q \\cdot k$ as a matrix product of $q$ and $k$, and state the shape of\nthe result.\n",
+    "check": "llm",
+    "difficulty": "core",
+    "reveal": {
+     "answer": "$q k^T$, of shape $(1, 1)$ - a scalar. The transpose turns $k$ into a\n$(d, 1)$ column so the inner dimensions $d$ match and contract away.\n",
+     "rubric": "Pass requires the expression $q k^T$ (or an equivalent explicitly showing\none factor transposed) AND the result being a scalar / shape $(1,1)$.\nPartial: correct shape reasoning but writes $q^T k$, which yields a\n$(d,d)$ outer product - note the error, it is a real orientation slip.\nFail and what it diagnoses: writing $qk$ with no transpose and calling it\nvalid = U0-M4 (orientation treated as cosmetic). Answering that the\nresult is a vector of length $d$ = confusing the dot product with\nelementwise multiplication, U0-M1.\n"
+    }
+   },
+   {
+    "id": "u0-p4",
+    "unit": "u0",
+    "concept": "c-notation",
+    "kind": "constructed",
+    "prompt": "Let $f(x) = (3x + 1)^2$. Compute $f'(1)$, the derivative of $f$ evaluated\nat $x = 1$. Answer with a single number.\n",
+    "check": "numeric(0.001)",
+    "difficulty": "core",
+    "reveal": {
+     "answer": "24"
+    }
+   },
+   {
+    "id": "u0-q2",
+    "unit": "u0",
+    "concept": "c-dotprod",
+    "kind": "constructed",
+    "prompt": "A query vector $q$ is compared against two key vectors that point in\nexactly the same direction as each other, but $k_2$ is five times as long\nas $k_1$. Compare $q \\cdot k_1$ with $q \\cdot k_2$, and compare the\ncosine similarity of $q$ with each. Explain the difference in one or two\nsentences.\n",
+    "check": "llm",
+    "difficulty": "core",
+    "reveal": {
+     "answer": "$q \\cdot k_2 = 5 \\, (q \\cdot k_1)$: the dot product scales linearly with\nthe length of either input. The cosine similarities are identical, because\ncosine divides out both magnitudes and depends only on the angle, which is\nunchanged. The dot product measures alignment scaled by both magnitudes;\nthe cosine measures alignment alone.\n",
+     "rubric": "Must contain: (1) the dot product is 5x larger for $k_2$ (any statement\nthat it scales with magnitude, with the correct direction of the effect);\n(2) the cosines are equal because the angle is unchanged.\nPass = both. Partial = (1) with no cosine comparison, or (2) with the dot\nproducts called equal in direction-terms but scaled correctly.\nFail and what it diagnoses: saying both dot products are equal because the\ndirection is the same = U0-M2. Saying $k_1$ scores higher because it is\nnearer to $q$ = U0-M6. Either failure means the dot-product section is\nrequired at full depth before u3.\n"
+    }
+   }
+  ],
+  "calibration": true,
+  "next_action": "Read the chapter and work every beat before its reveal."
+ },
+ "gate": null,
+ "results": [
+  {
+   "item_id": "u0-s1",
+   "verdict": "pass",
+   "misconceptions": null,
+   "evidence": "",
+   "feedback_md": "Placed at level 3.",
+   "next_action": ""
+  }
+ ],
+ "state": {
+  "active_misconceptions": [],
+  "debt": [],
+  "fringe": [
+   "u0"
+  ],
+  "llm": {
+   "connected": false
+  },
+  "session_minutes": 0.0002196033795674642,
+  "spine": [
+   {
+    "unit": "u0",
+    "title": "Calibration: where you actually are",
+    "status": "active",
+    "score": null,
+    "in_fringe": true
+   },
+   {
+    "unit": "u1",
+    "title": "The core bet: next-token prediction",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u2",
+    "title": "The math floor",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u3",
+    "title": "Attention from first principles",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u4",
+    "title": "The transformer block",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u5",
+    "title": "Training: loss to aligned model",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u6",
+    "title": "Inference: making it run",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u7",
+    "title": "Mixture of Experts",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u10",
+    "title": "The iron: hardware and training at scale",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u8",
+    "title": "Harnesses and agents",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   },
+   {
+    "unit": "u9",
+    "title": "Synthesis: the full trace",
+    "status": "locked",
+    "score": null,
+    "in_fringe": false
+   }
+  ],
+  "summary": "New session. No evidence yet; treat per the static profile."
+ }
+}
