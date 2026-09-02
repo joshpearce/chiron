@@ -214,14 +214,22 @@ to any screen (used by the harness and by the multi-book future).
 
 ## 6. Dev loop (Simulator for everything)
 
-One-time setup (the download is several GB; run it when the network is
-good):
+One-time setup, done 2026-09-01. `xcodebuild -downloadPlatform` refuses
+iOS 15.5 ("not available for download"): Apple's index lists it only as a
+legacy installer package, not a runtime image. What worked:
 ```
-xcodebuild -downloadPlatform iOS -buildVersion 15.5
-xcrun simctl create chiron-ipad-15 "com.apple.CoreSimulator.SimDeviceType.iPad-Pro--9-7-inch-" com.apple.CoreSimulator.SimRuntime.iOS-15-5
+# index: https://devimages-cdn.apple.com/downloads/xcode/simulators/index2.dvtdownloadableindex
+curl -L -o ios15.5-sim.dmg https://devimages-cdn.apple.com/downloads/xcode/simulators/com.apple.pkg.iPhoneSimulatorSDK15_5-15.5.1.1653527639.dmg   # 5.4 GB
+hdiutil attach -nobrowse -readonly ios15.5-sim.dmg
+pkgutil --expand-full /Volumes/Clearwater*/iPhoneSimulatorSDK15_5.pkg sdk15   # 12 GB, minutes
+mv sdk15/Payload ~/Library/Developer/CoreSimulator/Profiles/Runtimes/"iOS 15.5.simruntime"   # no sudo
+xcrun simctl create chiron-ipad-15 com.apple.CoreSimulator.SimDeviceType.iPad-mini-4 com.apple.CoreSimulator.SimRuntime.iOS-15-5
 ```
-`chiron-ipad-15` (768x1024 pt, iOS 15.5) is the gate; `chiron-ipad` (iPad
-A16, iOS 26.5) is the second target. Both must pass before a phase closes.
+`chiron-ipad-15` (iPad mini 4 device type, 768x1024 pt, iOS 15.5) is the
+gate; `chiron-ipad` (iPad A16, iOS 26.5) is the second target. Both must
+pass before a phase closes. Quirk: that runtime cannot delta-install over an
+existing copy of the app; `sim-run.sh` uninstalls and reinstalls when the
+install fails, which wipes the app's Documents on that device.
 
 Scripts (extend, do not fork):
 - `scripts/sim-run.sh [device]` - build, install, launch against the

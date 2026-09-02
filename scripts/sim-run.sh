@@ -62,7 +62,14 @@ xcodebuild -project Chiron.xcodeproj -scheme Chiron \
   -derivedDataPath build-sim build -quiet
 
 xcrun simctl terminate "$UDID" "$BUNDLE" 2>/dev/null || true
-xcrun simctl install "$UDID" build-sim/Build/Products/Debug-iphonesimulator/Chiron.app
+APP=build-sim/Build/Products/Debug-iphonesimulator/Chiron.app
+if ! xcrun simctl install "$UDID" "$APP" 2>/dev/null; then
+  # The iOS 15.5 runtime cannot delta-install over a copy that is already
+  # there ("Could not hardlink copy"); a clean install works. The app's
+  # Documents go with it, so on that device every run starts from nothing.
+  xcrun simctl uninstall "$UDID" "$BUNDLE" 2>/dev/null || true
+  xcrun simctl install "$UDID" "$APP"
+fi
 
 if [ "$cmd" = "selftest" ]; then
   log="/tmp/chiron-selftest-$DEVICE.log"
