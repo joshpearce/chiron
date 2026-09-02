@@ -74,7 +74,7 @@ type Reveal struct {
 
 type RevealOption struct {
 	Text          string `yaml:"text" json:"text"`
-	Correct       bool   `yaml:"correct" json:"correct,omitempty"`
+	Correct       bool   `yaml:"correct" json:"correct"`
 	Explain       string `yaml:"explain" json:"explain,omitempty"`
 	Misconception string `yaml:"misconception" json:"misconception,omitempty"`
 }

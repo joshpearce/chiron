@@ -1,6 +1,7 @@
 package render
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -166,5 +167,21 @@ func TestClientItemsHideAndRevealTheRightThings(t *testing.T) {
 	}
 	if fi.Difficulty != "core" {
 		t.Errorf("difficulty should default to core, got %q", fi.Difficulty)
+	}
+}
+
+// A wrong option's "correct": false was dropped by omitempty. The iPad's
+// strict decoder then failed the whole exchange on the first MCQ reveal,
+// which is every calibration series. False is a value here, not an absence.
+func TestRevealOptionsAlwaysCarryCorrect(t *testing.T) {
+	q := corpus.Question{ID: "q", Kind: "mcq", Prompt: "?", Check: "choice",
+		Options: []checkers.Option{{Text: "a", Correct: true, Explain: "yes"},
+			{Text: "b", Explain: "no", Misconception: "M1"}}}
+	raw, err := json.Marshal(clientItem(q))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(raw), `"correct":`) != 2 {
+		t.Fatalf("every reveal option must carry correct, got %s", raw)
 	}
 }
