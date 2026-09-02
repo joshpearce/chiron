@@ -54,7 +54,10 @@ func parseNumber(text string) (float64, bool) {
 func CheckAnswer(check string, expected, given string) (bool, error) {
 	switch {
 	case check == "exact", check == "choice":
-		return Norm(given) == Norm(expected), nil
+		// Whitespace inside an exact answer is never the meaning: "4x7" and
+		// "4 x 7" are the same shape, "w|i|d|est_" and "w | i | d | est_"
+		// the same tokens. Compare with it collapsed, then with it gone.
+		return Norm(given) == Norm(expected) || Compact(given) == Compact(expected), nil
 	}
 	if m := numericSpec.FindStringSubmatch(strings.TrimSpace(check)); m != nil {
 		tol, err := strconv.ParseFloat(m[1], 64)
@@ -116,4 +119,9 @@ func CheckMCQ(options []Option, selectedIndex int) MCQGrade {
 func Norm(s string) string {
 	text := strings.ToLower(strings.TrimSpace(spaces.ReplaceAllString(s, " ")))
 	return separator.ReplaceAllString(text, "$1")
+}
+
+// Compact is the exact-match fallback: lower case with every space gone.
+func Compact(s string) string {
+	return strings.ToLower(spaces.ReplaceAllString(s, ""))
 }

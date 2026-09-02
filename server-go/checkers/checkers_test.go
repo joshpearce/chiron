@@ -27,6 +27,11 @@ var cases = []struct {
 	{"exact", "4, 1; 11, 6", " 4 , 1 ; 11 , 6 ", true, "padded separators"},
 	{"exact", "4, 1; 11, 6", "4, 1; 11, 7", false, "one entry wrong"},
 	{"exact", "4 x 7", "4 X 7", true, "case-insensitive"},
+	{"exact", "4 x 7", "4x7", true, "spacing inside an expression is not meaning"},
+	{"exact", "4 x 7", "4 x7", true, "uneven spacing"},
+	{"exact", "w|i|d|est_", "w | i | d | est_", true, "spaces around pipes"},
+	{"exact", "4 x 7", "47", false, "the operator is meaning"},
+	{"exact", "4 x 7", "7 x 4", false, "order is meaning"},
 	{"numeric(0.01)", "6", "the answer is 6", true, "prose around a number still parses"},
 }
 

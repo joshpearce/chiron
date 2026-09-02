@@ -137,7 +137,12 @@ function finishBeat(holder, beat, response, extra) {
 
 /* Mirrors server/checkers.py for the detached path. */
 function gradeMechanical(check, expected, given) {
-  if (check === "exact") return norm(given) === norm(expected);
+  if (check === "exact") {
+    // Whitespace inside an exact answer is never the meaning: "4x7" and
+    // "4 x 7" are the same shape. Collapsed first, then gone - as the
+    // server does.
+    return norm(given) === norm(expected) || compact(given) === compact(expected);
+  }
   const m = /^numeric\(([\d.eE+-]+)\)$/.exec(check.trim());
   if (m) {
     const tol = parseFloat(m[1]);
@@ -147,7 +152,11 @@ function gradeMechanical(check, expected, given) {
     // grades one way offline and the other way at the boundary.
     return Math.abs(got - exp) <= tol + Math.abs(exp) * 1e-9;
   }
-  return norm(given) === norm(expected);
+  return norm(given) === norm(expected) || compact(given) === compact(expected);
+}
+
+function compact(s) {
+  return String(s).replace(/\s+/g, "").toLowerCase();
 }
 
 function parseNumber(text) {
