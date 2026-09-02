@@ -9,8 +9,10 @@
 /* Begin PBXBuildFile section */
 		22F0DE026E6BA746E20C90FF /* katex in Resources */ = {isa = PBXBuildFile; fileRef = 68F5F83F9E5D2EEB587385EF /* katex */; };
 		2BDCB839CEB3F03E8538AAB4 /* Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3091646F01947C00333241BA /* Credentials.swift */; };
+		3F19963DB080F3508ECC7EBF /* fixtures in Resources */ = {isa = PBXBuildFile; fileRef = 2A02C9562B8ECB9AF3BB69E3 /* fixtures */; };
 		3FC1C085C37DA34DC9042909 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA965B5A2EF9CB2D031CB1FE /* AppModel.swift */; };
 		49C25BFB2FE00A68F00BB1A9 /* book.css in Resources */ = {isa = PBXBuildFile; fileRef = 1F4412C6E6B26DC131C54235 /* book.css */; };
+		59F1078E57D0CDF81127B805 /* FixtureDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 473534689097CF5B3E8E2EE0 /* FixtureDecodingTests.swift */; };
 		5C223EEF7AE0AF48A9942AE5 /* SelfTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AA842BA32080A6287EB9A6 /* SelfTest.swift */; };
 		88AD80E868C1EF47C403E25D /* Servers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BD9A46CBDBDDEEAFF860927 /* Servers.swift */; };
 		8B7415A0D57A05F203D74AE1 /* book.js in Resources */ = {isa = PBXBuildFile; fileRef = 756BF2C5D73A3EFF3BD5C55C /* book.js */; };
@@ -26,13 +28,25 @@
 		F46447C3421936C299644C1C /* chapter.html in Resources */ = {isa = PBXBuildFile; fileRef = 6C775179B7AF96D0B1017B5E /* chapter.html */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		9EE958C4777E89E339F23EFB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 88AF112FA0F27BB17F7933AB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D2AE88B4FBD262E09816A6CA;
+			remoteInfo = Chiron;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		1CB1CBACDDC9D2B6E47206C7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1F4412C6E6B26DC131C54235 /* book.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = book.css; sourceTree = "<group>"; };
+		2A02C9562B8ECB9AF3BB69E3 /* fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; path = fixtures; sourceTree = SOURCE_ROOT; };
 		2BD9A46CBDBDDEEAFF860927 /* Servers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Servers.swift; sourceTree = "<group>"; };
 		2D6F3642FDD052AC3AE16540 /* Chiron.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chiron.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3091646F01947C00333241BA /* Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credentials.swift; sourceTree = "<group>"; };
 		4424A63E2C94C4589C4B5A8F /* default-book.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "default-book.json"; sourceTree = "<group>"; };
+		473534689097CF5B3E8E2EE0 /* FixtureDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureDecodingTests.swift; sourceTree = "<group>"; };
 		478BD8C483632C32A1A65736 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4E21F930C36788EA6466D67F /* CheckViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckViews.swift; sourceTree = "<group>"; };
 		4FDBD0C79377E20146856D09 /* Sync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sync.swift; sourceTree = "<group>"; };
@@ -42,6 +56,7 @@
 		6CE4AEBB512C66BBEEE9B508 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		6F177C08E551698E85C6707E /* TeachView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeachView.swift; sourceTree = "<group>"; };
 		756BF2C5D73A3EFF3BD5C55C /* book.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = book.js; sourceTree = "<group>"; };
+		7B0F074E09B2872B0CA5A339 /* ChironTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ChironTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		87AA842BA32080A6287EB9A6 /* SelfTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTest.swift; sourceTree = "<group>"; };
 		8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
 		BA965B5A2EF9CB2D031CB1FE /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
@@ -84,8 +99,10 @@
 		4810D2B0E90D2CDCD6AA570D = {
 			isa = PBXGroup;
 			children = (
+				2A02C9562B8ECB9AF3BB69E3 /* fixtures */,
 				68F5F83F9E5D2EEB587385EF /* katex */,
 				239752A9BB87BA2A94EADF28 /* Chiron */,
+				9DFC80362E7EF6702AF2C424 /* ChironTests */,
 				927FE4EDAA74BD3F9BCB9D38 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -94,13 +111,41 @@
 			isa = PBXGroup;
 			children = (
 				2D6F3642FDD052AC3AE16540 /* Chiron.app */,
+				7B0F074E09B2872B0CA5A339 /* ChironTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		9DFC80362E7EF6702AF2C424 /* ChironTests */ = {
+			isa = PBXGroup;
+			children = (
+				473534689097CF5B3E8E2EE0 /* FixtureDecodingTests.swift */,
+			);
+			path = ChironTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		A4F43552C3F139E136515CC3 /* ChironTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AE183DDED563CBCD88E119B0 /* Build configuration list for PBXNativeTarget "ChironTests" */;
+			buildPhases = (
+				4E3FCC1F725ADB7A0CD3C807 /* Sources */,
+				DA144B0BF043D4B7B17EDFF4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A2E4C155BE77AC9B9ACF08A7 /* PBXTargetDependency */,
+			);
+			name = ChironTests;
+			packageProductDependencies = (
+			);
+			productName = ChironTests;
+			productReference = 7B0F074E09B2872B0CA5A339 /* ChironTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		D2AE88B4FBD262E09816A6CA /* Chiron */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F6A9856ADE9185E6A42C79C5 /* Build configuration list for PBXNativeTarget "Chiron" */;
@@ -149,6 +194,7 @@
 			projectRoot = "";
 			targets = (
 				D2AE88B4FBD262E09816A6CA /* Chiron */,
+				A4F43552C3F139E136515CC3 /* ChironTests */,
 			);
 		};
 /* End PBXProject section */
@@ -164,6 +210,14 @@
 				F46447C3421936C299644C1C /* chapter.html in Resources */,
 				8C8562A01FFD05DE4D17DD2A /* default-book.json in Resources */,
 				22F0DE026E6BA746E20C90FF /* katex in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA144B0BF043D4B7B17EDFF4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3F19963DB080F3508ECC7EBF /* fixtures in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,7 +242,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4E3FCC1F725ADB7A0CD3C807 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				59F1078E57D0CDF81127B805 /* FixtureDecodingTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A2E4C155BE77AC9B9ACF08A7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D2AE88B4FBD262E09816A6CA /* Chiron */;
+			targetProxy = 9EE958C4777E89E339F23EFB /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		17F5E588D0DC107374061A3A /* Release */ = {
@@ -331,6 +401,23 @@
 			};
 			name = Release;
 		};
+		BB7891831DBE7291C5C71359 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mjbraun.ChironTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Chiron.app/Chiron";
+			};
+			name = Debug;
+		};
 		E06D0C73D86D789F5AA89F08 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -352,9 +439,35 @@
 			};
 			name = Debug;
 		};
+		FDD2C5FC2E28D39333140114 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mjbraun.ChironTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Chiron.app/Chiron";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		AE183DDED563CBCD88E119B0 /* Build configuration list for PBXNativeTarget "ChironTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BB7891831DBE7291C5C71359 /* Debug */,
+				FDD2C5FC2E28D39333140114 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		E26C8EA783A0643D4C901473 /* Build configuration list for PBXProject "Chiron" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -1,0 +1,21 @@
+{
+ "active": "data",
+ "subjects": [
+  {
+   "current_unit": "u1",
+   "debt": 0,
+   "id": "ai",
+   "title": "How AI Works",
+   "units_cleared": 1,
+   "units_total": 11
+  },
+  {
+   "current_unit": "v1",
+   "debt": 0,
+   "id": "data",
+   "title": "Where the Words Come From",
+   "units_cleared": 1,
+   "units_total": 14
+  }
+ ]
+}

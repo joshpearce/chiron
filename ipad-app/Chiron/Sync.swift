@@ -18,6 +18,10 @@ final class Sync: ObservableObject {
     @Published var connected = false
     @Published var transport = "offline"   // wifi | usb | offline
     @Published var busy = false
+    /// Whether the server has a model behind it (/health llm.connected).
+    /// Without one, mechanical grading and pre-authored chapters still work;
+    /// free-text grading and adaptive authoring do not.
+    @Published var llmConnected = false
 
     /// How long to wait for the Mac-side USB bridge before giving up. Chapter
     /// generation on a local model can take a while, so this is generous - but
@@ -50,10 +54,11 @@ final class Sync: ObservableObject {
             var req = URLRequest(url: url, timeoutInterval: 3)
             req.httpMethod = "GET"
             Credentials.authorize(&req, serverID: serverID)
-            if let (_, resp) = try? await URLSession.shared.data(for: req),
+            if let (data, resp) = try? await URLSession.shared.data(for: req),
                (resp as? HTTPURLResponse)?.statusCode == 200 {
                 connected = true
                 transport = "wifi"
+                llmConnected = (try? JSONDecoder().decode(Health.self, from: data))?.llm.connected ?? false
                 return
             }
         }
@@ -159,6 +164,11 @@ final class Sync: ObservableObject {
         if let body { out.append(body) }
         conn.send(content: out, completion: .contentProcessed { _ in conn.cancel() })
     }
+}
+
+private struct Health: Decodable {
+    struct LLM: Decodable { let connected: Bool }
+    let llm: LLM
 }
 
 /// Just enough HTTP parsing for the two bridge endpoints.

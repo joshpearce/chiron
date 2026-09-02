@@ -43,3 +43,17 @@ targets:
         UIRequiresFullScreen: false
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+  ChironTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ChironTests
+      # Real server responses, captured by scripts/capture-fixtures.py. A
+      # folder reference keeps them under fixtures/ inside the test bundle.
+      - path: fixtures
+        type: folder
+    dependencies:
+      - target: Chiron
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES

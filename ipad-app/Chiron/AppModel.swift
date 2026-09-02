@@ -20,6 +20,8 @@ final class AppModel: ObservableObject {
 
     @Published var screen: Screen = .menu
     @Published var subjects: [SubjectInfo] = []
+    /// The book the server says was last open, across every client.
+    @Published var activeSubjectID: String?
     @Published var chapter: ChapterPayload?
     @Published var bookState: BookState?
     @Published var lastResults: [GradeResult] = []
@@ -72,7 +74,7 @@ final class AppModel: ObservableObject {
     // MARK: - library
 
     func refreshSubjects() async {
-        var req: URLRequest? = URL(string: "\(sync.baseURL)/subjects").map { url in
+        let req: URLRequest? = URL(string: "\(sync.baseURL)/subjects").map { url in
             var r = URLRequest(url: url, timeoutInterval: 3)
             Credentials.authorize(&r, serverID: sync.serverID)
             return r
@@ -80,8 +82,9 @@ final class AppModel: ObservableObject {
         if let r = req,
            let (data, resp) = try? await URLSession.shared.data(for: r),
            (resp as? HTTPURLResponse)?.statusCode == 200,
-           let obj = try? JSONDecoder().decode([String: [SubjectInfo]].self, from: data) {
-            subjects = obj["subjects"] ?? []
+           let shelf = try? JSONDecoder().decode(SubjectsResponse.self, from: data) {
+            subjects = shelf.subjects
+            activeSubjectID = shelf.activeID
         } else if subjects.isEmpty {
             // offline: the built-in subject is always available
             subjects = [SubjectInfo(id: "ai", title: "How AI Works",

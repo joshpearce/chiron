@@ -1,0 +1,92 @@
+{
+ "active_misconceptions": [],
+ "debt": [],
+ "fringe": [
+  "u1",
+  "u2"
+ ],
+ "llm": {
+  "connected": false
+ },
+ "session_minutes": 0.1193219502766927,
+ "spine": [
+  {
+   "in_fringe": false,
+   "score": 0.7272727272727273,
+   "status": "passed",
+   "title": "Calibration: where you actually are",
+   "unit": "u0"
+  },
+  {
+   "in_fringe": true,
+   "score": null,
+   "status": "active",
+   "title": "The core bet: next-token prediction",
+   "unit": "u1"
+  },
+  {
+   "in_fringe": true,
+   "score": null,
+   "status": "locked",
+   "title": "The math floor",
+   "unit": "u2"
+  },
+  {
+   "in_fringe": false,
+   "score": null,
+   "status": "locked",
+   "title": "Attention from first principles",
+   "unit": "u3"
+  },
+  {
+   "in_fringe": false,
+   "score": null,
+   "status": "locked",
+   "title": "The transformer block",
+   "unit": "u4"
+  },
+  {
+   "in_fringe": false,
+   "score": null,
+   "status": "locked",
+   "title": "Training: loss to aligned model",
+   "unit": "u5"
+  },
+  {
+   "in_fringe": false,
+   "score": null,
+   "status": "locked",
+   "title": "Inference: making it run",
+   "unit": "u6"
+  },
+  {
+   "in_fringe": false,
+   "score": null,
+   "status": "locked",
+   "title": "Mixture of Experts",
+   "unit": "u7"
+  },
+  {
+   "in_fringe": false,
+   "score": null,
+   "status": "locked",
+   "title": "The iron: hardware and training at scale",
+   "unit": "u10"
+  },
+  {
+   "in_fringe": false,
+   "score": null,
+   "status": "locked",
+   "title": "Harnesses and agents",
+   "unit": "u8"
+  },
+  {
+   "in_fringe": false,
+   "score": null,
+   "status": "locked",
+   "title": "Synthesis: the full trace",
+   "unit": "u9"
+  }
+ ],
+ "summary": "New session. No evidence yet; treat per the static profile."
+}

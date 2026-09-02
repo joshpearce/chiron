@@ -11,12 +11,20 @@ struct ChapterPayload: Codable, Identifiable {
     let beats: [JSONValue]
     let pretest: [CheckItem]
     let check: [CheckItem]
+    // True for the placement screener and the calibration series: no reveal,
+    // no gate verdict - the score is measurement.
+    let calibration: Bool?
     let nextAction: String?
 
     var id: String { unit }
+    var isCalibration: Bool { calibration == true }
+    /// The placement screener travels as a one-item calibration chapter.
+    var screener: CheckItem? {
+        check.count == 1 && check[0].check == "screener" ? check[0] : nil
+    }
 
     enum CodingKeys: String, CodingKey {
-        case unit, title, minutes, html, beats, pretest, check
+        case unit, title, minutes, html, beats, pretest, check, calibration
         case nextAction = "next_action"
     }
 }
@@ -109,6 +117,15 @@ struct SubjectInfo: Codable, Identifiable {
         case unitsCleared = "units_cleared"
         case currentUnit = "current_unit"
     }
+}
+
+/// GET /subjects: the shelf, and which book the reader last had open.
+struct SubjectsResponse: Codable {
+    let subjects: [SubjectInfo]
+    let active: String?
+
+    /// The server sends "" before any book has been opened.
+    var activeID: String? { (active?.isEmpty ?? true) ? nil : active }
 }
 
 struct ExchangeRequest: Codable {
