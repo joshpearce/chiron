@@ -352,4 +352,38 @@ final class BookSessionTests: XCTestCase {
         XCTAssertTrue(fake.inks.isEmpty)
         guard case .results = s.screen else { return XCTFail("\(s.screen)") }
     }
+
+    func testChunkMinutesCountFromTheReaderOpening() async {
+        scriptFreshBook()
+        fake.onExchange = { [unowned self] req in
+            req.phase == "start" ? self.deliversU1() : self.fixture(ExchangeResponse.self, "exchange-fail")
+        }
+        let s = session()
+        await s.open()
+        guard case .reading = s.screen else { return XCTFail("\(s.screen)") }
+
+        // A relaunch onto the cached chapter starts the clock again.
+        let s2 = session()
+        await s2.open()
+        guard case .reading = s2.screen else { return XCTFail("\(s2.screen)") }
+        await s2.submitCheck([ItemResponse(itemId: "u1-q1", response: "x", selectedIndex: nil, confidence: 2)])
+        let minutes = try! XCTUnwrap(fake.exchanges.last?.chunkMinutes)
+        XCTAssertGreaterThanOrEqual(minutes, 0)
+        XCTAssertLessThan(minutes, 1, "the clock started at this open, not at delivery")
+
+        // The series is measurement, not reading: no chunk is reported.
+        fake.onExchange = { [unowned self] req in
+            if req.phase == "start" { return self.fixture(ExchangeResponse.self, "exchange-start") }
+            if req.checkResponses.count == 1 { return self.fixture(ExchangeResponse.self, "exchange-screener") }
+            return self.fixture(ExchangeResponse.self, "exchange-series")
+        }
+        let s3 = BookSession(subjectID: "data", title: "d", service: fake, storage: storage)
+        s3.pollInterval = 0
+        await s3.open()
+        await s3.place(level: 3)
+        await s3.submitCheck(s3.chapter!.check.map {
+            ItemResponse(itemId: $0.id, response: nil, selectedIndex: nil, confidence: 1, idk: true)
+        })
+        XCTAssertNil(fake.exchanges.last?.chunkMinutes)
+    }
 }

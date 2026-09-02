@@ -12,7 +12,10 @@ struct ResultsView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
+                // Lazy: every math prompt is a web view, and a results page
+                // with a dozen of them must not hold a dozen web views on a
+                // 2 GB iPad. Only the entries on screen are alive.
+                LazyVStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(doc.headLeft)
                             .font(.caption.weight(.semibold))

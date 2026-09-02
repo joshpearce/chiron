@@ -174,6 +174,10 @@ final class BookSession: ObservableObject {
         } else if !ch.pretest.isEmpty && !pretestDone {
             screen = .pretest
         } else {
+            // The chunk clock runs from the reader opening, as on the
+            // tablet - a chapter restored from disk counts from now, not
+            // from when it was first delivered.
+            if chapterOpenedAt == nil { chapterOpenedAt = Date() }
             screen = .reading
         }
     }
@@ -365,7 +369,7 @@ final class BookSession: ObservableObject {
         chapter = ch
         beatResponses = []
         pretestDone = false
-        chapterOpenedAt = Date()
+        chapterOpenedAt = nil
     }
 
     private func chunkMinutes() -> Double? {
