@@ -10,25 +10,23 @@ assumes: []
 ---
 
 One idea runs this whole book: a model trained to do nothing but predict the
-next token becomes, at sufficient scale, the systems you use every day. This
-unit states that bet precisely and walks it end to end - what a token is, how
-text enters the model, how scores come out, and what the training objective
-does and does not promise. By the end you can trace `The cat sat on` from
-characters to a scored vocabulary, and say exactly which claims about
-"understanding" that loop licenses.
+next token becomes, at sufficient scale, the systems you use every day. That
+idea is the bet, and this unit states it precisely and walks it end to end -
+what a token is, how text enters the model, how scores come out, and what the
+training objective does and does not promise. By the end you can trace
+`The cat sat on` from characters to a scored vocabulary, and say exactly which
+claims about "understanding" that loop licenses.
 
 
 ## Why prediction forces world modeling
 
-The bet is this: *if you make a system good enough at predicting the next symbol
-in human-generated text, you get world modeling for free, because there is no
-other way to be good at it.*
+The bet, in full: *if you make a system good enough at predicting the next
+symbol in human-generated text, you get world modeling for free, because there
+is no other way to be good at it.*
 
-That claim deserves scrutiny rather than assent. Here is the argument in its
-strong form, and then the honest statement of where it stops.
-
-Start from behavior, not machinery. Four fragments of ordinary text, each
-cut off one word early:
+"Free" is doing a lot of work in that sentence, so the sentence deserves an
+argument rather than a nod. The argument starts from behavior, not machinery:
+four fragments of ordinary text, each cut off one word early.
 
 - `The 44th president of the United States was Barack ____`
 - `>>> sorted([5, 2, 9, 1])\n[1, 2, 5, ____`
@@ -65,56 +63,60 @@ rubric: |
 check: llm
 ```
 
-To fill those blanks a system must, respectively: hold a fact about the
-world, execute a sorting algorithm, apply a geometric theorem, and track two
-agents' divergent beliefs about where an object is. Nothing about the
-interface distinguishes the four cases. The same next-token question is
-silently asking for lookup, computation, deduction, and a theory of mind -
-and human text is full of all four. Whatever gets good at this game must
-carry some working version of each capability. The rest of this section makes
-that argument precise, and then states honestly where it stops.
+Each blank asks for something different. The first needs a fact about the
+world. The second needs a sorting algorithm run to completion. The third needs
+a geometric theorem applied. The fourth needs two people's beliefs tracked
+separately, because Alice never saw the keys move. Four different capabilities,
+and nothing on the surface tells them apart: every one arrives as the same
+question, "what token comes next?", and human text is full of all four. So a
+system that gets good at next-token prediction across human text must carry
+some working version of each capability, because that is what the blanks
+demand.
 
-The argument is about compression. Shannon's source coding theorem says that if
-you have a probability model $Q$ over symbols, you can encode a symbol $x$ in
-$-\log_2 Q(x)$ bits, and you cannot do better on average than the true entropy.
-This is not a metaphor. Arithmetic coding achieves it in practice. And the
-number training pushes down - the loss, written $\mathcal{L}$: the average
-over the corpus of $-\ln$ of the probability the model gave the symbol that
-actually came next; the objective section below states it exactly - is this
-same quantity in natural-log units. Converted to base 2, the loss *is* the
-compressed size of the training corpus in bits per token under the model's
-code:
+"Must" is the word to press on. The rest of this section makes it precise,
+and then marks the exact point where the argument stops.
+
+The precise form goes through compression. Predicting a symbol well and
+encoding it cheaply are the same skill: Shannon's source coding theorem says
+that a probability model $Q$ over symbols lets you encode a symbol $x$ in
+$-\log_2 Q(x)$ bits, and that no code can do better on average than the true
+entropy of the source. This is not a metaphor; arithmetic coding achieves that
+bound in practice. Now look at the number training pushes down. The loss,
+written $\mathcal{L}$, is the average over the corpus of $-\ln$ of the
+probability the model gave the symbol that actually came next (the objective
+section below states it exactly). That is Shannon's quantity in natural-log
+units, so converting to base 2 turns the loss into the compressed size of the
+training corpus, in bits per token, under the model's code:
 
 $$\text{bits per token} = \frac{\mathcal{L}}{\ln 2}$$
 
-A language model is therefore a compressor, and lowering its loss is literally
-compressing the corpus harder. That reframing does the work, because compression
-has a known lower bound tied to structure: the only way to encode a string in
+A language model is therefore a compressor, and lowering its loss is
+compressing the corpus harder. That reframing does the work, because
+compression has a floor tied to structure: the only way to encode a string in
 fewer bits than its length is to exploit regularity in the process that
-generated it.
+generated it. Put the four blanks back in that light. A frequency table over
+5-token windows spends many bits on every one of them, those bits show up in
+the loss, the corpus is full of such continuations, and the gradient pushes on
+every one. The cheapest way to pay for a sorting example is to sort. The
+cheapest way to pay for Alice is to track what Alice knows.
 
-A frequency table over 5-token windows spends many bits on every one of the
-four blanks above, and those bits show up in the loss. The corpus is full of
-such continuations, and the gradient pushes on every one of them.
+That is the argument, and it is strong. Here is where it stops, because the
+overclaimed version is everywhere. The compression argument is a statement
+about the *limit*: a system with loss arbitrarily close to the entropy of
+language must model whatever generated that language. It says nothing about a
+transformer trained with SGD at achievable loss, which may hold those
+mechanisms or may hold a large bag of shallow heuristics that happen to cover
+most of the distribution. Those are different claims. The first is a theorem
+about codes; the second is an empirical question, and the honest answer is
+"considerably more than the skeptics predicted in 2019, considerably less than
+the marketing says." The failure modes you have seen with LLM tooling -
+confident wrong arithmetic, brittle multi-step reasoning that collapses when
+you rename the variables - are what heuristics standing in for mechanisms look
+like from the outside.
 
-That is the argument, and it is strong. Here is where it stops, stated plainly
-because the overclaimed version of this argument is everywhere.
-
-The compression argument establishes a statement about the *limit*: a system with
-loss arbitrarily close to the entropy of language must model whatever generated
-that language. It does *not* establish that a transformer trained with SGD at
-achievable loss actually acquires those mechanisms rather than a large bag of
-shallow heuristics that happen to cover most of the distribution. Those are
-different claims. The first is a theorem about codes. The second is an empirical
-question, and the honest answer is "considerably more than the skeptics
-predicted in 2019, considerably less than the marketing says." The failure modes
-you have seen with LLM tooling - confident wrong arithmetic, brittle multi-step
-reasoning that collapses when you rename the variables - are exactly the residue
-of heuristics standing in for mechanisms.
-
-Hold both halves. The objective *pressures* toward world modeling, monotonically
-and without limit. What you get at any particular scale is an empirical fact
-about that scale, not a guarantee.
+Hold both halves. The objective *pressures* toward world modeling,
+monotonically and without limit. What you get at any particular scale is an
+empirical fact about that scale, not a guarantee.
 
 ```beat
 id: u1-b2
@@ -161,21 +163,22 @@ check: llm
 
 <!-- fade: bpe-tokenize -->
 
-The model does not consume characters and does not consume words. It consumes
-integers drawn from a fixed vocabulary of $V$ subword strings, built before
-training ever starts by an algorithm called byte-pair encoding. The vocabulary is
-frozen for the model's entire life.
+The argument above kept saying "symbol", and the choice of symbol is the
+first design decision in the whole system. The model does not consume
+characters and does not consume words. It consumes integers drawn from a fixed
+vocabulary of $V$ subword strings, built before training ever starts by an
+algorithm called byte-pair encoding and frozen for the model's entire life.
 
 Why not characters? A 4000-character document would be 4000 positions, and u3
 will show that attention cost grows as the square of sequence length. Why not
 words? The vocabulary would be unbounded, and every typo, identifier, and
-non-English string would be an unknown symbol. BPE is the compromise: start from
-characters, then repeatedly glue together whichever adjacent pair occurs most
-often, until you have $V$ symbols. Frequent words become single symbols; rare
-words decompose into pieces; nothing is ever unrepresentable.
+non-English string would be an unknown symbol. BPE sits between the two: start
+from characters, then repeatedly glue together whichever adjacent pair occurs
+most often, until you have $V$ symbols. Frequent words become single symbols,
+rare words decompose into pieces, and nothing is ever unrepresentable.
 
-Here is the whole algorithm on a corpus small enough to do by hand. The corpus is
-four distinct words with these counts:
+The whole algorithm fits on a corpus small enough to do by hand. Take four
+distinct words with these counts:
 
 | word | count |
 |---|---|
@@ -184,8 +187,8 @@ four distinct words with these counts:
 | `newest` | 6 |
 | `widest` | 3 |
 
-Split every word into characters, with `_` marking end-of-word (so the algorithm
-can tell a word-final `t` from a word-internal one):
+Split every word into characters, with `_` marking end-of-word so the
+algorithm can tell a word-final `t` from a word-internal one:
 
 ```
 l o w _          (5)
@@ -253,23 +256,24 @@ Stop. The learned merge list, in order, is the tokenizer:
 5. lo + w   -> low
 ```
 
-Three observations, because each one predicts a real behavior you have seen.
+Three observations follow from those five merges, and each predicts a real
+behavior you have seen.
 
 **The tokenizer discovered a morpheme without being told morphemes exist.**
-`est_` is the English superlative suffix. Nothing in the algorithm knows about
-suffixes; it merged `e`,`s`,`t`,`_` because that byte sequence recurred. Every
-piece of linguistic structure a BPE vocabulary appears to know is an artifact of
-byte frequency.
+`est_` is the English superlative suffix, and nothing in the algorithm knows
+about suffixes; it merged `e`, `s`, `t`, `_` because that byte sequence
+recurred. Every piece of linguistic structure a BPE vocabulary appears to know
+arrived the same way, as an artifact of byte frequency.
 
-**Frequency, not meaning, decides what gets its own token.** `low` (count 5)
-became a single symbol. `lower` (count 2) did not, and now costs 4 tokens:
-`low`, `e`, `r`, `_`. Two words of near-identical meaning have wildly different
-representations, purely because of how often they appeared in the tokenizer's
-training corpus.
+**Frequency, not meaning, decides what gets its own token.** `low` appeared 5
+times and became a single symbol. `lower` appeared twice, did not, and now
+costs 4 tokens: `low`, `e`, `r`, `_`. Two words of near-identical meaning got
+wildly different representations, purely because of how often each appeared in
+the tokenizer's training corpus.
 
 **Encoding is deterministic replay.** To tokenize a new string, split it into
-characters and apply the merge list *in learned order*. Nothing is searched, and
-the merge order matters.
+characters and apply the merge list *in learned order*. Nothing is searched,
+and the order matters.
 
 ```beat
 id: u1-b3
@@ -307,8 +311,8 @@ rubric: |
 check: llm
 ```
 
-Now the same picture at real scale. These are actual outputs from `cl100k_base`,
-the tokenizer behind GPT-3.5 and GPT-4, with $V = 100{,}277$:
+The same picture at real scale looks like this. These are actual outputs from
+`cl100k_base`, the tokenizer behind GPT-3.5 and GPT-4, with $V = 100{,}277$:
 
 | string | tokens | count |
 |---|---|---|
@@ -318,30 +322,31 @@ the tokenizer behind GPT-3.5 and GPT-4, with $V = 100{,}277$:
 | `tokenization` | `token`, `ization` | 2 |
 | `2847 + 1913` | `284`, `7`, ` +`, ` `, `191`, `3` | 6 |
 
-Note that the leading space is part of the token: ` cat` and `cat` are different
-integers. And note that `strawberry` is one symbol or three depending on whether
-a space precedes it. Same word, same meaning, different atoms.
+Two of the rows show that the leading space is part of the token: ` cat` and
+`cat` are different integers, and `strawberry` is one symbol with a space
+before it and three symbols without. Same word, same meaning, different atoms.
 
-The last row is the one to sit with. `2847` is not four digit symbols. It is
-`284` followed by `7`. The number `1913` is `191` followed by `3`. Digits get
-grouped in threes from the left, which means the model's units column is not in a
-fixed position within a token, and place-value alignment between two operands is
-scrambled differently for every pair. Arithmetic in an LLM is not a hard problem
-that got solved badly; it is a problem whose inputs arrive pre-shredded.
+The last row is the one to sit with. `2847` is not four digit symbols; it is
+`284` followed by `7`, and `1913` is `191` followed by `3`. Digits get grouped
+in threes from the left, so the units column sits at no fixed position within
+a token, and the place-value alignment between two operands is scrambled
+differently for every pair. Arithmetic in an LLM is not a hard problem that
+got solved badly. It is a problem whose inputs arrive pre-shredded.
 
 <!-- refutes: U1-M1 -->
-The same shredding explains the character-counting failures. Asked how many `r`s
-are in `strawberry`, the model receives three integers: `str`, `aw`, `berry`.
-Nowhere in its input is there a character. It has no more direct access to the
-letters of `strawberry` than you have to the individual bits of a `float` you are
-reading off a screen. Any spelling ability the model has was learned indirectly,
-from text *about* spelling, and it is exactly as reliable as that indirect route
-suggests.
+The same shredding explains the character-counting failures. Asked how many
+`r`s are in `strawberry`, the model receives three integers, `str`, `aw`,
+`berry`, and nowhere in that input is there a character. It has no more direct
+access to the letters of `strawberry` than you have to the individual bits of
+a `float` you are reading off a screen. Whatever spelling ability the model has
+was learned indirectly, from text *about* spelling, and it is exactly as
+reliable as that indirect route suggests.
 
-You may find that a current model answers the strawberry question correctly. That
-does not refute the point. Specific famous instances get covered by training data
-and by reasoning traces that spell the word out one character at a time, which is
-the model routing around its own tokenization. Try an unfamiliar word.
+You may find that a current model answers the strawberry question correctly,
+and that does not refute the point. Specific famous instances get covered by
+training data and by reasoning traces that spell the word out one character at
+a time, which is the model routing around its own tokenization. Try an
+unfamiliar word.
 
 ```beat
 id: u1-b4
@@ -383,62 +388,63 @@ check: llm
 
 ## The objective, stated exactly
 
-Everything in this book is downstream of one training objective. Here it is, with
-every symbol defined.
+Every section so far has leaned on "the loss" without writing it down.
+Everything in this book is downstream of that one training objective, so here
+it is, with every symbol defined.
 
 A document is a sequence of $T$ discrete symbols $x_1, x_2, \ldots, x_T$. Each
-$x_t$ is an integer in $\{1, \ldots, V\}$, where $V$ is the vocabulary size (the
-number of distinct symbols the model can emit) - these are exactly the BPE
+$x_t$ is an integer in $\{1, \ldots, V\}$, where $V$ is the vocabulary size,
+the number of distinct symbols the model can emit; these are exactly the BPE
 tokens of the last section, integers indexing a frozen vocabulary.
 
-The probability of the whole document factors exactly, with no approximation, by
-the chain rule of probability:
+The probability of the whole document factors exactly, with no approximation,
+by the chain rule of probability:
 
 $$P(x_1, x_2, \ldots, x_T) = \prod_{t=1}^{T} P(x_t \mid x_1, \ldots, x_{t-1})$$
 
-Read the right-hand side as: the probability of symbol 1, times the probability
-of symbol 2 given symbol 1, times the probability of symbol 3 given symbols 1
-and 2, and so on. The notation $x_{<t}$ abbreviates $x_1, \ldots, x_{t-1}$, the
-prefix before position $t$.
+Read the right-hand side as: the probability of symbol 1, times the
+probability of symbol 2 given symbol 1, times the probability of symbol 3
+given symbols 1 and 2, and so on. The prefix before position $t$, that is
+$x_1, \ldots, x_{t-1}$, is abbreviated $x_{<t}$.
 
-This factorization is a tautology. It is true for any sequence of any kind. What
-makes it useful is that it converts "model the distribution over all documents"
-(a hopeless object: there are $V^T$ possible documents) into "model one
-conditional distribution over $V$ options, and apply it $T$ times."
+That factorization is a tautology, true for any sequence of any kind, and its
+use is in what it converts. "Model the distribution over all documents" is a
+hopeless object, since there are $V^T$ possible documents. "Model one
+conditional distribution over $V$ options, and apply it $T$ times" is a job.
 
-A neural network with parameters $\theta$ (a big pile of real numbers, roughly
-$10^{10}$ of them) approximates that one conditional:
+The job goes to a neural network with parameters $\theta$, a big pile of real
+numbers, roughly $10^{10}$ of them, which approximates that one conditional:
 
 $$P_\theta(\cdot \mid x_{<t}) \in \mathbb{R}^V, \qquad \sum_{v=1}^{V} P_\theta(v \mid x_{<t}) = 1$$
 
-Training minimizes the average negative log probability that the model assigned
-to the symbols that actually occurred:
+Training then minimizes the average negative log probability the model
+assigned to the symbols that actually occurred:
 
 $$\mathcal{L}(\theta) = -\frac{1}{T}\sum_{t=1}^{T} \log P_\theta(x_t \mid x_{<t})$$
 
-Here $\log$ is natural log, $x_t$ is the true symbol at position $t$, and
+Here $\log$ is the natural log, $x_t$ is the true symbol at position $t$, and
 $P_\theta(x_t \mid x_{<t})$ is the single number the model assigned to that
-symbol. If the model assigned probability 1 to the correct symbol every time,
-$\log 1 = 0$ and the loss is 0. If it assigned probability 0 to something that
-happened, $-\log 0 = \infty$. The loss punishes confident wrongness without
+symbol. Assign probability 1 to the correct symbol every time and
+$\log 1 = 0$, so the loss is 0. Assign probability 0 to something that
+happened and $-\log 0 = \infty$. The loss punishes confident wrongness without
 bound.
 
-That expression is cross-entropy loss; u5 derives its gradient and explains why
-its floor is not zero. For now, take it as: a scalar that goes down when the
-model is less surprised by real text.
+That expression is cross-entropy loss. u5 derives its gradient and explains
+why its floor is not zero; for now, take it as a scalar that goes down when
+the model is less surprised by real text.
 
-Two things are worth noticing immediately, because they are the source of most
-confusion later.
+Two features of that expression are the source of most confusion later, so
+notice them now.
 
 First, the sum runs over *every* position $t$. A single 4000-token training
-document produces 4000 prediction problems, not one. The model predicts position
-2 from position 1, position 3 from positions 1-2, and so on, all in one forward
-pass. Training is not "read the document, then guess the end."
+document is therefore 4000 prediction problems, not one: the model predicts
+position 2 from position 1, position 3 from positions 1-2, and so on, all in
+one forward pass. Training is not "read the document, then guess the end."
 
 Second, nothing in $\mathcal{L}$ mentions truth, helpfulness, reasoning, or
 correctness. The only thing being optimized is agreement with the empirical
-distribution of the training text. Every capability the finished system has is a
-side effect of that.
+distribution of the training text, and every capability the finished system
+has is a side effect of that agreement.
 
 ```beat
 id: u1-b1
@@ -482,17 +488,18 @@ check: llm
 
 <!-- canon-only -->
 
-The loss above averages over a training corpus. The quantity anyone
-actually cares about is defined over text nobody has - and papers write
-that distinction in a notation worth owning now.
+The loss above averages over a training corpus. The quantity anyone actually
+cares about is defined over text nobody has, and papers write that distinction
+in a notation worth owning now.
 
 **Expectation.** $\mathbb{E}_{x \sim \mathcal{D}}[f(x)]$ reads "the expected
-value of $f(x)$ when $x$ is drawn from the distribution $\mathcal{D}$" - the
+value of $f(x)$ when $x$ is drawn from the distribution $\mathcal{D}$": the
 average of $f(x)$ over all possible $x$, weighted by how likely each $x$ is
-under $\mathcal{D}$. The subscript names the distribution, the brackets hold
-what you are averaging. You cannot compute that average, because $\mathcal{D}$
-is "the distribution of all text that could exist" and you have a hard drive.
-So every expectation in this book is estimated by a sample mean over a batch:
+under $\mathcal{D}$. The subscript names the distribution and the brackets
+hold what you are averaging. That average cannot be computed, because
+$\mathcal{D}$ is "the distribution of all text that could exist" and you have
+a hard drive. So every expectation in this book is estimated by a sample mean
+over a batch:
 
 $$\mathbb{E}_{x \sim \mathcal{D}}[f(x)] \approx \frac{1}{b} \sum_{i=1}^{b} f(x_i)$$
 
@@ -503,14 +510,14 @@ You probably read that approximation as an equality with extra ceremony, with
 $\mathbb{E}$ meaning "average of the numbers I have". Here is the prediction
 that fails: if the objective were defined over your dataset, a model that
 memorized the dataset would have optimally solved the stated problem, and
-generalization error would not exist as a concept. Every number anyone reports
-is held-out loss. The belief is appealing because the batch mean is what the
-code computes and the dataset is the only concrete object in sight. What is
-true: the thing you want is an expectation over a distribution nobody can
-enumerate, the thing you compute is an unbiased but noisy estimate of it, and
-the gap is exactly why batch size affects training stability (u5). A related
-trap - $\mathbb{E}$ is a probability-weighted mean, not the typical value. The
-expected roll of a fair die is 3.5.
+generalization error would not exist as a concept. Yet every number anyone
+reports is held-out loss. The belief is appealing because the batch mean is
+what the code computes and the dataset is the only concrete object in sight.
+What is true: the thing you want is an expectation over a distribution nobody
+can enumerate, the thing you compute is an unbiased but noisy estimate of it,
+and the gap between them is exactly why batch size affects training stability
+(u5). A related trap: $\mathbb{E}$ is a probability-weighted mean, not the
+typical value. The expected roll of a fair die is 3.5.
 
 ```beat
 id: u0-b5
@@ -533,15 +540,16 @@ check: numeric(0.01)
 
 <!-- refutes: M3 -->
 
-Token IDs are integers, and integers are useless as input to a differentiable
-function - there is no sense in which token 5000 is "between" tokens 4999 and
-5001. So the first thing the model does is replace each ID with a vector.
+The objective takes integers in. Integers are useless as input to a
+differentiable function, because there is no sense in which token 5000 is
+"between" tokens 4999 and 5001, so the first thing the model does is replace
+each ID with a vector.
 
-The embedding matrix is $E \in \mathbb{R}^{V \times d_{model}}$, where $V$ is
-vocabulary size and $d_{model}$ is the model's internal width (4096 for a 7B-class
-model). Row $i$ of $E$, written $E[i,:] \in \mathbb{R}^{d_{model}}$, is the
-embedding of token $i$. "Embedding a token" is an array index. That is the entire
-operation.
+The vectors live in the embedding matrix $E \in \mathbb{R}^{V \times d_{model}}$,
+where $V$ is the vocabulary size and $d_{model}$ is the model's internal width
+(4096 for a 7B-class model). Row $i$ of $E$, written
+$E[i,:] \in \mathbb{R}^{d_{model}}$, is the embedding of token $i$, so
+"embedding a token" is an array index. That is the entire operation.
 
 **You probably think the vector contains the word's meaning** - that $E[i,:]$ is
 something like a struct of semantic fields, learned so that dimension 412 holds
@@ -549,61 +557,64 @@ formality and dimension 1900 holds animacy, and that this is what "semantic
 vector" means.
 
 **Here is the specific prediction that model makes, and it fails.** If meaning
-lived in the coordinates, the coordinates would have to be stable. Take a trained
-model, pick any permutation $\pi$ of the $d_{model}$ coordinate indices, and
-relabel the residual stream by it. That means four consistent edits: permute the
-columns of $E$; permute the input side of every weight matrix that *reads* from
-the stream; permute the output side of every matrix that *writes* into it; and
-permute the gain and bias vectors of every normalization layer. Now every
-activation in the network is the old activation with its coordinates shuffled by
-$\pi$, and every read undoes the shuffle before acting on it, so the logits come
-out identical on every input. Nothing measurable changed. There are $4096!$ such
-relabelings, all equally valid, so "dimension 412 means formality" cannot be a
-fact about the model - it is a fact about an arbitrary labeling that the training
-run happened to land on. (Strip the learned gains and use RMSNorm, which divides
-by $\lVert x \rVert / \sqrt{d_{model}}$ and is therefore invariant under any
-rotation, and the argument runs with an arbitrary orthogonal matrix $Q$ in place
-of a permutation - not even the axes are privileged. Real models keep a learned
-elementwise gain, which breaks the full rotational symmetry down to the
-permutations; that is why interpretability work can find axis-aligned features at
-all, and why what it reports are still directions rather than coordinates. u4
-covers the normalization detail.)
+lived in the coordinates, the coordinates would have to be stable. They are
+not, and here is the experiment that shows it. Take a trained model, pick any
+permutation $\pi$ of the $d_{model}$ coordinate indices, and relabel the
+residual stream by it. Relabeling means four consistent edits: permute the
+columns of $E$; permute the input side of every weight matrix that *reads*
+from the stream; permute the output side of every matrix that *writes* into
+it; and permute the gain and bias vectors of every normalization layer. After
+those edits every activation in the network is the old activation with its
+coordinates shuffled by $\pi$, every read undoes the shuffle before acting on
+it, and the logits come out identical on every input. Nothing measurable
+changed. There are $4096!$ such relabelings, all equally valid, so "dimension
+412 means formality" cannot be a fact about the model; it is a fact about an
+arbitrary labeling the training run happened to land on. (Strip the learned
+gains and use RMSNorm, which divides by $\lVert x \rVert / \sqrt{d_{model}}$
+and is therefore invariant under any rotation, and the argument runs with an
+arbitrary orthogonal matrix $Q$ in place of a permutation: not even the axes
+are privileged. Real models keep a learned elementwise gain, which breaks the
+full rotational symmetry down to the permutations; that is why
+interpretability work can find axis-aligned features at all, and why what it
+reports are still directions rather than coordinates. u4 covers the
+normalization detail.)
 
-Second failing prediction, cruder and easier to check: if the vector held the
-meaning, you could take GPT-2's row for `dog` and paste it into another model's
-embedding table. Meaning is meaning. In fact you get noise. Embeddings are not
-portable across models, across training runs, or even across two runs of the same
-code with different seeds. Nothing survives the boundary of the model that
-learned them.
+A second failing prediction is cruder and easier to check. If the vector held
+the meaning, you could take GPT-2's row for `dog` and paste it into another
+model's embedding table, since meaning is meaning. In fact you get noise.
+Embeddings are not portable across models, across training runs, or even
+across two runs of the same code with different seeds; nothing survives the
+boundary of the model that learned them.
 
-Third, and most decisive for what comes later: the row for `bank` is *one* row.
-In `the river bank` and `the bank approved the loan`, the model's input at that
-position is the identical vector. If the vector carried the word's meaning, it
-would have to carry both meanings at once, unresolved, forever. Whatever
-disambiguates them happens downstream, in attention, from context (u3). The
-embedding cannot be where meaning lives, because the embedding does not know
-which meaning it is.
+The third failing prediction is the most decisive for what comes later. The
+row for `bank` is *one* row, so in `the river bank` and `the bank approved the
+loan` the model's input at that position is the identical vector. If the
+vector carried the word's meaning, it would have to carry both meanings at
+once, unresolved, forever. Whatever disambiguates them happens downstream, in
+attention, from context (u3). The embedding cannot be where meaning lives,
+because the embedding does not know which meaning it is.
 
 **Here is why the wrong model is appealing.** The `king - man + woman = queen`
-demonstration, which is genuinely striking, and a decade of "semantic vector"
-marketing. Worth knowing: that demo is weaker than folklore holds. The standard
-implementation excludes the three input words from the nearest-neighbor search.
-Remove that exclusion and the nearest vector to `king - man + woman` is usually
-`king` itself. The analogy result is partly an artifact of the search procedure.
+demonstration is genuinely striking, and a decade of "semantic vector"
+marketing was built on it. The demo is weaker than folklore holds: the
+standard implementation excludes the three input words from the
+nearest-neighbor search, and without that exclusion the nearest vector to
+`king - man + woman` is usually `king` itself. The analogy result is partly an
+artifact of the search procedure.
 
-**Here is what is actually true.** An embedding is a *learned position in a space
-that the rest of the model is simultaneously learning to read*. The only thing
-with meaning is the relational geometry - which vectors are close to which, which
-directions separate which sets - and that geometry exists solely because it makes
-downstream prediction easier. Gradient descent does not push $E[i,:]$ toward
-"what token $i$ means." It pushes $E[i,:]$ wherever reduces loss, given what
-layer 1 currently does with it. The embedding is an *interface*, co-designed with
-its consumer, and like any interface its symbols mean nothing outside the system
-that agreed on them.
+**Here is what is actually true.** An embedding is a *learned position in a
+space that the rest of the model is simultaneously learning to read*. The only
+thing in that space with meaning is the relational geometry, which vectors are
+close to which and which directions separate which sets, and that geometry
+exists solely because it makes downstream prediction easier. Gradient descent
+does not push $E[i,:]$ toward "what token $i$ means"; it pushes $E[i,:]$
+wherever reduces loss, given what layer 1 currently does with it. The
+embedding is an *interface*, co-designed with its consumer, and like any
+interface its symbols mean nothing outside the system that agreed on them.
 
-The useful reframe for a systems engineer: embeddings are the model's internal
-calling convention. Asking what `dog`'s embedding means in isolation is like
-asking what the value in register `rsi` means without knowing the ABI.
+For a systems engineer, the reframe is that embeddings are the model's
+internal calling convention. Asking what `dog`'s embedding means in isolation
+is asking what the value in register `rsi` means without knowing the ABI.
 
 ```beat
 id: u1-b5
@@ -659,8 +670,8 @@ check: llm
 
 <!-- refutes: M4 -->
 
-Time to make this concrete by counting. $E$ is a matrix, so its parameter count
-is the product of its dimensions:
+An interface has a size, and $E$'s is easy to count: it is a matrix, so its
+parameter count is the product of its dimensions:
 
 $$|E| = V \times d_{model}$$
 
@@ -671,28 +682,28 @@ $$|E| = 32{,}000 \times 4096 = 131{,}072{,}000$$
 
 That is 131 million parameters whose entire job is to assign each of 32,000
 tokens a starting position. Llama-2 does not tie its input and output matrices
-(the output-layer section below explains tying), so there is a second matrix of
-the same size at the output end, for 262 million total, against a full model of
-about 6.74 billion.
-The embedding end is roughly 4% of the model. The other 96% is transformation.
+(the output-layer section below explains tying), so a second matrix of the
+same size sits at the output end, for 262 million total, against a full model
+of about 6.74 billion. The embedding end is roughly 4% of the model, and the
+other 96% is transformation.
 
-Hold onto that ratio, because it sets up a trap.
+That ratio sets up a trap, so hold onto it.
 
-**The embedding matrix is a genuine lookup table.** One row per token, indexed by
-integer ID, no computation. It is the only component of the model that works this
-way. If your mental model is "the parameters are a compressed key-value store of
-facts, and a bigger model has more rows," then notice what just happened: the one
-part of the model that literally *is* a table by that description contains no
-facts about the world at all. It contains 32,000 positions. Not one of them
-encodes that Paris is in France.
+**The embedding matrix is a genuine lookup table.** One row per token, indexed
+by integer ID, no computation, and it is the only component of the model that
+works this way. If your mental model is "the parameters are a compressed
+key-value store of facts, and a bigger model has more rows," then notice what
+just happened: the one part of the model that literally *is* a table by that
+description contains no facts about the world at all. It contains 32,000
+positions, and not one of them encodes that Paris is in France.
 
 Everything that could be called knowledge lives in the other 96%, and that 96%
 has no rows. It is a stack of matrices that *transform* whatever is handed to
-them. There is no index into it, no key to look up, no row to be missing. u4
-locates where facts appear to concentrate and u5 explains why the same mechanism
-produces both correct generalization and confident hallucination - they are not
-two systems, one working and one broken. For now, just register the shape of the
-thing: 4% table, 96% function.
+them: no index into it, no key to look up, no row to be missing. u4 locates
+where facts appear to concentrate, and u5 explains why the same mechanism
+produces both correct generalization and confident hallucination, which are
+not two systems, one working and one broken. For now, register the shape of
+the thing: 4% table, 96% function.
 
 ```beat
 id: u1-b6
@@ -740,41 +751,42 @@ check: llm
 
 <!-- fade: hidden-to-logits -->
 
-Skip over the middle of the model for now - u3 and u4 own it. Assume it ran, and
-that at each position it produced a vector $h \in \mathbb{R}^{d_{model}}$, the
-hidden state. For generating the next token, only the hidden state at the *last*
-position matters.
+The 96% is the middle of the model, and u3 and u4 own it; skip over it for
+now. Assume it ran, and that at each position it produced a vector
+$h \in \mathbb{R}^{d_{model}}$, the hidden state. For generating the next
+token, only the hidden state at the *last* position matters.
 
-That vector has to become a distribution over all $V$ tokens. One matrix does it.
-The unembedding matrix is $W_U \in \mathbb{R}^{V \times d_{model}}$ - one row per
-vocabulary entry, the same layout as $E$, which is what makes weight tying
-possible at the end of this section. With $h$ a row vector of shape
-$(1, d_{model})$ in this book's convention:
+That vector has to become a distribution over all $V$ tokens, and one matrix
+does it. The unembedding matrix is $W_U \in \mathbb{R}^{V \times d_{model}}$,
+one row per vocabulary entry, the same layout as $E$, which is what makes
+weight tying possible at the end of this section. With $h$ a row vector of
+shape $(1, d_{model})$ in this book's convention:
 
 $$z = h\,W_U^T, \qquad z \in \mathbb{R}^{V}$$
 
-The transpose is load-bearing, not tidying. $h$ carries $d_{model}$ on its second
-axis and $W_U$ carries $d_{model}$ on its second axis too, so nothing contracts
-until one of them is flipped; $W_U^T$ is $(d_{model}, V)$ and the join works.
-This is literally what the code does - a PyTorch `nn.Linear` stores its weight as
-(out, in) and computes `h @ W.T`.
+The transpose there is load-bearing, not tidying. $h$ carries $d_{model}$ on
+its second axis and $W_U$ carries $d_{model}$ on its second axis too, so
+nothing contracts until one of them is flipped; $W_U^T$ is $(d_{model}, V)$
+and the join works. This is literally what the code does: a PyTorch
+`nn.Linear` stores its weight as (out, in) and computes `h @ W.T`.
 
-Here $z$ is the vector of **logits**, one real number per vocabulary entry. Read
-componentwise, this is the part that matters:
+The result $z$ is the vector of **logits**, one real number per vocabulary
+entry, and the componentwise reading is the part that matters:
 
 $$z_j = \langle W_U[j,:],\ h \rangle = \sum_{k=1}^{d_{model}} W_U[j,k] \, h_k$$
 
 $W_U[j,:] \in \mathbb{R}^{d_{model}}$ is row $j$, token $j$'s output direction,
-and $\langle \cdot, \cdot \rangle$ is the dot product: multiply the vectors componentwise, sum. So the logit for
-token $j$ is the *similarity between the hidden state and token $j$'s stored
-direction*. The output layer is $V$ dot products run in parallel: score the
-hidden state against every token's direction, keep all the scores.
+and $\langle \cdot, \cdot \rangle$ is the dot product: multiply the vectors
+componentwise, then sum. So the logit for token $j$ is the *similarity between
+the hidden state and token $j$'s stored direction*, and the output layer is
+$V$ such dot products run in parallel: score the hidden state against every
+token's direction, keep all the scores.
 
-This is worth pausing on, because it is the same operation you will meet in u3
-under a different name. Dot-product-against-a-set-of-stored-directions is the
-model's one primitive for "compare this to those." Attention uses it to compare a
-query against keys; the output layer uses it to compare a hidden state against
-tokens. Same shape, different operands.
+That operation is worth pausing on, because you will meet it again in u3 under
+a different name. Dot-product-against-a-set-of-stored-directions is the
+model's one primitive for "compare this to those." Attention uses it to
+compare a query against keys; the output layer uses it to compare a hidden
+state against tokens. Same shape, different operands.
 
 **Worked example.** Take $d_{model} = 3$ and $V = 4$, with vocabulary
 $[\ \texttt{" the"},\ \texttt{" a"},\ \texttt{" mat"},\ \texttt{" quantum"}\ ]$
@@ -795,36 +807,38 @@ with one row per vocabulary entry, in the order listed. Row by row:
 
 $$z = [\,2.0,\ 1.0,\ -1.5,\ -4.0\,]$$
 
-`" the"` scores highest, `" quantum"` lowest. Sensible after `The cat sat on`.
+`" the"` scores highest and `" quantum"` lowest, which is sensible after
+`The cat sat on`.
 
-Three properties of logits, all of which cause trouble when misremembered.
+Logits have three properties, and each causes trouble when misremembered.
 
-**They are unnormalized and unbounded.** A logit can be any real number. Nothing
-forces them to sum to anything. Turning $z$ into a probability distribution is
-softmax's job, and u2 owns it; all you need here is that some function maps
-$\mathbb{R}^V$ to a distribution.
+**They are unnormalized and unbounded.** A logit can be any real number, and
+nothing forces them to sum to anything. Turning $z$ into a probability
+distribution is softmax's job, which u2 owns; all you need here is that some
+function maps $\mathbb{R}^V$ to a distribution.
 
-**Only differences are meaningful.** Add the same constant $c$ to every logit and
-the resulting distribution is unchanged: softmax divides $e^{z_j + c}$ by
-$\sum_k e^{z_k + c}$, and the factor $e^c$ cancels top and bottom. So
-$[2.0, 1.0, -1.5, -4.0]$ and $[102.0, 101.0, 98.5, 96.0]$ are the *same* model
-output. "The logit for token X was 12" is not a statement about anything. The gap
-between two logits is.
+**Only differences are meaningful.** Add the same constant $c$ to every logit
+and the resulting distribution is unchanged, because softmax divides
+$e^{z_j + c}$ by $\sum_k e^{z_k + c}$ and the factor $e^c$ cancels top and
+bottom. So $[2.0, 1.0, -1.5, -4.0]$ and $[102.0, 101.0, 98.5, 96.0]$ are the
+*same* model output. "The logit for token X was 12" is not a statement about
+anything; the gap between two logits is.
 
 **The name is about log-odds, and it is nearly literal.** After softmax,
 $z_j = \log P_j + \text{const}$: logits are log-probabilities up to that same
 additive constant. A gap of $\ln 2 \approx 0.69$ between two logits means one
-token is exactly twice as likely as the other, regardless of what the absolute
-values are.
+token is exactly twice as likely as the other, whatever the absolute values
+are.
 
-One implementation note. Many models set $W_U = E$ - the same matrix that mapped
-IDs to vectors on the way in maps hidden states to scores on the way out. This is
-**weight tying**, and it saves $V \times d_{model}$ parameters (31% of GPT-2
-small, from the last section). It works because both directions are asking about
-the same relationship between tokens and directions in the residual stream:
-reading in writes token $j$'s direction into the stream, and scoring out measures
-how much of token $j$'s direction is present. Llama-2 and Llama-3 do not tie;
-GPT-2 does. It is a tradeoff, not a law.
+One implementation note closes the loop back to $E$. Many models set
+$W_U = E$, so the same matrix that mapped IDs to vectors on the way in maps
+hidden states to scores on the way out. This is **weight tying**, and it saves
+$V \times d_{model}$ parameters (31% of GPT-2 small, from the last section).
+It works because both directions are asking about the same relationship
+between tokens and directions in the residual stream: reading in writes token
+$j$'s direction into the stream, and scoring out measures how much of token
+$j$'s direction is present. Llama-2 and Llama-3 do not tie; GPT-2 does. It is
+a tradeoff, not a law.
 
 ```beat
 id: u1-b7
@@ -888,35 +902,37 @@ check: numeric(0.01)
 
 ## What the bet actually claims
 
-Assemble the pieces. Text becomes integers by a frozen frequency-derived merge
-table. Integers become positions in a learned space by a table lookup. Something
-in the middle transforms those positions. The result is dotted against every
-token's direction to produce $V$ scores, which become a distribution, from which
-one token is drawn. Append it, run again.
+Assemble the pieces in order. Text becomes integers by a frozen,
+frequency-derived merge table. Integers become positions in a learned space by
+a table lookup. Something in the middle transforms those positions. The result
+is dotted against every token's direction to produce $V$ scores, the scores
+become a distribution, and one token is drawn from it. Append that token and
+run again.
 
-That is the whole system. The bet is that this loop, scaled, produces something
-worth calling intelligence - not because anyone designed intelligence into it,
-but because prediction has no ceiling and modeling is the only way up.
+That loop is the whole system, and the bet is that this loop, scaled, produces
+something worth calling intelligence: not because anyone designed intelligence
+into it, but because prediction has no ceiling and modeling is the only way
+up.
 
-Three things to carry forward, each of which is a correction you will need:
+Three things to carry forward, each a correction you will need later.
 
-**Nothing here is a database.** 4% of the parameters form a genuine lookup table
-containing no facts. The remaining 96% is a function with no rows to look up. When
-u5 explains hallucination, this is why the framing "it retrieved the wrong row"
-has no referent.
+**Nothing here is a database.** 4% of the parameters form a genuine lookup
+table containing no facts, and the remaining 96% is a function with no rows to
+look up. When u5 explains hallucination, this is why the framing "it retrieved
+the wrong row" has no referent.
 
 **Nothing here is portable.** Tokens are integers that mean something only
-relative to one merge table. Embeddings are positions that mean something only
-relative to one model's downstream layers. The system is internally coherent and
-externally meaningless, which is exactly what you would expect from something
-whose only constraint was reproducing a corpus.
+relative to one merge table, and embeddings are positions that mean something
+only relative to one model's downstream layers. The system is internally
+coherent and externally meaningless, which is exactly what you would expect
+from something whose only constraint was reproducing a corpus.
 
 **The objective is per-token; the computation is not.** Loss is summed over
-positions independently, which tempts the conclusion that the model is myopic and
-cannot plan. The next unit gives you the machinery to see why that does not
-follow: a hidden state at position $t$ is free to encode structure that only pays
-off at position $t+40$, and gradient descent rewards it for doing so, because
-that is where the loss went down.
+positions independently, which tempts the conclusion that the model is myopic
+and cannot plan. The next unit gives you the machinery to see why that does
+not follow: a hidden state at position $t$ is free to encode structure that
+only pays off at position $t+40$, and gradient descent rewards it for doing
+so, because that is where the loss went down.
 
 u2 builds the math floor - softmax properly, gradients, loss surfaces - and u3
 opens the middle of the model.
@@ -945,8 +961,8 @@ that everything applies per-sequence, in parallel, across the batch.
 
 <!-- refutes: U0-M4 -->
 You probably think the row-vs-column orientation of a vector is cosmetic - a
-transpose here or there, the kind of thing you fix when the code throws. Here is
-the prediction that fails: under that belief, a paper writing $xW$ and a
+transpose here or there, the kind of thing you fix when the code throws. Here
+is the prediction that fails: under that belief, a paper writing $xW$ and a
 textbook writing $Wx$ describe the same operation with the same matrix, so a
 shape derived in one carries to the other. It does not. In $Wx$, the
 linear-algebra-textbook form, $x$ is a column vector of shape

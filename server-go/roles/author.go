@@ -36,6 +36,7 @@ Hard constraints:
 - Refutation style when attacking a misconception: state the wrong model, give the specific prediction it makes that fails, say why it is appealing, then the correct model.
 - Real equations with symbols defined inline at first use. Restate rather than cross-reference. Worked numbers use tiny shapes that compute cleanly.
 - Audience: expert software engineer, novice at ML math. Math explained fully, code in one line. Direct tone, no filler, no exclamation marks. Hyphens only, no em dashes.
+- Prose must chain. Each sentence opens on something the previous sentence put on the table and ends on the new thing; the next sentence picks that up. Never refer to a thing ("this game", "the argument") before the text has introduced it by that name. No sentence that only announces what the next sentences will do.
 Return ONLY the rewritten sections you were asked to rewrite.`
 
 // minVariantChars is the size below which a depth file's section is treated as
