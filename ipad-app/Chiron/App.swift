@@ -131,11 +131,14 @@ struct BookView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showContents) { ContentsView() }
-        .overlay(alignment: .topTrailing) {
-            // Labelled, not bare glyphs: on the mini these were two small
-            // icons in the corner with nothing to say what they did, and
-            // the way back out of a chapter should not be a guess.
+        // The chrome takes its own strip at the top rather than floating
+        // over the page: at large text sizes a floating strip sat on the
+        // headline. Labelled, not bare glyphs: on the mini these were two
+        // small icons in the corner with nothing to say what they did, and
+        // the way back out of a chapter should not be a guess.
+        .safeAreaInset(edge: .top, spacing: 0) {
             HStack(spacing: 10) {
+                Spacer()
                 ConnectionBadge()
                 Button { showContents = true } label: {
                     Label("Contents", systemImage: "list.bullet.rectangle")
@@ -154,7 +157,7 @@ struct BookView: View {
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 12)
-            .padding(.top, 6)
+            .padding(.vertical, 6)
         }
     }
 }

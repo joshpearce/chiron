@@ -23,7 +23,7 @@ struct MathText: View {
         // Start from an estimate rather than a fixed small value: if the
         // JavaScript measurement never lands, over-estimating costs blank
         // space while under-estimating hides the question being asked.
-        _height = State(initialValue: Self.estimatedHeight(text, size: size))
+        _height = State(initialValue: Self.estimatedHeight(text, size: Self.scaled(size)))
     }
 
     /// Rough layout guess: wrapped lines at ~60 characters, plus room for each
@@ -45,13 +45,20 @@ struct MathText: View {
             .joined(separator: "\n\n")
     }
 
+    /// The point size after the reader's text-size setting: the web view
+    /// does not scale with Dynamic Type by itself, so the same metrics the
+    /// system applies to body text are applied here.
+    static func scaled(_ size: CGFloat) -> CGFloat {
+        UIFontMetrics(forTextStyle: .body).scaledValue(for: size)
+    }
+
     var body: some View {
         if text.contains("$") {
-            MathWebView(text: text, size: size, height: $height)
+            MathWebView(text: text, size: Self.scaled(size), height: $height)
                 .frame(height: height)
         } else {
             Text(.init(Self.reflow(text)))
-                .font(.system(size: size, design: .serif))
+                .font(.system(size: Self.scaled(size), design: .serif))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -77,7 +84,7 @@ private struct MathWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ web: WKWebView, context: Context) {
-        if context.coordinator.loadedText != text {
+        if context.coordinator.loadedText != text || context.coordinator.loadedSize != size {
             context.coordinator.load(web, text: text, size: size)
         }
     }
@@ -85,12 +92,14 @@ private struct MathWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate {
         @Binding var height: CGFloat
         var loadedText: String?
+        var loadedSize: CGFloat = 0
 
         init(height: Binding<CGFloat>) { _height = height }
 
         func load(_ web: WKWebView, text: String, size: CGFloat) {
             guard let res = Bundle.main.resourceURL else { return }
             loadedText = text
+            loadedSize = size
             let escaped = text
                 .replacingOccurrences(of: "&", with: "&amp;")
                 .replacingOccurrences(of: "<", with: "&lt;")

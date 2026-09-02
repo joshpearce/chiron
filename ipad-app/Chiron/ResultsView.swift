@@ -5,6 +5,7 @@ import SwiftUI
 /// read, what was chosen, the answer, why). The actions depend on the gate.
 struct ResultsView: View {
     @EnvironmentObject var session: BookSession
+    @Environment(\.sizeCategory) private var sizeCategory
     let doc: ResultsDoc
     let gate: Gate
 
@@ -18,9 +19,11 @@ struct ResultsView: View {
                             .foregroundStyle(.secondary)
                         Text(doc.headline)
                             .font(.system(size: 32, weight: .semibold, design: .serif))
+                            .fixedSize(horizontal: false, vertical: true)
                         Text(doc.dek)
                             .font(.system(size: 19, design: .serif))
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                         if let tally = doc.tally {
                             Text(tally)
                                 .font(.footnote.weight(.semibold))
@@ -47,26 +50,37 @@ struct ResultsView: View {
             }
 
             Divider()
-            HStack(spacing: 14) {
-                if doc.isCalibration || doc.passed {
-                    Button(doc.action) { Task { await session.proceed() } }
-                        .buttonStyle(.borderedProminent)
-                        .keyboardShortcut(.defaultAction)
-                } else {
-                    Button("Explain it differently") { Task { await session.proceed() } }
-                        .buttonStyle(.borderedProminent)
-                        .keyboardShortcut(.defaultAction)
-                    Button("Override and continue anyway") { Task { await session.override() } }
-                        .buttonStyle(.bordered).tint(.orange)
-                    Text("Overridden material lands in your debt; \"Catch me up\" collects it later.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-            .disabled(session.busy)
-            .padding(14)
-            .background(.bar)
+            actions
+                .disabled(session.busy)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.bar)
         }
+    }
+
+    /// Side by side normally; stacked at accessibility text sizes, where
+    /// three things in a row become three tall pillars.
+    @ViewBuilder private var actions: some View {
+        if doc.isCalibration || doc.passed {
+            Button(doc.action) { Task { await session.proceed() } }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+        } else if sizeCategory.isAccessibilityCategory {
+            VStack(alignment: .leading, spacing: 10) { gateActions }
+        } else {
+            HStack(alignment: .center, spacing: 14) { gateActions }
+        }
+    }
+
+    @ViewBuilder private var gateActions: some View {
+        Button("Explain it differently") { Task { await session.proceed() } }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.defaultAction)
+        Button("Override and continue anyway") { Task { await session.override() } }
+            .buttonStyle(.bordered).tint(.orange)
+        Text("Overridden material lands in your debt; \"Catch me up\" collects it later.")
+            .font(.footnote).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
