@@ -1,7 +1,9 @@
 package lint
 
 import (
+	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -147,5 +149,125 @@ func TestCanonOnlySectionsExemptFromDepthWarning(t *testing.T) {
 	if len(r.Warnings) != 1 {
 		t.Fatalf("unmarked missing variant: got %d warnings, want 1: %v",
 			len(r.Warnings), r.Warnings)
+	}
+}
+
+// A calibration set must size the learner WITHIN the level they claimed. The
+// original u0 sets only ever trimmed from the top of one ladder, so "absolute
+// novice" got the same ten dot-product and matrix-shape items as "could work
+// through it slowly" - the screener was decorative. Every level's series is
+// now a window: a floor from the band below, the bulk from the band itself, a
+// ceiling from the band above, and the bank has to actually contain every band.
+func calibrationUnit(bands map[string]int, sets map[int][]string) *corpus.Unit {
+	u := &corpus.Unit{ID: "u0", Front: map[string]any{"calibration": true}}
+	var ids []string
+	for id := range bands {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		u.Questions.Check = append(u.Questions.Check, corpus.Question{
+			ID: id, Band: bands[id], Kind: "constructed", Check: "exact", Answer: "1",
+		})
+	}
+	u.Questions.CalibrationSets = sets
+	return u
+}
+
+func TestCalibrationSetsAreWindowsAroundTheirLevel(t *testing.T) {
+	// Three items per band, named b<band>-<n>.
+	bank := map[string]int{}
+	for b := 1; b <= 5; b++ {
+		for n := 1; n <= 3; n++ {
+			bank[fmt.Sprintf("b%d-%d", b, n)] = b
+		}
+	}
+	band := func(b int) []string {
+		return []string{fmt.Sprintf("b%d-1", b), fmt.Sprintf("b%d-2", b), fmt.Sprintf("b%d-3", b)}
+	}
+	window := func(l int) []string {
+		var ids []string
+		if l > 1 {
+			ids = append(ids, band(l - 1)[0])
+		}
+		ids = append(ids, band(l)...)
+		if l < 5 {
+			ids = append(ids, band(l + 1)[0])
+		}
+		return ids
+	}
+	good := map[int][]string{}
+	for l := 1; l <= 5; l++ {
+		good[l] = window(l)
+	}
+	r := &Report{}
+	checkCalibrationSets(calibrationUnit(bank, good), r)
+	if len(r.Errors) > 0 {
+		t.Fatalf("well-formed windows flagged: %v", r.Errors)
+	}
+
+	cases := []struct {
+		name   string
+		mutate func(bank map[string]int, sets map[int][]string)
+		want   string
+	}{
+		{"level with no items of its own band", func(bank map[string]int, sets map[int][]string) {
+			sets[1] = band(2) // a novice handed only band-2 items: the original bug
+		}, "band 1"},
+		{"ladder that only trims from the top", func(bank map[string]int, sets map[int][]string) {
+			sets[1] = append(band(3), band(4)...)
+		}, "band 1"},
+		{"missing level", func(bank map[string]int, sets map[int][]string) {
+			delete(sets, 3)
+		}, "level 3"},
+		{"unknown item id", func(bank map[string]int, sets map[int][]string) {
+			sets[2] = append(sets[2], "b9-9")
+		}, "b9-9"},
+		{"item without a band", func(bank map[string]int, sets map[int][]string) {
+			bank["b2-1"] = 0
+		}, "b2-1"},
+		{"band absent from the bank", func(bank map[string]int, sets map[int][]string) {
+			for n := 1; n <= 3; n++ {
+				bank[fmt.Sprintf("b5-%d", n)] = 4
+			}
+		}, "band 5"},
+		{"no ceiling probe", func(bank map[string]int, sets map[int][]string) {
+			sets[2] = append([]string{band(1)[0]}, band(2)...)
+		}, "band 3"},
+		{"no floor", func(bank map[string]int, sets map[int][]string) {
+			sets[4] = append(band(4), band(5)[0])
+		}, "band 3"},
+		{"out of order", func(bank map[string]int, sets map[int][]string) {
+			sets[3] = []string{band(4)[0], band(2)[0], band(3)[0], band(3)[1], band(3)[2]}
+		}, "easy to hard"},
+	}
+	for _, c := range cases {
+		bank2 := map[string]int{}
+		for k, v := range bank {
+			bank2[k] = v
+		}
+		sets2 := map[int][]string{}
+		for k, v := range good {
+			sets2[k] = append([]string(nil), v...)
+		}
+		c.mutate(bank2, sets2)
+		r := &Report{}
+		checkCalibrationSets(calibrationUnit(bank2, sets2), r)
+		if len(r.Errors) == 0 {
+			t.Errorf("%s: not flagged", c.name)
+			continue
+		}
+		if !strings.Contains(strings.Join(r.Errors, "\n"), c.want) {
+			t.Errorf("%s: errors do not mention %q: %v", c.name, c.want, r.Errors)
+		}
+	}
+
+	// A teaching unit has no sets and no bands; none of this applies.
+	plain := calibrationUnit(bank, nil)
+	plain.Front = nil
+	r = &Report{}
+	checkCalibrationSets(plain, r)
+	if len(r.Errors) > 0 {
+		t.Errorf("non-calibration unit flagged: %v", r.Errors)
 	}
 }

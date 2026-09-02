@@ -15,6 +15,7 @@ check:
   answer: '-4'
   check: numeric(0.001)
   difficulty: warmup
+  band: 3
 - id: u0-p2
   concept: c-matmul
   prompt: |
@@ -24,6 +25,7 @@ check:
   answer: 32 x 512
   check: exact
   difficulty: warmup
+  band: 3
   kind: constructed
 - id: u0-q9
   concept: c-notation
@@ -36,6 +38,7 @@ check:
   answer: 256 x 1024
   check: exact
   difficulty: warmup
+  band: 3
 - id: u0-q3
   concept: c-dotprod
   kind: mcq
@@ -77,6 +80,7 @@ check:
       key''s alone. And length is not the deciding factor in general: a long vector at 90
       degrees still scores zero. Magnitude and alignment both matter, multiplicatively.'
   difficulty: warmup
+  band: 3
 - id: u0-q5
   concept: c-matmul
   kind: constructed
@@ -90,6 +94,7 @@ check:
   answer: '6'
   check: numeric(0.001)
   difficulty: core
+  band: 3
 - id: u0-q12
   concept: c-matmul
   kind: constructed
@@ -116,6 +121,7 @@ check:
     with elementwise multiplication of $X_{ij}$ and $W_{ij}$ = U0-M1 in its
     strongest form; deliver the matmul section before any later unit.
   difficulty: core
+  band: 4
 - id: u0-p7
   concept: c-dotprod
   prompt: |
@@ -136,6 +142,7 @@ check:
     result is a vector of length $d$ = confusing the dot product with
     elementwise multiplication, U0-M1.
   difficulty: core
+  band: 4
   kind: constructed
 - id: u0-q7
   concept: c-matmul
@@ -175,6 +182,7 @@ check:
       $BA$ is in fact singular here - $A$ flattens 3 dimensions down to 2, and no later
       map recovers what was lost.'
   difficulty: core
+  band: 4
 - id: u0-p3
   concept: c-notation
   prompt: |
@@ -199,6 +207,7 @@ check:
     A learner who computes the actual numbers and gets ~[0.73, 0.27] for both
     passes regardless of how the reason is phrased.
   difficulty: core
+  band: 4
   kind: constructed
 - id: u0-p4
   concept: c-notation
@@ -208,6 +217,7 @@ check:
   answer: '24'
   check: numeric(0.001)
   difficulty: core
+  band: 4
   kind: constructed
 - id: u0-p6
   concept: c-notation
@@ -230,6 +240,7 @@ check:
     distribution involved = U0-M5. "The most likely / typical value of f" =
     U0-M7. Either answer means the notation section should be delivered.
   difficulty: core
+  band: 4
   kind: constructed
 - id: u0-q2
   concept: c-dotprod
@@ -260,6 +271,7 @@ check:
     nearer to $q$ = U0-M6. Either failure means the dot-product section is
     required at full depth before u3.
   difficulty: core
+  band: 4
 - id: u0-p8
   concept: c-matmul
   prompt: |
@@ -281,6 +293,7 @@ check:
     Answering (b) "yes, transpose it and it works" without noticing that this
     computes a different function = U0-M4.
   difficulty: core
+  band: 4
   kind: constructed
 - id: u0-q8
   concept: c-notation
@@ -312,6 +325,7 @@ check:
     Confusing $n$ with $d_{\text{model}}$, or treating $b$ as anything other
     than independent parallel sequences, is a genuine miss.
   difficulty: core
+  band: 4
 - id: u0-q11
   concept: c-notation
   kind: constructed
@@ -350,6 +364,164 @@ check:
     This item is stretch: a learner who has never read an attention equation
     can still derive all three answers from shapes alone, which is the point.
   difficulty: stretch
+  band: 5
+
+# Bands 1 and 2: the floor the original bank never had. Band 1 is the
+# arithmetic everything else is built from; band 2 is recognising the
+# objects - a vector, a shape, what a dot product produces - or following a
+# recipe that is spelled out. A learner who rates "absolute novice" is sized
+# here, not thrown at matrix products.
+- id: u0-n1
+  concept: c-dotprod
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    Compute $3 \times (-2) + 4 \times 5$. Answer with a single number.
+  answer: '14'
+  check: numeric(0.001)
+  difficulty: warmup
+  band: 1
+- id: u0-n2
+  concept: c-matmul
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    A grid of numbers has 2 rows and 3 columns. How many numbers does it
+    hold?
+  answer: '6'
+  check: numeric(0.001)
+  difficulty: warmup
+  band: 1
+- id: u0-n3
+  concept: c-notation
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    If $x = 4$, what is $3x - 5$? Answer with a single number.
+  answer: '7'
+  check: numeric(0.001)
+  difficulty: warmup
+  band: 1
+- id: u0-n4
+  concept: c-notation
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    Four numbers must add up to exactly 1. Three of them are 0.1, 0.2 and
+    0.3. What is the fourth?
+  answer: '0.4'
+  check: numeric(0.001)
+  difficulty: warmup
+  band: 1
+- id: u0-n5
+  concept: c-dotprod
+  kind: mcq
+  congruent: false
+  callback_eligible: false
+  prompt: |
+    Two vectors have the same length. Their dot product is:
+  check: choice
+  options:
+  - text: A single number.
+    correct: true
+    explain: Correct. Multiply matching entries, add the products, and one number
+      comes out. Every attention score in this book is one of these.
+  - text: A vector of the same length, each entry the product of the matching
+      entries.
+    misconception: U0-M1
+    explain: That is the elementwise product - the halfway point. The dot product
+      then adds those products up, and the adding is what collapses two vectors
+      into one score.
+  - text: A matrix.
+    misconception: U0-M4
+    explain: A matrix is what the OUTER product gives - the same two vectors with
+      the orientation flipped, $k^T q$ instead of $q k^T$. Orientation decides
+      whether the result is a scalar or a $d \times d$ grid; it is not cosmetic.
+  - text: The distance between the two vectors.
+    misconception: U0-M6
+    explain: It is not a distance. Two vectors pointing the same way score higher
+      the longer they are, even as the gap between their tips grows.
+  difficulty: warmup
+  band: 2
+- id: u0-n6
+  concept: c-notation
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    How many components does the vector $[5, -1, 2, 0]$ have?
+  answer: '4'
+  check: numeric(0.001)
+  difficulty: warmup
+  band: 2
+- id: u0-n7
+  concept: c-matmul
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    A matrix has shape $(4, 7)$. How many rows does it have, and how many
+    columns? Answer in the exact form `rows x cols`, for example `3 x 8`.
+  answer: 4 x 7
+  check: exact
+  difficulty: warmup
+  band: 2
+- id: u0-n8
+  concept: c-dotprod
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    Take $[1, 2, 3]$ and $[4, 5, 6]$. Multiply them entry by entry - first
+    with first, second with second, third with third - then add the three
+    products. Answer with a single number.
+  answer: '32'
+  check: numeric(0.001)
+  difficulty: warmup
+  band: 2
+# Band 5: the top the original bank was one item short of. An expert answers
+# these on sight; everyone else finds the ceiling here.
+- id: u0-n9
+  concept: c-dotprod
+  kind: constructed
+  congruent: true
+  callback_eligible: true
+  prompt: |
+    $q$ and $k$ each have 64 components. All 128 components are independent,
+    with mean 0 and variance 1. What is the variance of $q \cdot k$? Answer
+    with a single number.
+  answer: '64'
+  check: numeric(0.001)
+  difficulty: stretch
+  band: 5
+- id: u0-n10
+  concept: c-notation
+  kind: constructed
+  congruent: true
+  callback_eligible: true
+  prompt: |
+    $Y = XW$, with $X$ of shape $(n, d)$ and $W$ of shape $(d, m)$. You are
+    handed $G = \partial L / \partial Y$, of shape $(n, m)$. Write
+    $\partial L / \partial W$ in terms of $X$ and $G$, and give its shape.
+  answer: |
+    $\partial L / \partial W = X^T G$, of shape $(d, m)$ - the shape of $W$
+    itself. $X^T$ is $(d, n)$, $G$ is $(n, m)$, and the $n$ axis contracts.
+  check: llm
+  rubric: |
+    Pass requires both: (1) the expression $X^T G$ - $X$ transposed, on the
+    left; (2) the shape $(d, m)$, the same as $W$.
+    Partial: the shape right with the expression wrong ($X G^T$, $G X$, or
+    $G^T X$), or the expression right with no shape.
+    Fail and what it diagnoses: a gradient whose shape is not $W$'s (a scalar,
+    or $(n, m)$) = U0-M3, the gradient treated as a slope rather than one
+    number per weight. Writing $XG$ with no transpose and calling it valid =
+    U0-M4.
+  difficulty: stretch
+  band: 5
 
 # Self-placement, asked before the series. The answer selects a
 # calibration_sets entry; it is never graded for correctness.
@@ -370,11 +542,14 @@ screener:
     - text: Comfortable
     - text: Expert - I could teach it
 
-# Pre-computed series per self-rating: novices skip the hardest tail,
-# experts skip the warmups. Each list is delivered complete, in order.
+# Pre-computed series per self-rating. Each is a WINDOW around the level the
+# learner claimed - a floor from the band below, the bulk from the band
+# itself, a ceiling from the band above - so the score locates them within
+# that level. A series that only trimmed one ladder from the top handed every
+# novice the same matrix questions as level 3. Ordered easy to hard.
 calibration_sets:
-  1: [u0-q1, u0-p2, u0-q9, u0-q3, u0-q5, u0-q12, u0-p7, u0-q7, u0-p3, u0-p4]
-  2: [u0-q1, u0-p2, u0-q9, u0-q3, u0-q5, u0-q12, u0-p7, u0-q7, u0-p3, u0-p4, u0-p6, u0-q2]
-  3: [u0-q1, u0-p2, u0-q9, u0-q3, u0-q5, u0-q12, u0-p7, u0-q7, u0-p3, u0-p4, u0-p6, u0-q2, u0-p8, u0-q8, u0-q11]
-  4: [u0-q3, u0-q5, u0-q12, u0-p7, u0-q7, u0-p3, u0-p4, u0-p6, u0-q2, u0-p8, u0-q8, u0-q11]
-  5: [u0-q12, u0-p7, u0-q7, u0-p3, u0-p4, u0-p6, u0-q2, u0-p8, u0-q8, u0-q11]
+  1: [u0-n1, u0-n2, u0-n3, u0-n4, u0-n5, u0-n6, u0-n7, u0-n8, u0-q1, u0-p2]
+  2: [u0-n1, u0-n4, u0-n5, u0-n6, u0-n7, u0-n8, u0-q1, u0-p2, u0-q9, u0-q5]
+  3: [u0-n7, u0-n8, u0-q1, u0-p2, u0-q9, u0-q3, u0-q5, u0-q12, u0-p7, u0-p4, u0-q2]
+  4: [u0-q3, u0-q5, u0-q12, u0-p7, u0-q7, u0-p3, u0-p4, u0-p6, u0-q2, u0-p8, u0-q8, u0-q11, u0-n9]
+  5: [u0-q12, u0-p7, u0-q2, u0-p8, u0-q8, u0-q11, u0-n9, u0-n10]

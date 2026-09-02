@@ -39,14 +39,19 @@ func TestInkCheckInGradesTranscriptions(t *testing.T) {
 	}
 
 	// The "handwriting" answers the transcriber will return, keyed by the
-	// item id it is called with (the tag): right answer for item 1 (dot
-	// product = -4), garbage for item 2. Everything else sends no strokes.
+	// item id it is called with (the tag): the reference answer for item 1,
+	// garbage for item 2. Everything else sends no strokes.
 	firstID := first.Chapter.Check[0].ID
+	firstQ, _ := sub.Corpus.FindQuestion(firstID)
+	if firstQ == nil || firstQ.Check == "llm" {
+		t.Fatalf("first series item %s is not mechanically checkable", firstID)
+	}
+	firstAnswer := firstQ.Answer.String()
 	transcribed := map[string]bool{}
 	s.transcribe = func(tag string, png []byte) (string, error) {
 		transcribed[tag] = true
 		if tag == firstID {
-			return "-4", nil
+			return firstAnswer, nil
 		}
 		return "no idea, sorry", nil
 	}
@@ -95,7 +100,7 @@ func TestInkCheckInGradesTranscriptions(t *testing.T) {
 	if v := verdicts[first.Chapter.Check[1].ID]; v == "pass" {
 		t.Errorf("wrong transcription graded pass")
 	}
-	if got := resp.Transcripts[first.Chapter.Check[0].ID]; got != "-4" {
+	if got := resp.Transcripts[first.Chapter.Check[0].ID]; got != firstAnswer {
 		t.Errorf("transcript = %q", got)
 	}
 	idkID := first.Chapter.Check[2].ID

@@ -157,6 +157,7 @@ check:              # >=10 items so the server can compose an 8+ item check
       what earns partial credit, and which misconception each characteristic
       error indicates (cite bank IDs)...
     difficulty: core    # warmup | core | stretch
+    band: 3             # calibration units only: 1-5 on the screener's own scale
   - id: u3-q7
     concept: c-qkv
     kind: mcq
@@ -179,6 +180,48 @@ Rules:
 - Anything a program can check (`numeric`, `exact`, `choice`) must NOT use `check: llm`.
 - At least 2 items per unit marked `callback_eligible` and at least 1 `stretch`
   item that the >90% path can use.
+
+### Calibration units: bands and windows
+
+A calibration unit (`calibration: true` in canon front matter) ends its
+questions.yaml with a `screener` - one self-placement question with five
+options, novice to expert - and `calibration_sets`, the series delivered for
+each of those five answers:
+
+```yaml
+screener:
+  id: u0-s1
+  check: screener
+  prompt: "Before the questions: how would you rate..."
+  options:            # exactly five, in ascending order
+    - text: Absolute novice
+    - text: Seen the words, could not compute
+    - text: Could work through it slowly
+    - text: Comfortable
+    - text: Expert - I could teach it
+
+calibration_sets:     # one list per level, item ids from check, easy to hard
+  1: [u0-n1, u0-n2, ..., u0-q1, u0-p2]
+  ...
+```
+
+Every item in the bank carries `band: 1..5`, the screener level at which a
+learner is expected to get it right without strain. The point of the screener
+is to size the learner WITHIN the level they claimed, so each level's series
+is a window, not a ladder:
+
+- at least 3 items from the level's own band (the bulk);
+- at least 1 from the band below (a floor - catches an overrated learner);
+- at least 1 from the band above (a ceiling - catches an underrated one);
+- ordered easy to hard by band;
+- and the bank holds at least 3 items in every band, so no level is empty.
+
+The linter enforces all of this. The failure it exists to prevent: one ladder
+trimmed from the top, where "absolute novice" receives the same first ten
+matrix-product items as level 3 and the self-rating changes nothing the
+learner can feel. Band 1 is the arithmetic the subject is built from; band 2
+is recognising the objects or following a recipe that is spelled out; band 5
+is what an expert answers on sight.
 
 ## Tone
 

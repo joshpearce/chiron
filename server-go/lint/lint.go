@@ -281,6 +281,75 @@ func checkRefutationIDs(u *corpus.Unit, c *corpus.Corpus, r *Report) {
 	}
 }
 
+// checkCalibrationSets holds a calibration unit to the one thing its screener
+// exists for: sizing the learner within the level they claimed. The original
+// u0 sets only trimmed from the top of a single ladder, so "absolute novice"
+// received the same ten dot-product and matrix-shape items as level 3 - the
+// self-rating changed nothing a novice could feel. A level's series must be a
+// window: a floor from the band below, the bulk from its own band, a ceiling
+// from the band above; and the bank must actually contain every band.
+func checkCalibrationSets(u *corpus.Unit, r *Report) {
+	if !u.IsCalibration() {
+		return
+	}
+	byID := map[string]corpus.Question{}
+	perBand := map[int]int{}
+	for _, q := range u.Questions.Check {
+		byID[q.ID] = q
+		if q.Band < 1 || q.Band > 5 {
+			r.errorf(u.ID+"/"+q.ID, "calibration item has no band (1-5) - without one the "+
+				"level series cannot be a window around the level")
+			continue
+		}
+		perBand[q.Band]++
+	}
+	for b := 1; b <= 5; b++ {
+		if perBand[b] < 3 {
+			r.errorf(u.ID, "bank has %d item(s) in band %d, need >= 3 - a level with nothing "+
+				"at its own band cannot size a learner within it", perBand[b], b)
+		}
+	}
+	for l := 1; l <= 5; l++ {
+		ids := u.Questions.CalibrationSets[l]
+		where := fmt.Sprintf("%s/level %d", u.ID, l)
+		if len(ids) == 0 {
+			r.errorf(u.ID, "no calibration set for level %d - that screener answer falls "+
+				"through to the whole bank", l)
+			continue
+		}
+		counts := map[int]int{}
+		prev, ordered := 0, true
+		for _, id := range ids {
+			q, ok := byID[id]
+			if !ok {
+				r.errorf(where, "set names unknown item %q (the server silently drops it)", id)
+				continue
+			}
+			if q.Band == 0 {
+				continue // reported above
+			}
+			counts[q.Band]++
+			if q.Band < prev {
+				ordered = false
+			}
+			prev = q.Band
+		}
+		if counts[l] < 3 {
+			r.errorf(where, "%d item(s) of band %d in its own series, need >= 3 - a series "+
+				"that only trims a ladder cannot size the learner within the level", counts[l], l)
+		}
+		if l > 1 && counts[l-1] < 1 {
+			r.errorf(where, "no floor: nothing from band %d, so an overrated learner is never caught", l-1)
+		}
+		if l < 5 && counts[l+1] < 1 {
+			r.errorf(where, "no ceiling: nothing from band %d, so an underrated learner is never caught", l+1)
+		}
+		if !ordered {
+			r.errorf(where, "series is not ordered easy to hard by band")
+		}
+	}
+}
+
 func first(xs []string, n int) []string {
 	if len(xs) > n {
 		return xs[:n]
@@ -303,6 +372,7 @@ func Run(c *corpus.Corpus) *Report {
 		checkSpecConformance(u, r)
 		checkDepthHeadings(u, r)
 		checkRefutationIDs(u, c, r)
+		checkCalibrationSets(u, r)
 	}
 	return r
 }

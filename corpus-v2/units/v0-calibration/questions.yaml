@@ -14,6 +14,7 @@ check:
   answer: '3.5'
   check: numeric(0.001)
   difficulty: warmup
+  band: 3
 - id: v0-q2
   concept: d-prob-basics
   kind: constructed
@@ -25,6 +26,7 @@ check:
   answer: '0.25'
   check: numeric(0.001)
   difficulty: warmup
+  band: 3
 - id: v0-q3
   concept: d-prob-basics
   kind: constructed
@@ -35,6 +37,7 @@ check:
   answer: '3'
   check: numeric(0.001)
   difficulty: warmup
+  band: 3
 - id: v0-q4
   concept: d-vol1-floor
   kind: constructed
@@ -46,6 +49,7 @@ check:
   answer: '3'
   check: numeric(0.001)
   difficulty: warmup
+  band: 1
 - id: v0-q5
   concept: d-prob-basics
   kind: constructed
@@ -56,6 +60,7 @@ check:
   answer: '6'
   check: numeric(0.001)
   difficulty: core
+  band: 3
 - id: v0-q6
   concept: d-prob-basics
   kind: constructed
@@ -68,6 +73,7 @@ check:
   answer: '1.5'
   check: numeric(0.001)
   difficulty: core
+  band: 3
 - id: v0-q7
   concept: d-vol1-floor
   kind: constructed
@@ -80,6 +86,7 @@ check:
   answer: '0'
   check: numeric(0.001)
   difficulty: core
+  band: 4
 - id: v0-q8
   concept: d-vol1-floor
   kind: constructed
@@ -92,6 +99,7 @@ check:
   answer: 64 x 128
   check: exact
   difficulty: core
+  band: 4
 - id: v0-q9
   concept: d-prob-basics
   kind: constructed
@@ -103,6 +111,7 @@ check:
   answer: '-1.5'
   check: numeric(0.001)
   difficulty: core
+  band: 3
 - id: v0-q10
   concept: d-prob-basics
   kind: constructed
@@ -115,6 +124,7 @@ check:
   answer: '50, 5'
   check: exact
   difficulty: core
+  band: 4
 - id: v0-q11
   concept: d-prob-basics
   kind: constructed
@@ -127,6 +137,7 @@ check:
   answer: '10'
   check: numeric(0.5)
   difficulty: core
+  band: 4
 - id: v0-q12
   concept: d-prob-basics
   kind: constructed
@@ -156,6 +167,7 @@ check:
     p-value-as-truth-probability confusion - deliver v6 slowly.
   check: llm
   difficulty: stretch
+  band: 5
 - id: v0-q13
   concept: d-prob-basics
   kind: constructed
@@ -182,6 +194,7 @@ check:
     from the direction of the gap rather than its size vs noise.
   check: llm
   difficulty: stretch
+  band: 5
 - id: v0-q14
   concept: d-vol1-floor
   kind: constructed
@@ -194,6 +207,99 @@ check:
   answer: '0.2'
   check: numeric(0.001)
   difficulty: stretch
+  band: 4
+
+# Bands 1 and 2: the floor. Band 1 is the arithmetic of chance - a fraction,
+# an average, a coin. Band 2 is recognising the objects (probabilities sum to
+# 1, an expected value is a weighted sum) or following a recipe that is
+# spelled out. "Absolute novice" is sized here, not at z-scores.
+- id: v0-n1
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    A fair coin is flipped once. What is the probability it lands heads?
+    Answer as a decimal.
+  answer: '0.5'
+  check: numeric(0.001)
+  difficulty: warmup
+  band: 1
+- id: v0-n2
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    Three of the 12 documents in a folder are duplicates. What fraction of
+    the folder is duplicates? Answer as a decimal.
+  answer: '0.25'
+  check: numeric(0.001)
+  difficulty: warmup
+  band: 1
+- id: v0-n3
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    What is the average (mean) of 2, 4 and 9?
+  answer: '5'
+  check: numeric(0.001)
+  difficulty: warmup
+  band: 1
+- id: v0-n4
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    A quantity has four possible outcomes. Three of them have probabilities
+    0.1, 0.2 and 0.3. What must the probability of the fourth be?
+  answer: '0.4'
+  check: numeric(0.001)
+  difficulty: warmup
+  band: 2
+- id: v0-n5
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    A quantity is 0 with probability 0.5 and 10 with probability 0.5.
+    Multiply each outcome by its probability and add the two results. What
+    do you get? (This is its expected value.)
+  answer: '5'
+  check: numeric(0.001)
+  difficulty: warmup
+  band: 2
+- id: v0-n6
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: false
+  prompt: |
+    Measurements have mean 100 and standard deviation 10. How many standard
+    deviations above the mean is the value 120?
+  answer: '2'
+  check: numeric(0.001)
+  difficulty: warmup
+  band: 2
+# Band 5: the ceiling. The Bonferroni bound is the book's own tool in v7.
+- id: v0-n7
+  concept: d-prob-basics
+  kind: constructed
+  congruent: true
+  callback_eligible: true
+  prompt: |
+    You will run 20 independent significance tests and want the chance of
+    even ONE false positive across all of them to be at most 0.05 under the
+    null. Using the Bonferroni correction, what p-value threshold do you
+    apply to each individual test?
+  answer: '0.0025'
+  check: numeric(0.0001)
+  difficulty: stretch
+  band: 5
 
 # Self-placement, asked before the series. The answer selects a
 # calibration_sets entry; it is never graded for correctness.
@@ -214,11 +320,13 @@ screener:
     - text: Comfortable
     - text: Expert - I could teach it
 
-# Pre-computed series per self-rating: novices skip the hardest tail,
-# experts skip the warmups. Each list is delivered complete, in order.
+# Pre-computed series per self-rating. Each is a WINDOW around the level the
+# learner claimed - a floor from the band below, the bulk from the band
+# itself, a ceiling from the band above - so the score locates them within
+# that level. Ordered easy to hard.
 calibration_sets:
-  1: [v0-q1, v0-q2, v0-q3, v0-q4, v0-q5, v0-q6, v0-q7, v0-q9]
-  2: [v0-q1, v0-q2, v0-q3, v0-q4, v0-q5, v0-q6, v0-q7, v0-q8, v0-q9, v0-q10]
-  3: [v0-q1, v0-q2, v0-q4, v0-q5, v0-q6, v0-q7, v0-q8, v0-q9, v0-q10, v0-q11, v0-q12, v0-q13]
-  4: [v0-q4, v0-q5, v0-q6, v0-q7, v0-q8, v0-q9, v0-q10, v0-q11, v0-q12, v0-q13, v0-q14]
-  5: [v0-q6, v0-q8, v0-q9, v0-q10, v0-q11, v0-q12, v0-q13, v0-q14]
+  1: [v0-n1, v0-n2, v0-n3, v0-q4, v0-n4, v0-n5, v0-n6, v0-q1, v0-q2]
+  2: [v0-n1, v0-q4, v0-n4, v0-n5, v0-n6, v0-q1, v0-q2, v0-q3, v0-q5]
+  3: [v0-n5, v0-n6, v0-q1, v0-q2, v0-q3, v0-q5, v0-q6, v0-q9, v0-q7, v0-q10]
+  4: [v0-q5, v0-q6, v0-q9, v0-q7, v0-q8, v0-q10, v0-q11, v0-q14, v0-q12, v0-q13]
+  5: [v0-q7, v0-q10, v0-q11, v0-q14, v0-q12, v0-q13, v0-n7]

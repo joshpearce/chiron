@@ -81,15 +81,19 @@ type RevealOption struct {
 
 // Question is a pretest or check item.
 type Question struct {
-	ID               string            `yaml:"id" json:"id"`
-	Unit             string            `yaml:"unit" json:"unit,omitempty"`
-	Concept          string            `yaml:"concept" json:"concept,omitempty"`
-	Kind             string            `yaml:"kind" json:"kind"` // constructed | mcq
-	Prompt           string            `yaml:"prompt" json:"prompt"`
-	Check            string            `yaml:"check" json:"check"`
-	Answer           Scalar            `yaml:"answer" json:"-"`
-	Rubric           string            `yaml:"rubric" json:"-"`
-	Difficulty       string            `yaml:"difficulty" json:"difficulty,omitempty"`
+	ID         string `yaml:"id" json:"id"`
+	Unit       string `yaml:"unit" json:"unit,omitempty"`
+	Concept    string `yaml:"concept" json:"concept,omitempty"`
+	Kind       string `yaml:"kind" json:"kind"` // constructed | mcq
+	Prompt     string `yaml:"prompt" json:"prompt"`
+	Check      string `yaml:"check" json:"check"`
+	Answer     Scalar `yaml:"answer" json:"-"`
+	Rubric     string `yaml:"rubric" json:"-"`
+	Difficulty string `yaml:"difficulty" json:"difficulty,omitempty"`
+	// Band places a calibration item on the screener's own 1-5 scale, so a
+	// level's series can be a window around the level rather than a ladder
+	// that only ever trims from the top.
+	Band             int               `yaml:"band" json:"-"`
 	Congruent        bool              `yaml:"congruent" json:"-"`
 	CallbackEligible bool              `yaml:"callback_eligible" json:"-"`
 	Options          []checkers.Option `yaml:"options" json:"-"`
