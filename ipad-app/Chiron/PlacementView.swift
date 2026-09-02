@@ -11,7 +11,7 @@ struct PlacementView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 Text("Before the book begins")
-                    .font(.system(size: 30, weight: .semibold, design: .serif))
+                    .font(Typography.display(30))
                 MathText(text: screener.prompt, size: 20)
                 VStack(spacing: 10) {
                     ForEach(Array((screener.options ?? []).enumerated()), id: \.offset) { i, option in
@@ -20,11 +20,11 @@ struct PlacementView: View {
                         } label: {
                             HStack(alignment: .firstTextBaseline, spacing: 14) {
                                 Text("\(i + 1)")
-                                    .font(.system(.title3, design: .serif).weight(.semibold))
+                                    .font(Typography.serif(20, weight: .semibold, relativeTo: .title3))
                                     .foregroundStyle(.secondary)
                                     .frame(width: 28, alignment: .trailing)
                                 Text(option.text)
-                                    .font(.system(size: 19, design: .serif))
+                                    .font(Typography.serif(19))
                                     .multilineTextAlignment(.leading)
                                 Spacer(minLength: 0)
                             }
@@ -33,6 +33,7 @@ struct PlacementView: View {
                             .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect()
                         .disabled(session.busy)
                         .accessibilityLabel("Level \(i + 1): \(option.text)")
                         .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: [])

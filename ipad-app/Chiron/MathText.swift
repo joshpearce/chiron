@@ -58,7 +58,7 @@ struct MathText: View {
                 .frame(height: height)
         } else {
             Text(.init(Self.reflow(text)))
-                .font(.system(size: Self.scaled(size), design: .serif))
+                .font(Typography.serif(size))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -111,8 +111,11 @@ private struct MathWebView: UIViewRepresentable {
             <style>
               :root { color-scheme: light dark; }
               html, body { margin:0; padding:0; background:transparent; }
+              @font-face { font-family: "Source Serif 4"; src: url("fonts/SourceSerif4-Regular.ttf"); font-weight: 400; }
+              @font-face { font-family: "Source Serif 4"; src: url("fonts/SourceSerif4-It.ttf"); font-weight: 400; font-style: italic; }
+              @font-face { font-family: "Source Serif 4"; src: url("fonts/SourceSerif4-Semibold.ttf"); font-weight: 600; }
               body {
-                font: \(size)px/1.5 -apple-system-ui-serif, ui-serif, Georgia, serif;
+                font: \(size)px/1.5 \(Typography.webSerif);
                 color: #1a1a1a;
                 -webkit-text-size-adjust: 100%;
               }

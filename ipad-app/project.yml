@@ -16,10 +16,15 @@ targets:
         excludes: ["Resources/katex/**"]
       - path: Chiron/Resources/katex
         type: folder
+      # The book's faces, shared with the e-ink client (assets/fonts); a
+      # folder reference so book.css can @font-face them as fonts/<file>.
+      - path: ../assets/fonts
+        name: fonts
+        type: folder
     settings:
       base:
         TARGETED_DEVICE_FAMILY: "2"          # iPad only
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         CODE_SIGN_STYLE: Automatic
         # Fly.io, Inc - a paid team, so provisioning profiles last a year
         # rather than the seven days a personal team gets. The free-team profile
@@ -43,6 +48,15 @@ targets:
         UIRequiresFullScreen: false
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        UIAppFonts:
+          - fonts/SourceSerif4-Regular.ttf
+          - fonts/SourceSerif4-It.ttf
+          - fonts/SourceSerif4-Semibold.ttf
+          - fonts/SourceSerif4-Bold.ttf
+          - fonts/SourceSans3-Regular.ttf
+          - fonts/SourceSans3-Medium.ttf
+          - fonts/SourceSans3-Semibold.ttf
+          - fonts/SourceSans3-Bold.ttf
   ChironTests:
     type: bundle.unit-test
     platform: iOS

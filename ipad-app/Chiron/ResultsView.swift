@@ -18,10 +18,10 @@ struct ResultsView: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                         Text(doc.headline)
-                            .font(.system(size: 32, weight: .semibold, design: .serif))
+                            .font(Typography.display(32))
                             .fixedSize(horizontal: false, vertical: true)
                         Text(doc.dek)
-                            .font(.system(size: 19, design: .serif))
+                            .font(Typography.serif(19))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         if let tally = doc.tally {
@@ -131,7 +131,7 @@ struct ResultsEntryView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Text(mark.glyph)
-                .font(.system(size: 22, weight: .bold, design: .serif))
+                .font(Typography.serif(22, weight: .bold))
                 .foregroundStyle(mark.color)
                 .frame(width: 24)
                 .accessibilityLabel(entry.isIDK ? "Passed on" : entry.passed ? "Correct" : "Missed")
@@ -139,7 +139,7 @@ struct ResultsEntryView: View {
                 HStack(alignment: .top) {
                     HStack(alignment: .top, spacing: 6) {
                         Text("\(entry.n).")
-                            .font(.system(size: 19, weight: .semibold, design: .serif))
+                            .font(Typography.serif(19, weight: .semibold))
                         MathText(text: entry.prompt, size: 19)
                     }
                     Spacer(minLength: 8)

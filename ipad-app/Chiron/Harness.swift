@@ -14,6 +14,8 @@ import Network
 ///   POST /start              start exchange from the top
 ///   POST /place  {level}     answer the placement screener
 ///   POST /check              enter the check from the reader
+///   POST /contents           toggle the contents (sidebar or sheet)
+///   POST /chrome             toggle the reader chrome, as a tap on the page does
 ///   POST /answer {mode}      answer every item of the current chapter:
 ///                            correct | idk | wrong (default correct)
 ///   POST /proceed            leave the results (or the break)
@@ -79,6 +81,10 @@ final class Harness {
             await session?.place(level: body["level"] as? Int ?? 3)
         case ("POST", "/check"):
             session?.beginCheck()
+        case ("POST", "/contents"):
+            session?.contentsShown.toggle()
+        case ("POST", "/chrome"):
+            session?.toggleChrome()
         case ("POST", "/answer"):
             if let s = session, let ch = s.chapter {
                 let mode = body["mode"] as? String ?? "correct"
@@ -128,6 +134,8 @@ final class Harness {
             out["unit"] = s.chapter?.unit ?? ""
             out["items"] = s.chapter?.check.count ?? 0
             out["wait"] = s.wait?.rawValue ?? ""
+            out["contents"] = s.contentsShown
+            out["chrome_hidden"] = s.chromeHidden
             out["error"] = s.errorMessage ?? ""
             if case .results(let doc, _) = s.screen {
                 out["headline"] = doc.headline

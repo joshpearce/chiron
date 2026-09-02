@@ -50,7 +50,7 @@ struct ItemFlowView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                 }
-                Text(title).font(.system(.title2, design: .serif).weight(.semibold))
+                Text(title).font(Typography.serif(24, weight: .semibold, relativeTo: .title2))
                 Text(subtitle).font(.callout).foregroundStyle(.secondary)
                 ProgressView(value: Double(index), total: Double(max(items.count, 1)))
                 Text("\(index + 1) of \(items.count)")
@@ -68,8 +68,13 @@ struct ItemFlowView: View {
                             Button {
                                 if !revealed { selected = i }
                             } label: {
-                                HStack(alignment: .top) {
+                                HStack(alignment: .top, spacing: 10) {
                                     Image(systemName: iconFor(i))
+                                        .padding(.top, 3)
+                                    Text(String(UnicodeScalar(65 + i)!))
+                                        .font(Typography.sans(17, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                        .padding(.top, 1)
                                     MathText(text: options[i].text, size: 17)
                                     Spacer(minLength: 0)
                                 }
@@ -77,6 +82,10 @@ struct ItemFlowView: View {
                                 .background(backgroundFor(i), in: RoundedRectangle(cornerRadius: 10))
                             }
                             .buttonStyle(.plain)
+                            .hoverEffect()
+                            // The lettered options answer to their number key.
+                            .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: [])
+                            .accessibilityLabel("Option \(String(UnicodeScalar(65 + i)!))")
                             if revealed, let r = item.reveal?.options?[i],
                                selected == i || r.correct {
                                 MathText(text: r.explain, size: 15)
@@ -200,7 +209,7 @@ struct BreakView: View {
     var body: some View {
         VStack(spacing: 24) {
             Image(systemName: "moon.zzz").font(.system(size: 56)).foregroundStyle(.indigo)
-            Text("Break time").font(.largeTitle.weight(.semibold))
+            Text("Break time").font(Typography.display(34))
             Text(suggestion.note).multilineTextAlignment(.center).foregroundStyle(.secondary)
             Text(timeString)
                 .font(.system(size: 54, weight: .light, design: .monospaced))
@@ -225,15 +234,36 @@ struct BreakView: View {
     }
 }
 
-/// The contents: every chapter of the book with its status, what is owed,
-/// and the way to start the book over.
+/// The contents as a sheet, for compact width.
 struct ContentsView: View {
     @EnvironmentObject var session: BookSession
-    @Environment(\.presentationMode) private var presentation
-    @State private var confirmingReset = false
 
     var body: some View {
         NavigationView {
+            ContentsList()
+                .navigationTitle("Contents")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") { session.contentsShown = false }
+                    }
+                }
+        }
+        .navigationViewStyle(.stack)
+    }
+}
+
+/// The contents: every chapter of the book with its status, what is owed,
+/// and the way to start the book over. A sidebar in regular width, the
+/// body of a sheet in compact.
+struct ContentsList: View {
+    @EnvironmentObject var session: BookSession
+    @State private var confirmingReset = false
+
+    /// Anything that changes the page closes the contents: the reader
+    /// should see the change, not a list over it.
+    private func dismiss() { session.contentsShown = false }
+
+    var body: some View {
             List {
                 if session.bookState == nil {
                     Section {
@@ -257,8 +287,8 @@ struct ContentsView: View {
                                 Spacer()
                                 if entry.inFringe && entry.status != "active" {
                                     Button("Read next") {
+                                        dismiss()
                                         Task { await session.start(choice: entry.unit) }
-                                        presentation.wrappedValue.dismiss()
                                     }
                                     .buttonStyle(.bordered).controlSize(.small)
                                 }
@@ -270,8 +300,8 @@ struct ContentsView: View {
                             Text("\(state.debt.count) unit(s) skipped or below gate")
                                 .foregroundStyle(.orange)
                             Button("Catch me up now") {
+                                dismiss()
                                 Task { await session.catchMeUp() }
-                                presentation.wrappedValue.dismiss()
                             }
                         }
                     }
@@ -294,28 +324,21 @@ struct ContentsView: View {
                     Text("Clears every grade, gate result and debt entry for this subject.")
                 }
             }
-            .navigationTitle("Contents")
+            .listStyle(.sidebar)
             .refreshable { await session.refreshState() }
             .task { await session.refreshState() }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { presentation.wrappedValue.dismiss() }
-                }
-            }
             .alert("Start over?", isPresented: $confirmingReset) {
                 Button("Cancel", role: .cancel) { }
                 Button("Start over", role: .destructive) {
-                    // The contents is a sheet over the screen startOver()
+                    // The contents may be a sheet over the screen startOver()
                     // changes. Without dismissing it the reset happens and
                     // the learner sees nothing at all.
-                    presentation.wrappedValue.dismiss()
+                    dismiss()
                     Task { await session.startOver() }
                 }
             } message: {
                 Text("Every grade, gate result and debt entry for this subject is discarded. This cannot be undone from the app.")
             }
-        }
-        .navigationViewStyle(.stack)
     }
 
     private func icon(_ s: String) -> String {

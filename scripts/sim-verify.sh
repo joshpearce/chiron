@@ -118,6 +118,12 @@ for DEVICE in $DEVICES; do
       cmd /proceed
       expect reading
       shot 05 reading 3
+      cmd /contents
+      shot 05b contents 1.5
+      cmd /contents
+      cmd /chrome
+      shot 05c reading-chrome-hidden 1
+      cmd /chrome
       cmd /check
       expect check
       shot 06 check

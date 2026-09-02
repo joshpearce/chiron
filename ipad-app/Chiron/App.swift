@@ -63,9 +63,35 @@ struct ContentView: View {
 struct BookView: View {
     @EnvironmentObject var library: Library
     @EnvironmentObject var session: BookSession
-    @State private var showContents = false
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    /// Regular width shows the contents as a sidebar beside the page;
+    /// compact width (Split View, Slide Over) presents it over the page.
+    private var sidebar: Bool { sizeClass == .regular }
+    private var chromeHidden: Bool {
+        if case .reading = session.screen { return session.chromeHidden }
+        return false
+    }
 
     var body: some View {
+        HStack(spacing: 0) {
+            if sidebar && session.contentsShown {
+                ContentsList()
+                    .frame(width: 320)
+                    .transition(.move(edge: .leading))
+                Divider()
+            }
+            page
+        }
+        .animation(.easeInOut(duration: 0.2), value: session.contentsShown)
+        .sheet(isPresented: Binding(
+            get: { !sidebar && session.contentsShown },
+            set: { session.contentsShown = $0 })) {
+            ContentsView()
+        }
+    }
+
+    private var page: some View {
         ZStack {
             switch session.screen {
             case .empty:
@@ -130,35 +156,41 @@ struct BookView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .sheet(isPresented: $showContents) { ContentsView() }
         // The chrome takes its own strip at the top rather than floating
         // over the page: at large text sizes a floating strip sat on the
-        // headline. Labelled, not bare glyphs: on the mini these were two
-        // small icons in the corner with nothing to say what they did, and
-        // the way back out of a chapter should not be a guess.
+        // headline. A tap on the page hides it while reading. Labelled, not
+        // bare glyphs: on the mini these were two small icons in the corner
+        // with nothing to say what they did, and the way back out of a
+        // chapter should not be a guess.
         .safeAreaInset(edge: .top, spacing: 0) {
-            HStack(spacing: 10) {
-                Spacer()
-                ConnectionBadge()
-                Button { showContents = true } label: {
-                    Label("Contents", systemImage: "list.bullet.rectangle")
-                        .font(.footnote)
-                        .padding(.horizontal, 10).padding(.vertical, 6)
+            if !chromeHidden {
+                HStack(spacing: 10) {
+                    Spacer()
+                    ConnectionBadge()
+                    Button { session.contentsShown.toggle() } label: {
+                        Label("Contents", systemImage: "list.bullet.rectangle")
+                            .font(.footnote)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                    }
+                    .background(.thinMaterial, in: Capsule())
+                    .hoverEffect()
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
+                    .accessibilityLabel("Contents")
+                    Button { library.closeBook() } label: {
+                        Label("Bookshelf", systemImage: "books.vertical")
+                            .font(.footnote)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                    }
+                    .background(.thinMaterial, in: Capsule())
+                    .hoverEffect()
+                    .accessibilityLabel("Bookshelf")
                 }
-                .background(.thinMaterial, in: Capsule())
-                .accessibilityLabel("Contents")
-                Button { library.closeBook() } label: {
-                    Label("Bookshelf", systemImage: "books.vertical")
-                        .font(.footnote)
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                }
-                .background(.thinMaterial, in: Capsule())
-                .accessibilityLabel("Bookshelf")
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
         }
+        .animation(.easeInOut(duration: 0.2), value: chromeHidden)
     }
 }
 
@@ -175,9 +207,9 @@ struct BookshelfView: View {
                     .scaledToFit()
                     .frame(height: 160)
                     .accessibilityHidden(true)
-                Text("Chiron").font(.system(size: 52, weight: .semibold, design: .serif))
+                Text("Chiron").font(Typography.display(52))
                 Text("The bookshelf")
-                    .font(.title3.italic())
+                    .font(Typography.serifItalic(20))
                     .foregroundStyle(.secondary)
             }
             VStack(spacing: 12) {
@@ -187,9 +219,9 @@ struct BookshelfView: View {
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(s.title).font(.title3.weight(.semibold))
+                                Text(s.title).font(Typography.serif(22, weight: .semibold, relativeTo: .title3))
                                 Text(s.id == library.activeSubjectID ? "Open now" : s.progressLine)
-                                    .font(.caption).foregroundStyle(.secondary)
+                                    .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.secondary)
                             }
                             Spacer()
                             Image(systemName: "chevron.right").foregroundStyle(.secondary)
@@ -199,6 +231,7 @@ struct BookshelfView: View {
                         .background(Color.gray.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
                     }
                     .buttonStyle(.plain)
+                    .hoverEffect()
                     .accessibilityLabel(s.title)
                     .accessibilityHint(s.id == library.activeSubjectID ? "Open now" : s.progressLine)
                 }

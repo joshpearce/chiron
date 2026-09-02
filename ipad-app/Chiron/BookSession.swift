@@ -40,6 +40,10 @@ final class BookSession: ObservableObject {
     @Published var lastResults: [GradeResult] = []
     /// A non-fatal problem worth a line on the current screen.
     @Published var errorMessage: String?
+    /// Reader chrome (top strip, bottom bar) hidden by a tap on the page.
+    @Published var chromeHidden = false
+    /// The contents beside the reader (regular width) or over it (compact).
+    @Published var contentsShown = false
 
     let subjectID: String
     let title: String
@@ -50,6 +54,8 @@ final class BookSession: ObservableObject {
     private var beatResponses: [BeatResponse] = []
     private var chapterOpenedAt: Date?
     private var pretestDone = false
+    /// Where the reader left each chapter: scroll offset in CSS pixels.
+    private var positions: [String: Double] = [:]
     /// Held from a graded exchange until the learner leaves the results.
     private var pendingBreak: BreakSuggestion?
     private var pendingAuthoring: String?
@@ -160,6 +166,7 @@ final class BookSession: ObservableObject {
     /// question, a calibration series is measurement, a pretest comes before
     /// the prose, and otherwise there is a chapter to read.
     private func show(_ ch: ChapterPayload) {
+        chromeHidden = false
         if ch.screener != nil {
             screen = .placement
         } else if ch.isCalibration {
@@ -349,7 +356,7 @@ final class BookSession: ObservableObject {
         return Date().timeIntervalSince(t) / 60
     }
 
-    // MARK: - beat responses from the webview bridge
+    // MARK: - the reader's bridge
 
     func recordBeat(_ r: BeatResponse) {
         beatResponses.removeAll { $0.beatId == r.beatId }
@@ -357,11 +364,26 @@ final class BookSession: ObservableObject {
         persist()
     }
 
+    /// The reader reports where it is as the page scrolls; the position is
+    /// kept per chapter so a book reopens where it was left.
+    func recordPosition(unit: String, offset: Double) {
+        positions[unit] = offset
+    }
+
+    func position(for unit: String) -> Double {
+        positions[unit] ?? 0
+    }
+
+    func toggleChrome() {
+        chromeHidden.toggle()
+    }
+
     // MARK: - persistence
 
     private struct Position: Codable {
         var pendingAuthoring: String?
         var pretestDone: Bool
+        var positions: [String: Double]?
     }
 
     private func file(_ name: String) -> URL {
@@ -388,6 +410,7 @@ final class BookSession: ObservableObject {
            let p = try? JSONDecoder().decode(Position.self, from: d) {
             pendingAuthoring = p.pendingAuthoring
             pretestDone = p.pretestDone
+            positions = p.positions ?? [:]
         }
     }
 
@@ -403,7 +426,7 @@ final class BookSession: ObservableObject {
         if let d = try? JSONEncoder().encode(beatResponses) {
             try? d.write(to: file("beats"))
         }
-        if let d = try? JSONEncoder().encode(Position(pendingAuthoring: pendingAuthoring, pretestDone: pretestDone)) {
+        if let d = try? JSONEncoder().encode(Position(pendingAuthoring: pendingAuthoring, pretestDone: pretestDone, positions: positions)) {
             try? d.write(to: file("position"))
         }
     }

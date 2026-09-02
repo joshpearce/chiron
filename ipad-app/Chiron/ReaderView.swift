@@ -13,7 +13,16 @@ struct ReaderContainer: View {
         VStack(spacing: 0) {
             ReaderView(chapter: chapter)
                 .ignoresSafeArea(edges: .bottom)
-            Divider()
+            if !session.chromeHidden {
+                Divider()
+                bottomBar
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: session.chromeHidden)
+    }
+
+    private var bottomBar: some View {
+        Group {
             HStack {
                 if let state = session.bookState, !state.debt.isEmpty {
                     Button {
@@ -51,8 +60,13 @@ struct ReaderContainer: View {
 struct ReaderView: UIViewRepresentable {
     let chapter: ChapterPayload
     @EnvironmentObject var session: BookSession
+    @Environment(\.sizeCategory) private var sizeCategory
 
     func makeCoordinator() -> Coordinator { Coordinator(session: session) }
+
+    /// The system's body text scale, handed to the stylesheet so the page
+    /// reflows with Dynamic Type rather than zooming.
+    private var scale: CGFloat { UIFontMetrics(forTextStyle: .body).scaledValue(for: 100) / 100 }
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -70,12 +84,17 @@ struct ReaderView: UIViewRepresentable {
     func updateUIView(_ web: WKWebView, context: Context) {
         if context.coordinator.loadedUnit != chapter.unit {
             load(into: web, context: context)
+        } else if context.coordinator.scale != scale {
+            context.coordinator.scale = scale
+            web.evaluateJavaScript("setScale(\(scale))")
         }
     }
 
     private func load(into web: WKWebView, context: Context) {
         context.coordinator.loadedUnit = chapter.unit
         context.coordinator.pendingChapter = chapter
+        context.coordinator.scale = scale
+        context.coordinator.position = session.position(for: chapter.unit)
         guard let template = Bundle.main.url(forResource: "chapter", withExtension: "html") else { return }
         web.loadFileURL(template, allowingReadAccessTo: template.deletingLastPathComponent())
     }
@@ -85,6 +104,8 @@ struct ReaderView: UIViewRepresentable {
         weak var web: WKWebView?
         var loadedUnit: String?
         var pendingChapter: ChapterPayload?
+        var scale: CGFloat = 1
+        var position: Double = 0
 
         init(session: BookSession) { self.session = session }
 
@@ -97,8 +118,14 @@ struct ReaderView: UIViewRepresentable {
                 if let ch = pendingChapter,
                    let data = try? JSONEncoder().encode(ch),
                    let json = String(data: data, encoding: .utf8) {
-                    web?.evaluateJavaScript("initChapter(\(json))")
+                    web?.evaluateJavaScript("setScale(\(scale)); initChapter(\(json), \(position))")
                 }
+            case "scroll":
+                if let unit = loadedUnit, let offset = body["offset"] as? Double {
+                    Task { @MainActor in self.session.recordPosition(unit: unit, offset: offset) }
+                }
+            case "tap":
+                Task { @MainActor in self.session.toggleChrome() }
             case "beat":
                 let r = BeatResponse(
                     beatId: body["beatId"] as? String ?? "",

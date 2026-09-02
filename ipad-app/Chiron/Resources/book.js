@@ -20,7 +20,9 @@ function post(msg) {
   }
 }
 
-function initChapter(payload) {
+/* position: the scroll offset to restore, from the native side's memory of
+ * where this chapter was left. */
+function initChapter(payload, position) {
   CH = payload;
   const root = document.getElementById("chapter");
   root.innerHTML =
@@ -33,7 +35,30 @@ function initChapter(payload) {
     if (holder) renderBeat(holder, beat);
   }
   renderMathIn(root);
-  window.scrollTo(0, 0);
+  window.scrollTo(0, position || 0);
+}
+
+/* The native side keeps the reading position; report it as the page
+ * settles rather than on every scroll event. */
+let scrollTimer = null;
+window.addEventListener("scroll", () => {
+  clearTimeout(scrollTimer);
+  scrollTimer = setTimeout(() => {
+    post({ type: "scroll", offset: window.scrollY });
+  }, 300);
+});
+
+/* A tap on the page itself (not on anything that answers or links) toggles
+ * the reader's chrome. */
+document.addEventListener("click", (e) => {
+  if (e.target.closest("a, button, input, textarea, select, .beat")) return;
+  post({ type: "tap" });
+});
+
+/* Dynamic Type: the native side passes the system's body scale factor and
+ * the stylesheet sizes everything from it. */
+function setScale(scale) {
+  document.documentElement.style.setProperty("--scale", String(scale));
 }
 
 function renderMathIn(el) {

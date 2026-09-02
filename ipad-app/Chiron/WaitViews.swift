@@ -11,7 +11,7 @@ struct WaitOverlay: View {
             VStack(spacing: 14) {
                 ProgressView().controlSize(.large)
                 Text(text)
-                    .font(.system(.title3, design: .serif))
+                    .font(Typography.serif(20, relativeTo: .title3))
             }
             .padding(30)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -29,12 +29,12 @@ struct AuthoringView: View {
     var body: some View {
         VStack(spacing: 18) {
             Text("The next chapter is being written.")
-                .font(.system(size: 30, weight: .semibold, design: .serif))
+                .font(Typography.display(30))
                 .multilineTextAlignment(.center)
             Text(long
                  ? "Still writing. This can take a few minutes; the book opens on it as soon as it is done."
                  : "It is being shaped by what you just answered.")
-                .font(.system(.title3, design: .serif))
+                .font(Typography.serif(20, relativeTo: .title3))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             ProgressView()
@@ -60,7 +60,7 @@ struct ErrorView: View {
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             Text(message)
-                .font(.system(size: 26, weight: .semibold, design: .serif))
+                .font(Typography.display(26))
                 .multilineTextAlignment(.center)
             Button("Try again") {
                 Task { await session.retry() }
