@@ -5,7 +5,7 @@
 # review by eye.
 #
 #   ./scripts/sim-verify.sh                 both devices, light and dark, both text sizes
-#   DEVICES="chiron-ipad-15" THEMES=light SIZES=default ./scripts/sim-verify.sh
+#   DEVICES="chiron-ipad-15" THEMES=light SIZES=large ./scripts/sim-verify.sh
 #   SUBJECT=data ./scripts/sim-verify.sh    walk the other book
 #
 # Output: $OUT/<device>/<theme>-<size>/<nn>-<screen>.png (default
@@ -22,7 +22,8 @@ LEVEL="${LEVEL:-2}"
 OUT="${OUT:-$ROOT/ipad-app/verify}"
 DEVICES="${DEVICES:-chiron-ipad chiron-ipad-15}"
 THEMES="${THEMES:-light dark}"
-SIZES="${SIZES:-default accessibility-extra-large}"
+# "large" is the system default size; "default" is not a name simctl knows.
+SIZES="${SIZES:-large accessibility-extra-large}"
 PORT=8087
 H="http://localhost:$PORT"
 
@@ -95,8 +96,8 @@ for DEVICE in $DEVICES; do
       mkdir -p "$DIR"
       rm -f "$DIR"/*.png
       echo "-- $THEME $SIZE -> $DIR"
-      xcrun simctl ui "$UDID" appearance "$THEME" >/dev/null 2>&1 || true
-      xcrun simctl ui "$UDID" content_size "$SIZE" >/dev/null 2>&1 || true
+      xcrun simctl ui "$UDID" appearance "$THEME"
+      xcrun simctl ui "$UDID" content_size "$SIZE"
       reset_subject
       xcrun simctl terminate "$UDID" "$BUNDLE" 2>/dev/null || true
       SIMCTL_CHILD_CHIRON_SERVER="$SERVER" xcrun simctl launch "$UDID" "$BUNDLE" harness "harness_port=$PORT" >/dev/null
@@ -135,7 +136,7 @@ for DEVICE in $DEVICES; do
       xcrun simctl terminate "$UDID" "$BUNDLE" 2>/dev/null || true
     done
   done
-  xcrun simctl ui "$UDID" appearance light >/dev/null 2>&1 || true
-  xcrun simctl ui "$UDID" content_size default >/dev/null 2>&1 || true
+  xcrun simctl ui "$UDID" appearance light
+  xcrun simctl ui "$UDID" content_size large
 done
 echo "screenshots in $OUT"
