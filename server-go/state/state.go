@@ -100,6 +100,7 @@ type Data struct {
 	Summary        string                         `json:"summary"`
 	CurrentUnit    *string                        `json:"current_unit"`
 	ChapterCache   map[string]any                 `json:"chapter_cache"`
+	Questions      []Question                     `json:"questions,omitempty"`
 }
 
 // Event is one entry in the append-only log. Fields are optional per kind; the
@@ -131,6 +132,19 @@ type Event struct {
 	Text string `json:"text,omitempty"`
 	Ref  any    `json:"ref,omitempty"`
 }
+
+// Question is something the reader asked about a passage, with the answer
+// they were given. Kept so the planner can see what confused them.
+type Question struct {
+	Unit     string  `json:"unit"`
+	Quote    string  `json:"quote"`
+	Question string  `json:"question"`
+	Answer   string  `json:"answer"`
+	TS       float64 `json:"ts"`
+}
+
+// maxQuestions bounds the snapshot: the log keeps everything.
+const maxQuestions = 200
 
 type Learner struct {
 	dir    string
@@ -326,6 +340,12 @@ func (l *Learner) handle(ev Event) {
 	case "self_rating":
 		if ev.Score != nil {
 			l.Data.Profile.SelfRating = int(*ev.Score)
+		}
+	case "asked":
+		l.Data.Questions = append(l.Data.Questions, Question{
+			Unit: ev.Unit, Quote: ev.Evidence, Question: ev.Text, Answer: ev.Why, TS: ev.TS})
+		if n := len(l.Data.Questions); n > maxQuestions {
+			l.Data.Questions = l.Data.Questions[n-maxQuestions:]
 		}
 	case "assumed_known":
 		seen := map[string]bool{}
@@ -599,6 +619,19 @@ func (l *Learner) MinutesSinceBreak() float64 {
 		}
 	}
 	return total
+}
+
+// Questions returns what the reader asked, newest last; unit "" means all.
+func (l *Learner) Questions(unit string) []Question {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var out []Question
+	for _, q := range l.Data.Questions {
+		if unit == "" || q.Unit == unit {
+			out = append(out, q)
+		}
+	}
+	return out
 }
 
 func (l *Learner) Snapshot() Data {

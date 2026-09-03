@@ -233,3 +233,62 @@ func TestPlannerSeesTheSelfRating(t *testing.T) {
 		t.Errorf("unrated learner should be marked as not asked:\n%s", chain.user)
 	}
 }
+
+// The answer is grounded in the section the quote came from, not the whole
+// unit, and the reader's question travels verbatim.
+func TestAnswerIsGroundedInTheQuotedSection(t *testing.T) {
+	c, l := fixtures(t)
+	unit := c.Units["u1"]
+	var quoteSection string
+	for _, s := range unit.Sections {
+		if strings.Contains(s.Heading, "Tokens") {
+			quoteSection = s.Markdown()
+		}
+	}
+	if quoteSection == "" {
+		t.Fatal("no tokens section in u1")
+	}
+	// A quote as the rendered page would give it: rewrapped whitespace.
+	quote := "Frequent words become single symbols, rare words decompose into pieces"
+	chain := &capturingChain{}
+	if _, err := AnswerQuestion(chain, unit, quote, "why not just use words?", l); err == nil {
+		t.Fatal("captured chain should fail")
+	}
+	if !strings.Contains(chain.user, "why not just use words?") {
+		t.Errorf("question missing from prompt:\n%s", chain.user)
+	}
+	if !strings.Contains(chain.user, "Tokens: BPE from scratch") {
+		t.Errorf("the quoted section is not the context:\n%.400s", chain.user)
+	}
+	if strings.Contains(chain.user, "Embeddings are coordinates") {
+		t.Errorf("unrelated sections leaked into the context")
+	}
+
+	// A quote nothing matches falls back to the whole unit.
+	chain = &capturingChain{}
+	AnswerQuestion(chain, unit, "text the author rewrote entirely", "what?", l)
+	if !strings.Contains(chain.user, "Embeddings are coordinates") || !strings.Contains(chain.user, "Tokens: BPE") {
+		t.Errorf("fallback should carry the whole unit")
+	}
+}
+
+// A question asked while reading is a confusion the check may never surface;
+// the planner sees the recent ones.
+func TestPlannerSeesRecentQuestions(t *testing.T) {
+	c, l := fixtures(t)
+	if _, err := l.Apply(state.Event{Kind: "asked", Unit: "u1", Text: "why is the loss in nats?",
+		Evidence: "the loss is this same quantity in natural-log units", Why: "..."}); err != nil {
+		t.Fatal(err)
+	}
+	chain := &capturingChain{}
+	PlanDirectives(chain, l, c.Units["u2"], "Check u1: 50% (below gate). ")
+	if !strings.Contains(chain.user, "why is the loss in nats?") || !strings.Contains(chain.user, "[u1]") {
+		t.Errorf("planner prompt lacks the reader's question:\n%s", chain.user)
+	}
+	chain = &capturingChain{}
+	_, l2 := fixtures(t)
+	PlanDirectives(chain, l2, c.Units["u2"], "Check u1: 50% (below gate). ")
+	if !strings.Contains(chain.user, "QUESTIONS THE READER ASKED WHILE READING (newest last):\n(none)") {
+		t.Errorf("no questions should read as none:\n%s", chain.user)
+	}
+}

@@ -288,3 +288,33 @@ func TestFloorProbesNeverCertifyMastery(t *testing.T) {
 		t.Errorf("unbanded ladder -> %q, want mastered", got)
 	}
 }
+
+// What the reader asked about a passage is part of the state: the planner
+// reads it, and it survives a restart like everything else in the log.
+func TestAskedQuestionsAreKeptPerUnit(t *testing.T) {
+	l := newLearner(t)
+	for _, q := range []struct{ unit, quote, question, answer string }{
+		{"u1", "the loss is the compressed size", "why bits and not nats?", "Because..."},
+		{"u1", "4096! relabelings", "is that a factorial?", "Yes..."},
+		{"u2", "softmax", "why exponentiate?", "Because..."},
+	} {
+		if _, err := l.Apply(Event{Kind: "asked", Unit: q.unit, Text: q.question, Evidence: q.quote, Why: q.answer}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := l.Questions("u1"); len(got) != 2 || got[1].Question != "is that a factorial?" || got[1].Answer != "Yes..." {
+		t.Fatalf("u1 questions = %+v", got)
+	}
+	if got := l.Questions(""); len(got) != 3 || got[2].Unit != "u2" {
+		t.Fatalf("all questions = %+v", got)
+	}
+
+	// Survives a reload from disk.
+	l2, err := Open(l.dir, l.corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := l2.Questions(""); len(got) != 3 || got[0].Quote != "the loss is the compressed size" {
+		t.Fatalf("after reload, questions = %+v", got)
+	}
+}

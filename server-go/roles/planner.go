@@ -138,6 +138,9 @@ OPEN DEBT: %s
 SESSION: %.0f min elapsed, fatigue_flag=%t
 SELF-RATED START: %s
 
+QUESTIONS THE READER ASKED WHILE READING (newest last):
+%s
+
 LAST CHECK:
 %s
 
@@ -153,6 +156,7 @@ Concepts: %s`,
 		orNone(strings.Join(debtUnits, ", ")),
 		l.SessionMinutes(), snapshot.Pacing.FatigueFlag,
 		selfRatingLine(snapshot.Profile.SelfRating),
+		recentQuestions(l, 6),
 		lastCheck,
 		unit.ID, unit.Title, unit.Minutes,
 		orNone(unit.Notes),
@@ -195,4 +199,26 @@ func orNone(s string) string {
 		return "none"
 	}
 	return s
+}
+
+// recentQuestions lists the last n things the reader asked about passages,
+// with what they highlighted: a question is a confusion the check may never
+// surface, and the next chapter should answer it before it is asked again.
+func recentQuestions(l *state.Learner, n int) string {
+	qs := l.Questions("")
+	if len(qs) == 0 {
+		return "(none)"
+	}
+	if len(qs) > n {
+		qs = qs[len(qs)-n:]
+	}
+	var lines []string
+	for _, q := range qs {
+		quote := strings.Join(strings.Fields(q.Quote), " ")
+		if len(quote) > 120 {
+			quote = quote[:120] + "..."
+		}
+		lines = append(lines, fmt.Sprintf("- [%s] on %q: %s", q.Unit, quote, q.Question))
+	}
+	return strings.Join(lines, "\n")
 }

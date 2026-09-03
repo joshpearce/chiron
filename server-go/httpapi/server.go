@@ -345,6 +345,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /pages/{subject}/contents", s.handleContentsMeta)
 	mux.HandleFunc("GET /pages/{subject}/contents/{page}", s.handleContentsPage)
 	mux.HandleFunc("POST /ink/{subject}", s.handleInk)
+	mux.HandleFunc("POST /ask/{subject}", s.handleAsk)
 	mux.HandleFunc("POST /drive/cmd", s.handleDriveCmd)
 	mux.HandleFunc("GET /drive/next", s.handleDriveNext)
 	mux.HandleFunc("POST /drive/ack", s.handleDriveAck)
