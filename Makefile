@@ -19,7 +19,8 @@ test:
 	node scripts/test-book-js.mjs
 
 lint:
-	$(GO) run ./cmd/corpus-lint corpus corpus-v2
+	$(GO) run ./cmd/corpus-lint ../corpus
+	$(GO) run ./cmd/corpus-lint ../corpus-v2
 
 # Build, keep yesterday's binary under a dated name, swap, restart, verify.
 # The book server sits on 8081 behind the gate; 8080 answers through it.

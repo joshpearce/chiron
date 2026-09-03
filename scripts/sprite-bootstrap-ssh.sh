@@ -106,8 +106,9 @@ sprite -s chiron exec -- bash -c "
 echo "==> the developer's side: PATH, the checkout, Claude Code"
 sprite -s chiron exec -- bash -c '
   set -e
-  grep -q "/.sprite/bin" /home/sprite/.bashrc || sed -i "1i export PATH=/.sprite/bin:\$HOME/go/bin:\$HOME/.local/bin:\$PATH" /home/sprite/.bashrc
-  grep -q "/.sprite/bin" /home/sprite/.profile 2>/dev/null || echo "export PATH=/.sprite/bin:\$HOME/go/bin:\$HOME/.local/bin:\$PATH" >> /home/sprite/.profile
+  # GOBIN: the sprite'"'"'s Go workspace is under /.sprite, off PATH; installs go to ~/go/bin.
+  grep -q "/.sprite/bin" /home/sprite/.bashrc || sed -i "1i export GOBIN=\$HOME/go/bin\nexport PATH=/.sprite/bin:\$HOME/go/bin:\$HOME/.local/bin:\$PATH" /home/sprite/.bashrc
+  grep -q "/.sprite/bin" /home/sprite/.profile 2>/dev/null || printf "export GOBIN=\$HOME/go/bin\nexport PATH=/.sprite/bin:\$HOME/go/bin:\$HOME/.local/bin:\$PATH\n" >> /home/sprite/.profile
   mkdir -p /home/sprite/src/chiron && cd /home/sprite/src/chiron
   [ -d .git ] || { git init -q -b main && git config receive.denyCurrentBranch updateInstead; }
   command -v claude >/dev/null || [ -x /home/sprite/.local/bin/claude ] || { curl -fsSL https://claude.ai/install.sh | bash >/tmp/claude-install.log 2>&1 && echo "claude installed"; }

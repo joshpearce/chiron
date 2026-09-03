@@ -111,7 +111,21 @@ awake.
   shows no gap (the keepalive proves the sprite stays awake).
 - Exit: `ssh chiron` works from a cold sprite, from either CLI account.
 
-**Phase B: the repo lives on the sprite.**
+**Phase B: the repo lives on the sprite.** Done 2026-09-03: checkout at
+`/home/sprite/src/chiron` (pushed from the Mac over the tunnel, remote
+`sprite`), Go 1.25 and Node 22 from the sprite's own shims, Claude Code
+present, `chiron-app` installed and configured there, `make test` green
+(16 packages plus the page script), and `make deploy` from the sprite
+served the iPad. Lessons, all folded into the scripts: the sprite is an
+8 GB box that also serves the book, and the full-parallel suite with its
+Chromium fan-out beside a `go install` took it down; it came back restored
+to a snapshot from before the bootstrap. So `make test` runs `-p 2` with
+`CHIRON_RENDER=0` (no page images; the iPad never uses them), one heavy
+job at a time, and `sprite checkpoint create` before risky work
+(checkpoints v1 and v2 exist). `sprite-env` keeps only the last `--env`
+flag, refuses to restart a service another `--needs`, and installs Go
+binaries under `/.sprite` unless `GOBIN` is set. Still Matt's: the GitHub
+PAT on the sprite and the Claude Code login there.
 - Clone to `/home/sprite/src/chiron`. Toolchain: Go, Node (for
   `scripts/test-book-js.mjs`), `tmux`, Claude Code (log in once through the
   ssh session). GitHub access is a fine-grained PAT scoped to this one

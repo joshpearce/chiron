@@ -42,7 +42,6 @@ sprite-env services create chiron-gate \\
   --cmd /home/sprite/chiron/bin/chiron-gate \\
   --args '-listen,0.0.0.0:8080,-upstream,http://127.0.0.1:8081,-ssh,127.0.0.1:2222' \\
   --env 'CHIRON_AUTH_TOKEN=${key}' \\
-  --needs chiron-server,sshd \\
   --dir /home/sprite/chiron
 sleep 2
 echo -n 'gate /ping via proxy          -> '; curl -s -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:8080/ping
@@ -63,6 +62,10 @@ sleep 2
 echo -n 'sshd on 127.0.0.1:2222        -> '; (exec 3<>/dev/tcp/127.0.0.1/2222 && head -c 7 <&3 && echo) || echo 'not listening'
 EOF
 }
+
+# No --needs between the services: a dependency cannot be restarted while
+# its dependant runs, which is exactly what `make deploy` must do to the
+# book server behind the gate.
 
 # One --env flag, comma-separated: sprite-env keeps only the last --env
 # given, which once silently dropped the key and left the book open.
