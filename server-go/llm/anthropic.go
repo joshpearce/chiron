@@ -79,7 +79,7 @@ func (a *Anthropic) Structured(role, system, user string, schema map[string]any,
 		},
 		OutputConfig: anthropic.OutputConfigParam{
 			Effort: limits.effort,
-			Format: anthropic.JSONOutputFormatParam{Schema: schema},
+			Format: anthropic.JSONOutputFormatParam{Schema: strictSchema(schema)},
 		},
 	})
 	if err != nil {
