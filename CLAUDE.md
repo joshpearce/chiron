@@ -29,6 +29,9 @@ You are on the machine that serves the book. Facts that matter:
   On 2026-09-03 the sprite twice came back from a platform storage fault
   restored to an older checkpoint; a checkpoint you made yourself is what
   limits the loss. Before anything risky: `sprite-env checkpoints create`.
+- `claude --update` hangs here: it shells out to `npm -g config get prefix`
+  through the sprite's nvm shim and never returns. Update with
+  `curl -fsSL https://claude.ai/install.sh | bash` instead.
 - Never push to GitHub unless Matt asks in the conversation, even though
   the credential here allows it.
 
