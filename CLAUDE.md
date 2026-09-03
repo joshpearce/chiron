@@ -26,10 +26,9 @@ You are on the machine that serves the book. Facts that matter:
 - The sprite has 8 GB and serves the book while you work. Run one heavy
   thing at a time (`make test` uses `-p 2` and `CHIRON_RENDER=0`, so no
   Chromium; do not run a build beside it).
-  On 2026-09-03 a full-parallel test run beside a `go install` took the
-  sprite down, and it came back restored to a snapshot from before the
-  bootstrap: half an hour of writes gone. Before anything risky:
-  `sprite-env checkpoints create`.
+  On 2026-09-03 the sprite twice came back from a platform storage fault
+  restored to an older checkpoint; a checkpoint you made yourself is what
+  limits the loss. Before anything risky: `sprite-env checkpoints create`.
 - Never push to GitHub unless Matt asks in the conversation, even though
   the credential here allows it.
 

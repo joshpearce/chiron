@@ -116,13 +116,18 @@ awake.
 `sprite`), Go 1.25 and Node 22 from the sprite's own shims, Claude Code
 present, `chiron-app` installed and configured there, `make test` green
 (16 packages plus the page script), and `make deploy` from the sprite
-served the iPad. Lessons, all folded into the scripts: the sprite is an
-8 GB box that also serves the book, and the full-parallel suite with its
-Chromium fan-out beside a `go install` took it down; it came back restored
-to a snapshot from before the bootstrap. So `make test` runs `-p 2` with
-`CHIRON_RENDER=0` (no page images; the iPad never uses them), one heavy
-job at a time, and `sprite checkpoint create` before risky work
-(checkpoints v1 and v2 exist). `sprite-env` keeps only the last `--env`
+served the iPad. The evening also had two sprite outages that at first
+looked like load from the test suite and were not: the platform logs
+(`fly-search logs app sprite66a88ef403`) show a JuiceFS chunk missing from
+object storage (404 NoSuchKey), ext4 I/O errors, and the sidecar's
+checkpoint-based recovery, which once landed on a snapshot from before the
+bootstrap and later held the machine in "replacing" through a sidecar
+upgrade to rc48. Fly's status page had a Sprites API incident that
+evening. Everything came back intact after the upgrade. The guardrails
+stay because they are cheap on an 8 GB box that also serves the book:
+`make test` runs `-p 2` with `CHIRON_RENDER=0` (no page images; the iPad
+never uses them), one heavy job at a time, and `sprite checkpoint create`
+before risky work (checkpoints v1 to v3 exist). `sprite-env` keeps only the last `--env`
 flag, refuses to restart a service another `--needs`, and installs Go
 binaries under `/.sprite` unless `GOBIN` is set. Still Matt's: the GitHub
 PAT on the sprite and the Claude Code login there.

@@ -9,9 +9,9 @@ BIN     := $(SERVED)/bin/chiron-server
 .PHONY: test lint deploy deploy-gate
 
 # On the sprite (which also serves the book, on 8 GB) the suite runs two
-# packages at a time and without browser renders: the full-parallel suite
-# with its Chromium fan-out took the sprite down once, and the restore lost
-# half an hour of writes. On a Mac renders are on; RENDER=0 turns them off.
+# packages at a time and without browser renders, so a test run never
+# competes with the reader for memory. On a Mac renders are on; RENDER=0
+# turns them off.
 RENDER ?= $(shell [ -d /.sprite ] && echo 0 || echo 1)
 
 test:
