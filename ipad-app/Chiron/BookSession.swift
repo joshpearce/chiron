@@ -56,6 +56,48 @@ final class BookSession: ObservableObject {
     private var pretestDone = false
     /// Where the reader left each chapter: scroll offset in CSS pixels.
     private var positions: [String: Double] = [:]
+    /// The reader's marks on the current chapter: highlights and questions.
+    @Published private(set) var marks: [Mark] = []
+    /// The reader's ink over the current chapter, as PencilKit data.
+    @Published var inkData: Data?
+    /// A question being asked or answered, shown in the ask card.
+    @Published var asking: Asking?
+
+    struct Asking: Equatable {
+        var mark: Mark
+        var busy = false
+        var error: String?
+    }
+
+    /// The palette's tools over the page. Pen and eraser are ink; the
+    /// highlighter and ask tools select runs of text.
+    enum Tool: String, CaseIterable {
+        case none, pen, highlighter, ask, eraser
+    }
+    @Published var tool: Tool = .none
+
+    /// The page, when one is loaded: what a script or a gesture needs from it.
+    weak var page: PageBridge?
+
+    /// Squeeze on a Pencil Pro: the next tool round the palette.
+    func cycleTool() {
+        let order: [Tool] = [.none, .pen, .highlighter, .ask]
+        let i = order.firstIndex(of: tool) ?? 0
+        tool = order[(i + 1) % order.count]
+    }
+
+    /// Double-tap on a Pencil: pen and eraser trade places.
+    func flipEraser() {
+        tool = tool == .eraser ? .pen : .eraser
+    }
+
+    /// Mark the first occurrence of a run of the chapter's text (scripts,
+    /// and restoring); the page finds the offsets.
+    @discardableResult
+    func mark(text: String, kind: Mark.Kind) async -> Mark? {
+        guard let page, let r = await page.find(text) else { return nil }
+        return addMark(kind: kind, start: r.start, end: r.end, text: r.text)
+    }
     /// Held from a graded exchange until the learner leaves the results.
     private var pendingBreak: BreakSuggestion?
     private var pendingAuthoring: String?
@@ -387,6 +429,7 @@ final class BookSession: ObservableObject {
         beatResponses = []
         pretestDone = false
         chapterOpenedAt = nil
+        loadMarks()
     }
 
     private func chunkMinutes() -> Double? {
@@ -416,6 +459,87 @@ final class BookSession: ObservableObject {
         chromeHidden.toggle()
     }
 
+    // MARK: - marks on the page
+
+    /// A highlight, or the start of a question: the mark is placed at once
+    /// and the card opens for the question.
+    @discardableResult
+    func addMark(kind: Mark.Kind, start: Int, end: Int, text: String) -> Mark {
+        let mark = Mark(id: UUID().uuidString, kind: kind, start: start, end: end, text: text)
+        marks.append(mark)
+        if kind == .question { asking = Asking(mark: mark) }
+        persistMarks()
+        return mark
+    }
+
+    func removeMark(_ id: String) {
+        marks.removeAll { $0.id == id }
+        if asking?.mark.id == id { asking = nil }
+        persistMarks()
+    }
+
+    /// Reopen the card on an existing question, or nothing for a highlight.
+    func openMark(_ id: String) {
+        guard let m = marks.first(where: { $0.id == id }), m.kind == .question else { return }
+        asking = Asking(mark: m)
+    }
+
+    func closeAsking() {
+        // A question card closed with nothing asked leaves no mark behind.
+        if let a = asking, a.mark.question == nil {
+            marks.removeAll { $0.id == a.mark.id }
+            persistMarks()
+        }
+        asking = nil
+    }
+
+    /// Send the question with its passage; the answer lands on the mark.
+    func ask(_ question: String) async {
+        guard var a = asking, let unit = chapter?.unit else { return }
+        let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty, !a.busy else { return }
+        a.busy = true
+        a.error = nil
+        a.mark.question = q
+        asking = a
+        do {
+            let reply = try await service.ask(subject: subjectID, unit: unit, quote: a.mark.text, question: q)
+            a.mark.answer = reply.answerMd
+        } catch {
+            a.error = "The tutor can't be reached. Try again."
+        }
+        a.busy = false
+        asking = a
+        if let i = marks.firstIndex(where: { $0.id == a.mark.id }) { marks[i] = a.mark }
+        persistMarks()
+    }
+
+    func saveInk(_ data: Data?) {
+        inkData = data
+        guard let unit = chapter?.unit else { return }
+        let url = dir.appendingPathComponent("ink-\(unit).pkdrawing")
+        if let data { try? data.write(to: url) } else { try? FileManager.default.removeItem(at: url) }
+    }
+
+    private func loadMarks() {
+        marks = []
+        inkData = nil
+        asking = nil
+        guard let unit = chapter?.unit else { return }
+        if let d = try? Data(contentsOf: dir.appendingPathComponent("marks-\(unit).json")),
+           let m = try? JSONDecoder().decode([Mark].self, from: d) {
+            marks = m
+        }
+        inkData = try? Data(contentsOf: dir.appendingPathComponent("ink-\(unit).pkdrawing"))
+    }
+
+    private func persistMarks() {
+        guard let unit = chapter?.unit else { return }
+        if let d = try? JSONEncoder().encode(marks) {
+            try? d.write(to: dir.appendingPathComponent("marks-\(unit).json"))
+        }
+    }
+
     // MARK: - persistence
 
     private struct Position: Codable {
@@ -435,6 +559,7 @@ final class BookSession: ObservableObject {
         if let d = try? Data(contentsOf: file("chapter")),
            let ch = try? JSONDecoder().decode(ChapterPayload.self, from: d) {
             chapter = ch
+            loadMarks()
         }
         if let d = try? Data(contentsOf: file("state")),
            let st = try? JSONDecoder().decode(BookState.self, from: d) {
@@ -468,4 +593,11 @@ final class BookSession: ObservableObject {
             try? d.write(to: file("position"))
         }
     }
+}
+
+/// What the loaded page can do for the session.
+@MainActor
+protocol PageBridge: AnyObject {
+    /// Offsets of the first occurrence of text in the chapter, or nil.
+    func find(_ text: String) async -> (start: Int, end: Int, text: String)?
 }

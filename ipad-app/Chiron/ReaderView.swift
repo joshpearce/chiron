@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import PencilKit
 
 struct ReaderContainer: View {
     @EnvironmentObject var session: BookSession
@@ -13,12 +14,24 @@ struct ReaderContainer: View {
         VStack(spacing: 0) {
             ReaderView(chapter: chapter)
                 .ignoresSafeArea(edges: .bottom)
+                .overlay(alignment: .trailing) {
+                    Palette()
+                        .padding(.trailing, 10)
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if session.asking != nil {
+                        AskCard()
+                            .padding(16)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
             if !session.chromeHidden {
                 Divider()
                 bottomBar
             }
         }
         .animation(.easeInOut(duration: 0.2), value: session.chromeHidden)
+        .animation(.easeInOut(duration: 0.2), value: session.asking != nil)
     }
 
     private var bottomBar: some View {
@@ -57,6 +70,10 @@ struct ReaderContainer: View {
     }
 }
 
+/// The chapter page: a web view for the prose, with the reader's ink riding
+/// inside its scroll view so it scrolls with the text, and a gesture layer
+/// over it that turns a drag into a run of text for the highlighter and the
+/// ask tool. The Pencil Pro's squeeze and double-tap land here too.
 struct ReaderView: UIViewRepresentable {
     let chapter: ChapterPayload
     @EnvironmentObject var session: BookSession
@@ -72,42 +89,184 @@ struct ReaderView: UIViewRepresentable {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "bridge")
         let web = WKWebView(frame: .zero, configuration: config)
-        if #available(iOS 16.4, *) {
-            web.isInspectable = true
-        }
+        web.isInspectable = true
         web.scrollView.contentInsetAdjustmentBehavior = .never
-        context.coordinator.web = web
+        context.coordinator.attach(to: web)
         load(into: web, context: context)
         return web
     }
 
     func updateUIView(_ web: WKWebView, context: Context) {
-        if context.coordinator.loadedUnit != chapter.unit {
+        let c = context.coordinator
+        if c.loadedUnit != chapter.unit {
             load(into: web, context: context)
-        } else if context.coordinator.scale != scale {
-            context.coordinator.scale = scale
+        } else if c.scale != scale {
+            c.scale = scale
             web.evaluateJavaScript("setScale(\(scale))")
         }
+        c.apply(tool: session.tool)
+        c.apply(marks: session.marks)
+        c.apply(ink: session.inkData)
     }
 
     private func load(into web: WKWebView, context: Context) {
-        context.coordinator.loadedUnit = chapter.unit
-        context.coordinator.pendingChapter = chapter
-        context.coordinator.scale = scale
-        context.coordinator.position = session.position(for: chapter.unit)
+        let c = context.coordinator
+        c.loadedUnit = chapter.unit
+        c.pendingChapter = chapter
+        c.scale = scale
+        c.position = session.position(for: chapter.unit)
+        c.pageReady = false
+        c.appliedMarks = nil
         guard let template = Bundle.main.url(forResource: "chapter", withExtension: "html") else { return }
         web.loadFileURL(template, allowingReadAccessTo: template.deletingLastPathComponent())
     }
 
-    final class Coordinator: NSObject, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKScriptMessageHandler, PKCanvasViewDelegate,
+                             UIPencilInteractionDelegate, PageBridge {
         let session: BookSession
         weak var web: WKWebView?
         var loadedUnit: String?
         var pendingChapter: ChapterPayload?
         var scale: CGFloat = 1
         var position: Double = 0
+        var pageReady = false
+        var appliedMarks: [Mark]?
+        private var appliedTool: BookSession.Tool = .none
+        private var appliedInk: Data?
+        private var loadingInk = false
 
-        init(session: BookSession) { self.session = session }
+        private let canvas = PKCanvasView()
+        private let marker = MarkGestureView()
+        private var contentSizeObservation: NSKeyValueObservation?
+
+        init(session: BookSession) {
+            self.session = session
+            super.init()
+            session.page = self
+        }
+
+        func attach(to web: WKWebView) {
+            self.web = web
+
+            // The ink lives inside the page's scroll view, sized to the
+            // content, so it scrolls with the text it annotates. With the
+            // default drawing policy a paired Pencil draws and fingers keep
+            // scrolling; without one, fingers draw.
+            canvas.drawingPolicy = .default
+            canvas.backgroundColor = .clear
+            canvas.isOpaque = false
+            canvas.isScrollEnabled = false
+            canvas.delegate = self
+            canvas.isUserInteractionEnabled = false
+            web.scrollView.addSubview(canvas)
+            contentSizeObservation = web.scrollView.observe(\.contentSize, options: [.initial, .new]) { [weak self] sv, _ in
+                self?.canvas.frame = CGRect(origin: .zero, size: sv.contentSize)
+            }
+
+            // The text-selection layer sits over the viewport (the page's
+            // caret lookup works in viewport coordinates).
+            marker.translatesAutoresizingMaskIntoConstraints = false
+            marker.isUserInteractionEnabled = false
+            marker.onPreview = { [weak self] a, b in self?.preview(from: a, to: b) }
+            marker.onSelect = { [weak self] a, b in self?.select(from: a, to: b) }
+            web.addSubview(marker)
+            NSLayoutConstraint.activate([
+                marker.leadingAnchor.constraint(equalTo: web.leadingAnchor),
+                marker.trailingAnchor.constraint(equalTo: web.trailingAnchor),
+                marker.topAnchor.constraint(equalTo: web.topAnchor),
+                marker.bottomAnchor.constraint(equalTo: web.bottomAnchor),
+            ])
+
+            web.addInteraction(UIPencilInteraction(delegate: self))
+        }
+
+        // MARK: tools
+
+        func apply(tool: BookSession.Tool) {
+            guard tool != appliedTool else { return }
+            appliedTool = tool
+            switch tool {
+            case .pen:
+                canvas.tool = PKInkingTool(.pen, color: .systemRed, width: 2.5)
+                canvas.isUserInteractionEnabled = true
+                marker.isUserInteractionEnabled = false
+            case .eraser:
+                canvas.tool = PKEraserTool(.vector)
+                canvas.isUserInteractionEnabled = true
+                marker.isUserInteractionEnabled = false
+            case .highlighter, .ask:
+                canvas.isUserInteractionEnabled = false
+                marker.isUserInteractionEnabled = true
+            case .none:
+                canvas.isUserInteractionEnabled = false
+                marker.isUserInteractionEnabled = false
+            }
+        }
+
+        // MARK: ink
+
+        func apply(ink: Data?) {
+            guard ink != appliedInk else { return }
+            appliedInk = ink
+            loadingInk = true
+            canvas.drawing = ink.flatMap { try? PKDrawing(data: $0) } ?? PKDrawing()
+            loadingInk = false
+        }
+
+        func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+            guard !loadingInk else { return }
+            let data = canvasView.drawing.strokes.isEmpty ? nil : canvasView.drawing.dataRepresentation()
+            appliedInk = data
+            Task { @MainActor in self.session.saveInk(data) }
+        }
+
+        // MARK: marks
+
+        func apply(marks: [Mark]) {
+            guard pageReady, marks != appliedMarks else { return }
+            appliedMarks = marks
+            let list = marks.map { ["id": $0.id, "kind": $0.kind.rawValue, "start": $0.start, "end": $0.end] as [String: Any] }
+            if let data = try? JSONSerialization.data(withJSONObject: list),
+               let json = String(data: data, encoding: .utf8) {
+                web?.evaluateJavaScript("applyMarks(\(json))")
+            }
+        }
+
+        private func preview(from a: CGPoint, to b: CGPoint) {
+            web?.evaluateJavaScript("previewRange(\(a.x), \(a.y), \(b.x), \(b.y))")
+        }
+
+        private func select(from a: CGPoint, to b: CGPoint) {
+            web?.evaluateJavaScript("unmark('preview'); offsetsFromPoints(\(a.x), \(a.y), \(b.x), \(b.y))") { [weak self] result, _ in
+                guard let self, let r = result as? [String: Any],
+                      let start = r["start"] as? Int, let end = r["end"] as? Int, let text = r["text"] as? String else { return }
+                Task { @MainActor in
+                    let kind: Mark.Kind = self.session.tool == .ask ? .question : .highlight
+                    self.session.addMark(kind: kind, start: start, end: end, text: text)
+                }
+            }
+        }
+
+        func find(_ text: String) async -> (start: Int, end: Int, text: String)? {
+            guard let web, pageReady else { return nil }
+            let escaped = text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+            guard let r = try? await web.evaluateJavaScript("findText('\(escaped)')") as? [String: Any],
+                  let start = r["start"] as? Int, let end = r["end"] as? Int, let found = r["text"] as? String else { return nil }
+            return (start, end, found)
+        }
+
+        // MARK: pencil
+
+        func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
+            Task { @MainActor in self.session.flipEraser() }
+        }
+
+        func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveSqueeze squeeze: UIPencilInteraction.Squeeze) {
+            guard squeeze.phase == .ended else { return }
+            Task { @MainActor in self.session.cycleTool() }
+        }
+
+        // MARK: the page's messages
 
         func userContentController(_ ucc: WKUserContentController,
                                    didReceive message: WKScriptMessage) {
@@ -118,7 +277,11 @@ struct ReaderView: UIViewRepresentable {
                 if let ch = pendingChapter,
                    let data = try? JSONEncoder().encode(ch),
                    let json = String(data: data, encoding: .utf8) {
-                    web?.evaluateJavaScript("setScale(\(scale)); initChapter(\(json), \(position))")
+                    web?.evaluateJavaScript("setScale(\(scale)); initChapter(\(json), \(position))") { [weak self] _, _ in
+                        guard let self else { return }
+                        self.pageReady = true
+                        Task { @MainActor in self.apply(marks: self.session.marks) }
+                    }
                 }
             case "scroll":
                 if let unit = loadedUnit, let offset = body["offset"] as? Double {
@@ -126,6 +289,10 @@ struct ReaderView: UIViewRepresentable {
                 }
             case "tap":
                 Task { @MainActor in self.session.toggleChrome() }
+            case "mark":
+                if let id = body["id"] as? String {
+                    Task { @MainActor in self.session.openMark(id) }
+                }
             case "beat":
                 let r = BeatResponse(
                     beatId: body["beatId"] as? String ?? "",
@@ -136,6 +303,34 @@ struct ReaderView: UIViewRepresentable {
             default:
                 break
             }
+        }
+    }
+}
+
+/// A drag across the page selects a run of text. Reports the drag as it
+/// moves (for the provisional highlight) and when it ends.
+final class MarkGestureView: UIView {
+    var onPreview: ((CGPoint, CGPoint) -> Void)?
+    var onSelect: ((CGPoint, CGPoint) -> Void)?
+    private var start: CGPoint = .zero
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(pan(_:)))
+        pan.maximumNumberOfTouches = 1
+        addGestureRecognizer(pan)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func pan(_ g: UIPanGestureRecognizer) {
+        let p = g.location(in: self)
+        switch g.state {
+        case .began: start = p
+        case .changed: onPreview?(start, p)
+        case .ended: onSelect?(start, p)
+        default: break
         }
     }
 }

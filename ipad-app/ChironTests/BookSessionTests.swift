@@ -10,8 +10,10 @@ final class FakeService: ChironService {
     var onExchange: (ExchangeRequest) throws -> ExchangeResponse = { _ in throw URLError(.cannotConnectToHost) }
     var onReset: (String) throws -> BookState = { _ in throw URLError(.cannotConnectToHost) }
     var onInk: (String, InkSubmission) throws -> ExchangeResponse = { _, _ in throw URLError(.cannotConnectToHost) }
+    var onAsk: (String, String, String) throws -> AskResponse = { _, _, _ in throw URLError(.cannotConnectToHost) }
     var exchanges: [ExchangeRequest] = []
     var inks: [InkSubmission] = []
+    var asks: [(unit: String, quote: String, question: String)] = []
     var chapterPolls = 0
 
     func subjects() async throws -> SubjectsResponse { try onSubjects() }
@@ -27,6 +29,10 @@ final class FakeService: ChironService {
     func ink(subject: String, _ submission: InkSubmission) async throws -> ExchangeResponse {
         inks.append(submission)
         return try onInk(subject, submission)
+    }
+    func ask(subject: String, unit: String, quote: String, question: String) async throws -> AskResponse {
+        asks.append((unit, quote, question))
+        return try onAsk(unit, quote, question)
     }
     func reset(subject: String) async throws -> BookState { try onReset(subject) }
 }
@@ -428,5 +434,70 @@ final class BookSessionTests: XCTestCase {
         await s3.open()
         guard case .reading = s3.screen else { return XCTFail("\(s3.screen)") }
         XCTAssertEqual(polls, 2)
+    }
+
+    func testMarksAndInkBelongToTheChapterAndSurviveRelaunch() async {
+        scriptFreshBook()
+        fake.onExchange = { [unowned self] _ in self.deliversU1() }
+        let s = session()
+        await s.open()
+        XCTAssertTrue(s.marks.isEmpty)
+        s.addMark(kind: .highlight, start: 10, end: 40, text: "a model trained to do nothing")
+        s.saveInk(Data([1, 2, 3]))
+
+        let s2 = session()
+        await s2.open()
+        XCTAssertEqual(s2.marks.count, 1)
+        XCTAssertEqual(s2.marks[0].kind, .highlight)
+        XCTAssertEqual(s2.marks[0].text, "a model trained to do nothing")
+        XCTAssertEqual(s2.inkData, Data([1, 2, 3]))
+        s2.removeMark(s2.marks[0].id)
+        s2.saveInk(nil)
+
+        let s3 = session()
+        await s3.open()
+        XCTAssertTrue(s3.marks.isEmpty)
+        XCTAssertNil(s3.inkData)
+    }
+
+    func testAskingSendsThePassageAndKeepsTheAnswerOnTheMark() async {
+        scriptFreshBook()
+        fake.onExchange = { [unowned self] _ in self.deliversU1() }
+        fake.onAsk = { unit, quote, q in AskResponse(unit: unit, answerMd: "Because $\\ln$ is what the code computes.") }
+        let s = session()
+        await s.open()
+
+        // A question mark opens the card; closing it unasked leaves nothing.
+        s.addMark(kind: .question, start: 100, end: 140, text: "the loss is this same quantity")
+        XCTAssertNotNil(s.asking)
+        s.closeAsking()
+        XCTAssertNil(s.asking)
+        XCTAssertTrue(s.marks.isEmpty)
+
+        let m = s.addMark(kind: .question, start: 100, end: 140, text: "the loss is this same quantity")
+        await s.ask("why nats and not bits?")
+        XCTAssertEqual(fake.asks.count, 1)
+        XCTAssertEqual(fake.asks[0].unit, "u1")
+        XCTAssertEqual(fake.asks[0].quote, "the loss is this same quantity")
+        XCTAssertEqual(fake.asks[0].question, "why nats and not bits?")
+        XCTAssertEqual(s.asking?.mark.answer, "Because $\\ln$ is what the code computes.")
+        XCTAssertEqual(s.marks.first?.answer, s.asking?.mark.answer)
+        XCTAssertNil(s.asking?.error)
+
+        // The answered question survives a relaunch and reopens on tap.
+        s.closeAsking()
+        let s2 = session()
+        await s2.open()
+        XCTAssertEqual(s2.marks.count, 1)
+        s2.openMark(m.id)
+        XCTAssertEqual(s2.asking?.mark.question, "why nats and not bits?")
+
+        // The tutor away: the question stays on the mark, the card says so.
+        fake.onAsk = { _, _, _ in throw URLError(.cannotConnectToHost) }
+        s2.addMark(kind: .question, start: 1, end: 5, text: "One")
+        await s2.ask("what?")
+        XCTAssertNotNil(s2.asking?.error)
+        XCTAssertNil(s2.asking?.mark.answer)
+        XCTAssertEqual(s2.marks.count, 2)
     }
 }

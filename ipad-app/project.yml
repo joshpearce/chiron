@@ -2,7 +2,7 @@ name: Chiron
 options:
   bundleIdPrefix: com.mjbraun
   deploymentTarget:
-    iOS: "15.0"          # iPad mini 4 (iPad5,1) tops out at iPadOS 15.8
+    iOS: "26.0"          # the reading iPad runs current iPadOS with a Pencil Pro
 targets:
   Chiron:
     type: application

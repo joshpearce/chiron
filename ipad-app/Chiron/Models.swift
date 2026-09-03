@@ -416,3 +416,31 @@ enum JSONValue: Codable {
         }
     }
 }
+
+/// POST /ask/{subject}: the tutor's answer to a question about a passage.
+struct AskResponse: Codable {
+    let unit: String
+    let answerMd: String
+
+    enum CodingKeys: String, CodingKey {
+        case unit
+        case answerMd = "answer_md"
+    }
+}
+
+/// A mark on the page: a run of the chapter's text, by character offsets
+/// into the article's text content, that is highlighted or carries a
+/// question. Offsets survive re-rendering because the page's text does.
+struct Mark: Codable, Identifiable, Equatable {
+    enum Kind: String, Codable {
+        case highlight
+        case question
+    }
+    let id: String
+    let kind: Kind
+    let start: Int
+    let end: Int
+    let text: String
+    var question: String?
+    var answer: String?
+}

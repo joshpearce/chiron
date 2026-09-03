@@ -100,3 +100,23 @@ th, td { border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent); padd
 .beat .verdict-ok { color: var(--ok); font-weight: 600; }
 .beat .verdict-bad { color: var(--bad); font-weight: 600; }
 .beat.done { opacity: 0.92; }
+
+/* ------- marks: highlights and questions ------- */
+mark.mark { color: inherit; border-radius: 2px; padding: 0.05em 0; }
+mark.mark-highlight { background: rgba(255, 214, 10, 0.45); }
+mark.mark-question { background: rgba(10, 132, 255, 0.18); box-shadow: 0 2px 0 rgba(10, 132, 255, 0.55); }
+mark.mark-preview { background: rgba(10, 132, 255, 0.28); }
+mark.mark-question[data-last="1"]::after {
+  content: "?";
+  display: inline-block;
+  margin-left: 0.25em;
+  padding: 0 0.4em;
+  border-radius: 999px;
+  font: 600 0.7em/1.5 "Source Sans 3", -apple-system, sans-serif;
+  color: var(--paper);
+  background: rgba(10, 132, 255, 0.9);
+  vertical-align: 0.25em;
+}
+@media (prefers-color-scheme: dark) {
+  mark.mark-highlight { background: rgba(255, 214, 10, 0.30); }
+}

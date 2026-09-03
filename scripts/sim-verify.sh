@@ -20,7 +20,8 @@ SERVER="${CHIRON_SERVER:-http://localhost:8084}"
 SUBJECT="${SUBJECT:-ai}"
 LEVEL="${LEVEL:-2}"
 OUT="${OUT:-$ROOT/ipad-app/verify}"
-DEVICES="${DEVICES:-chiron-ipad chiron-ipad-15}"
+# The iOS 15 device is retired; chiron-ipad (current iPadOS) is the loop.
+DEVICES="${DEVICES:-chiron-ipad}"
 THEMES="${THEMES:-light dark}"
 # "large" is the system default size; "default" is not a name simctl knows.
 SIZES="${SIZES:-large accessibility-extra-large}"
@@ -124,6 +125,16 @@ for DEVICE in $DEVICES; do
       cmd /chrome
       shot 05c reading-chrome-hidden 1
       cmd /chrome
+      # The reader's marks: a highlight, then a question on a passage, asked
+      # (a dev server answers with a stub), then the card closed.
+      cmd /tool '{"tool":"highlighter"}'
+      cmd /mark '{"text":"predict the next token","kind":"highlight"}'
+      shot 05d highlight 1.5
+      cmd /tool '{"tool":"ask"}'
+      cmd /ask '{"text":"at sufficient scale","question":"What counts as sufficient scale?"}'
+      shot 05e ask-answered 2
+      cmd /close
+      cmd /tool '{"tool":"none"}'
       cmd /check
       expect check
       shot 06 check

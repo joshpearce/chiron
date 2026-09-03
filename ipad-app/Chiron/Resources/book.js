@@ -51,9 +51,147 @@ window.addEventListener("scroll", () => {
 /* A tap on the page itself (not on anything that answers or links) toggles
  * the reader's chrome. */
 document.addEventListener("click", (e) => {
-  if (e.target.closest("a, button, input, textarea, select, .beat")) return;
+  if (e.target.closest("a, button, input, textarea, select, .beat, mark.mark")) return;
   post({ type: "tap" });
 });
+
+/* ---- Marks: highlights and questions anchored to the chapter's text ----
+ *
+ * A mark is a run of the article's text by character offsets. The offset
+ * space is the visible prose in document order, skipping interaction beats
+ * (their DOM is rewritten when answered) and KaTeX's hidden MathML copy, so
+ * offsets survive re-rendering and answering. The native side owns the list
+ * of marks; this side turns offsets into <mark> wrappers and back.
+ */
+
+function markableTextNodes() {
+  const root = document.getElementById("chapter");
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => {
+      if (!n.nodeValue) return NodeFilter.FILTER_REJECT;
+      for (let el = n.parentElement; el && el !== root; el = el.parentElement) {
+        if (el.classList.contains("beat") || el.classList.contains("katex-mathml")) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        if (el.tagName === "SCRIPT" || el.tagName === "STYLE") return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  const nodes = [];
+  let offset = 0;
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    nodes.push({ node: n, start: offset, end: offset + n.nodeValue.length });
+    offset += n.nodeValue.length;
+  }
+  return nodes;
+}
+
+function articleText() {
+  return markableTextNodes().map((t) => t.node.nodeValue).join("");
+}
+
+/* Character offset of a (node, offset) DOM position, or -1 if it is not in
+ * the markable text. */
+function offsetOf(node, off, nodes) {
+  if (node.nodeType !== Node.TEXT_NODE) {
+    // An element position: take the start of the first text node inside it
+    // at or after the child index.
+    const child = node.childNodes[Math.min(off, node.childNodes.length - 1)];
+    if (!child) return -1;
+    const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT);
+    const first = child.nodeType === Node.TEXT_NODE ? child : walker.nextNode();
+    if (!first) return -1;
+    node = first; off = 0;
+  }
+  for (const t of nodes) if (t.node === node) return t.start + off;
+  return -1;
+}
+
+/* Offsets for a drag from (x1,y1) to (x2,y2) in viewport coordinates,
+ * snapped outward to word boundaries. Null when the points miss the text. */
+function offsetsFromPoints(x1, y1, x2, y2) {
+  const nodes = markableTextNodes();
+  const a = document.caretRangeFromPoint(x1, y1);
+  const b = document.caretRangeFromPoint(x2, y2);
+  if (!a || !b) return null;
+  let s = offsetOf(a.startContainer, a.startOffset, nodes);
+  let e = offsetOf(b.startContainer, b.startOffset, nodes);
+  if (s < 0 || e < 0) return null;
+  if (s > e) [s, e] = [e, s];
+  const text = articleText();
+  const isWord = (c) => /[\w$\\^_{}.,'’-]/.test(c);
+  while (s > 0 && isWord(text[s - 1])) s--;
+  while (e < text.length && isWord(text[e])) e++;
+  while (s < e && /\s/.test(text[s])) s++;
+  while (e > s && /\s/.test(text[e - 1])) e--;
+  if (e - s < 1) return null;
+  return { start: s, end: e, text: text.slice(s, e) };
+}
+
+/* Offsets of the first occurrence of query in the article text, ignoring
+ * whitespace differences. Used to restore and to drive from scripts. */
+function findText(query) {
+  const text = articleText();
+  const needle = query.trim().split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+");
+  const m = new RegExp(needle).exec(text);
+  if (!m) return null;
+  return { start: m.index, end: m.index + m[0].length, text: m[0] };
+}
+
+/* Wrap [start, end) in <mark> elements, one per text-node segment. */
+function markRange(start, end, kind, id) {
+  unmark(id);
+  const nodes = markableTextNodes();
+  const pieces = [];
+  for (const t of nodes) {
+    if (t.end <= start || t.start >= end) continue;
+    const from = Math.max(start, t.start) - t.start;
+    const to = Math.min(end, t.end) - t.start;
+    pieces.push({ node: t.node, from, to });
+  }
+  pieces.forEach((p, i) => {
+    let node = p.node;
+    if (p.to < node.nodeValue.length) node.splitText(p.to);
+    if (p.from > 0) node = node.splitText(p.from);
+    const mark = document.createElement("mark");
+    mark.className = "mark mark-" + kind;
+    mark.dataset.id = id;
+    if (i === pieces.length - 1) mark.dataset.last = "1";
+    node.parentNode.insertBefore(mark, node);
+    mark.appendChild(node);
+  });
+}
+
+function unmark(id) {
+  document.querySelectorAll(`mark[data-id="${id}"]`).forEach((m) => {
+    const parent = m.parentNode;
+    while (m.firstChild) parent.insertBefore(m.firstChild, m);
+    parent.removeChild(m);
+    parent.normalize();
+  });
+}
+
+function applyMarks(list) {
+  document.querySelectorAll("mark.mark").forEach((m) => unmark(m.dataset.id));
+  for (const m of list) markRange(m.start, m.end, m.kind, m.id);
+}
+
+/* A provisional highlight while the drag is in progress. */
+function previewRange(x1, y1, x2, y2) {
+  const r = offsetsFromPoints(x1, y1, x2, y2);
+  unmark("preview");
+  if (r) markRange(r.start, r.end, "preview", "preview");
+  return r;
+}
+
+document.addEventListener("click", (e) => {
+  const m = e.target.closest("mark.mark");
+  if (m && m.dataset.id !== "preview") {
+    e.stopPropagation();
+    post({ type: "mark", id: m.dataset.id });
+  }
+}, true);
 
 /* Dynamic Type: the native side passes the system's body scale factor and
  * the stylesheet sizes everything from it. */

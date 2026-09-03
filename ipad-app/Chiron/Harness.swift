@@ -16,6 +16,10 @@ import Network
 ///   POST /check              enter the check from the reader
 ///   POST /contents           toggle the contents (sidebar or sheet)
 ///   POST /chrome             toggle the reader chrome, as a tap on the page does
+///   POST /tool {tool}        pick a palette tool: none | pen | highlighter | ask | eraser
+///   POST /mark {text, kind}  highlight the first occurrence of text (kind: highlight | question)
+///   POST /ask {text, question}  mark text as a question and ask it
+///   POST /close              close the ask card
 ///   POST /answer {mode}      answer every item of the current chapter:
 ///                            correct | idk | wrong | mixed (default correct;
 ///                            mixed inks one item, passes on one, types the rest)
@@ -86,6 +90,23 @@ final class Harness {
             session?.contentsShown.toggle()
         case ("POST", "/chrome"):
             session?.toggleChrome()
+        case ("POST", "/tool"):
+            if let s = session, let name = body["tool"] as? String, let t = BookSession.Tool(rawValue: name) {
+                s.tool = t
+            }
+        case ("POST", "/mark"):
+            if let s = session, let text = body["text"] as? String {
+                let kind: Mark.Kind = (body["kind"] as? String) == "question" ? .question : .highlight
+                await s.mark(text: text, kind: kind)
+            }
+        case ("POST", "/ask"):
+            if let s = session, let text = body["text"] as? String, let q = body["question"] as? String {
+                if await s.mark(text: text, kind: .question) != nil {
+                    await s.ask(q)
+                }
+            }
+        case ("POST", "/close"):
+            session?.closeAsking()
         case ("POST", "/answer"):
             if let s = session, let ch = s.chapter {
                 let mode = body["mode"] as? String ?? "correct"
@@ -160,6 +181,11 @@ final class Harness {
             out["wait"] = s.wait?.rawValue ?? ""
             out["contents"] = s.contentsShown
             out["chrome_hidden"] = s.chromeHidden
+            out["tool"] = s.tool.rawValue
+            out["marks"] = s.marks.map { ["kind": $0.kind.rawValue, "text": $0.text, "answered": $0.answer != nil] }
+            if let a = s.asking {
+                out["asking"] = ["question": a.mark.question ?? "", "busy": a.busy, "answered": a.mark.answer != nil, "error": a.error ?? ""]
+            }
             out["error"] = s.errorMessage ?? ""
             if case .results(let doc, _) = s.screen {
                 out["headline"] = doc.headline

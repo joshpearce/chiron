@@ -14,12 +14,16 @@ import WebKit
 struct MathText: View {
     let text: String
     var size: CGFloat
+    /// Markdown paragraphs, emphasis and code alongside the math, in one
+    /// web view: for the tutor's answers, which use both.
+    var rich = false
 
     @State private var height: CGFloat
 
-    init(text: String, size: CGFloat = 19) {
+    init(text: String, size: CGFloat = 19, rich: Bool = false) {
         self.text = text
         self.size = size
+        self.rich = rich
         // Start from an estimate rather than a fixed small value: if the
         // JavaScript measurement never lands, over-estimating costs blank
         // space while under-estimating hides the question being asked.
@@ -52,8 +56,35 @@ struct MathText: View {
         UIFontMetrics(forTextStyle: .body).scaledValue(for: size)
     }
 
+    /// Markdown-lite to HTML: paragraphs, bullets, bold, italics, code.
+    /// Math is left alone for KaTeX. Mirrors mdLite in book.js.
+    static func html(fromMarkdown md: String) -> String {
+        func inline(_ s: String) -> String {
+            var t = s.replacingOccurrences(of: "&", with: "&amp;")
+                .replacingOccurrences(of: "<", with: "&lt;")
+                .replacingOccurrences(of: ">", with: "&gt;")
+            t = t.replacingOccurrences(of: #"`([^`]+)`"#, with: "<code>$1</code>", options: .regularExpression)
+            t = t.replacingOccurrences(of: #"\*\*([^*]+)\*\*"#, with: "<strong>$1</strong>", options: .regularExpression)
+            t = t.replacingOccurrences(of: #"(^|[^*])\*([^*\n]+)\*"#, with: "$1<em>$2</em>", options: .regularExpression)
+            return t
+        }
+        var out = ""
+        for para in md.components(separatedBy: "\n\n") {
+            let lines = para.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            if lines.allSatisfy({ $0.trimmingCharacters(in: .whitespaces).hasPrefix("- ") || $0.trimmingCharacters(in: .whitespaces).isEmpty }) && lines.contains(where: { !$0.isEmpty }) {
+                out += "<ul>" + lines.filter { !$0.isEmpty }.map { "<li>" + inline(String($0.trimmingCharacters(in: .whitespaces).dropFirst(2))) + "</li>" }.joined() + "</ul>"
+            } else {
+                out += "<p>" + inline(lines.joined(separator: " ")) + "</p>"
+            }
+        }
+        return out
+    }
+
     var body: some View {
-        if text.contains("$") {
+        if rich {
+            MathWebView(text: Self.html(fromMarkdown: text), size: Self.scaled(size), height: $height, preformatted: true)
+                .frame(height: height)
+        } else if text.contains("$") {
             MathWebView(text: text, size: Self.scaled(size), height: $height)
                 .frame(height: height)
         } else {
@@ -69,6 +100,8 @@ private struct MathWebView: UIViewRepresentable {
     let text: String
     let size: CGFloat
     @Binding var height: CGFloat
+    /// The text is already HTML.
+    var preformatted = false
 
     func makeCoordinator() -> Coordinator { Coordinator(height: $height) }
 
@@ -79,13 +112,13 @@ private struct MathWebView: UIViewRepresentable {
         web.scrollView.isScrollEnabled = false
         web.scrollView.backgroundColor = .clear
         web.navigationDelegate = context.coordinator
-        context.coordinator.load(web, text: text, size: size)
+        context.coordinator.load(web, text: text, size: size, preformatted: preformatted)
         return web
     }
 
     func updateUIView(_ web: WKWebView, context: Context) {
         if context.coordinator.loadedText != text || context.coordinator.loadedSize != size {
-            context.coordinator.load(web, text: text, size: size)
+            context.coordinator.load(web, text: text, size: size, preformatted: preformatted)
         }
     }
 
@@ -96,11 +129,11 @@ private struct MathWebView: UIViewRepresentable {
 
         init(height: Binding<CGFloat>) { _height = height }
 
-        func load(_ web: WKWebView, text: String, size: CGFloat) {
+        func load(_ web: WKWebView, text: String, size: CGFloat, preformatted: Bool) {
             guard let res = Bundle.main.resourceURL else { return }
             loadedText = text
             loadedSize = size
-            let escaped = text
+            let escaped = preformatted ? text : text
                 .replacingOccurrences(of: "&", with: "&amp;")
                 .replacingOccurrences(of: "<", with: "&lt;")
                 .replacingOccurrences(of: ">", with: "&gt;")
@@ -122,6 +155,8 @@ private struct MathWebView: UIViewRepresentable {
               @media (prefers-color-scheme: dark) { body { color: #d8d3c8; } }
               .katex-display { overflow-x:auto; overflow-y:hidden; margin:0.4em 0; }
               code { font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; }
+              p { margin: 0 0 0.6em; } p:last-child { margin-bottom: 0; }
+              ul { margin: 0.2em 0 0.6em 1.2em; padding: 0; }
             </style>
             <script src="katex/katex.min.js"></script>
             <script src="katex/contrib/auto-render.min.js"></script>

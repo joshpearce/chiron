@@ -8,6 +8,7 @@ protocol ChironService: AnyObject {
     func chapter(subject: String) async throws -> ChapterStatus
     func exchange(_ request: ExchangeRequest) async throws -> ExchangeResponse
     func ink(subject: String, _ submission: InkSubmission) async throws -> ExchangeResponse
+    func ask(subject: String, unit: String, quote: String, question: String) async throws -> AskResponse
     func reset(subject: String) async throws -> BookState
 }
 
@@ -81,6 +82,14 @@ final class Sync: ObservableObject, ChironService {
     /// exchange.
     func ink(subject: String, _ submission: InkSubmission) async throws -> ExchangeResponse {
         try await post("/ink/\(subject)", body: try JSONEncoder().encode(submission), timeout: 600)
+    }
+
+    /// One model call; the answer comes back in the same request.
+    func ask(subject: String, unit: String, quote: String, question: String) async throws -> AskResponse {
+        struct Body: Encodable { let unit, quote, question: String }
+        return try await post("/ask/\(subject)",
+                              body: try JSONEncoder().encode(Body(unit: unit, quote: quote, question: question)),
+                              timeout: 120)
     }
 
     func reset(subject: String) async throws -> BookState {
