@@ -103,6 +103,17 @@ sprite -s chiron exec -- bash -c "
   $(sprite_gate_script "$KEY")" \
   2>&1 | grep -Ev '"type":"(stdout|stderr|started|stopping|stopped|complete)"' | sed 's/^/    /'
 
+echo "==> the developer's side: PATH, the checkout, Claude Code"
+sprite -s chiron exec -- bash -c '
+  set -e
+  grep -q "/.sprite/bin" /home/sprite/.bashrc || sed -i "1i export PATH=/.sprite/bin:\$HOME/go/bin:\$HOME/.local/bin:\$PATH" /home/sprite/.bashrc
+  grep -q "/.sprite/bin" /home/sprite/.profile 2>/dev/null || echo "export PATH=/.sprite/bin:\$HOME/go/bin:\$HOME/.local/bin:\$PATH" >> /home/sprite/.profile
+  mkdir -p /home/sprite/src/chiron && cd /home/sprite/src/chiron
+  [ -d .git ] || { git init -q -b main && git config receive.denyCurrentBranch updateInstead; }
+  command -v claude >/dev/null || [ -x /home/sprite/.local/bin/claude ] || { curl -fsSL https://claude.ai/install.sh | bash >/tmp/claude-install.log 2>&1 && echo "claude installed"; }
+  echo "checkout at ~/src/chiron ($(git -C /home/sprite/src/chiron rev-parse --short HEAD 2>/dev/null || echo empty)); push it from the Mac with: git push sprite main"' 2>&1 | sed 's/^/    /'
+git remote get-url sprite >/dev/null 2>&1 || git remote add sprite sprite@chiron:src/chiron
+
 echo "==> verifying from outside"
 printf '    /ping            %s\n' "$(curl -s -o /dev/null -w '%{http_code}' -m 20 https://chiron.example/ping)"
 printf '    /health no token %s\n' "$(curl -s -o /dev/null -w '%{http_code}' -m 20 https://chiron.example/health)"
