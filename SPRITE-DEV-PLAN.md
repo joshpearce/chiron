@@ -127,11 +127,11 @@ evening. Everything came back intact after the upgrade. The guardrails
 stay because they are cheap on an 8 GB box that also serves the book:
 `make test` runs `-p 2` with `CHIRON_RENDER=0` (no page images; the iPad
 never uses them), one heavy job at a time, and `sprite checkpoint create`
-before risky work (checkpoints v1 to v3 exist). `sprite-env` keeps only the last `--env`
+before risky work (checkpoints v1 to v3 exist). Matt then set the
+non-expiring repo-scoped PAT (`credential.helper store`) and logged Claude
+Code in on the sprite; `origin` fetches, `main` tracks `origin/main`. `sprite-env` keeps only the last `--env`
 flag, refuses to restart a service another `--needs`, and installs Go
-binaries under `/.sprite` unless `GOBIN` is set. Still Matt's: the GitHub
-PAT on the sprite and the Claude Code login there.
-- Clone to `/home/sprite/src/chiron`. Toolchain: Go, Node (for
+binaries under `/.sprite` unless `GOBIN` is set. - Clone to `/home/sprite/src/chiron`. Toolchain: Go, Node (for
   `scripts/test-book-js.mjs`), `tmux`, Claude Code (log in once through the
   ssh session). GitHub access is a fine-grained PAT scoped to this one
   repo, Contents read/write, nothing else, one-year expiry, held by the
