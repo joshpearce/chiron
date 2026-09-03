@@ -113,8 +113,10 @@ for DEVICE in $DEVICES; do
       cmd /capture/card '{"text":"User-agent: *\nContent-Signal: search=yes, ai-input=no","url":"https://lexweekly.example/robots.txt","app":"Safari"}'
       shot 00a capture-card 1.5
       cmd /capture/close
-      cmd /capture '{"text":"User-agent: *\nContent-Signal: search=yes, ai-input=no","url":"https://lexweekly.example/robots.txt","app":"Safari","prompt":"How does a crawler read Content-Signal?"}'
-      primer=$(curl -sf "$H/state" | python3 -c 'import json,sys; print([r["id"] for r in json.load(sys.stdin)["shelf_rows"] if r["kind"]=="primer"][-1])')
+      primer=$(curl -sf -X POST -H 'Content-Type: application/json' \
+        -d '{"text":"User-agent: *\nContent-Signal: search=yes, ai-input=no","url":"https://lexweekly.example/robots.txt","app":"Safari","prompt":"How does a crawler read Content-Signal?"}' \
+        "$H/capture" | python3 -c 'import json,sys; print(json.load(sys.stdin)["subject"])')
+      [ -n "$primer" ] || { echo "capture returned no subject" >&2; exit 1; }
       shot 00b shelf-with-primer 1.5
       cmd /open "{\"subject\":\"$primer\"}"
       expect reading
