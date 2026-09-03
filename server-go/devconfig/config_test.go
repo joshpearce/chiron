@@ -1,9 +1,9 @@
-package main
+package devconfig
 
 import "testing"
 
 func TestParseConfig(t *testing.T) {
-	c, err := parseConfig(`
+	c, err := Parse(`
 # the sprite
 url = https://chiron.example
 key=op://<vault>/<item>/password
@@ -18,10 +18,10 @@ op_account = flyio
 }
 
 func TestParseConfigRejectsUnknownAndMalformed(t *testing.T) {
-	if _, err := parseConfig("host = x\n"); err == nil {
+	if _, err := Parse("host = x\n"); err == nil {
 		t.Fatal("unknown setting accepted")
 	}
-	if _, err := parseConfig("just words\n"); err == nil {
+	if _, err := Parse("just words\n"); err == nil {
 		t.Fatal("malformed line accepted")
 	}
 }

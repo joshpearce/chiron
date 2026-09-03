@@ -345,6 +345,8 @@ struct ConnectionSettings: View {
 
                 DeviceKeySection(sync: library.sync)
 
+                AgentSection(agent: library.agent)
+
                 Section { ConnectionBadge() }
             }
             .navigationTitle("Connection")
@@ -457,6 +459,32 @@ struct DeviceKeySection: View {
     }
 }
 
+/// Whether the sprite's agent may drive this app.
+struct AgentSection: View {
+    @ObservedObject var agent: AgentLink
+
+    var body: some View {
+        Section {
+            Toggle(isOn: Binding(
+                get: { agent.enabled },
+                set: { on in
+                    agent.enabled = on
+                    if on { agent.start() } else { agent.stop() }
+                })) {
+                Label("Let the sprite's agent drive this app", systemImage: "hand.point.up.left")
+            }
+            if agent.enabled {
+                Text(agent.connected ? "The agent is connected." : "Waiting for the server.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Agent")
+        } footer: {
+            Text("With this on, Claude Code on the sprite can open books, answer checks and take screenshots here, and a badge shows while it is connected.")
+        }
+    }
+}
+
 /// The chrome's way into the shell.
 struct ShellButton: View {
     @EnvironmentObject var library: Library
@@ -558,9 +586,18 @@ struct ServerEditor: View {
 
 struct ConnectionBadge: View {
     @EnvironmentObject var library: Library
+    @ObservedObject private var agentState = AgentBadgeState.shared
 
     var body: some View {
         let connected = library.sync.connected
+        if agentState.driven {
+            Label("driven by the agent", systemImage: "hand.point.up.left.fill")
+                .font(.caption)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(.thinMaterial, in: Capsule())
+                .foregroundStyle(.purple)
+                .accessibilityLabel("The sprite's agent is driving this app")
+        }
         Label(connected ? "connected" : "offline", systemImage: connected ? "wifi" : "wifi.slash")
             .font(.caption)
             .padding(.horizontal, 8).padding(.vertical, 4)
@@ -574,4 +611,13 @@ struct ConnectionBadge: View {
                 }
             }
     }
+}
+
+
+/// The badge's view of the agent link, mirrored so the badge (which is
+/// used in several places) needs no extra plumbing.
+@MainActor
+final class AgentBadgeState: ObservableObject {
+    static let shared = AgentBadgeState()
+    @Published var driven = false
 }

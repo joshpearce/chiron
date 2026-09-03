@@ -23,6 +23,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/mjbraun/chiron/server/agent"
 	"github.com/mjbraun/chiron/server/auth"
 	"github.com/mjbraun/chiron/server/corpus"
 	"github.com/mjbraun/chiron/server/llm"
@@ -135,8 +136,10 @@ type Server struct {
 	// authorizedKeys is sshd's file on the sprite; empty means device keys
 	// cannot be enrolled here.
 	authorizedKeys string
-	rng            *rand.Rand
-	rngMu          sync.Mutex
+	// hub is the sprite agent's line to the app.
+	hub   *agent.Hub
+	rng   *rand.Rand
+	rngMu sync.Mutex
 
 	mu       sync.RWMutex
 	subjects map[string]*Subject
@@ -168,6 +171,7 @@ func New(cfg *Config, root string) (*Server, error) {
 		root:           root,
 		token:          token,
 		authorizedKeys: strings.TrimSpace(os.Getenv("CHIRON_AUTHORIZED_KEYS")),
+		hub:            agent.NewHub(),
 		rng:            rand.New(rand.NewSource(time.Now().UnixNano())),
 		subjects:       map[string]*Subject{},
 		jobs:           map[string]*Job{},
@@ -353,6 +357,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /agent/pubkey", s.handleEnrolKey)
 	mux.HandleFunc("GET /agent/keys", s.handleListKeys)
 	mux.HandleFunc("POST /agent/keys/revoke", s.handleRevokeKey)
+	mux.HandleFunc("GET /agent/app", s.handleAgentApp)
+	mux.HandleFunc("POST /agent/cmd", s.handleAgentCmd)
+	mux.HandleFunc("GET /agent/status", s.handleAgentStatus)
 	mux.HandleFunc("POST /drive/cmd", s.handleDriveCmd)
 	mux.HandleFunc("GET /drive/next", s.handleDriveNext)
 	mux.HandleFunc("POST /drive/ack", s.handleDriveAck)

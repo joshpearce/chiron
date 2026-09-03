@@ -8,6 +8,8 @@ final class Library: ObservableObject {
     /// One shell for the app, kept across books; the sheet shows it.
     let shell = ShellSession()
     @Published var shellShown = false
+    /// The sprite agent's line in, off unless the reader turns it on.
+    let agent = AgentLink()
     @Published var subjects: [SubjectInfo] = []
     /// The book the server says was last open, across every client.
     @Published var activeSubjectID: String?
@@ -23,6 +25,7 @@ final class Library: ObservableObject {
 
     init(storage: URL? = nil) {
         self.storage = storage ?? Library.defaultStorage()
+        agent.attach(self)
     }
 
     /// Per-subject caches live in Application Support, not Documents: they

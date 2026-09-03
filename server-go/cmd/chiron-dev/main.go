@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/mjbraun/chiron/server/devconfig"
 	"github.com/mjbraun/chiron/server/gate/client"
 )
 
@@ -53,7 +54,7 @@ func main() {
 }
 
 func proxy() error {
-	cfg, err := loadConfig()
+	cfg, err := devconfig.Load()
 	if err != nil {
 		return err
 	}

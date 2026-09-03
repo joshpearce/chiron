@@ -150,7 +150,16 @@ tmux attach, and the Magic Keyboard.
 - Exit: from the iPad, open the shell, `claude` is running in tmux, and a
   command there changes the book the reader is holding (Phase D's verbs).
 
-**Phase D: the agent reaches the app.**
+**Phase D: the agent reaches the app.** Built 2026-09-02, verified in the
+Simulator: `chiron-app` on the Mac went through the gate to the book server
+and the app ran `state`, `shelf`, `open`, and `screenshot` (a PNG of the page
+with the purple "driven by the agent" badge). Files: `server-go/agent`
+(the hub), `httpapi/agent.go` (`GET /agent/app`, `POST /agent/cmd`,
+`GET /agent/status`), `cmd/chiron-app`, `devconfig` (shared with
+chiron-dev); app `AppCommands.swift` (the verbs, shared with the debug
+harness), `AgentLink.swift`, the Agent section in server settings. The
+first screenshot after `open` can be blank while the page loads; take it a
+moment later.
 - The iPad has no inbound path, so the app connects out: `POST
   /agent/connect` (bearer key) registers the app instance; a WebSocket at
   `/agent/app` carries harness commands from the sprite to the app and
@@ -161,7 +170,8 @@ tmux attach, and the Magic Keyboard.
   driven.
 - Sprite: `chiron-app` CLI (`cmd/chiron-app`) with the verbs
   `scripts/sim-verify.sh` uses today, so the verify walk can run against
-  the real iPad.
+  the real iPad. On the sprite its config points at the book server
+  directly: `url = http://127.0.0.1:8081`.
 - Exit: from a Claude Code session on the sprite, walk the iPad through
   placement, series, results and a marked passage, screenshots landing on
   the sprite.

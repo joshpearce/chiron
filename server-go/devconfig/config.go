@@ -1,4 +1,10 @@
-package main
+// Package devconfig is how the developer-side tools (chiron-dev on the Mac,
+// chiron-app on the sprite) find the server and its key. Settings come from
+// the environment first (CHIRON_URL, CHIRON_KEY), then from
+// ~/.config/chiron-dev/config, "name = value" per line. The key may be a
+// 1Password reference (op://...), resolved with `op read` at run time so
+// the secret never sits in a file.
+package devconfig
 
 import (
 	"bufio"
@@ -10,18 +16,14 @@ import (
 	"strings"
 )
 
-// Settings come from the environment first (CHIRON_URL, CHIRON_KEY), then
-// from ~/.config/chiron-dev/config, "name = value" per line. The key may be
-// a 1Password reference (op://...), resolved with `op read` at run time so
-// the secret never sits in a file.
-type config struct {
+type Config struct {
 	URL       string
 	Key       string
 	OpAccount string
 }
 
-func parseConfig(text string) (config, error) {
-	var c config
+func Parse(text string) (Config, error) {
+	var c Config
 	sc := bufio.NewScanner(strings.NewReader(text))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
@@ -47,12 +49,12 @@ func parseConfig(text string) (config, error) {
 	return c, sc.Err()
 }
 
-func loadConfig() (config, error) {
-	var c config
+func Load() (Config, error) {
+	var c Config
 	home, _ := os.UserHomeDir()
 	path := filepath.Join(home, ".config", "chiron-dev", "config")
 	if text, err := os.ReadFile(path); err == nil {
-		if c, err = parseConfig(string(text)); err != nil {
+		if c, err = Parse(string(text)); err != nil {
 			return c, err
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
