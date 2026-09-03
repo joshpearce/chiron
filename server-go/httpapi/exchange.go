@@ -385,6 +385,9 @@ type authorCacheEntry struct {
 }
 
 func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*render.Chapter, error) {
+	if sub.Kind == KindPrimer {
+		return s.buildPrimerChapter(sub, unitID)
+	}
 	unit, ok := sub.Corpus.Units[unitID]
 	if !ok {
 		return nil, fmt.Errorf("unit %s not authored", unitID)

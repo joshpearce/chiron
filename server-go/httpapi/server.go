@@ -28,6 +28,7 @@ import (
 	"github.com/mjbraun/chiron/server/corpus"
 	"github.com/mjbraun/chiron/server/llm"
 	"github.com/mjbraun/chiron/server/pages"
+	"github.com/mjbraun/chiron/server/primer"
 	"github.com/mjbraun/chiron/server/state"
 )
 
@@ -62,6 +63,8 @@ type Config struct {
 	VisionModel string        `yaml:"vision_model"`
 	Session     SessionConfig `yaml:"session"`
 	AuthToken   string        `yaml:"auth_token"`
+	// PrimersDir holds captured primers; empty means <parent>/state/primers.
+	PrimersDir string `yaml:"primers_dir"`
 	// Grade all free-text items of a check in one model call. Off by default:
 	// the per-item path is the one verified end to end, and a check is the
 	// moment a learner is most exposed to a regression.
@@ -88,8 +91,12 @@ func LoadConfig(path string) (*Config, error) {
 
 // Subject pairs a corpus with the learner state for it.
 type Subject struct {
-	ID       string
-	Title    string
+	ID    string
+	Title string
+	// Kind is "" for a book and KindPrimer for a captured primer, which has
+	// no check and grows from margin notes.
+	Kind     string
+	Primer   *primer.Meta
 	Corpus   *corpus.Corpus
 	Learner  *state.Learner
 	StateDir string
@@ -137,9 +144,13 @@ type Server struct {
 	// cannot be enrolled here.
 	authorizedKeys string
 	// hub is the sprite agent's line to the app.
-	hub   *agent.Hub
-	rng   *rand.Rand
-	rngMu sync.Mutex
+	hub *agent.Hub
+	// primers are the captured documents by id, including those still
+	// authoring or failed, which are not subjects.
+	primersMu sync.Mutex
+	primers   map[string]*primer.Meta
+	rng       *rand.Rand
+	rngMu     sync.Mutex
 
 	mu       sync.RWMutex
 	subjects map[string]*Subject
@@ -175,6 +186,7 @@ func New(cfg *Config, root string) (*Server, error) {
 		rng:            rand.New(rand.NewSource(time.Now().UnixNano())),
 		subjects:       map[string]*Subject{},
 		jobs:           map[string]*Job{},
+		primers:        map[string]*primer.Meta{},
 		chain: llm.New(llm.FactoryConfig{
 			Provider: cfg.Provider, AnthropicModel: cfg.AnthropicModel,
 			ClaudeCLIModel: cfg.ClaudeCLIModel, Upstreams: cfg.Upstreams, LLM: cfg.LLM,
@@ -187,6 +199,7 @@ func New(cfg *Config, root string) (*Server, error) {
 		}
 	}
 	s.Discover()
+	s.loadPrimers()
 	if len(cfg.Subjects) > 0 {
 		dir := filepath.Dir(resolve(root, cfg.Subjects[0].StateDir))
 		s.activePath = filepath.Join(dir, "active-subject")
@@ -355,6 +368,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /pages/{subject}/contents/{page}", s.handleContentsPage)
 	mux.HandleFunc("POST /ink/{subject}", s.handleInk)
 	mux.HandleFunc("POST /ask/{subject}", s.handleAsk)
+	mux.HandleFunc("POST /primer/capture", s.handlePrimerCapture)
+	mux.HandleFunc("POST /primer/{subject}/extend", s.handlePrimerExtend)
 	mux.HandleFunc("POST /agent/pubkey", s.handleEnrolKey)
 	mux.HandleFunc("GET /agent/keys", s.handleListKeys)
 	mux.HandleFunc("POST /agent/keys/revoke", s.handleRevokeKey)
@@ -442,19 +457,41 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 	type row struct {
 		ID           string  `json:"id"`
 		Title        string  `json:"title"`
+		Kind         string  `json:"kind"`
 		UnitsTotal   int     `json:"units_total"`
 		UnitsCleared int     `json:"units_cleared"`
 		CurrentUnit  *string `json:"current_unit"`
 		Debt         int     `json:"debt"`
+		// Primers only: how the capture is doing and where it came from.
+		Status     string         `json:"status,omitempty"`
+		Error      string         `json:"error,omitempty"`
+		Source     *primer.Source `json:"source,omitempty"`
+		CapturedAt string         `json:"captured_at,omitempty"`
 	}
 	out := []row{}
 	for _, sub := range s.allSubjects() {
-		out = append(out, row{
-			ID: sub.ID, Title: sub.Title,
+		r := row{
+			ID: sub.ID, Title: sub.Title, Kind: "book",
 			UnitsTotal:   len(sub.Corpus.UnitOrder()),
 			UnitsCleared: len(sub.Learner.ClearedUnits()),
 			CurrentUnit:  sub.Learner.Snapshot().CurrentUnit,
 			Debt:         len(sub.Learner.OpenDebt()),
+		}
+		if sub.Kind == KindPrimer && sub.Primer != nil {
+			r.Kind, r.Status = KindPrimer, sub.Primer.Status
+			src := sub.Primer.Source
+			src.Text = clipText(src.Text, 200)
+			r.Source = &src
+			r.CapturedAt = sub.Primer.CapturedAt.Format(time.RFC3339)
+		}
+		out = append(out, r)
+	}
+	for _, m := range s.pendingPrimers() {
+		src := m.Source
+		src.Text = clipText(src.Text, 200)
+		out = append(out, row{
+			ID: m.ID, Title: m.Title, Kind: KindPrimer, Status: m.Status, Error: m.Error,
+			Source: &src, CapturedAt: m.CapturedAt.Format(time.RFC3339),
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{

@@ -26,7 +26,8 @@ func newServer(t *testing.T, token string) *Server {
 			CorpusDir: filepath.Join("..", "corpus"),
 			StateDir:  t.TempDir(),
 		}},
-		AuthToken: token,
+		AuthToken:  token,
+		PrimersDir: t.TempDir(),
 		Session: SessionConfig{
 			MasteryGate: 0.8, ExtensionTrigger: 0.9, CheckItems: 9,
 			CallbackFraction: 0.4, ChunkMinutes: 22, BreakMinutes: 5,

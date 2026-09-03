@@ -20,6 +20,7 @@ func newTwoSubjectServer(t *testing.T, stateRoot string) *Server {
 	}
 	corpusDir := filepath.Join("..", "corpus")
 	cfg := &Config{
+		PrimersDir: t.TempDir(),
 		Subjects: []SubjectSpec{
 			{ID: "ai", Title: "How AI Works",
 				CorpusDir: corpusDir, StateDir: filepath.Join(stateRoot, "ai")},
