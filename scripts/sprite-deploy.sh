@@ -10,6 +10,9 @@
 #
 #   scripts/sprite-deploy.sh              # build, copy, restart, verify
 #   scripts/sprite-deploy.sh --corpus     # also sync corpus/ and config.yaml
+#
+# The server listens on loopback :8081 behind chiron-gate (see
+# sprite-service.sh); scripts/sprite-bootstrap-ssh.sh must have run first.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -44,6 +47,8 @@ echo "==> swapping the service"
 . "$(dirname "$0")/sprite-service.sh"
 KEY=$(sprite_current_key)
 [ -n "$KEY" ] || { echo "FATAL: no CHIRON_AUTH_TOKEN on the existing service" >&2; exit 1; }
+sprite -s chiron exec -- bash -c "sprite-env services list" 2>/dev/null | grep -q '"chiron-gate"' \
+  || { echo "FATAL: no chiron-gate service; run scripts/sprite-bootstrap-ssh.sh first" >&2; exit 1; }
 sprite -s chiron exec -- bash -c "
   mv /home/sprite/chiron/bin/chiron-server.new /home/sprite/chiron/bin/chiron-server
   $(sprite_service_script "$KEY")" \
