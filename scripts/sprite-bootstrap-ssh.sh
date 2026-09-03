@@ -85,6 +85,10 @@ if [ -n "$SSH_TTY" ] && [ -z "$TMUX" ] && command -v tmux >/dev/null; then
 fi
 RC
   [ -f /home/sprite/.ssh/host_ed25519 ] || ssh-keygen -q -t ed25519 -N "" -f /home/sprite/.ssh/host_ed25519
+  # The sprite user has no password, which leaves its shadow entry locked
+  # ("!"), and sshd refuses a locked account even for key auth. "*" means no
+  # password without the lock.
+  sudo usermod -p "*" sprite
   echo -n "host key: "; ssh-keygen -lf /home/sprite/.ssh/host_ed25519.pub' 2>&1 | sed 's/^/    /'
 
 echo "==> swapping the services"
