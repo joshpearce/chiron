@@ -81,7 +81,7 @@ for DEVICE in $DEVICES; do
   [ -n "$UDID" ] || { echo "no simulator named $DEVICE" >&2; exit 1; }
   echo "== $DEVICE ($UDID)"
   xcrun simctl bootstatus "$UDID" -b >/dev/null
-  (cd "$ROOT/ipad-app" && xcodebuild -project Chiron.xcodeproj -scheme Chiron \
+  (cd "$ROOT/ipad-app" && xcodebuild -project Chiron.xcodeproj -scheme Chiron -skipPackagePluginValidation \
     -destination "platform=iOS Simulator,id=$UDID" -derivedDataPath build-sim build -quiet 2>&1 \
     | grep -E "error:" || true)
   APP="$ROOT/ipad-app/build-sim/Build/Products/Debug-iphonesimulator/Chiron.app"
@@ -101,7 +101,8 @@ for DEVICE in $DEVICES; do
       xcrun simctl ui "$UDID" content_size "$SIZE"
       reset_subject
       xcrun simctl terminate "$UDID" "$BUNDLE" 2>/dev/null || true
-      SIMCTL_CHILD_CHIRON_SERVER="$SERVER" xcrun simctl launch "$UDID" "$BUNDLE" harness "harness_port=$PORT" >/dev/null
+      SIMCTL_CHILD_CHIRON_SERVER="$SERVER" SIMCTL_CHILD_CHIRON_SHELL_USER="$USER" \
+        xcrun simctl launch "$UDID" "$BUNDLE" harness "harness_port=$PORT" >/dev/null
       wait_for_harness
       # The app reopens on the active book; the shelf is the screen behind it.
       cmd /shelf
@@ -135,6 +136,28 @@ for DEVICE in $DEVICES; do
       shot 05e ask-answered 2
       cmd /close
       cmd /tool '{"tool":"none"}'
+      # The shell, when a gate is up: CHIRON_GATE=http://localhost:8090
+      # CHIRON_GATE_KEY=k1 with a user-mode sshd behind it that accepts the
+      # key the app enrols (the server's CHIRON_AUTHORIZED_KEYS must be the
+      # file that sshd reads). The app signs in as $USER on the Mac.
+      if [ -n "${CHIRON_GATE:-}" ]; then
+        cmd /server "{\"url\":\"$CHIRON_GATE\",\"key\":\"${CHIRON_GATE_KEY:-}\",\"name\":\"gate\"}"
+        cmd /shell
+        for _ in $(seq 1 40); do
+          phase=$(curl -sf "$H/shell/screen" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("phase",""))')
+          [ "$phase" = "connected" ] && break
+          case "$phase" in closed*) echo "shell failed: $phase" >&2; exit 1;; esac
+          sleep 0.5
+        done
+        [ "$phase" = "connected" ] || { echo "shell never connected: $phase" >&2; exit 1; }
+        cmd /shell/type '{"text":"echo shell-$((6*7))\n"}'
+        settle 1.5
+        curl -sf "$H/shell/screen" | grep -q 'shell-42' || { echo "typed command did not echo back" >&2; curl -sf "$H/shell/screen" >&2; exit 1; }
+        shot 05f shell 1
+        cmd /shell/close
+      else
+        echo "  (no CHIRON_GATE; shell step skipped)"
+      fi
       cmd /check
       expect check
       shot 06 check

@@ -71,10 +71,19 @@ tar czf - -C "$STAGE" chiron-gate chiron-server mac_keys sshd_config \
     echo "    authorized_keys now holds $(wc -l < authorized_keys) keys"' \
   2>&1 | grep -v LIBARCHIVE || true
 
-echo "==> sshd and host key"
+echo "==> sshd, tmux and host key"
 sprite -s chiron exec -- bash -c '
   set -e
   command -v sshd >/dev/null || { echo "installing openssh-server"; sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q openssh-server >/dev/null; }
+  command -v tmux >/dev/null || { echo "installing tmux"; sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q tmux >/dev/null; }
+  # An interactive ssh login lands in the one tmux session, so a dropped
+  # connection (the iPad sleeping, the sprite hibernating) resumes where it
+  # was. Commands, scp and rsync are non-interactive and unaffected.
+  grep -q "tmux new -A -s chiron" /home/sprite/.bashrc || cat >> /home/sprite/.bashrc <<"RC"
+if [ -n "$SSH_TTY" ] && [ -z "$TMUX" ] && command -v tmux >/dev/null; then
+  exec tmux new -A -s chiron
+fi
+RC
   [ -f /home/sprite/.ssh/host_ed25519 ] || ssh-keygen -q -t ed25519 -N "" -f /home/sprite/.ssh/host_ed25519
   echo -n "host key: "; ssh-keygen -lf /home/sprite/.ssh/host_ed25519.pub' 2>&1 | sed 's/^/    /'
 
@@ -95,7 +104,8 @@ printf '    /ping            %s\n' "$(curl -s -o /dev/null -w '%{http_code}' -m 
 printf '    /health no token %s\n' "$(curl -s -o /dev/null -w '%{http_code}' -m 20 https://chiron.example/health)"
 printf '    /health authed   %s\n' "$(curl -s -o /dev/null -w '%{http_code}' -m 20 -H "Authorization: Bearer $KEY" https://chiron.example/health)"
 printf '    /ssh no token    %s\n' "$(curl -s -o /dev/null -w '%{http_code}' -m 20 https://chiron.example/ssh)"
-echo "Expect 200 / 401 / 200 / 401."
+printf '    /agent/keys      %s\n' "$(curl -s -o /dev/null -w '%{http_code}' -m 20 -H "Authorization: Bearer $KEY" https://chiron.example/agent/keys)"
+echo "Expect 200 / 401 / 200 / 401 / 200 (the last is key enrolment for the iPad)."
 
 echo
 echo "Then, once:"

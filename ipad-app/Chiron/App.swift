@@ -55,6 +55,12 @@ struct ContentView: View {
         // Without this the stack shrinks to its content and the badge drifts
         // into the middle of the page on short screens.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $library.shellShown) {
+            ShellView(shell: library.shell)
+                .environmentObject(library)
+                .presentationSizing(.page)
+                .interactiveDismissDisabled()
+        }
     }
 }
 
@@ -176,6 +182,7 @@ struct BookView: View {
                     .hoverEffect()
                     .keyboardShortcut("c", modifiers: [.command, .shift])
                     .accessibilityLabel("Contents")
+                    ShellButton()
                     Button { library.closeBook() } label: {
                         Label("Bookshelf", systemImage: "books.vertical")
                             .font(.footnote)
@@ -258,6 +265,12 @@ struct BookshelfView: View {
                     showSettings = true
                 } label: { Label("Server", systemImage: "gearshape") }
                     .font(.callout)
+                Button {
+                    library.shellShown = true
+                } label: { Label("Shell", systemImage: "terminal") }
+                    .font(.callout)
+                    .keyboardShortcut("`", modifiers: [.command])
+                    .accessibilityLabel("Shell")
             }
             if let err = library.shelfError, !library.subjects.isEmpty {
                 Text(err).foregroundStyle(.red).font(.callout)
@@ -330,6 +343,8 @@ struct ConnectionSettings: View {
                     }
                 }
 
+                DeviceKeySection(sync: library.sync)
+
                 Section { ConnectionBadge() }
             }
             .navigationTitle("Connection")
@@ -352,6 +367,110 @@ struct ConnectionSettings: View {
         if let s = store.selected { library.sync.baseURL = s.url }
         await library.sync.probe()
         await library.refresh()
+        // Saving a server with a shared key is the moment to enrol this
+        // device's ssh key: the key proves the right to.
+        if let id = library.sync.serverID, Credentials.token(for: id) != nil {
+            _ = try? await library.sync.enrolDeviceKey(name: DeviceKeySection.deviceName)
+        }
+    }
+}
+
+/// This device's ssh key on the selected server: enrol it, see what the
+/// server holds, revoke what should not be there.
+struct DeviceKeySection: View {
+    @ObservedObject var sync: Sync
+    @State private var keys: [EnrolledKey] = []
+    @State private var note: String?
+    @State private var fingerprint: String?
+
+    static var deviceName: String {
+        let name = UIDevice.current.name
+        let allowed = name.filter { $0.isLetter || $0.isNumber || $0 == " " || $0 == "." || $0 == "_" || $0 == "-" || $0 == "'" }
+        return allowed.isEmpty ? "iPad" : String(allowed.prefix(64))
+    }
+
+    var body: some View {
+        Section {
+            Button {
+                Task { await enrol() }
+            } label: {
+                Label("Enrol this iPad's key", systemImage: "key")
+            }
+            .disabled(sync.serverID == nil || Credentials.token(for: sync.serverID!) == nil)
+            if let note {
+                Text(note).font(.footnote).foregroundStyle(.secondary)
+            }
+            ForEach(keys) { key in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(key.name.isEmpty ? key.type : key.name)
+                        Text(key.fingerprint).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if key.fingerprint == fingerprint {
+                        Text("this iPad").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .swipeActions {
+                    Button(role: .destructive) {
+                        Task { await revoke(key) }
+                    } label: { Label("Revoke", systemImage: "trash") }
+                }
+            }
+        } header: {
+            Text("Shell access")
+        } footer: {
+            Text("The shell signs in with a key made on this iPad. Enrolling it needs the server's shared key; swipe a key to revoke it.")
+        }
+        .task(id: sync.serverID) { await load() }
+    }
+
+    private func load() async {
+        do {
+            keys = try await sync.serverKeys()
+            note = nil
+        } catch ServiceError.status(404) {
+            keys = []
+            note = "This server does not enrol keys (a Mac dev server, or the gate is not installed yet)."
+        } catch {
+            keys = []
+            note = nil
+        }
+    }
+
+    private func enrol() async {
+        do {
+            let r = try await sync.enrolDeviceKey(name: Self.deviceName)
+            fingerprint = r.fingerprint
+            note = r.installed ? "Enrolled as \(r.name)." : "Already enrolled as \(r.name)."
+            await load()
+        } catch ServiceError.status(let code) {
+            note = code == 404 ? "This server does not enrol keys." : "The server refused the key (\(code))."
+        } catch {
+            note = error.localizedDescription
+        }
+    }
+
+    private func revoke(_ key: EnrolledKey) async {
+        try? await sync.revokeKey(fingerprint: key.fingerprint)
+        await load()
+    }
+}
+
+/// The chrome's way into the shell.
+struct ShellButton: View {
+    @EnvironmentObject var library: Library
+
+    var body: some View {
+        Button { library.shellShown = true } label: {
+            Label("Shell", systemImage: "terminal")
+                .font(.footnote)
+                .padding(.horizontal, 10).padding(.vertical, 6)
+        }
+        .background(.thinMaterial, in: Capsule())
+        .hoverEffect()
+        .keyboardShortcut("`", modifiers: [.command])
+        .accessibilityLabel("Shell")
     }
 }
 

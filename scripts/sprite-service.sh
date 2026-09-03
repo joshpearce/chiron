@@ -24,6 +24,7 @@ sprite-env services create chiron-server \\
   --cmd /home/sprite/chiron/bin/chiron-server \\
   --args '-addr,127.0.0.1:8081,-config,/home/sprite/chiron/server/config.yaml' \\
   --env 'CHIRON_AUTH_TOKEN=${key}' \\
+  --env 'CHIRON_AUTHORIZED_KEYS=/home/sprite/.ssh/authorized_keys' \\
   --dir /home/sprite/chiron/server
 sleep 4
 echo -n 'server unauthenticated /health -> '; curl -s -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:8081/health

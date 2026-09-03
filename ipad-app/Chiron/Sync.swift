@@ -92,6 +92,30 @@ final class Sync: ObservableObject, ChironService {
                               timeout: 120)
     }
 
+    // MARK: - device keys
+
+    /// Put this device's ssh key on the server. Possessing the shared key
+    /// is what authorizes it; a server without key enrolment says so.
+    func enrolDeviceKey(name: String) async throws -> EnrolResponse {
+        guard let id = serverID else { throw ServiceError.badURL }
+        struct Body: Encodable { let pubkey, name: String }
+        return try await post("/agent/pubkey",
+                              body: try JSONEncoder().encode(Body(pubkey: DeviceKey.authorizedKeysLine(for: id), name: name)),
+                              timeout: 30)
+    }
+
+    func serverKeys() async throws -> [EnrolledKey] {
+        struct Reply: Decodable { let keys: [EnrolledKey] }
+        let r: Reply = try await get("/agent/keys", timeout: 15)
+        return r.keys
+    }
+
+    func revokeKey(fingerprint: String) async throws {
+        struct Body: Encodable { let fingerprint: String }
+        struct Reply: Decodable { let removed: Int }
+        let _: Reply = try await post("/agent/keys/revoke", body: try JSONEncoder().encode(Body(fingerprint: fingerprint)), timeout: 15)
+    }
+
     func reset(subject: String) async throws -> BookState {
         // Hand-encoded: confirm is a bool on the wire, and a [String: String]
         // dictionary would send it as the string "true", which the server

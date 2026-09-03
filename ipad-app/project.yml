@@ -3,10 +3,22 @@ options:
   bundleIdPrefix: com.mjbraun
   deploymentTarget:
     iOS: "26.0"          # the reading iPad runs current iPadOS with a Pencil Pro
+packages:
+  # The shell: SwiftTerm draws the terminal, Citadel speaks SSH (pure Swift,
+  # on SwiftNIO) through the gate's tunnel.
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm.git
+    from: 1.20.0
+  Citadel:
+    url: https://github.com/orlandos-nl/Citadel.git
+    from: 0.12.1
 targets:
   Chiron:
     type: application
     platform: iOS
+    dependencies:
+      - package: SwiftTerm
+      - package: Citadel
     sources:
       # KaTeX must keep its directory structure: chapter.html and MathText.swift
       # reference "katex/katex.min.css" and "katex/contrib/auto-render.min.js".

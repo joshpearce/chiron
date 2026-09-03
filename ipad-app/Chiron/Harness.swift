@@ -27,6 +27,10 @@ import Network
 ///   POST /override           override a failed gate
 ///   POST /reset              start the book over
 ///   POST /retry              the error screen's Try again
+///   POST /server {url, key, name}  save and select a server (the shell needs one)
+///   POST /shell              open the shell sheet;  POST /shell/close closes it
+///   POST /shell/type {text}  type into the shell
+///   GET  /shell/screen       {phase, lines}: what the terminal shows
 ///
 /// Every POST waits for the action to settle and returns the new state.
 @MainActor
@@ -160,6 +164,30 @@ final class Harness {
             await session?.startOver()
         case ("POST", "/retry"):
             await session?.retry()
+        case ("POST", "/server"):
+            if let url = body["url"] as? String {
+                library.sync.servers.add(name: body["name"] as? String ?? "", url: url, key: body["key"] as? String)
+                library.sync.baseURL = url
+                await library.sync.probe()
+                // As the settings sheet does on save: a key means enrol.
+                if let key = body["key"] as? String, !key.isEmpty {
+                    _ = try? await library.sync.enrolDeviceKey(name: DeviceKeySection.deviceName)
+                }
+            }
+        case ("POST", "/shell"):
+            library.shellShown = true
+            try? await Task.sleep(nanoseconds: 300_000_000)
+        case ("POST", "/shell/close"):
+            library.shell.close()
+            library.shellShown = false
+        case ("POST", "/shell/type"):
+            if let text = body["text"] as? String { library.shell.send(text: text) }
+            try? await Task.sleep(nanoseconds: 300_000_000)
+        case ("GET", "/shell/screen"):
+            var out: [String: Any] = ["phase": shellPhase(library.shell.phase)]
+            if let t = ShellScreen.shared.lines() { out["lines"] = t }
+            respond(conn, status: "200 OK", body: (try? JSONSerialization.data(withJSONObject: out)) ?? Data())
+            return
         default:
             respond(conn, status: "404 Not Found", body: nil)
             return
@@ -196,6 +224,15 @@ final class Harness {
             out["screen"] = library.teaching ? "teach" : "bookshelf"
         }
         return (try? JSONSerialization.data(withJSONObject: out)) ?? Data("{}".utf8)
+    }
+
+    private func shellPhase(_ phase: ShellSession.Phase) -> String {
+        switch phase {
+        case .idle: return "idle"
+        case .connecting: return "connecting"
+        case .connected: return "connected"
+        case .closed(let err): return "closed" + (err.map { ": " + $0 } ?? "")
+        }
     }
 
     private func screenName(_ screen: BookSession.Screen) -> String {

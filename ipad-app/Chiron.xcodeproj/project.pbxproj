@@ -7,15 +7,21 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		11C6CA0F7706D0D596463985 /* Citadel in Frameworks */ = {isa = PBXBuildFile; productRef = 3B941DBBC469D10A3B1E0278 /* Citadel */; };
 		22F0DE026E6BA746E20C90FF /* katex in Resources */ = {isa = PBXBuildFile; fileRef = 68F5F83F9E5D2EEB587385EF /* katex */; };
 		29364CDF3858A11CA746C64A /* BookSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EF263EE8ABB8A188DA7D430 /* BookSessionTests.swift */; };
 		2BDCB839CEB3F03E8538AAB4 /* Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3091646F01947C00333241BA /* Credentials.swift */; };
+		32CA8ADA55C01966DD6D5E6A /* DeviceKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F506717299A374C8AA31320C /* DeviceKeyTests.swift */; };
 		3F19963DB080F3508ECC7EBF /* fixtures in Resources */ = {isa = PBXBuildFile; fileRef = 2A02C9562B8ECB9AF3BB69E3 /* fixtures */; };
+		447F160110B9562D6CFC7164 /* DeviceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEE5BEC3075A333377FEE436 /* DeviceKey.swift */; };
 		49C25BFB2FE00A68F00BB1A9 /* book.css in Resources */ = {isa = PBXBuildFile; fileRef = 1F4412C6E6B26DC131C54235 /* book.css */; };
+		4D335A02EAD9014A07BA9B60 /* TunnelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E5D9B01B743228E1E20CC2 /* TunnelTests.swift */; };
 		59F1078E57D0CDF81127B805 /* FixtureDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 473534689097CF5B3E8E2EE0 /* FixtureDecodingTests.swift */; };
 		5C223EEF7AE0AF48A9942AE5 /* SelfTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AA842BA32080A6287EB9A6 /* SelfTest.swift */; };
+		6DFAE5171310C9CA93D24B36 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = FB840DC1DA1441BC90473907 /* SwiftTerm */; };
 		73C9290A5A8E44753FBA4E6B /* Harness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C2E4E249BD2C1C75083AB14 /* Harness.swift */; };
 		88AD80E868C1EF47C403E25D /* Servers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BD9A46CBDBDDEEAFF860927 /* Servers.swift */; };
+		8A971C981578FB0592F8EA57 /* ShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ECBF91310F511343F4FFC57 /* ShellView.swift */; };
 		8B7415A0D57A05F203D74AE1 /* book.js in Resources */ = {isa = PBXBuildFile; fileRef = 756BF2C5D73A3EFF3BD5C55C /* book.js */; };
 		8C8562A01FFD05DE4D17DD2A /* default-book.json in Resources */ = {isa = PBXBuildFile; fileRef = 4424A63E2C94C4589C4B5A8F /* default-book.json */; };
 		8DBD6D9E13F6B6B1E994DA96 /* fonts in Resources */ = {isa = PBXBuildFile; fileRef = F6474556AF056C444945956F /* fonts */; };
@@ -23,12 +29,14 @@
 		9A12A71D111DEE5FB1A1265C /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A19EB4693171E14B4F6BAD /* App.swift */; };
 		A0641BBC47F65EC186C3AA87 /* Sync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDBD0C79377E20146856D09 /* Sync.swift */; };
 		A67BB45B6191D6A590258527 /* CheckViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E21F930C36788EA6466D67F /* CheckViews.swift */; };
+		AE21F9C86BD4FCE4E1716EA4 /* ShellSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2439EC313A18D920AF6BD7D7 /* ShellSession.swift */; };
 		AF29D4E2D309DDDCBC3C20E1 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE4AEBB512C66BBEEE9B508 /* Models.swift */; };
 		B512708502B49BDBA48396AE /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */; };
 		B6C8F1C6D6698FD57D2187BC /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09BB0CC993F9898C0640FD10 /* Palette.swift */; };
 		C4B40CBDCAA3019109786987 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59D9E626478A65422345A2F1 /* Library.swift */; };
 		C63E8AC4B2923CBE812FF629 /* WaitViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 402925421173333E62074B75 /* WaitViews.swift */; };
 		CE4995FD409AD790A8F172C0 /* TeachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F177C08E551698E85C6707E /* TeachView.swift */; };
+		D668A28376F693E15569C781 /* Tunnel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C467FAF6F7C13BCA4900BE0 /* Tunnel.swift */; };
 		D7298C18B730F83C6078BF84 /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9657BA2E7A99837373A3E6C /* Typography.swift */; };
 		DD2CA6AC8A2B62274888FC97 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 478BD8C483632C32A1A65736 /* Assets.xcassets */; };
 		E885811ACFCBA74CC50BAE93 /* AskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC625AEF8F1DC8BFD298857 /* AskCard.swift */; };
@@ -53,9 +61,11 @@
 		09BB0CC993F9898C0640FD10 /* Palette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Palette.swift; sourceTree = "<group>"; };
 		1CB1CBACDDC9D2B6E47206C7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1F4412C6E6B26DC131C54235 /* book.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = book.css; sourceTree = "<group>"; };
+		2439EC313A18D920AF6BD7D7 /* ShellSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellSession.swift; sourceTree = "<group>"; };
 		2A02C9562B8ECB9AF3BB69E3 /* fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; path = fixtures; sourceTree = SOURCE_ROOT; };
 		2BD9A46CBDBDDEEAFF860927 /* Servers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Servers.swift; sourceTree = "<group>"; };
 		2D6F3642FDD052AC3AE16540 /* Chiron.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chiron.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2ECBF91310F511343F4FFC57 /* ShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellView.swift; sourceTree = "<group>"; };
 		3091646F01947C00333241BA /* Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credentials.swift; sourceTree = "<group>"; };
 		34A9FA4F8B8DAA26FA36F1D4 /* PlacementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacementView.swift; sourceTree = "<group>"; };
 		3C2E4E249BD2C1C75083AB14 /* Harness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Harness.swift; sourceTree = "<group>"; };
@@ -75,15 +85,31 @@
 		756BF2C5D73A3EFF3BD5C55C /* book.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = book.js; sourceTree = "<group>"; };
 		79FB25B2A0E99E8DF4A73477 /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
 		7B0F074E09B2872B0CA5A339 /* ChironTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ChironTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7C467FAF6F7C13BCA4900BE0 /* Tunnel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tunnel.swift; sourceTree = "<group>"; };
 		87AA842BA32080A6287EB9A6 /* SelfTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTest.swift; sourceTree = "<group>"; };
 		88A8C3D184F56D0B771B098F /* BookSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookSession.swift; sourceTree = "<group>"; };
 		89B2BA152D8A07FC89372909 /* InkBox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkBox.swift; sourceTree = "<group>"; };
 		8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
+		B2E5D9B01B743228E1E20CC2 /* TunnelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelTests.swift; sourceTree = "<group>"; };
+		DEE5BEC3075A333377FEE436 /* DeviceKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceKey.swift; sourceTree = "<group>"; };
 		DF7A7AA69D4E3E6C07183050 /* MathText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathText.swift; sourceTree = "<group>"; };
+		F506717299A374C8AA31320C /* DeviceKeyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceKeyTests.swift; sourceTree = "<group>"; };
 		F6474556AF056C444945956F /* fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = fonts; path = ../assets/fonts; sourceTree = SOURCE_ROOT; };
 		F9657BA2E7A99837373A3E6C /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		FBC625AEF8F1DC8BFD298857 /* AskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskCard.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		634E3A46BAB5DB03DE0D1ED1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6DFAE5171310C9CA93D24B36 /* SwiftTerm in Frameworks */,
+				11C6CA0F7706D0D596463985 /* Citadel in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		18688403B5A7406E79EB56D8 /* Resources */ = {
@@ -106,6 +132,7 @@
 				88A8C3D184F56D0B771B098F /* BookSession.swift */,
 				4E21F930C36788EA6466D67F /* CheckViews.swift */,
 				3091646F01947C00333241BA /* Credentials.swift */,
+				DEE5BEC3075A333377FEE436 /* DeviceKey.swift */,
 				3C2E4E249BD2C1C75083AB14 /* Harness.swift */,
 				1CB1CBACDDC9D2B6E47206C7 /* Info.plist */,
 				89B2BA152D8A07FC89372909 /* InkBox.swift */,
@@ -118,8 +145,11 @@
 				79FB25B2A0E99E8DF4A73477 /* ResultsView.swift */,
 				87AA842BA32080A6287EB9A6 /* SelfTest.swift */,
 				2BD9A46CBDBDDEEAFF860927 /* Servers.swift */,
+				2439EC313A18D920AF6BD7D7 /* ShellSession.swift */,
+				2ECBF91310F511343F4FFC57 /* ShellView.swift */,
 				4FDBD0C79377E20146856D09 /* Sync.swift */,
 				6F177C08E551698E85C6707E /* TeachView.swift */,
+				7C467FAF6F7C13BCA4900BE0 /* Tunnel.swift */,
 				F9657BA2E7A99837373A3E6C /* Typography.swift */,
 				402925421173333E62074B75 /* WaitViews.swift */,
 				18688403B5A7406E79EB56D8 /* Resources */,
@@ -152,7 +182,9 @@
 			isa = PBXGroup;
 			children = (
 				4EF263EE8ABB8A188DA7D430 /* BookSessionTests.swift */,
+				F506717299A374C8AA31320C /* DeviceKeyTests.swift */,
 				473534689097CF5B3E8E2EE0 /* FixtureDecodingTests.swift */,
+				B2E5D9B01B743228E1E20CC2 /* TunnelTests.swift */,
 			);
 			path = ChironTests;
 			sourceTree = "<group>";
@@ -185,6 +217,7 @@
 			buildPhases = (
 				073C707B38913B93631E77AA /* Sources */,
 				B7549C662ED4B59B24639996 /* Resources */,
+				634E3A46BAB5DB03DE0D1ED1 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -192,6 +225,8 @@
 			);
 			name = Chiron;
 			packageProductDependencies = (
+				FB840DC1DA1441BC90473907 /* SwiftTerm */,
+				3B941DBBC469D10A3B1E0278 /* Citadel */,
 			);
 			productName = Chiron;
 			productReference = 2D6F3642FDD052AC3AE16540 /* Chiron.app */;
@@ -221,6 +256,10 @@
 			);
 			mainGroup = 4810D2B0E90D2CDCD6AA570D;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				12B8564604A7C2B922C2674B /* XCRemoteSwiftPackageReference "Citadel" */,
+				CE082277E8083C60B90F91B0 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 927FE4EDAA74BD3F9BCB9D38 /* Products */;
 			projectDirPath = "";
@@ -267,6 +306,7 @@
 				EF6C9F8A52A8EBC636C5D2C7 /* BookSession.swift in Sources */,
 				A67BB45B6191D6A590258527 /* CheckViews.swift in Sources */,
 				2BDCB839CEB3F03E8538AAB4 /* Credentials.swift in Sources */,
+				447F160110B9562D6CFC7164 /* DeviceKey.swift in Sources */,
 				73C9290A5A8E44753FBA4E6B /* Harness.swift in Sources */,
 				92A27FDF307807755C3BF474 /* InkBox.swift in Sources */,
 				C4B40CBDCAA3019109786987 /* Library.swift in Sources */,
@@ -278,8 +318,11 @@
 				F05899EFFD330B9C8D2E40DE /* ResultsView.swift in Sources */,
 				5C223EEF7AE0AF48A9942AE5 /* SelfTest.swift in Sources */,
 				88AD80E868C1EF47C403E25D /* Servers.swift in Sources */,
+				AE21F9C86BD4FCE4E1716EA4 /* ShellSession.swift in Sources */,
+				8A971C981578FB0592F8EA57 /* ShellView.swift in Sources */,
 				A0641BBC47F65EC186C3AA87 /* Sync.swift in Sources */,
 				CE4995FD409AD790A8F172C0 /* TeachView.swift in Sources */,
+				D668A28376F693E15569C781 /* Tunnel.swift in Sources */,
 				D7298C18B730F83C6078BF84 /* Typography.swift in Sources */,
 				C63E8AC4B2923CBE812FF629 /* WaitViews.swift in Sources */,
 			);
@@ -290,7 +333,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				29364CDF3858A11CA746C64A /* BookSessionTests.swift in Sources */,
+				32CA8ADA55C01966DD6D5E6A /* DeviceKeyTests.swift in Sources */,
 				59F1078E57D0CDF81127B805 /* FixtureDecodingTests.swift in Sources */,
+				4D335A02EAD9014A07BA9B60 /* TunnelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -531,6 +576,38 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		12B8564604A7C2B922C2674B /* XCRemoteSwiftPackageReference "Citadel" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/orlandos-nl/Citadel.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.12.1;
+			};
+		};
+		CE082277E8083C60B90F91B0 /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.20.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		3B941DBBC469D10A3B1E0278 /* Citadel */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 12B8564604A7C2B922C2674B /* XCRemoteSwiftPackageReference "Citadel" */;
+			productName = Citadel;
+		};
+		FB840DC1DA1441BC90473907 /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CE082277E8083C60B90F91B0 /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = SwiftTerm;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 88AF112FA0F27BB17F7933AB /* Project object */;
 }

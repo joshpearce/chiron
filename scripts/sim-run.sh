@@ -41,7 +41,7 @@ case "$cmd" in
     # fails over an existing copy (see below), so clear it first.
     xcrun simctl uninstall "$UDID" "$BUNDLE" 2>/dev/null || true
     cd "$APPDIR"
-    xcodebuild -project Chiron.xcodeproj -scheme Chiron \
+    xcodebuild -project Chiron.xcodeproj -scheme Chiron -skipPackagePluginValidation \
       -destination "platform=iOS Simulator,id=$UDID" \
       -derivedDataPath "build-sim" test -quiet 2>&1 | grep -vE "^$|objc\[[0-9]+\]: Class" || true
     # xcodebuild's own exit status is lost in the pipe; the result bundle says.
@@ -60,7 +60,7 @@ xcrun simctl bootstatus "$UDID" -b >/dev/null
 open -a Simulator
 
 cd "$APPDIR"
-xcodebuild -project Chiron.xcodeproj -scheme Chiron \
+xcodebuild -project Chiron.xcodeproj -scheme Chiron -skipPackagePluginValidation \
   -destination "platform=iOS Simulator,id=$UDID" \
   -derivedDataPath build-sim build -quiet
 

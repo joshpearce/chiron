@@ -121,7 +121,16 @@ user-mode sshd behind the real gate binary: ssh, scp, a refused key, and a
 - Exit: `go test ./...`, the corpus lint, and the `book.js` test pass on
   the sprite; a deploy from the sprite serves the iPad.
 
-**Phase C: the shell in the app.**
+**Phase C: the shell in the app.** Built 2026-09-02, verified in the
+Simulator against a user-mode sshd behind the real gate on the Mac: the app
+enrols its Ed25519 key through `POST /agent/pubkey`, opens the tunnel,
+signs in with that key, and a typed command echoes back in the terminal
+(`scripts/sim-verify.sh` step 05f, when `CHIRON_GATE` is set). Files:
+`DeviceKey.swift`, `Tunnel.swift`, `ShellSession.swift`, `ShellView.swift`;
+server `httpapi/keys.go`. Packages: SwiftTerm 1.20 (needs Xcode's Metal
+toolchain and `-skipPackagePluginValidation` on the command line) and
+Citadel 0.12. Untested until the sprite is bootstrapped: the real sshd,
+tmux attach, and the Magic Keyboard.
 - Key enrolment: on saving a server with a shared key, the app generates
   an Ed25519 keypair (CryptoKit `Curve25519.Signing`; the OpenSSH public
   encoding is `ssh-ed25519` plus the 32 raw bytes, base64) in the Keychain

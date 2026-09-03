@@ -444,3 +444,18 @@ struct Mark: Codable, Identifiable, Equatable {
     var question: String?
     var answer: String?
 }
+
+/// A key sshd on the sprite accepts; the app's own shows up here after
+/// enrolment beside the Mac's.
+struct EnrolledKey: Codable, Identifiable, Equatable {
+    let fingerprint: String
+    let type: String
+    let name: String
+    var id: String { fingerprint }
+}
+
+struct EnrolResponse: Codable {
+    let fingerprint: String
+    let name: String
+    let installed: Bool
+}

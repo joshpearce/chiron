@@ -5,6 +5,9 @@ import Foundation
 /// once opened, so switching books later costs nothing.
 @MainActor
 final class Library: ObservableObject {
+    /// One shell for the app, kept across books; the sheet shows it.
+    let shell = ShellSession()
+    @Published var shellShown = false
     @Published var subjects: [SubjectInfo] = []
     /// The book the server says was last open, across every client.
     @Published var activeSubjectID: String?

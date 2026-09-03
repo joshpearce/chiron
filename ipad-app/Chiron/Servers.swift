@@ -111,6 +111,7 @@ final class ServerStore: ObservableObject {
         // The key goes with it. Leaving an orphaned secret in the keychain for a
         // server nobody can select is the kind of thing nobody cleans up later.
         Credentials.forget(server.id)
+        DeviceKey.forget(server.id)
         if selectedID == server.id { selectedID = servers.first?.id }
         save()
     }
