@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"encoding/json"
+	"net/http"
+	"os"
 	"os/exec"
 	"testing"
 
@@ -9,6 +11,9 @@ import (
 )
 
 func TestPagesEndpoints(t *testing.T) {
+	if os.Getenv("CHIRON_RENDER") == "0" {
+		t.Skip("CHIRON_RENDER=0: no browser renders in this run")
+	}
 	if _, err := exec.LookPath("pdftoppm"); err != nil {
 		t.Skip("pdftoppm not installed")
 	}
@@ -87,5 +92,21 @@ func TestIDKGradesAsFailWithoutModel(t *testing.T) {
 	}
 	if resp.Results[0].Verdict != "fail" {
 		t.Fatalf("IDK verdict = %q, want fail", resp.Results[0].Verdict)
+	}
+}
+
+// With rendering off the book still works end to end; only page images
+// are refused, and as unavailable rather than broken.
+func TestRenderOffServesTheBookWithoutPages(t *testing.T) {
+	t.Setenv("CHIRON_RENDER", "0")
+	s := newServer(t, "")
+	if w := do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start"}`, ""); w.Code != http.StatusOK {
+		t.Fatalf("start -> %d: %s", w.Code, w.Body.String())
+	}
+	if w := do(t, s, "GET", "/pages/ai", "", ""); w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("/pages/ai -> %d: %s", w.Code, w.Body.String())
+	}
+	if w := do(t, s, "GET", "/pages/ai/contents", "", ""); w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("/pages/ai/contents -> %d: %s", w.Code, w.Body.String())
 	}
 }

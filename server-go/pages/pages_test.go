@@ -2,6 +2,7 @@ package pages
 
 import (
 	"encoding/json"
+	"errors"
 	"image"
 	"image/png"
 	"os"
@@ -18,6 +19,9 @@ func testRenderer(t *testing.T) *Renderer {
 	r := &Renderer{
 		KatexDir: "../../ipad-app/Chiron/Resources/katex",
 		CacheDir: t.TempDir(),
+	}
+	if os.Getenv("CHIRON_RENDER") == "0" {
+		t.Skip("CHIRON_RENDER=0: no browser renders in this run")
 	}
 	if _, err := os.Stat(r.KatexDir); err != nil {
 		t.Skip("katex assets not present")
@@ -418,5 +422,14 @@ func TestScreenerLevelsRenderAsVerticalList(t *testing.T) {
 		if !strings.Contains(doc, want) {
 			t.Fatalf("missing %q", want)
 		}
+	}
+}
+
+// A renderer that is off answers at once, without looking for a browser.
+func TestRendererOffRefusesWithoutABrowser(t *testing.T) {
+	r := &Renderer{Off: true, ChromePath: "/definitely/not/chrome", CacheDir: t.TempDir()}
+	_, err := r.renderShared("x", "<html></html>")
+	if !errors.Is(err, ErrRenderingOff) {
+		t.Fatalf("got %v", err)
 	}
 }

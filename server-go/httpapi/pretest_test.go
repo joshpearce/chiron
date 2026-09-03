@@ -98,6 +98,9 @@ func TestResetArchivesInsteadOfDeleting(t *testing.T) {
 // URL - that is how new prose ended up underneath a previous check's
 // answer strips.
 func TestStalePageHashRefused(t *testing.T) {
+	if os.Getenv("CHIRON_RENDER") == "0" {
+		t.Skip("CHIRON_RENDER=0: no browser renders in this run")
+	}
 	s := newServer(t, "")
 	w := httptest.NewRecorder()
 	s.Handler().ServeHTTP(w, httptest.NewRequest("POST", "/exchange",

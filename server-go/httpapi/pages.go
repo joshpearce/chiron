@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -96,7 +97,7 @@ func (s *Server) handlePagesMeta(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := sub.Pages.Render(ch)
 	if err != nil {
-		http.Error(w, "render: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "render: "+err.Error(), renderStatus(err))
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -161,7 +162,7 @@ func (s *Server) handleResultsMeta(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := sub.Pages.RenderResults(doc)
 	if err != nil {
-		http.Error(w, "render: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "render: "+err.Error(), renderStatus(err))
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -194,7 +195,7 @@ func (s *Server) handleResultsPage(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := sub.Pages.RenderResults(doc)
 	if err != nil {
-		http.Error(w, "render: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "render: "+err.Error(), renderStatus(err))
 		return
 	}
 	if n >= res.Count {
@@ -250,7 +251,7 @@ func (s *Server) handleContentsMeta(w http.ResponseWriter, r *http.Request) {
 	doc := s.buildContentsDoc(sub)
 	res, err := sub.Pages.RenderContents(doc)
 	if err != nil {
-		http.Error(w, "render: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "render: "+err.Error(), renderStatus(err))
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -278,7 +279,7 @@ func (s *Server) handleContentsPage(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := sub.Pages.RenderContents(s.buildContentsDoc(sub))
 	if err != nil {
-		http.Error(w, "render: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "render: "+err.Error(), renderStatus(err))
 		return
 	}
 	if n >= res.Count {
@@ -309,7 +310,7 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := sub.Pages.Render(ch)
 	if err != nil {
-		http.Error(w, "render: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "render: "+err.Error(), renderStatus(err))
 		return
 	}
 	if n >= res.Count {
@@ -328,4 +329,12 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 	// Pages are content-addressed by chapter hash, so clients can cache hard.
 	w.Header().Set("Cache-Control", "max-age=86400")
 	http.ServeFile(w, r, res.PagePath(n))
+}
+
+// renderStatus: a switched-off renderer is a 503, not a server fault.
+func renderStatus(err error) int {
+	if errors.Is(err, pages.ErrRenderingOff) {
+		return http.StatusServiceUnavailable
+	}
+	return http.StatusInternalServerError
 }

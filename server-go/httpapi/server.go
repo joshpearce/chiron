@@ -250,6 +250,7 @@ func (s *Server) register(id, title, corpusDir, stateDir string) error {
 	s.subjects[id] = &Subject{ID: id, Title: title, Corpus: c, Learner: l,
 		StateDir: stateDir,
 		Pages: &pages.Renderer{
+			Off:      renderOff(),
 			KatexDir: resolve(s.root, s.cfg.KatexDir),
 			FontsDir: fonts,
 			CacheDir: filepath.Join(stateDir, "pages"),
@@ -386,6 +387,16 @@ func (s *Server) requireToken(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// renderOff reads CHIRON_RENDER: "0", "off" or "false" switch page images
+// off for the whole server.
+func renderOff() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("CHIRON_RENDER"))) {
+	case "0", "off", "false":
+		return true
+	}
+	return false
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

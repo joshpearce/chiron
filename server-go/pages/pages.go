@@ -19,6 +19,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"os"
@@ -33,6 +34,9 @@ import (
 	"github.com/mjbraun/chiron/server/corpus"
 	"github.com/mjbraun/chiron/server/render"
 )
+
+// ErrRenderingOff is every render's answer while Renderer.Off is set.
+var ErrRenderingOff = errors.New("page rendering is switched off (CHIRON_RENDER=0)")
 
 // reMarkable Paper Pro portrait, native pixels (11.8", 229 ppi).
 const (
@@ -69,6 +73,11 @@ const (
 const styleVersion = "v19"
 
 type Renderer struct {
+	// Off refuses every render with ErrRenderingOff. The iPad reads the
+	// chapter as HTML and never asks for page images; on a small box that
+	// also serves the book, five Chromium processes per placement is what
+	// takes it down.
+	Off bool
 	// ChromePath overrides Chrome discovery; empty means look in the
 	// usual places.
 	ChromePath string
@@ -249,6 +258,9 @@ func (r *Renderer) Render(ch *render.Chapter) (Result, error) {
 // renderShared is the cached, deduplicated path under every page render:
 // chapters and results docs both land here, keyed by content hash.
 func (r *Renderer) renderShared(name, doc string) (Result, error) {
+	if r.Off {
+		return Result{}, ErrRenderingOff
+	}
 	sum := sha256.Sum256([]byte(doc))
 	key := hex.EncodeToString(sum[:8])
 

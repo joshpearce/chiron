@@ -8,11 +8,14 @@ BIN     := $(SERVED)/bin/chiron-server
 
 .PHONY: test lint deploy deploy-gate
 
-# -p 2: the sprite that runs these also serves the book and has 8 GB; the
-# full-parallel suite (page renders through Chromium included) took the
-# whole sprite down once, and the restore lost half an hour of writes.
+# On the sprite (which also serves the book, on 8 GB) the suite runs two
+# packages at a time and without browser renders: the full-parallel suite
+# with its Chromium fan-out took the sprite down once, and the restore lost
+# half an hour of writes. On a Mac renders are on; RENDER=0 turns them off.
+RENDER ?= $(shell [ -d /.sprite ] && echo 0 || echo 1)
+
 test:
-	$(GO) test -p 2 ./...
+	CHIRON_RENDER=$(RENDER) $(GO) test -p 2 ./...
 	node scripts/test-book-js.mjs
 
 lint:
