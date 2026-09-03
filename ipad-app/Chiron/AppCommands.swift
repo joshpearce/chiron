@@ -46,6 +46,28 @@ enum AppCommands {
             library.agent.enabled = on
             if on { library.agent.start() } else { library.agent.stop() }
             try? await Task.sleep(nanoseconds: 500_000_000)
+        case "capture":
+            guard let prompt = args["prompt"] as? String else { throw Failure.badArguments("capture needs prompt") }
+            let c = Capture(text: args["text"] as? String ?? "", sourceURL: args["url"] as? String, sourceApp: args["app"] as? String)
+            let id = try await library.submitCapture(c, prompt: prompt)
+            var out = state(library)
+            out["subject"] = id
+            return out
+        case "capture/card":
+            // The card as the share extension would open it.
+            let c = Capture(text: args["text"] as? String ?? "", sourceURL: args["url"] as? String, sourceApp: args["app"] as? String)
+            try CaptureInbox.write(c)
+            library.receiveCapture(id: c.id)
+        case "capture/close":
+            library.pendingCapture = nil
+        case "note":
+            guard let s = library.session else { throw Failure.noBook }
+            guard let text = args["text"] as? String, let note = args["note"] as? String else {
+                throw Failure.badArguments("note needs text and note")
+            }
+            if await s.mark(text: text, kind: .note) != nil {
+                await s.extend(note)
+            }
         case "shell":
             library.shellShown = true
             try? await Task.sleep(nanoseconds: 300_000_000)
@@ -162,9 +184,12 @@ enum AppCommands {
             "active": library.activeSubjectID ?? "",
             "connected": library.sync.connected,
             "agent": library.agent.connected,
+            "capture_card": library.pendingCapture != nil,
+            "shelf_rows": library.subjects.map { ["id": $0.id, "kind": $0.kind ?? "book", "status": $0.status ?? ""] },
         ]
         if let s = library.session {
             out["subject"] = s.subjectID
+            out["kind"] = s.kind
             out["screen"] = screenName(s.screen)
             out["unit"] = s.chapter?.unit ?? ""
             out["items"] = s.chapter?.check.count ?? 0

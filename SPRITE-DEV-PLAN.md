@@ -241,4 +241,5 @@ Still open:
 ## 6. After this plan
 
 Capture: primers from anything on the iPad (share extension, App Intent,
-`kind` on subjects). Design in `IPAD-PLAN.md` section 12.
+`kind` on subjects). Design and status in `IPAD-PLAN.md` section 12; built
+2026-09-03, device checks pending.

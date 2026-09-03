@@ -138,11 +138,19 @@ func (s *Server) handlePrimerCapture(w http.ResponseWriter, r *http.Request) {
 // uniquePrimerID: "primer-" plus a slug of the seed, with a counter when
 // the reader captures the same thing twice.
 func (s *Server) uniquePrimerID(seed string) string {
-	words := strings.Fields(seed)
-	if len(words) > 5 {
-		words = words[:5]
+	// Whole words up to the slug's length, so an id reads as a phrase.
+	slug := ""
+	for _, w := range strings.Fields(seed) {
+		word := slugify(w)
+		if word == "" {
+			continue
+		}
+		next := strings.TrimPrefix(slug+"-"+word, "-")
+		if len(next) > 32 {
+			break
+		}
+		slug = next
 	}
-	slug := slugify(strings.Join(words, " "))
 	if slug == "" {
 		slug = "capture"
 	}
@@ -160,14 +168,19 @@ func (s *Server) uniquePrimerID(seed string) string {
 	}
 }
 
+// workingTitle names a primer until the author does: the question, whole
+// if it is short, otherwise cut at a word.
 func workingTitle(prompt string) string {
-	words := strings.Fields(prompt)
-	if len(words) > 6 {
-		words = words[:6]
-	}
-	t := strings.Join(words, " ")
+	t := strings.Join(strings.Fields(prompt), " ")
 	if t == "" {
 		return "Capture"
+	}
+	if len(t) > 72 {
+		cut := strings.LastIndex(t[:72], " ")
+		if cut < 24 {
+			cut = 72
+		}
+		t = t[:cut]
 	}
 	return strings.ToUpper(t[:1]) + t[1:]
 }

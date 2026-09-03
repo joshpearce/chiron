@@ -8,12 +8,18 @@ import SwiftUI
 struct Palette: View {
     @EnvironmentObject var session: BookSession
 
-    private let tools: [(BookSession.Tool, String, String)] = [
-        (.pen, "pencil.tip", "Pen"),
-        (.highlighter, "highlighter", "Highlighter"),
-        (.ask, "questionmark.bubble", "Ask about a passage"),
-        (.eraser, "eraser", "Eraser"),
-    ]
+    private var tools: [(BookSession.Tool, String, String)] {
+        var list: [(BookSession.Tool, String, String)] = [
+            (.pen, "pencil.tip", "Pen"),
+            (.highlighter, "highlighter", "Highlighter"),
+            (.ask, "questionmark.bubble", "Ask about a passage"),
+        ]
+        if session.isPrimer {
+            list.append((.note, "note.text.badge.plus", "Margin note: extend the primer"))
+        }
+        list.append((.eraser, "eraser", "Eraser"))
+        return list
+    }
 
     var body: some View {
         VStack(spacing: 6) {

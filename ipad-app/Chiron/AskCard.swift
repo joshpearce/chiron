@@ -36,26 +36,32 @@ struct AskCard: View {
                 if a.busy {
                     HStack(spacing: 10) {
                         ProgressView()
-                        Text("Asking the tutor.")
+                        Text(isNote ? "Extending the primer." : "Asking the tutor.")
                             .font(Typography.serif(16))
                             .foregroundStyle(.secondary)
                     }
                 } else if let answer = a.mark.answer {
-                    // Hugs a short answer; scrolls a long one.
-                    ScrollView {
-                        MathText(text: answer, size: 16, rich: true)
+                    if isNote {
+                        // The section is on the page; the card only says where.
+                        Label("Added at the end: \(answer)", systemImage: "text.append")
+                            .font(Typography.serif(16))
+                    } else {
+                        // Hugs a short answer; scrolls a long one.
+                        ScrollView {
+                            MathText(text: answer, size: 16, rich: true)
+                        }
+                        .frame(maxHeight: 320)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
-                    .frame(maxHeight: 320)
-                    .fixedSize(horizontal: false, vertical: true)
                 } else if let err = a.error {
                     Text(err)
                         .font(Typography.serif(16))
                         .foregroundStyle(.red)
-                    Button("Try again") { Task { await session.ask(q) } }
+                    Button("Try again") { Task { await send(q) } }
                         .buttonStyle(.bordered)
                 }
             } else {
-                TextField("Your question about this passage", text: $question, axis: .vertical)
+                TextField(isNote ? "Your note on this passage" : "Your question about this passage", text: $question, axis: .vertical)
                     .font(Typography.serif(17))
                     .lineLimit(1...4)
                     .textFieldStyle(.roundedBorder)
@@ -63,7 +69,7 @@ struct AskCard: View {
                     .onSubmit { submit() }
                 HStack {
                     Spacer()
-                    Button("Ask") { submit() }
+                    Button(isNote ? "Add to the primer" : "Ask") { submit() }
                         .buttonStyle(.borderedProminent)
                         .keyboardShortcut(.defaultAction)
                         .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -81,9 +87,15 @@ struct AskCard: View {
         }
     }
 
+    private var isNote: Bool { asking?.mark.kind == .note }
+
     private func submit() {
         let q = question
         guard !q.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        Task { await session.ask(q) }
+        Task { await send(q) }
+    }
+
+    private func send(_ q: String) async {
+        if isNote { await session.extend(q) } else { await session.ask(q) }
     }
 }

@@ -176,8 +176,29 @@ struct SubjectInfo: Codable, Identifiable {
     let unitsCleared: Int?
     let currentUnit: String?
     let debt: Int?
+    /// "book" or "primer"; a server before primers sends nothing.
+    let kind: String?
+    /// Primers only: authoring | ready | failed, why it failed, and where
+    /// the capture came from.
+    let status: String?
+    let error: String?
+    let source: PrimerSource?
+    let capturedAt: String?
+
+    init(id: String, title: String, unitsTotal: Int? = nil, unitsCleared: Int? = nil, currentUnit: String? = nil,
+         debt: Int? = nil, kind: String? = nil, status: String? = nil, error: String? = nil,
+         source: PrimerSource? = nil, capturedAt: String? = nil) {
+        self.id = id; self.title = title; self.unitsTotal = unitsTotal; self.unitsCleared = unitsCleared
+        self.currentUnit = currentUnit; self.debt = debt; self.kind = kind; self.status = status
+        self.error = error; self.source = source; self.capturedAt = capturedAt
+    }
+
+    var isPrimer: Bool { kind == "primer" }
+    var authoring: Bool { isPrimer && status == "authoring" }
+    var failed: Bool { isPrimer && status == "failed" }
 
     var progressLine: String {
+        if isPrimer { return sourceLine }
         var parts: [String] = []
         if let c = unitsCleared, let t = unitsTotal { parts.append("\(c)/\(t) units") }
         if let u = currentUnit { parts.append("reading \(u)") }
@@ -185,12 +206,65 @@ struct SubjectInfo: Codable, Identifiable {
         return parts.isEmpty ? "not started" : parts.joined(separator: " · ")
     }
 
+    /// Where a primer came from and when: "from Safari · Sep 3".
+    var sourceLine: String {
+        var parts: [String] = []
+        if let app = source?.app, !app.isEmpty {
+            parts.append("from \(app)")
+        } else if let url = source?.url, let host = URLComponents(string: url)?.host {
+            parts.append("from \(host)")
+        } else {
+            parts.append("captured")
+        }
+        if let raw = capturedAt, let date = ISO8601DateFormatter().date(from: raw) {
+            parts.append(date.formatted(.dateTime.month(.abbreviated).day()))
+        }
+        return parts.joined(separator: " · ")
+    }
+
     enum CodingKeys: String, CodingKey {
-        case id, title, debt
+        case id, title, debt, kind, status, error, source
         case unitsTotal = "units_total"
         case unitsCleared = "units_cleared"
         case currentUnit = "current_unit"
+        case capturedAt = "captured_at"
     }
+}
+
+struct PrimerSource: Codable, Equatable {
+    let text: String?
+    let url: String?
+    let app: String?
+}
+
+/// POST /primer/capture: what was captured and what the reader asks of it.
+struct CaptureRequest: Codable {
+    var text: String?
+    var imagePngB64: String?
+    var sourceUrl: String?
+    var sourceApp: String?
+    var prompt: String
+    var title: String?
+
+    enum CodingKeys: String, CodingKey {
+        case text, prompt, title
+        case imagePngB64 = "image_png_b64"
+        case sourceUrl = "source_url"
+        case sourceApp = "source_app"
+    }
+}
+
+struct CaptureResponse: Codable {
+    let subject: String
+    let status: String
+    let title: String
+}
+
+/// POST /primer/{id}/extend: the document with its new section.
+struct ExtendResponse: Codable {
+    let chapter: ChapterPayload
+    let heading: String
+    let entries: Int
 }
 
 /// GET /subjects: the shelf, and which book the reader last had open.
@@ -435,6 +509,9 @@ struct Mark: Codable, Identifiable, Equatable {
     enum Kind: String, Codable {
         case highlight
         case question
+        /// A primer's margin note: the passage, the note, and the heading
+        /// of the section it added.
+        case note
     }
     let id: String
     let kind: Kind

@@ -107,6 +107,25 @@ for DEVICE in $DEVICES; do
       # The app reopens on the active book; the shelf is the screen behind it.
       cmd /shelf
       expect bookshelf
+      # A capture: the card as the share sheet opens it, then a primer on
+      # the shelf (a dev server writes a stub at once), read with no check,
+      # and grown by a margin note.
+      cmd /capture/card '{"text":"User-agent: *\nContent-Signal: search=yes, ai-input=no","url":"https://lexweekly.example/robots.txt","app":"Safari"}'
+      shot 00a capture-card 1.5
+      cmd /capture/close
+      cmd /capture '{"text":"User-agent: *\nContent-Signal: search=yes, ai-input=no","url":"https://lexweekly.example/robots.txt","app":"Safari","prompt":"How does a crawler read Content-Signal?"}'
+      primer=$(curl -sf "$H/state" | python3 -c 'import json,sys; print([r["id"] for r in json.load(sys.stdin)["shelf_rows"] if r["kind"]=="primer"][-1])')
+      shot 00b shelf-with-primer 1.5
+      cmd /open "{\"subject\":\"$primer\"}"
+      expect reading
+      shot 00c primer 2
+      cmd /tool '{"tool":"note"}'
+      cmd /note '{"text":"ai-input=no","note":"Who actually honours this?"}'
+      shot 00d primer-extended 2.5
+      cmd /close
+      cmd /tool '{"tool":"none"}'
+      cmd /shelf
+      expect bookshelf
       shot 01 bookshelf
       cmd /open "{\"subject\":\"$SUBJECT\"}"
       expect placement

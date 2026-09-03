@@ -32,6 +32,12 @@ struct ChironApp: App {
                         library.session?.persist()
                     }
                 }
+                // The share extension and the capture intent hand over
+                // through a URL naming a capture in the shared inbox.
+                .onOpenURL { url in
+                    if let id = CaptureInbox.captureID(in: url) { library.receiveCapture(id: id) }
+                }
+                .onReceive(CaptureRouter.arrivals) { id in library.receiveCapture(id: id) }
         }
     }
 }
@@ -60,6 +66,10 @@ struct ContentView: View {
                 .environmentObject(library)
                 .presentationSizing(.page)
                 .interactiveDismissDisabled()
+        }
+        .sheet(item: $library.pendingCapture) { capture in
+            CaptureCard(capture: capture)
+                .environmentObject(library)
         }
     }
 }
@@ -221,40 +231,32 @@ struct BookshelfView: View {
             }
             VStack(spacing: 12) {
                 ForEach(library.subjects) { s in
-                    Button {
-                        Task { await library.open(s.id) }
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(s.title).font(Typography.serif(22, weight: .semibold, relativeTo: .title3))
-                                Text(s.id == library.activeSubjectID ? "Open now" : s.progressLine)
-                                    .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                        }
-                        .padding(16)
-                        .frame(maxWidth: 480)
-                        .background(Color.gray.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
-                    }
-                    .buttonStyle(.plain)
-                    .hoverEffect()
-                    .accessibilityLabel(s.title)
-                    .accessibilityHint(s.id == library.activeSubjectID ? "Open now" : s.progressLine)
+                    ShelfCard(subject: s)
                 }
                 if library.subjects.isEmpty && !library.loadingShelf {
                     Text(library.shelfError ?? "No books on the shelf.")
                         .foregroundStyle(.secondary)
                 }
             }
-            Button {
-                library.teaching = true
-            } label: {
-                Label("Teach me something else", systemImage: "sparkles")
-                    .font(.callout)
+            HStack(spacing: 12) {
+                Button {
+                    library.teaching = true
+                } label: {
+                    Label("Teach me something else", systemImage: "sparkles")
+                        .font(.callout)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!library.sync.connected)
+                Button {
+                    library.pendingCapture = Capture()
+                } label: {
+                    Label("Capture", systemImage: "doc.text.badge.plus")
+                        .font(.callout)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!library.sync.connected)
+                .accessibilityHint("Paste something and ask about it; a primer appears on the shelf")
             }
-            .buttonStyle(.bordered)
-            .disabled(!library.sync.connected)
             HStack(spacing: 14) {
                 ConnectionBadge()
                 Button {
@@ -620,4 +622,60 @@ struct ConnectionBadge: View {
 final class AgentBadgeState: ObservableObject {
     static let shared = AgentBadgeState()
     @Published var driven = false
+}
+
+
+/// One book or primer on the shelf. A book carries its progress; a primer
+/// its source and capture date, greyed with a spinner while the server is
+/// still writing it, red when that failed. The badge in the corner says
+/// which is which without reading.
+struct ShelfCard: View {
+    @EnvironmentObject var library: Library
+    let subject: SubjectInfo
+
+    private var openable: Bool { !subject.authoring && !subject.failed }
+
+    var body: some View {
+        Button {
+            Task { await library.open(subject.id) }
+        } label: {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(subject.title).font(Typography.serif(22, weight: .semibold, relativeTo: .title3))
+                    if subject.authoring {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text("Writing the primer · \(subject.sourceLine)")
+                        }
+                        .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.secondary)
+                    } else if subject.failed {
+                        Text(subject.error ?? "The primer could not be written.")
+                            .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.red)
+                    } else {
+                        Text(subject.id == library.activeSubjectID ? "Open now" : subject.progressLine)
+                            .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(.secondary)
+            }
+            .padding(16)
+            .padding(.bottom, 10)
+            .frame(maxWidth: 480)
+            .background(Color.gray.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+            .overlay(alignment: .bottomTrailing) {
+                Image(systemName: subject.isPrimer ? "doc.text" : "brain")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(10)
+                    .accessibilityLabel(subject.isPrimer ? "Primer" : "Smart book")
+            }
+            .opacity(openable ? 1 : 0.55)
+        }
+        .buttonStyle(.plain)
+        .hoverEffect()
+        .disabled(!openable)
+        .accessibilityLabel(subject.title)
+        .accessibilityHint(subject.authoring ? "Still being written" : (subject.id == library.activeSubjectID ? "Open now" : subject.progressLine))
+    }
 }

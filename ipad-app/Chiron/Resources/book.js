@@ -27,7 +27,7 @@ function initChapter(payload, position) {
   const root = document.getElementById("chapter");
   root.innerHTML =
     `<h1>${escapeHtml(payload.title)}</h1>` +
-    `<div class="chapter-meta">~${payload.minutes} min · work every beat before its reveal</div>` +
+    `<div class="chapter-meta">~${payload.minutes} min${(payload.beats || []).length ? " · work every beat before its reveal" : ""}</div>` +
     payload.html;
 
   for (const beat of payload.beats) {

@@ -106,6 +106,19 @@ mark.mark { color: inherit; border-radius: 2px; padding: 0.05em 0; }
 mark.mark-highlight { background: rgba(255, 214, 10, 0.45); }
 mark.mark-question { background: rgba(10, 132, 255, 0.18); box-shadow: 0 2px 0 rgba(10, 132, 255, 0.55); }
 mark.mark-preview { background: rgba(10, 132, 255, 0.28); }
+/* a primer's margin note: green, with a "+" once its section was added */
+mark.mark-note { background: rgba(52, 199, 89, 0.2); box-shadow: 0 2px 0 rgba(52, 199, 89, 0.6); }
+mark.mark-note[data-last="1"]::after {
+  content: "+";
+  display: inline-block;
+  margin-left: 0.25em;
+  padding: 0 0.45em;
+  border-radius: 999px;
+  font: 700 0.7em/1.5 "Source Sans 3", -apple-system, sans-serif;
+  color: var(--paper);
+  background: rgba(52, 199, 89, 0.9);
+  vertical-align: 0.25em;
+}
 mark.mark-question[data-last="1"]::after {
   content: "?";
   display: inline-block;

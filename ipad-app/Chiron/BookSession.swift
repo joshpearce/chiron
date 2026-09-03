@@ -73,15 +73,22 @@ final class BookSession: ObservableObject {
     /// highlighter and ask tools select runs of text.
     enum Tool: String, CaseIterable {
         case none, pen, highlighter, ask, eraser
+        /// Primers only: a margin note that extends the document.
+        case note
     }
     @Published var tool: Tool = .none
+
+    /// "book" or "primer". A primer has no check; its loop is read,
+    /// annotate, and extend from margin notes.
+    var kind: String = "book"
+    var isPrimer: Bool { kind == "primer" }
 
     /// The page, when one is loaded: what a script or a gesture needs from it.
     weak var page: PageBridge?
 
     /// Squeeze on a Pencil Pro: the next tool round the palette.
     func cycleTool() {
-        let order: [Tool] = [.none, .pen, .highlighter, .ask]
+        let order: [Tool] = isPrimer ? [.none, .pen, .highlighter, .ask, .note] : [.none, .pen, .highlighter, .ask]
         let i = order.firstIndex(of: tool) ?? 0
         tool = order[(i + 1) % order.count]
     }
@@ -468,12 +475,12 @@ final class BookSession: ObservableObject {
         // The same run marked the same way twice is one mark: a question
         // reopens rather than stacking a second badge on the passage.
         if let existing = marks.first(where: { $0.kind == kind && $0.start == start && $0.end == end }) {
-            if kind == .question { asking = Asking(mark: existing) }
+            if kind == .question || kind == .note { asking = Asking(mark: existing) }
             return existing
         }
         let mark = Mark(id: UUID().uuidString, kind: kind, start: start, end: end, text: text)
         marks.append(mark)
-        if kind == .question { asking = Asking(mark: mark) }
+        if kind == .question || kind == .note { asking = Asking(mark: mark) }
         persistMarks()
         return mark
     }
@@ -486,7 +493,7 @@ final class BookSession: ObservableObject {
 
     /// Reopen the card on an existing question, or nothing for a highlight.
     func openMark(_ id: String) {
-        guard let m = marks.first(where: { $0.id == id }), m.kind == .question else { return }
+        guard let m = marks.first(where: { $0.id == id }), m.kind == .question || m.kind == .note else { return }
         asking = Asking(mark: m)
     }
 
@@ -519,6 +526,36 @@ final class BookSession: ObservableObject {
         if let i = marks.firstIndex(where: { $0.id == a.mark.id }) { marks[i] = a.mark }
         persistMarks()
     }
+
+    /// A margin note on a primer: the passage and the note go to the
+    /// server, which writes a new section; the document comes back whole
+    /// and the mark records the heading it added.
+    func extend(_ note: String) async {
+        guard var a = asking, a.mark.kind == .note else { return }
+        let n = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !n.isEmpty, !a.busy else { return }
+        a.busy = true
+        a.error = nil
+        a.mark.question = n
+        asking = a
+        do {
+            let reply = try await service.extend(subject: subjectID, quote: a.mark.text, note: n)
+            a.mark.answer = reply.heading
+            setChapter(reply.chapter)
+            persist()
+        } catch {
+            a.error = "The primer can't be extended right now. Try again."
+        }
+        a.busy = false
+        asking = a
+        if let i = marks.firstIndex(where: { $0.id == a.mark.id }) { marks[i] = a.mark }
+        persistMarks()
+    }
+
+    #if DEBUG
+    /// Tests put a chapter in hand without a server round trip.
+    func setChapterForTesting(_ ch: ChapterPayload) { setChapter(ch) }
+    #endif
 
     func saveInk(_ data: Data?) {
         inkData = data

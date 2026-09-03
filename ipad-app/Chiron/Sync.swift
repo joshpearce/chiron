@@ -9,6 +9,8 @@ protocol ChironService: AnyObject {
     func exchange(_ request: ExchangeRequest) async throws -> ExchangeResponse
     func ink(subject: String, _ submission: InkSubmission) async throws -> ExchangeResponse
     func ask(subject: String, unit: String, quote: String, question: String) async throws -> AskResponse
+    func capture(_ request: CaptureRequest) async throws -> CaptureResponse
+    func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse
     func reset(subject: String) async throws -> BookState
 }
 
@@ -114,6 +116,18 @@ final class Sync: ObservableObject, ChironService {
         struct Body: Encodable { let fingerprint: String }
         struct Reply: Decodable { let removed: Int }
         let _: Reply = try await post("/agent/keys/revoke", body: try JSONEncoder().encode(Body(fingerprint: fingerprint)), timeout: 15)
+    }
+
+    /// A capture becomes a primer on the shelf; authoring runs on the
+    /// server after this returns.
+    func capture(_ request: CaptureRequest) async throws -> CaptureResponse {
+        try await post("/primer/capture", body: try JSONEncoder().encode(request), timeout: 60)
+    }
+
+    /// A margin note extends the primer; the whole document comes back.
+    func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse {
+        struct Body: Encodable { let quote, note: String }
+        return try await post("/primer/\(subject)/extend", body: try JSONEncoder().encode(Body(quote: quote, note: note)), timeout: 180)
     }
 
     func reset(subject: String) async throws -> BookState {

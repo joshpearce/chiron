@@ -11,6 +11,10 @@ final class FakeService: ChironService {
     var onReset: (String) throws -> BookState = { _ in throw URLError(.cannotConnectToHost) }
     var onInk: (String, InkSubmission) throws -> ExchangeResponse = { _, _ in throw URLError(.cannotConnectToHost) }
     var onAsk: (String, String, String) throws -> AskResponse = { _, _, _ in throw URLError(.cannotConnectToHost) }
+    var onCapture: (CaptureRequest) throws -> CaptureResponse = { _ in throw URLError(.cannotConnectToHost) }
+    var onExtend: (String, String, String) throws -> ExtendResponse = { _, _, _ in throw URLError(.cannotConnectToHost) }
+    var captures: [CaptureRequest] = []
+    var extends: [(subject: String, quote: String, note: String)] = []
     var exchanges: [ExchangeRequest] = []
     var inks: [InkSubmission] = []
     var asks: [(unit: String, quote: String, question: String)] = []
@@ -35,6 +39,14 @@ final class FakeService: ChironService {
         return try onAsk(unit, quote, question)
     }
     func reset(subject: String) async throws -> BookState { try onReset(subject) }
+    func capture(_ request: CaptureRequest) async throws -> CaptureResponse {
+        captures.append(request)
+        return try onCapture(request)
+    }
+    func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse {
+        extends.append((subject, quote, note))
+        return try onExtend(subject, quote, note)
+    }
 }
 
 @MainActor

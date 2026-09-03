@@ -475,3 +475,28 @@ so the reader can go back to what they were reading and check later.
 book later by asking the server to generate checks for it. Cheap if the
 corpus format is shared, and the kind of thing wanted after a primer turns
 out to matter.
+
+**Status (2026-09-03, overnight build).** Steps 1 to 3 built and verified in
+the Simulator against a dev server; step 4's Simulator half is in
+`scripts/sim-verify.sh` (steps 00a to 00d). Server: `primer/` (a primer is
+a one-unit corpus written from the author's markdown under
+`state/primers/<id>/`, so chapters, asks, marks and learner state need
+nothing new), `roles/primer.go` (AuthorPrimer, ExtendPrimer), routes
+`POST /primer/capture` and `POST /primer/{id}/extend`, `kind`, `status`,
+`source` and `captured_at` on `/subjects`, an image capture through the
+ink transcriber, stub documents on a dev server without a model, primers
+reloaded at boot (one caught mid-authoring is marked failed). App: shelf
+cards with the `brain` / `doc.text` badge, source line, greyed-with-spinner
+while authoring, red when failed, a Capture button; the capture card
+(`CaptureCard.swift`) opened by `chiron://capture/<id>` from the shared
+inbox (`Chiron/Shared/CaptureInbox.swift`, App Group
+`group.dev.mjbraun.chiron`), by the `CapturePrimerIntent` App Intent, or by
+the shelf button with pasted text; the share extension target
+`ChironShare` (text, URL, image, PDF via PDFKit); the primer reader with no
+check bar and a `note` tool whose card says "Add to the primer", the
+document reloading in place with the new section and the mark keeping its
+"+" badge. Harness verbs: `capture`, `capture/card`, `capture/close`,
+`note`. Untested until a device: the share sheet from Safari, the intent
+in Shortcuts and the Pencil squeeze menu, and App Group provisioning under
+automatic signing. Not built: promotion of a primer to a smart book (the
+open decision above).

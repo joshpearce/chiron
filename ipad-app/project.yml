@@ -19,6 +19,12 @@ targets:
     dependencies:
       - package: SwiftTerm
       - package: Citadel
+      - target: ChironShare
+    entitlements:
+      path: Chiron/Chiron.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.mjbraun.chiron
     sources:
       # KaTeX must keep its directory structure: chapter.html and MathText.swift
       # reference "katex/katex.min.css" and "katex/contrib/auto-render.min.js".
@@ -60,6 +66,10 @@ targets:
         UIRequiresFullScreen: false
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        # chiron://capture/<id>: the share extension's and intents' way in.
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.mjbraun.chiron
+            CFBundleURLSchemes: [chiron]
         UIAppFonts:
           - fonts/SourceSerif4-Regular.ttf
           - fonts/SourceSerif4-It.ttf
@@ -69,6 +79,45 @@ targets:
           - fonts/SourceSans3-Medium.ttf
           - fonts/SourceSans3-Semibold.ttf
           - fonts/SourceSans3-Bold.ttf
+  # The share sheet's "Chiron": text, a URL, an image or a PDF from any app
+  # lands in the shared inbox and the app opens on the question.
+  ChironShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ChironShare
+      - path: Chiron/Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.mjbraun.chiron.share
+        DEVELOPMENT_TEAM: ${CHIRON_TEAM_ID}
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Chiron
+        TARGETED_DEVICE_FAMILY: "2"
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.0
+    info:
+      path: ChironShare/Info.plist
+      properties:
+        # The Simulator refuses an extension whose plist has no version.
+        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.0"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsWebPageWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 1
+              NSExtensionActivationSupportsFileWithMaxCount: 1
+    entitlements:
+      path: ChironShare/ChironShare.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.mjbraun.chiron
   ChironTests:
     type: bundle.unit-test
     platform: iOS

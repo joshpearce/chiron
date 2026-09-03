@@ -25,7 +25,8 @@ struct ReaderContainer: View {
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
-            if !session.chromeHidden {
+            // A primer has no check: nothing to take, nothing to skip.
+            if !session.chromeHidden && !session.isPrimer {
                 Divider()
                 bottomBar
             }
@@ -98,7 +99,9 @@ struct ReaderView: UIViewRepresentable {
 
     func updateUIView(_ web: WKWebView, context: Context) {
         let c = context.coordinator
-        if c.loadedUnit != chapter.unit {
+        // A new unit, or the same unit rewritten (a primer that grew from a
+        // margin note), is a fresh page; marks re-apply on top.
+        if c.loadedUnit != chapter.unit || c.loadedHTML != chapter.html.hashValue {
             load(into: web, context: context)
         } else if c.scale != scale {
             c.scale = scale
@@ -112,6 +115,7 @@ struct ReaderView: UIViewRepresentable {
     private func load(into web: WKWebView, context: Context) {
         let c = context.coordinator
         c.loadedUnit = chapter.unit
+        c.loadedHTML = chapter.html.hashValue
         c.pendingChapter = chapter
         c.scale = scale
         c.position = session.position(for: chapter.unit)
@@ -126,6 +130,7 @@ struct ReaderView: UIViewRepresentable {
         let session: BookSession
         weak var web: WKWebView?
         var loadedUnit: String?
+        var loadedHTML: Int?
         var pendingChapter: ChapterPayload?
         var scale: CGFloat = 1
         var position: Double = 0
@@ -194,7 +199,7 @@ struct ReaderView: UIViewRepresentable {
                 canvas.tool = PKEraserTool(.vector)
                 canvas.isUserInteractionEnabled = true
                 marker.isUserInteractionEnabled = false
-            case .highlighter, .ask:
+            case .highlighter, .ask, .note:
                 canvas.isUserInteractionEnabled = false
                 marker.isUserInteractionEnabled = true
             case .none:
@@ -241,7 +246,12 @@ struct ReaderView: UIViewRepresentable {
                 guard let self, let r = result as? [String: Any],
                       let start = r["start"] as? Int, let end = r["end"] as? Int, let text = r["text"] as? String else { return }
                 Task { @MainActor in
-                    let kind: Mark.Kind = self.session.tool == .ask ? .question : .highlight
+                    let kind: Mark.Kind
+                    switch self.session.tool {
+                    case .ask: kind = .question
+                    case .note: kind = .note
+                    default: kind = .highlight
+                    }
                     self.session.addMark(kind: kind, start: start, end: end, text: text)
                 }
             }

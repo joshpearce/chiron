@@ -28,6 +28,10 @@ import Network
 ///   POST /reset              start the book over
 ///   POST /retry              the error screen's Try again
 ///   POST /server {url, key, name}  save and select a server (the shell needs one)
+///   POST /capture {text, prompt, url, app}  capture and ask: a primer starts on the shelf
+///   POST /capture/card {text, url, app}     open the capture card as the share sheet would
+///   POST /capture/close      dismiss the capture card
+///   POST /note {text, note}  a margin note on a primer's passage; the primer grows
 ///   POST /agent {on}         let the sprite's agent drive the app (default on)
 ///   POST /shell              open the shell sheet;  POST /shell/close closes it
 ///   POST /shell/type {text}  type into the shell

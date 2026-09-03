@@ -256,3 +256,17 @@ func TestAFailedPrimerSaysWhy(t *testing.T) {
 		t.Fatalf("row = %+v", row)
 	}
 }
+
+func TestPrimerNamesReadAsPhrases(t *testing.T) {
+	s := newServer(t, "")
+	if got := s.uniquePrimerID("What does Content-Signal mean for a crawler?"); got != "primer-what-does-content-signal-mean" {
+		t.Errorf("id = %q", got)
+	}
+	if got := workingTitle("what does Content-Signal mean for a crawler?"); got != "What does Content-Signal mean for a crawler?" {
+		t.Errorf("title = %q", got)
+	}
+	long := strings.Repeat("word ", 30)
+	if got := workingTitle(long); len(got) > 72 || strings.HasSuffix(got, " ") {
+		t.Errorf("long title = %q", got)
+	}
+}
