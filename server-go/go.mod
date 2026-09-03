@@ -1,6 +1,6 @@
 module github.com/mjbraun/chiron/server
 
-go 1.25
+go 1.26.0
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.61.0 // indirect
@@ -16,6 +16,8 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/yuin/goldmark v1.8.4 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
+	golang.org/x/crypto v0.56.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

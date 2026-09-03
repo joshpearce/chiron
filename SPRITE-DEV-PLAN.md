@@ -1,138 +1,194 @@
 # Chiron development on the sprite: the plan
 
-Written 2026-09-02. The goal Matt set: the whole Chiron development
-environment lives on the sprite that serves the book, and the iPad app can
-open a shell on it to drive Claude Code from the iPad (Magic Keyboard in
-hand). This document is meant to be executed cold: every fact needed to
-start is here or in a file it names.
+Written 2026-09-02, revised the same day after Matt's constraints on wake
+and account. The goal: the whole Chiron development environment lives on
+the sprite that serves the book, reachable from the Mac and from the iPad
+app with the same mechanism, so Claude Code on the sprite can be driven
+from either. This document is meant to be executed cold: every fact needed
+to start is here or in a file it names.
 
 ## 0. Where things stand
 
-- The sprite `chiron` (Fly, org `matthew-braun`, `https://chiron.example`)
-  runs the Go book server as a `sprite-env` service from `/home/sprite/chiron`,
-  which is a copy of the repo's server, corpora and config, not a git checkout
-  in use. Deploys are hand-pushed binaries (see the project memory
-  `chiron-deployment`). The sprite has Chromium and poppler installed for page
-  renders and an Anthropic OAuth token in the service environment.
-- Development happens on the Mac: Xcode for the app, Go on the Mac for the
-  server, the iOS Simulator for verification, `scripts/sim-*.sh` and a debug
-  harness inside the app. Claude Code runs on the Mac against the repo.
+- The sprite `chiron` (Fly, personal org `matthew-braun`,
+  `https://chiron.example`) runs the Go book server as a
+  `sprite-env` service from `/home/sprite/chiron`, which is a copy of the
+  repo's server, corpora and config, not a git checkout. Deploys are
+  hand-pushed binaries (see the project memory `chiron-deployment`). The
+  sprite has Chromium and poppler for page renders and an Anthropic OAuth
+  token in the service environment.
+- Development happens on the Mac: Xcode for the app, Go for the server, the
+  Simulator for verification, `scripts/sim-*.sh` and a debug harness inside
+  the app. Claude Code runs on the Mac against the repo.
 - The iPad talks to the server over HTTPS with a bearer key stored in the
   Keychain per saved server.
 
-## 1. What "development on the sprite" can and cannot mean
+## 1. The two constraints that shape everything
 
-The server side moves cleanly: Go builds anywhere, the corpora are text, the
-tests run headless, Chromium is already there. Claude Code runs anywhere a
-shell does.
+**The sprite hibernates after about 30 seconds idle** and wakes on the next
+inbound request. Measured 2026-09-02: the first request to the public URL
+after idle took 0.89 s, the next 0.12 s. Memory and filesystem survive
+hibernation, so processes (sshd, tmux, a running `claude`) freeze and
+resume rather than restart. Consequences: nothing needs a separate "wake"
+call, because the connection that opens the shell is itself the request
+that wakes the box; but a long Claude Code task with no connection open
+will pause until the next connection, so an open shell (with keepalives)
+is what keeps it running.
 
-The app side does not move: an iPad app needs Xcode and macOS to build and
-sign, and the Simulator to verify. Nothing on a Linux sprite can produce a
-`.app` or install it on the iPad. Two consequences:
+**The `sprite` CLI is per account.** Logged into the work account, the
+personal org is invisible (`sprite list` shows only `fly-util`). So
+`sprite console`, `sprite exec` and `sprite proxy` cannot be the day-to-day
+path in, and cannot be the iPad's path at all. The only thing reachable
+without the CLI is the public HTTPS URL on port 8080, which is the book
+server. Therefore: **the shell rides port 8080 as a WebSocket carrying a
+real SSH session.** The sprite CLI is kept for bootstrap and for rescue.
 
-1. The sprite becomes the home of the **server, corpora, tests, and Claude
-   Code**. The Mac remains the **build and install** machine for the app,
-   driven from the same git repo.
-2. To drive the *app* from the iPad without a Mac in the loop, the sprite
-   needs a way to reach the app. The app's debug harness (localhost:8087 in
-   the Simulator) can be extended so the running app on the iPad connects
-   *out* to the sprite and takes commands from it (the reverse of today's
-   direction, because the iPad has no inbound path). Claude Code on the
-   sprite then has `chiron-app` commands: state, navigate, mark, ask,
-   screenshot. That gives an agent on the sprite hands on the app the
-   reader is holding, which is the thing Matt is after.
+## 2. The mechanism: SSH over a WebSocket on the book port
 
-Builds still need the Mac. A GitHub-hosted macOS runner (or the Mac left on
-at home with a runner) closes that gap later: the sprite pushes a branch, the
-runner builds and signs, and the iPad installs it through TestFlight or an
-ad hoc manifest. That is a phase of its own, after the shell works.
+Three parts, all small.
 
-## 2. Phases
+1. **`sshd` on the sprite**, listening on `127.0.0.1:22` only, key auth
+   only (`PasswordAuthentication no`), run as a `sprite-env` service so it
+   comes back after a restore. `~/.ssh/authorized_keys` holds the Mac's key
+   and every enrolled iPad key.
+2. **A tunnel route on port 8080.** `GET /ssh` with the bearer key upgrades
+   to a WebSocket and pipes bytes to `127.0.0.1:22`; nothing else, no
+   command execution, target not configurable. Auth is two layers with no
+   new code: the bearer key opens the tunnel, then `sshd` demands a key.
+   Library: `github.com/coder/websocket` (zero dependencies, has `NetConn`
+   for byte piping). Where the route lives is decision 3 below.
+3. **Clients speak SSH into the tunnel.**
+   - Mac: `chiron-dev` (Go, `server-go/cmd/chiron-dev`) with one job,
+     `chiron-dev proxy`: open the WebSocket, retry the connect for up to
+     20 s while the sprite wakes, then pipe stdin/stdout. It is an SSH
+     `ProxyCommand`, so `ssh`, `scp`, `rsync`, `git push` over ssh, and
+     VS Code Remote all work unchanged:
+     ```
+     Host chiron
+       ProxyCommand chiron-dev proxy
+       User sprite
+       IdentityFile ~/.ssh/chiron_ed25519
+       ServerAliveInterval 15
+     ```
+     `ServerAliveInterval` keeps frames flowing through the tunnel so an
+     open-but-quiet session never counts as idle. `chiron-dev` reads the URL
+     and an `op://` reference for the key from `~/.config/chiron-dev/config`
+     and resolves the key with `op read` at run time; the secret is never
+     written to disk.
+   - iPad: the same tunnel, an SSH client library, and a terminal view.
+     Details in Phase C. The bearer key the app already holds opens the
+     tunnel; the device's Ed25519 key, enrolled once, satisfies `sshd`.
 
-**Phase A: the repo lives on the sprite.**
-- Clone the repo onto the sprite (`/home/sprite/src/chiron`), with the Go
-  toolchain, Node (for the `book.js` grading test), and `xcodegen` absent by
-  design. The served instance keeps running from `/home/sprite/chiron`;
-  deploys become `make deploy` on the sprite: build, swap the binary, restart
-  the service, with the rollback naming already in use.
-- Git remote: the sprite needs read/write to the GitHub repo. Matt's rule is
-  that pushes need his YubiKey; on the sprite that means either a deploy key
-  scoped to this repo (his call) or the sprite pushes to a branch the Mac
-  pulls. Decision needed before Phase A closes.
-- Claude Code on the sprite: install, log in once (browser flow through
-  `sprite exec`), and set the project's `CLAUDE.md` so the sprite session
-  knows it *is* the server host (never point tests at :8080, use :8084 with
-  drive mode, etc.). The memory directory conventions carry over.
-- Exit: `go test ./...`, the corpus lint, and `node scripts/test-book-js.mjs`
-  pass on the sprite; a deploy from the sprite serves the iPad.
+Why real SSH instead of a PTY-over-WebSocket: one protocol on both clients,
+key auth done by software that has been audited for it, file transfer and
+port forwarding for free, and the Mac side needs no custom client at all.
 
-**Phase B: the app reaches the sprite's agent.**
-- Server: `POST /agent/connect` (bearer key) registers the app instance and
-  returns a session id; a WebSocket at `/agent/app` carries harness commands
-  from the sprite to the app and results back. The existing harness routes
-  become the command set, plus `screenshot` (the app renders its own window
-  to PNG; a UIView snapshot suffices).
-- App: an "Agent" toggle in the server settings opens the WebSocket when the
-  book is open, with a visible badge while connected, so the reader always
-  knows when the app is being driven. Off by default.
-- Sprite: a `chiron-app` CLI (Go, in `cmd/chiron-app`) that Claude Code calls:
-  `chiron-app state`, `chiron-app open ai`, `chiron-app shot out.png`. Same
-  verbs as `scripts/sim-verify.sh` uses today, so the verify script can run on
-  the sprite against the real iPad.
-- Exit: from a Claude Code session on the sprite, walk the iPad through
-  placement, series, results, and a marked passage, with screenshots landing
-  on the sprite.
+## 3. Phases
+
+**Phase A: the tunnel and the Mac.** Built 2026-09-02: `server-go/gate`
+(the handler), `cmd/chiron-gate`, `gate/client` and `cmd/chiron-dev`, the
+shared `auth` package, `scripts/sprite-bootstrap-ssh.sh` and the service
+layout in `scripts/sprite-service.sh`. Proven on the Mac end to end with a
+user-mode sshd behind the real gate binary: ssh, scp, a refused key, and a
+25 s idle session with keepalives. Waiting on the bootstrap run.
+- Bootstrap once from the personal account: `sprite -s chiron console`,
+  install `openssh-server`, write `sshd_config` (loopback, keys only),
+  register the service, install the Mac's public key. Check `/.sprite/llm.txt`
+  for whether any port other than 8080 can be exposed; if a raw TCP port
+  can, the tunnel is unnecessary and `sshd` listens there directly.
+- Server: the `/ssh` route (decision 3), gated by an env flag so the Mac dev
+  servers never carry it. Tests: refuses without the bearer key; pipes
+  bytes end to end against a loopback echo listener standing in for `sshd`.
+- `chiron-dev proxy` plus the `~/.ssh/config` stanza. Verify: `ssh chiron`
+  from the work-account Mac with the sprite hibernated; hold the session
+  idle for two minutes and confirm a background `date` loop on the sprite
+  shows no gap (the keepalive proves the sprite stays awake).
+- Exit: `ssh chiron` works from a cold sprite, from either CLI account.
+
+**Phase B: the repo lives on the sprite.**
+- Clone to `/home/sprite/src/chiron`. Toolchain: Go, Node (for
+  `scripts/test-book-js.mjs`), `tmux`, Claude Code (log in once through the
+  ssh session). GitHub access is a fine-grained PAT scoped to this one
+  repo, Contents read/write, nothing else, one-year expiry, held by the
+  sprite user's git credential store (Matt's decision, 2026-09-02). The
+  rule for the agent does not change: Claude Code on the sprite never
+  pushes unless asked; the sprite's `CLAUDE.md` says so.
+- The sprite's `CLAUDE.md` also records that it *is* the server host: the
+  live server on 8080 holds Matt's real learner state, test servers use
+  drive mode on another port, and deploy means `make deploy` (build, swap
+  the binary with the dated rollback name in use today, restart the
+  service). The served instance stays a deploy target rather than the
+  checkout (decision 1).
+- Exit: `go test ./...`, the corpus lint, and the `book.js` test pass on
+  the sprite; a deploy from the sprite serves the iPad.
 
 **Phase C: the shell in the app.**
-- Transport. Checked 2026-09-02: the `sprite` CLI has no SSH; its
-  `console` and `exec` go through the sprites API (WebSocket), and `proxy`
-  forwards ports through the same API. So a plain SSH client on the iPad has
-  nothing to connect to unless the sprite runs `sshd` behind a proxied port,
-  and the app would then need a sprites API token as well as the book key.
-  The smaller design is a WebSocket-to-PTY bridge served by the book server
-  itself at `/shell`: bearer key, then a PTY running `tmux attach` with
-  Claude Code inside. One credential (the one the app already has), no
-  second daemon, and the same route works from the Simulator. The Ed25519
-  key the app enrols becomes the second factor for `/shell` (a signed
-  challenge), so a leaked bearer key alone does not open a shell.
-- Key push: on saving a server with a shared key, the app generates an
-  Ed25519 keypair in the Keychain and `POST /agent/pubkey` installs it in the
-  sprite user's `authorized_keys` (the server does the write, gated by the
-  bearer key). The passphrase Matt mentioned is that shared key: possessing
-  it is what authorizes enrolling a device key. Keys are listed and revocable
-  from the settings sheet.
-- Terminal UI: a terminal emulator view (SwiftTerm is the established Swift
-  package; iOS 26 has no system terminal view) in a sheet or a split beside
-  the reader, with the Magic Keyboard's keys passed through (Ctrl, Esc, Tab,
-  arrows). A "Shell" icon in the top chrome opens it. Claude Code runs in a
-  `tmux` session on the sprite so a dropped connection resumes where it was.
-- Exit: from the iPad, open the shell, `claude` is running, ask it to change
-  the app's state through `chiron-app`, and watch the reader view change
-  behind the sheet.
+- Key enrolment: on saving a server with a shared key, the app generates
+  an Ed25519 keypair (CryptoKit `Curve25519.Signing`; the OpenSSH public
+  encoding is `ssh-ed25519` plus the 32 raw bytes, base64) in the Keychain
+  and `POST /agent/pubkey` appends it to `authorized_keys`. Possessing the
+  shared key is what authorizes enrolling a device key. Keys are listed and
+  revocable from the settings sheet.
+- SSH client: a pure Swift SSH library (Citadel, on SwiftNIO, is the
+  current candidate). Libraries connect to host:port, so the app runs a
+  loopback `NWListener` and bridges each accepted connection to the
+  `/ssh` WebSocket via `URLSessionWebSocketTask`. Terminal: SwiftTerm, with
+  the Magic Keyboard's Ctrl, Esc, Tab and arrows passed through. A "Shell"
+  icon in the top chrome opens it as a sheet or a split beside the reader.
+  `tmux` on the sprite so a dropped connection resumes where it was.
+- Fallback if the library fights us: a PTY-over-WebSocket route beside
+  `/ssh`, with the enrolled key used for a signed challenge. Same
+  enrolment, same terminal view; only the transport differs.
+- Exit: from the iPad, open the shell, `claude` is running in tmux, and a
+  command there changes the book the reader is holding (Phase D's verbs).
 
-**Phase D: builds without the Mac (later).**
-- A macOS runner that builds and signs on a push, and an install path to the
-  iPad (TestFlight is the clean one; ad hoc over HTTPS is the quick one).
-  Until then, app changes made on the sprite are pulled and built on the Mac.
+**Phase D: the agent reaches the app.**
+- The iPad has no inbound path, so the app connects out: `POST
+  /agent/connect` (bearer key) registers the app instance; a WebSocket at
+  `/agent/app` carries harness commands from the sprite to the app and
+  results back. The existing harness verbs become the command set, plus
+  `screenshot`.
+- App: an "Agent" toggle in server settings, off by default, with a visible
+  badge while connected, so the reader always knows when the app is being
+  driven.
+- Sprite: `chiron-app` CLI (`cmd/chiron-app`) with the verbs
+  `scripts/sim-verify.sh` uses today, so the verify walk can run against
+  the real iPad.
+- Exit: from a Claude Code session on the sprite, walk the iPad through
+  placement, series, results and a marked passage, screenshots landing on
+  the sprite.
 
-## 3. Security notes
+**Phase E: builds without the Mac (later).**
+- An iPad app needs Xcode and macOS to build and sign; nothing on the
+  sprite can produce a `.app`. A macOS runner that builds and signs on a
+  push, and TestFlight for install. Until then, app changes made on the
+  sprite are pulled and built on the Mac.
 
-- The bearer key becomes the root of everything: it already gates the book,
-  and in this plan it gates enrolling SSH keys and driving the app. Keep it
-  long, keep it in the Keychain, and rotate it when the sprite is exposed to
-  anything new. The `/agent/*` routes must refuse unauthenticated calls
-  exactly as `/exchange` does today.
-- The app must show when it is being driven. A remote agent moving the
-  reader's screen without a visible indicator is a trust failure.
-- The shell is a full shell on the box that holds the Anthropic token. The
-  SSH key path is only as safe as the iPad's Keychain; a device-level
-  passcode is assumed.
+## 4. Security notes
 
-## 4. Open decisions for Matt
+- The bearer key gates the book, the tunnel, key enrolment and the agent
+  channel. Keep it long, keep it in the Keychain, rotate it when the sprite
+  is exposed to anything new. The tunnel alone is not a shell: `sshd` still
+  demands a key.
+- The sprite holds two secrets after Phase B: the Anthropic OAuth token and
+  the repo-scoped PAT. A full shell on the box can read both; the PAT is
+  the smaller of the two.
+- The app must show when it is being driven.
+- The shell path is only as safe as the iPad's Keychain; a device passcode
+  is assumed.
 
-1. Git write access from the sprite: deploy key, or branch-and-pull.
-2. Shell transport: the server's own PTY-over-WebSocket (recommended, see
-   Phase C), or `sshd` on the sprite behind a proxied port if a standard SSH
-   client matters more than a second credential.
-3. Whether the served instance should become the git checkout itself
-   (simpler, but a bad commit takes the book down) or stay a deploy target.
+## 5. Decisions
+
+Settled by Matt on 2026-09-02:
+- Served instance stays a deploy target; `/ssh` lives in `chiron-gate` on
+  8080 with the book server behind it on 8081.
+- GitHub access from the sprite: a read/write fine-grained PAT scoped to
+  this repo.
+- Shell transport: real SSH tunnelled over the book port; `chiron-dev` on
+  the Mac, an in-app client on the iPad, one mechanism for both.
+
+Still open:
+1. Bootstrap timing: `scripts/sprite-bootstrap-ssh.sh` from the Mac with
+   the sprite CLI on the personal account. It builds and pushes the gate
+   and the current server (which brings `/ask` along), installs sshd and
+   the Mac keys, and recreates the three services. Matt runs it; everything
+   after goes through `ssh chiron`.
