@@ -84,15 +84,17 @@ ad hoc manifest. That is a phase of its own, after the shell works.
   on the sprite.
 
 **Phase C: the shell in the app.**
-- Transport: SSH to the sprite. Sprites expose SSH through the `sprite`
-  CLI's proxy today, not a public port; the plan needs a reachable SSH
-  endpoint. Options, in order of preference: (1) `sprite ssh`-style access
-  through the Fly proxy if sprites expose it to arbitrary SSH clients (check
-  `sprite --help` and the sprites docs); (2) a WebSocket-to-PTY bridge served
-  by the book server itself at `/shell` (bearer key, then a PTY running
-  `claude` or `bash`), which needs no SSH at all and is the same auth the app
-  already has. Option 2 is smaller and keeps one credential; option 1 is
-  more standard. Decide after checking (1).
+- Transport. Checked 2026-09-02: the `sprite` CLI has no SSH; its
+  `console` and `exec` go through the sprites API (WebSocket), and `proxy`
+  forwards ports through the same API. So a plain SSH client on the iPad has
+  nothing to connect to unless the sprite runs `sshd` behind a proxied port,
+  and the app would then need a sprites API token as well as the book key.
+  The smaller design is a WebSocket-to-PTY bridge served by the book server
+  itself at `/shell`: bearer key, then a PTY running `tmux attach` with
+  Claude Code inside. One credential (the one the app already has), no
+  second daemon, and the same route works from the Simulator. The Ed25519
+  key the app enrols becomes the second factor for `/shell` (a signed
+  challenge), so a leaked bearer key alone does not open a shell.
 - Key push: on saving a server with a shared key, the app generates an
   Ed25519 keypair in the Keychain and `POST /agent/pubkey` installs it in the
   sprite user's `authorized_keys` (the server does the write, gated by the
@@ -129,7 +131,8 @@ ad hoc manifest. That is a phase of its own, after the shell works.
 ## 4. Open decisions for Matt
 
 1. Git write access from the sprite: deploy key, or branch-and-pull.
-2. Shell transport: SSH through Fly's proxy if available, otherwise the
-   server's own PTY-over-WebSocket.
+2. Shell transport: the server's own PTY-over-WebSocket (recommended, see
+   Phase C), or `sshd` on the sprite behind a proxied port if a standard SSH
+   client matters more than a second credential.
 3. Whether the served instance should become the git checkout itself
    (simpler, but a bad commit takes the book down) or stay a deploy target.
