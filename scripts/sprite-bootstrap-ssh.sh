@@ -129,7 +129,13 @@ sprite -s "$SPRITE" exec -- bash -c '
   mkdir -p /home/sprite/src/chiron && cd /home/sprite/src/chiron
   [ -d .git ] || { git init -q -b main && git config receive.denyCurrentBranch updateInstead; }
   command -v claude >/dev/null || [ -x /home/sprite/.local/bin/claude ] || { curl -fsSL https://claude.ai/install.sh | bash >/tmp/claude-install.log 2>&1 && echo "claude installed"; }
-  echo "checkout at ~/src/chiron ($(git -C /home/sprite/src/chiron rev-parse --short HEAD 2>/dev/null || echo empty)); push it from the Mac with: git push $SPRITE main"' 2>&1 | sed 's/^/    /'
+  echo "checkout at ~/src/chiron ($(git -C /home/sprite/src/chiron rev-parse --short HEAD 2>/dev/null || echo empty))"
+  # chiron-app on the sprite talks to the book server directly.
+  mkdir -p /home/sprite/.config/chiron-dev
+  printf "url = http://127.0.0.1:8081\nkey = %s\n" "'"$KEY"'" > /home/sprite/.config/chiron-dev/config
+  chmod 600 /home/sprite/.config/chiron-dev/config' 2>&1 | sed 's/^/    /'
+echo "    push the checkout from the Mac with: git push $SPRITE main; then on the sprite: go install ./cmd/chiron-app"
+
 git remote get-url "$SPRITE" >/dev/null 2>&1 || git remote add "$SPRITE" "sprite@$SPRITE:src/chiron"
 
 echo "==> the public URL"
