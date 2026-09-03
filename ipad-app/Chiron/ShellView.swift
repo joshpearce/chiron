@@ -33,6 +33,11 @@ struct ShellView: View {
                 .ignoresSafeArea(.keyboard)
         }
         .onAppear { open() }
+        // The view's first measurement can land before the PTY exists; once
+        // connected, the session sends the size it has.
+        .onChange(of: shell.phase) { _, phase in
+            if case .connected = phase { TerminalHost.refocus() }
+        }
     }
 
     private func open() {
@@ -60,6 +65,10 @@ struct ShellView: View {
 struct TerminalHost: UIViewRepresentable {
     @ObservedObject var shell: ShellSession
 
+    /// The terminal that is showing, so the keyboard can be handed back to it.
+    private static weak var current: TerminalView?
+    static func refocus() { DispatchQueue.main.async { _ = current?.becomeFirstResponder() } }
+
     func makeUIView(context: Context) -> TerminalView {
         let view = TerminalView(frame: .zero, font: UIFont.monospacedSystemFont(ofSize: 14, weight: .regular))
         view.terminalDelegate = context.coordinator
@@ -67,6 +76,7 @@ struct TerminalHost: UIViewRepresentable {
         view.nativeForegroundColor = UIColor(white: 0.92, alpha: 1)
         view.backgroundColor = view.nativeBackgroundColor
         context.coordinator.view = view
+        Self.current = view
         #if DEBUG
         ShellScreen.shared.view = view
         #endif

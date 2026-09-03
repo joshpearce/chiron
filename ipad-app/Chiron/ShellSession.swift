@@ -24,6 +24,9 @@ final class ShellSession: ObservableObject {
     private var writer: TTYStdinWriter?
     private var task: Task<Void, Never>?
     private var cols = 80, rows = 24
+    /// Keystrokes go out in the order typed: each write waits for the one
+    /// before it. Separate tasks per key reordered bursts.
+    private var outbound: Task<Void, Never>?
 
     /// The login user on the sprite. A launch-environment override lets a
     /// Simulator run reach a user-mode sshd on the Mac.
@@ -61,7 +64,13 @@ final class ShellSession: ObservableObject {
                 terminalPixelWidth: 0, terminalPixelHeight: 0,
                 terminalModes: .init([:]))
             try await client.withPTY(pty) { output, writer in
-                await MainActor.run { self.writer = writer }
+                // The view may have measured itself while the connection
+                // was being made; the PTY starts at that size, not 80x24.
+                let (c, r) = await MainActor.run { () -> (Int, Int) in
+                    self.writer = writer
+                    return (self.cols, self.rows)
+                }
+                try? await writer.changeSize(cols: c, rows: r, pixelWidth: 0, pixelHeight: 0)
                 for try await chunk in output {
                     let bytes: [UInt8]
                     switch chunk {
@@ -97,7 +106,11 @@ final class ShellSession: ObservableObject {
     func send(_ bytes: ArraySlice<UInt8>) {
         guard let writer else { return }
         let data = Array(bytes)
-        Task { try? await writer.write(ByteBuffer(bytes: data)) }
+        let previous = outbound
+        outbound = Task {
+            await previous?.value
+            try? await writer.write(ByteBuffer(bytes: data))
+        }
     }
 
     func send(text: String) {
@@ -109,7 +122,11 @@ final class ShellSession: ObservableObject {
         self.cols = cols
         self.rows = rows
         guard let writer else { return }
-        Task { try? await writer.changeSize(cols: cols, rows: rows, pixelWidth: 0, pixelHeight: 0) }
+        let previous = outbound
+        outbound = Task {
+            await previous?.value
+            try? await writer.changeSize(cols: cols, rows: rows, pixelWidth: 0, pixelHeight: 0)
+        }
     }
 
     func close() {
@@ -121,6 +138,7 @@ final class ShellSession: ObservableObject {
         guard phase != .idle, !phase.isClosed else { return }
         phase = .closed(error)
         writer = nil
+        outbound = nil
         let client = self.client
         self.client = nil
         tunnel?.close()
