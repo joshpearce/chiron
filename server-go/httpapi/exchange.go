@@ -415,7 +415,11 @@ func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*rende
 			// Every level's series is already known: render all five page
 			// stacks while the learner reads the placement question, so
 			// whichever they pick is on disk before they ask for it.
-			go s.prerenderCalibrationSets(sub, unit, checkSummary)
+			s.renders.Add(1)
+			go func() {
+				defer s.renders.Done()
+				s.prerenderCalibrationSets(sub, unit, checkSummary)
+			}()
 		}
 	} else {
 		s.rngMu.Lock()
@@ -931,7 +935,9 @@ func (s *Server) buildAsync(sub *Subject, unitID, checkSummary string) {
 	if !sub.beginBuild() {
 		return
 	}
+	s.renders.Add(1)
 	go func() {
+		defer s.renders.Done()
 		ch, err := s.buildChapter(sub, unitID, checkSummary)
 		if err != nil {
 			log.Printf("async build %s: %v", unitID, err)
