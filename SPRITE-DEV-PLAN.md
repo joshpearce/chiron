@@ -92,7 +92,11 @@ user-mode sshd behind the real gate binary: ssh, scp, a refused key, and a
 25 s idle session with keepalives. Bootstrapped by Matt on 2026-09-02; the first run
 dropped the server's key (two `--env` flags, where `sprite-env` keeps only
 the last) and the book ran open for a few minutes until the service was
-recreated with one comma-separated `--env`. `/ask` is live.
+recreated with one comma-separated `--env`. `/ask` is live. Phase A exit
+met the same evening: `ssh chiron` from the Mac through the real gate, and
+a 130 s idle session with keepalives beside a one-second clock loop on the
+sprite showed 131 ticks with no gap, so an open shell keeps the sprite
+awake.
 - Bootstrap once from the personal account: `sprite -s chiron console`,
   install `openssh-server`, write `sshd_config` (loopback, keys only),
   register the service, install the Mac's public key. Check `/.sprite/llm.txt`
