@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -48,6 +49,11 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 	s.markActive(sub.ID)
 
 	answer, err := roles.AnswerQuestion(s.chain, unit, req.Quote, req.Question, sub.Learner)
+	if err != nil && driveEnabled() && !s.chain.Status().Connected {
+		// A dev server without a model still lets a client exercise the
+		// whole ask flow; the stub names itself.
+		answer, err = fmt.Sprintf("[stub answer about %q: %s]", req.Quote, req.Question), nil
+	}
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "no answer: %v", err)
 		return

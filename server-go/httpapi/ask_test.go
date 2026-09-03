@@ -88,3 +88,19 @@ func (capturingFail) Structured(role, system, user string, schema map[string]any
 	return llm.Errorf("dead")
 }
 func (capturingFail) Status() llm.Status { return llm.Status{} }
+
+// A dev server with no model answers with a stub, so the client's ask flow
+// can be walked end to end; a real server never does.
+func TestAskStubsWithoutAModelInDriveMode(t *testing.T) {
+	t.Setenv("CHIRON_DRIVE", "1")
+	s := newServer(t, "")
+	s.chain = &capturingFail{}
+	w := do(t, s, "POST", "/ask/ai", `{"unit":"u1","quote":"the loss","question":"why?"}`, "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "stub answer") {
+		t.Fatalf("drive-mode ask -> %d: %s", w.Code, w.Body.String())
+	}
+	t.Setenv("CHIRON_DRIVE", "")
+	if w := do(t, s, "POST", "/ask/ai", `{"unit":"u1","quote":"the loss","question":"why?"}`, ""); w.Code != http.StatusBadGateway {
+		t.Fatalf("outside drive mode -> %d, want 502", w.Code)
+	}
+}
