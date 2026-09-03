@@ -23,6 +23,12 @@ You are on the machine that serves the book. Facts that matter:
   `chiron-app open subject=ai`, `chiron-app shot page.png`); it works only
   while the reader has the agent switched on in the app's server settings.
 - Services are `sprite-env services ...`; logs under `/.sprite/logs/services/`.
+- The sprite has 8 GB and serves the book while you work. Run one heavy
+  thing at a time (`make test` uses `-p 2`; do not run a build beside it).
+  On 2026-09-03 a full-parallel test run beside a `go install` took the
+  sprite down, and it came back restored to a snapshot from before the
+  bootstrap: half an hour of writes gone. Before anything risky:
+  `sprite-env checkpoints create`.
 - Never push to GitHub unless Matt asks in the conversation, even though
   the credential here allows it.
 

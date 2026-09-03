@@ -115,6 +115,6 @@ echo
 echo "Then, once:"
 echo "  (cd server-go && go install ./cmd/chiron-dev)      # puts chiron-dev on PATH via GOBIN"
 echo "  mkdir -p ~/.config/chiron-dev"
-echo "  printf 'url = https://chiron.example\nkey = op://<vault>/chiron-sprite/password\nop_account = flyio\n' > ~/.config/chiron-dev/config"
+echo "  printf 'url = https://chiron.example\nkey = op://<vault>/<item>/password\nop_account = my\n' > ~/.config/chiron-dev/config"
 echo "  chiron-dev ssh-config >> ~/.ssh/config"
 echo "  ssh chiron"

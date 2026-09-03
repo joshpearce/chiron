@@ -8,8 +8,11 @@ BIN     := $(SERVED)/bin/chiron-server
 
 .PHONY: test lint deploy deploy-gate
 
+# -p 2: the sprite that runs these also serves the book and has 8 GB; the
+# full-parallel suite (page renders through Chromium included) took the
+# whole sprite down once, and the restore lost half an hour of writes.
 test:
-	$(GO) test ./...
+	$(GO) test -p 2 ./...
 	node scripts/test-book-js.mjs
 
 lint:
