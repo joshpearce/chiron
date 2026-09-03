@@ -6,8 +6,16 @@
 # it was never written to disk on the Mac. Use this to read it back once, to
 # store in 1Password and to type into the app's "shared key" field:
 #
-#   scripts/sprite-get-auth.sh | op item create --category=password \
-#       --title=chiron-sprite --account flyio password=-
+#   scripts/sprite-get-auth.sh | python3 -c 'import json,sys; print(json.dumps({
+#       "title":"chiron-sprite","category":"PASSWORD","fields":[{"id":"password",
+#       "type":"CONCEALED","purpose":"PASSWORD","label":"password",
+#       "value":sys.stdin.read().strip()}]}))' \
+#     | op item create --account my --vault Private
+#
+# (op item create reads stdin as a JSON item template; "password=-" does not
+# read stdin. The item lives in the personal account, vault Private, and
+# ~/.config/chiron-dev/config refers to it as
+# op://<vault>/<item>/password.)
 #
 # To rotate: pipe a fresh key through scripts/sprite-set-auth.sh, then update
 # the app. Old keys stop working the moment the service restarts.
