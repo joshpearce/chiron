@@ -465,6 +465,12 @@ final class BookSession: ObservableObject {
     /// and the card opens for the question.
     @discardableResult
     func addMark(kind: Mark.Kind, start: Int, end: Int, text: String) -> Mark {
+        // The same run marked the same way twice is one mark: a question
+        // reopens rather than stacking a second badge on the passage.
+        if let existing = marks.first(where: { $0.kind == kind && $0.start == start && $0.end == end }) {
+            if kind == .question { asking = Asking(mark: existing) }
+            return existing
+        }
         let mark = Mark(id: UUID().uuidString, kind: kind, start: start, end: end, text: text)
         marks.append(mark)
         if kind == .question { asking = Asking(mark: mark) }

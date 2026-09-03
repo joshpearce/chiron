@@ -458,6 +458,14 @@ final class BookSessionTests: XCTestCase {
         await s3.open()
         XCTAssertTrue(s3.marks.isEmpty)
         XCTAssertNil(s3.inkData)
+
+        // The same span marked twice is one mark.
+        let first = s3.addMark(kind: .highlight, start: 10, end: 40, text: "a model trained to do nothing")
+        let again = s3.addMark(kind: .highlight, start: 10, end: 40, text: "a model trained to do nothing")
+        XCTAssertEqual(first.id, again.id)
+        XCTAssertEqual(s3.marks.count, 1)
+        s3.addMark(kind: .question, start: 10, end: 40, text: "a model trained to do nothing")
+        XCTAssertEqual(s3.marks.count, 2, "a question on a highlighted span is its own mark")
     }
 
     func testAskingSendsThePassageAndKeepsTheAnswerOnTheMark() async {

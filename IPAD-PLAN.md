@@ -385,3 +385,30 @@ Still open:
 - The pretest still reveals the reference answer per item after commit, as
   the flight-era app did; the plan's "reveal only on teaching-unit checks"
   is read as "never on the calibration series", which holds.
+
+## 11. iOS 26 and the Pencil Pro (2026-09-02)
+
+A current iPad with a Pencil Pro replaced the mini 4 as the reading device.
+The deployment target is now iOS 26.0; the iOS 15.5 simulator and the mini 4
+are no longer gates (`sim-verify.sh` walks `chiron-ipad` alone). Built:
+
+- An annotation layer over the page: the reader's ink rides inside the
+  page's scroll view (PencilKit, default drawing policy, so a paired Pencil
+  draws and fingers scroll), persisted per chapter as PencilKit data.
+- Highlights and questions as marks on runs of the chapter's text, by
+  character offsets into the article's visible prose (beats and hidden
+  MathML excluded so answering a beat cannot shift them), applied by the
+  page script and persisted per chapter.
+- A palette on the trailing edge (pen, highlighter, ask, eraser) with Liquid
+  Glass; a Pencil Pro squeeze cycles the tools and a double-tap flips pen
+  and eraser.
+- The ask card: a question about a highlighted passage goes to
+  `POST /ask/{subject}` with the passage; the tutor answers from the section
+  the passage came from, the question is recorded in the learner state, and
+  the planner sees recent questions when it plans the next chapter. A dev
+  server without a model stubs the answer.
+- Harness verbs for all of it (`/tool`, `/mark`, `/ask`, `/close`), and the
+  walk screenshots a highlight and an answered question.
+
+Not yet verified on a device: the Pencil Pro gestures and the drawing
+policy's finger/pencil split, which the Simulator cannot exercise.
