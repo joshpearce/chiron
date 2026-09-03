@@ -32,7 +32,7 @@ const sshConfig = `Host chiron
 
 // How long to keep knocking while a hibernated sprite wakes. Measured wake
 // is about a second; a restore from a checkpoint can be much longer.
-const patience = 30 * time.Second
+const patience = 90 * time.Second
 
 func main() {
 	if len(os.Args) < 2 {

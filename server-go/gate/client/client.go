@@ -36,7 +36,9 @@ func Dial(ctx context.Context, base, key string, patience time.Duration, notify 
 	deadline := time.Now().Add(patience)
 	var last error
 	for attempt := 1; ; attempt++ {
-		actx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		// A sprite whose disk is stalling can take most of a minute to
+		// answer the handshake; better to wait than to declare it gone.
+		actx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		ws, resp, err := websocket.Dial(actx, u, opts)
 		cancel()
 		if err == nil {
