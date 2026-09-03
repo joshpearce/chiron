@@ -15,5 +15,5 @@ KEY=$(cat)
 [ -n "$KEY" ] || { echo "no key on stdin" >&2; exit 1; }
 
 . "$(dirname "$0")/sprite-service.sh"
-sprite -s chiron exec -- bash -c "$(sprite_service_script "$KEY")" \
+sprite -s "$SPRITE" exec -- bash -c "$(sprite_service_script "$KEY")" \
   2>&1 | grep -Ev '"type":"(stdout|stderr|started|stopping|stopped|complete)"'

@@ -12,10 +12,21 @@
 #   sshd           127.0.0.1:2222 user-mode, keys only, reached via the gate
 #
 # Each function prints a script that runs inside the sprite via `sprite exec`;
-# $KEY is interpolated on the Mac and never printed.
+# $KEY is interpolated on the Mac and never printed. SPRITE names the sprite
+# (default chiron); the callers pass it to `sprite -s`.
+SPRITE="${SPRITE:-chiron}"
+
+# The model credential is an OAuth token, so it must travel as
+# ANTHROPIC_AUTH_TOKEN (Bearer); ANTHROPIC_API_KEY gets 401. The 1Password
+# item carries stray whitespace, hence the tr.
+sprite_anthropic_token() {
+  op read 'op://<vault>/<item>/credential' --account my 2>/dev/null | tr -d ' \n\t'
+}
 
 sprite_service_script() {
-  local key="$1"
+  local key="$1" model="${2:-}"
+  local env="CHIRON_AUTH_TOKEN=${key},CHIRON_AUTHORIZED_KEYS=/home/sprite/.ssh/authorized_keys,CHIRON_PROVIDER=anthropic,CHIRON_RENDER=0"
+  [ -n "$model" ] && env="${env},ANTHROPIC_AUTH_TOKEN=${model}"
   cat <<EOF
 set -e
 sprite-env services stop chiron-server 2>/dev/null || true
@@ -23,12 +34,12 @@ sprite-env services delete chiron-server 2>/dev/null || true
 sprite-env services create chiron-server \\
   --cmd /home/sprite/chiron/bin/chiron-server \\
   --args '-addr,127.0.0.1:8081,-config,/home/sprite/chiron/server/config.yaml' \\
-  --env 'CHIRON_AUTH_TOKEN=${key},CHIRON_AUTHORIZED_KEYS=/home/sprite/.ssh/authorized_keys' \\
+  --env '${env}' \\
   --dir /home/sprite/chiron/server
 sleep 4
 echo -n 'server unauthenticated /health -> '; curl -s -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:8081/health
 echo -n 'server unauthenticated /ping   -> '; curl -s -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:8081/ping
-echo -n 'server authenticated  /health  -> '; curl -s -o /dev/null -w '%{http_code}\\n' -H 'Authorization: Bearer ${key}' http://127.0.0.1:8081/health
+echo -n 'server authenticated  /health  -> '; curl -s -w ' %{http_code}\\n' -H 'Authorization: Bearer ${key}' http://127.0.0.1:8081/health | tr -d '\\n' | cut -c1-140; echo
 EOF
 }
 
@@ -71,9 +82,11 @@ EOF
 # given, which once silently dropped the key and left the book open.
 
 # Read the key currently installed on a service, without printing it. The
-# gate and the server carry the same key; either will do.
+# gate and the server carry the same key; either will do. CHIRON_KEY in the
+# environment wins, which is how a fresh sprite gets its first key.
 sprite_current_key() {
-  sprite -s chiron exec -- bash -c "sprite-env services list" 2>/dev/null \
+  [ -n "${CHIRON_KEY:-}" ] && { printf '%s' "$CHIRON_KEY"; return; }
+  sprite -s "$SPRITE" exec -- bash -c "sprite-env services list" 2>/dev/null \
     | python3 -c '
 import sys, json
 for line in sys.stdin:
