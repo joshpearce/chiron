@@ -23,8 +23,7 @@ sprite-env services delete chiron-server 2>/dev/null || true
 sprite-env services create chiron-server \\
   --cmd /home/sprite/chiron/bin/chiron-server \\
   --args '-addr,127.0.0.1:8081,-config,/home/sprite/chiron/server/config.yaml' \\
-  --env 'CHIRON_AUTH_TOKEN=${key}' \\
-  --env 'CHIRON_AUTHORIZED_KEYS=/home/sprite/.ssh/authorized_keys' \\
+  --env 'CHIRON_AUTH_TOKEN=${key},CHIRON_AUTHORIZED_KEYS=/home/sprite/.ssh/authorized_keys' \\
   --dir /home/sprite/chiron/server
 sleep 4
 echo -n 'server unauthenticated /health -> '; curl -s -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:8081/health
@@ -43,6 +42,7 @@ sprite-env services create chiron-gate \\
   --cmd /home/sprite/chiron/bin/chiron-gate \\
   --args '-listen,0.0.0.0:8080,-upstream,http://127.0.0.1:8081,-ssh,127.0.0.1:2222' \\
   --env 'CHIRON_AUTH_TOKEN=${key}' \\
+  --needs chiron-server,sshd \\
   --dir /home/sprite/chiron
 sleep 2
 echo -n 'gate /ping via proxy          -> '; curl -s -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:8080/ping
@@ -64,7 +64,11 @@ echo -n 'sshd on 127.0.0.1:2222        -> '; (exec 3<>/dev/tcp/127.0.0.1/2222 &&
 EOF
 }
 
-# Read the key currently installed on the service, without printing it.
+# One --env flag, comma-separated: sprite-env keeps only the last --env
+# given, which once silently dropped the key and left the book open.
+
+# Read the key currently installed on a service, without printing it. The
+# gate and the server carry the same key; either will do.
 sprite_current_key() {
   sprite -s chiron exec -- bash -c "sprite-env services list" 2>/dev/null \
     | python3 -c '
@@ -72,10 +76,12 @@ import sys, json
 for line in sys.stdin:
     line = line.strip()
     if line.startswith("["):
-        for s in json.loads(line):
-            if s.get("name") == "chiron-server":
-                print(s.get("env", {}).get("CHIRON_AUTH_TOKEN", ""), end="")
+        by_name = {s.get("name"): s for s in json.loads(line)}
+        for name in ("chiron-server", "chiron-gate"):
+            key = by_name.get(name, {}).get("env", {}).get("CHIRON_AUTH_TOKEN", "")
+            if key:
+                print(key, end="")
                 sys.exit(0)
-sys.exit("chiron-server service not found")
+sys.exit("no service carries CHIRON_AUTH_TOKEN")
 '
 }

@@ -89,7 +89,10 @@ port forwarding for free, and the Mac side needs no custom client at all.
 shared `auth` package, `scripts/sprite-bootstrap-ssh.sh` and the service
 layout in `scripts/sprite-service.sh`. Proven on the Mac end to end with a
 user-mode sshd behind the real gate binary: ssh, scp, a refused key, and a
-25 s idle session with keepalives. Waiting on the bootstrap run.
+25 s idle session with keepalives. Bootstrapped by Matt on 2026-09-02; the first run
+dropped the server's key (two `--env` flags, where `sprite-env` keeps only
+the last) and the book ran open for a few minutes until the service was
+recreated with one comma-separated `--env`. `/ask` is live.
 - Bootstrap once from the personal account: `sprite -s chiron console`,
   install `openssh-server`, write `sshd_config` (loopback, keys only),
   register the service, install the Mac's public key. Check `/.sprite/llm.txt`
@@ -211,3 +214,8 @@ Still open:
    and the current server (which brings `/ask` along), installs sshd and
    the Mac keys, and recreates the three services. Matt runs it; everything
    after goes through `ssh chiron`.
+
+## 6. After this plan
+
+Capture: primers from anything on the iPad (share extension, App Intent,
+`kind` on subjects). Design in `IPAD-PLAN.md` section 12.

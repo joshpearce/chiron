@@ -412,3 +412,66 @@ are no longer gates (`sim-verify.sh` walks `chiron-ipad` alone). Built:
 
 Not yet verified on a device: the Pencil Pro gestures and the drawing
 policy's finger/pencil split, which the Simulator cannot exercise.
+
+
+## 12. Capture: primers from anything on the iPad (design, 2026-09-02)
+
+Matt's note from a side channel, folded in verbatim in substance. The
+idea: select text, a URL, an image or a PDF anywhere on the iPad, send it
+to Chiron with a question, and get a *primer* on the shelf a minute later.
+
+**Two entry points, one code path.**
+
+1. *Share Extension.* An extension target appears in the share sheet for
+   text, URLs, images and PDFs. Extensions run sandboxed with a strict
+   memory cap and no access to the app's state, so the extension does
+   almost nothing: write the payload to an App Group container and open
+   the main app via `chiron://capture/<id>`. The main app shows the "What
+   do you want to know about this?" card.
+2. *App Intent* (`CapturePrimerIntent`, text, image or file input). This
+   puts Chiron in Shortcuts, Spotlight and Apple Intelligence's action
+   list; on iOS 26 it can be registered as a Pencil Pro squeeze action and
+   can appear in the text-selection menu with no share sheet at all.
+
+Both normalise to `{text?, imagePNG?, sourceURL?, sourceApp?}` and the
+main app POSTs `/primer/capture` with the payload plus the prompt. The
+server runs the author role in primer mode and returns a new book on the
+shelf; the wait lands on the existing authoring screen.
+
+Constraints: image payloads go through the vision transcription path the
+ink check-in uses, so capture is offline-capable for text only. The
+extension needs its own bundle id (`dev.mjbraun.chiron.share`), an App
+Group entitlement on both targets, and the URL scheme in Info.plist: all
+three are `project.yml` additions.
+
+**Primers vs smart books.** A `kind` field on the subject: `primer` or
+`book`. A primer is a unit list with no gate, no calibration series, no
+checks. Its loop is read, annotate, comment; each ask or margin note
+becomes an append request (`POST /primer/{id}/extend`) and the author
+role extends the document rather than authoring the next chapter. A smart
+book is what exists now.
+
+**Library view.** One grid with a badge rather than two sections, since
+the count stays small for a long time. SF Symbols over emoji at small
+sizes and in dark mode: `brain` for books, `doc.text` for primers. Primer
+cards show source and capture date instead of progress; book cards keep
+the progress line. A capture still authoring shows greyed with a spinner,
+so the reader can go back to what they were reading and check later.
+
+**Steps.**
+
+1. Server: `kind` on subjects, `POST /primer/capture`, primer-mode author
+   role, `POST /primer/{id}/extend` for appends from comments.
+2. App: App Group, URL scheme, share extension target,
+   `CapturePrimerIntent`, the capture card, primer reading screen (reader
+   without check chrome; comments feed the extend call).
+3. Library: kind-aware shelf with badges and the authoring-in-progress
+   state.
+4. Verify: sim-verify steps for capture-from-text and a primer extend; a
+   device step for the share sheet from Safari, since extensions cannot be
+   driven from the harness.
+
+**Open decision for Matt:** whether a primer can be promoted to a smart
+book later by asking the server to generate checks for it. Cheap if the
+corpus format is shared, and the kind of thing wanted after a primer turns
+out to matter.
