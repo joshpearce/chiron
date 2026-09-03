@@ -132,8 +132,11 @@ type Server struct {
 	transcribe func(hint string, png []byte) (string, error)
 	chain      llm.Chain
 	token      string
-	rng        *rand.Rand
-	rngMu      sync.Mutex
+	// authorizedKeys is sshd's file on the sprite; empty means device keys
+	// cannot be enrolled here.
+	authorizedKeys string
+	rng            *rand.Rand
+	rngMu          sync.Mutex
 
 	mu       sync.RWMutex
 	subjects map[string]*Subject
@@ -161,12 +164,13 @@ func New(cfg *Config, root string) (*Server, error) {
 		token = strings.TrimSpace(cfg.AuthToken)
 	}
 	s := &Server{
-		cfg:      cfg,
-		root:     root,
-		token:    token,
-		rng:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		subjects: map[string]*Subject{},
-		jobs:     map[string]*Job{},
+		cfg:            cfg,
+		root:           root,
+		token:          token,
+		authorizedKeys: strings.TrimSpace(os.Getenv("CHIRON_AUTHORIZED_KEYS")),
+		rng:            rand.New(rand.NewSource(time.Now().UnixNano())),
+		subjects:       map[string]*Subject{},
+		jobs:           map[string]*Job{},
 		chain: llm.New(llm.FactoryConfig{
 			Provider: cfg.Provider, AnthropicModel: cfg.AnthropicModel,
 			ClaudeCLIModel: cfg.ClaudeCLIModel, Upstreams: cfg.Upstreams, LLM: cfg.LLM,
@@ -346,6 +350,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /pages/{subject}/contents/{page}", s.handleContentsPage)
 	mux.HandleFunc("POST /ink/{subject}", s.handleInk)
 	mux.HandleFunc("POST /ask/{subject}", s.handleAsk)
+	mux.HandleFunc("POST /agent/pubkey", s.handleEnrolKey)
+	mux.HandleFunc("GET /agent/keys", s.handleListKeys)
+	mux.HandleFunc("POST /agent/keys/revoke", s.handleRevokeKey)
 	mux.HandleFunc("POST /drive/cmd", s.handleDriveCmd)
 	mux.HandleFunc("GET /drive/next", s.handleDriveNext)
 	mux.HandleFunc("POST /drive/ack", s.handleDriveAck)
