@@ -15,7 +15,7 @@ BIN     := $(SERVED)/bin/chiron-server
 RENDER ?= $(shell [ -d /.sprite ] && echo 0 || echo 1)
 
 test:
-	CHIRON_RENDER=$(RENDER) $(GO) test -p 2 ./...
+	cd server-go && CHIRON_RENDER=$(RENDER) go test -p 2 ./...
 	node scripts/test-book-js.mjs
 
 lint:
