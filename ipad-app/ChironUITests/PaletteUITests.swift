@@ -207,6 +207,17 @@ final class AskCardUITests: XCTestCase {
         XCTAssertNotNil(s["asking"], "tapping the badge reopened the card")
         XCTAssertTrue(app.buttons["Delete"].waitForExistence(timeout: 5))
         app.buttons["Delete"].tap()
+        // The bin asks first, in a popover; on iPad a tap outside keeps it.
+        let confirm = app.buttons["Delete the question and its highlight"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "the confirmation appeared")
+        app.otherElements["PopoverDismissRegion"].tap()
+        Thread.sleep(forTimeInterval: 0.7)
+        s = try state()
+        XCTAssertNotNil(s["asking"], "kept: the card is still open")
+        XCTAssertEqual((s["marks"] as? [[String: Any]])?.count, 1)
+        app.buttons["Delete"].tap()
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
         Thread.sleep(forTimeInterval: 0.5)
         s = try state()
         XCTAssertNil(s["asking"])

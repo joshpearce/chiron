@@ -9,6 +9,7 @@ import SwiftUI
 struct AskCard: View {
     @EnvironmentObject var session: BookSession
     @State private var question = ""
+    @State private var confirmingDelete = false
     @FocusState private var typing: Bool
 
     private var asking: BookSession.Asking? { session.asking }
@@ -24,8 +25,10 @@ struct AskCard: View {
                     .lineLimit(3)
                 Spacer(minLength: 8)
                 if answered || asking?.mark.question != nil {
+                    // The bin sits a thumb's width from the close button, so
+                    // it asks before it acts.
                     Button {
-                        session.deleteAsking()
+                        confirmingDelete = true
                     } label: {
                         Image(systemName: "trash")
                             .font(.body)
@@ -34,6 +37,15 @@ struct AskCard: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Delete")
                     .accessibilityHint(isNote ? "Removes the note; the section it added stays" : "Removes the question and its highlight")
+                    .confirmationDialog(isNote ? "Delete this note?" : "Delete this question?",
+                                        isPresented: $confirmingDelete, titleVisibility: .visible) {
+                        Button(isNote ? "Delete the note" : "Delete the question and its highlight", role: .destructive) {
+                            session.deleteAsking()
+                        }
+                        Button("Keep it", role: .cancel) {}
+                    } message: {
+                        Text(isNote ? "The section it added to the primer stays." : "The exchange with the tutor goes with it.")
+                    }
                 }
                 Button {
                     session.closeAsking()
