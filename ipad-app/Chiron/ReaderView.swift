@@ -107,7 +107,7 @@ struct ReaderView: UIViewRepresentable {
             c.scale = scale
             web.evaluateJavaScript("setScale(\(scale))")
         }
-        c.apply(tool: session.tool)
+        c.apply(tool: session.tool, color: session.penColor.uiColor)
         c.apply(marks: session.marks)
         c.apply(ink: session.inkData)
     }
@@ -187,12 +187,15 @@ struct ReaderView: UIViewRepresentable {
 
         // MARK: tools
 
-        func apply(tool: BookSession.Tool) {
-            guard tool != appliedTool else { return }
+        private var appliedColor: UIColor?
+
+        func apply(tool: BookSession.Tool, color: UIColor) {
+            guard tool != appliedTool || (tool == .pen && color != appliedColor) else { return }
             appliedTool = tool
+            appliedColor = color
             switch tool {
             case .pen:
-                canvas.tool = PKInkingTool(.pen, color: .systemRed, width: 2.5)
+                canvas.tool = PKInkingTool(.pen, color: color, width: 2.5)
                 canvas.isUserInteractionEnabled = true
                 marker.isUserInteractionEnabled = false
             case .eraser:

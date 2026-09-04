@@ -521,3 +521,27 @@ final class BookSessionTests: XCTestCase {
         XCTAssertEqual(s2.marks.count, 2)
     }
 }
+
+@MainActor
+final class InkTests: XCTestCase {
+    func testPenColorPersistsAndInkSavesAfterAPause() async throws {
+        UserDefaults.standard.removeObject(forKey: "penColor")
+        let storage = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let s = BookSession(subjectID: "ai", title: "AI", service: FakeService(), storage: storage)
+        XCTAssertEqual(s.penColor, .red)
+        s.penColor = .blue
+        XCTAssertEqual(UserDefaults.standard.string(forKey: "penColor"), "blue")
+        let s2 = BookSession(subjectID: "ai", title: "AI", service: FakeService(), storage: storage)
+        XCTAssertEqual(s2.penColor, .blue)
+
+        let json = #"{"unit":"u1","title":"T","minutes":1,"html":"<p>x</p>","beats":[],"pretest":[],"check":[],"next_action":"read"}"#
+        s.setChapterForTesting(try JSONDecoder().decode(ChapterPayload.self, from: Data(json.utf8)))
+        let file = storage.appendingPathComponent("ai/ink-u1.pkdrawing")
+        s.saveInk(Data([1]))
+        s.saveInk(Data([1, 2]))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path), "not written per stroke")
+        try await Task.sleep(nanoseconds: 700_000_000)
+        XCTAssertEqual(try Data(contentsOf: file), Data([1, 2]))
+        UserDefaults.standard.removeObject(forKey: "penColor")
+    }
+}

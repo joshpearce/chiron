@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 /// One book, open: its chapter, the learner's position in it, and the state
 /// machine from placement through checks, results, and the next chapter.
@@ -59,7 +60,27 @@ final class BookSession: ObservableObject {
     /// The reader's marks on the current chapter: highlights and questions.
     @Published private(set) var marks: [Mark] = []
     /// The reader's ink over the current chapter, as PencilKit data.
-    @Published var inkData: Data?
+    /// The page's ink, as PencilKit data. Not published: every stroke
+    /// updates it, and a view update per stroke re-ran the reader's update
+    /// while the Pencil was still down, which showed as the page flickering.
+    var inkData: Data?
+    private var inkSave: Task<Void, Never>?
+
+    /// The pen's colour, kept across books.
+    enum PenColor: String, CaseIterable {
+        case red, blue, green, black
+        var uiColor: UIColor {
+            switch self {
+            case .red: return .systemRed
+            case .blue: return .systemBlue
+            case .green: return .systemGreen
+            case .black: return .label
+            }
+        }
+    }
+    @Published var penColor: PenColor = PenColor(rawValue: UserDefaults.standard.string(forKey: "penColor") ?? "") ?? .red {
+        didSet { UserDefaults.standard.set(penColor.rawValue, forKey: "penColor") }
+    }
     /// A question being asked or answered, shown in the ask card.
     @Published var asking: Asking?
 
@@ -557,11 +578,18 @@ final class BookSession: ObservableObject {
     func setChapterForTesting(_ ch: ChapterPayload) { setChapter(ch) }
     #endif
 
+    /// Strokes arrive many times a second; the file is written once the
+    /// hand pauses.
     func saveInk(_ data: Data?) {
         inkData = data
         guard let unit = chapter?.unit else { return }
         let url = dir.appendingPathComponent("ink-\(unit).pkdrawing")
-        if let data { try? data.write(to: url) } else { try? FileManager.default.removeItem(at: url) }
+        inkSave?.cancel()
+        inkSave = Task {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else { return }
+            if let data { try? data.write(to: url) } else { try? FileManager.default.removeItem(at: url) }
+        }
     }
 
     private func loadMarks() {

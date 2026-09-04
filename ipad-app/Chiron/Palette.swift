@@ -38,6 +38,23 @@ struct Palette: View {
                 .hoverEffect()
                 .accessibilityLabel(label)
                 .accessibilityAddTraits(session.tool == tool ? .isSelected : [])
+                // The pen's colours, right under the pen while it is up.
+                if tool == .pen && session.tool == .pen {
+                    ForEach(BookSession.PenColor.allCases, id: \.self) { c in
+                        Button {
+                            session.penColor = c
+                        } label: {
+                            Circle()
+                                .fill(Color(c.uiColor))
+                                .frame(width: 18, height: 18)
+                                .overlay(Circle().stroke(Color.primary.opacity(session.penColor == c ? 0.9 : 0), lineWidth: 2))
+                                .frame(width: 40, height: 26)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(c.rawValue) pen")
+                        .accessibilityAddTraits(session.penColor == c ? .isSelected : [])
+                    }
+                }
             }
         }
         .padding(6)
