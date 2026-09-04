@@ -106,7 +106,7 @@ func (s *Server) handleTeachCreate(w http.ResponseWriter, r *http.Request) {
 	s.jobs[slug] = job
 	s.jobsMu.Unlock()
 
-	go s.generate(slug, req.Title, req.Brief)
+	s.startGenerate(slug, req.Title, req.Brief)
 	writeJSON(w, http.StatusOK, job)
 }
 

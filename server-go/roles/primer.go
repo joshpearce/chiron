@@ -19,6 +19,8 @@ type Capture struct {
 	URL    string
 	App    string
 	Prompt string
+	// Brief is what the planning conversation settled on, when there was one.
+	Brief string
 }
 
 var primerSchema = map[string]any{
@@ -40,17 +42,11 @@ const primerSystem = `You write a primer: a short, self-contained document that 
 
 // AuthorPrimer writes the document for a capture.
 func AuthorPrimer(chain llm.Chain, cap Capture) (title, markdown string, err error) {
-	var b strings.Builder
-	fmt.Fprintf(&b, "THE READER'S QUESTION:\n%s\n\n", strings.TrimSpace(cap.Prompt))
-	if cap.URL != "" || cap.App != "" {
-		fmt.Fprintf(&b, "CAPTURED FROM: %s %s\n\n", cap.App, cap.URL)
-	}
-	fmt.Fprintf(&b, "CAPTURED MATERIAL:\n%s\n", clip(strings.TrimSpace(cap.Text), 60000))
 	var out struct {
 		Title    string `json:"title"`
 		Markdown string `json:"markdown"`
 	}
-	if err := chain.Structured("author", primerSystem, b.String(), primerSchema, "primer", &out); err != nil {
+	if err := chain.Structured("author", primerSystem, captureContext(cap), primerSchema, "primer", &out); err != nil {
 		return "", "", err
 	}
 	out.Title = strings.TrimSpace(out.Title)

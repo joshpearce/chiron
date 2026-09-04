@@ -19,8 +19,11 @@ import (
 )
 
 // Primers: the reader captures something anywhere on the iPad, asks a
-// question, and a document appears on the shelf. Each is a one-unit
-// subject with no check; margin notes extend it.
+// question, and says how much they want back. A summary or a description
+// is answered in the card. A primer or a smart book is a draft first: a
+// short planning conversation the reader can leave and come back to, then
+// a build. A primer is a one-unit subject with no check that margin notes
+// extend; a book goes through the same generation as "Teach me".
 
 const KindPrimer = "primer"
 
@@ -44,6 +47,10 @@ func (s *Server) loadPrimers() {
 	for _, m := range metas {
 		if m.Status == primer.StatusAuthoring {
 			m.Status, m.Error = primer.StatusFailed, "authoring was interrupted by a restart"
+			primer.Save(s.primersRoot(), m)
+		}
+		if m.Status == primer.StatusBuilding {
+			m.Status, m.Error = primer.StatusFailed, "the book's generation was interrupted by a restart"
 			primer.Save(s.primersRoot(), m)
 		}
 		s.primersMu.Lock()
@@ -78,6 +85,8 @@ type captureRequest struct {
 	SourceApp string `json:"source_app"`
 	Prompt    string `json:"prompt"`
 	Title     string `json:"title"`
+	// Scale is summary, description, primer or book; a primer without one.
+	Scale string `json:"scale"`
 }
 
 func (s *Server) handlePrimerCapture(w http.ResponseWriter, r *http.Request) {
@@ -92,6 +101,15 @@ func (s *Server) handlePrimerCapture(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "prompt is required: what do you want to know about this?")
 		return
 	}
+	if req.Scale == "" {
+		req.Scale = roles.ScalePrimer
+	}
+	switch req.Scale {
+	case roles.ScaleSummary, roles.ScaleDescription, roles.ScalePrimer, roles.ScaleBook:
+	default:
+		writeError(w, http.StatusUnprocessableEntity, "scale must be summary, description, primer or book")
+		return
+	}
 	var png []byte
 	if req.ImagePNG != "" {
 		var err error
@@ -104,6 +122,30 @@ func (s *Server) handlePrimerCapture(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "nothing captured: send text or image_png_b64")
 		return
 	}
+	// An image becomes words first, whatever the scale; the same vision
+	// path the ink check-in uses.
+	if req.Text == "" {
+		text, err := s.transcribeCapture(png)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "transcribe the image: %v", err)
+			return
+		}
+		req.Text = text
+	}
+	cap := roles.Capture{Text: req.Text, URL: req.SourceURL, App: req.SourceApp, Prompt: req.Prompt}
+
+	if req.Scale == roles.ScaleSummary || req.Scale == roles.ScaleDescription {
+		md, err := roles.AnswerCapture(s.chain, cap, req.Scale)
+		if err != nil && driveEnabled() && !s.chain.Status().Connected {
+			md, err = fmt.Sprintf("[stub %s] You asked: %s\n\nAbout: %s", req.Scale, cap.Prompt, clipText(cap.Text, 300)), nil
+		}
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "no answer: %v", err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"scale": req.Scale, "answer_md": md})
+		return
+	}
 
 	seed := req.Title
 	if seed == "" {
@@ -113,26 +155,333 @@ func (s *Server) handlePrimerCapture(w http.ResponseWriter, r *http.Request) {
 	m := &primer.Meta{
 		ID: id, Title: strings.TrimSpace(req.Title), Prompt: req.Prompt,
 		Source:     primer.Source{Text: req.Text, URL: req.SourceURL, App: req.SourceApp, HasImage: len(png) > 0},
-		Status:     primer.StatusAuthoring,
+		Status:     primer.StatusPlanning,
+		Scale:      req.Scale,
 		CapturedAt: time.Now().UTC(),
 	}
 	if m.Title == "" {
 		m.Title = workingTitle(req.Prompt)
 	}
-	if err := primer.Save(s.primersRoot(), m); err != nil {
-		writeError(w, http.StatusInternalServerError, "save primer: %v", err)
-		return
-	}
 	s.primersMu.Lock()
 	s.primers[id] = m
 	s.primersMu.Unlock()
+	// The tutor opens the conversation.
+	turn, err := s.planTurn(m, "")
+	if err != nil {
+		s.primersMu.Lock()
+		delete(s.primers, id)
+		s.primersMu.Unlock()
+		writeError(w, http.StatusBadGateway, "no plan: %v", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"subject": id, "status": m.Status, "title": m.Title, "scale": m.Scale,
+		"reply_md": turn.ReplyMD, "done": turn.Done, "brief": turn.Brief,
+	})
+}
 
-	s.renders.Add(1)
-	go func() {
-		defer s.renders.Done()
-		s.authorPrimer(m, req.Text, png)
-	}()
-	writeJSON(w, http.StatusOK, map[string]any{"subject": id, "status": m.Status, "title": m.Title})
+func (s *Server) transcribeCapture(png []byte) (string, error) {
+	tr := s.transcribe
+	if tr == nil {
+		tr = s.transcriberFor()
+	}
+	return tr("captured image", png)
+}
+
+// draft finds a capture still being planned or built, by id.
+func (s *Server) draft(id string) (*primer.Meta, bool) {
+	s.primersMu.Lock()
+	defer s.primersMu.Unlock()
+	m, ok := s.primers[id]
+	if !ok || m.Scale == "" || !m.Draft() {
+		return nil, false
+	}
+	return m, true
+}
+
+// planTurn adds the reader's words (if any) and the tutor's reply to the
+// draft's conversation, and keeps it. The plan itself is one model call.
+func (s *Server) planTurn(m *primer.Meta, learner string) (roles.Elicitation, error) {
+	primersMu.Lock()
+	defer primersMu.Unlock()
+	if learner != "" {
+		m.Plan = append(m.Plan, primer.Turn{Role: "learner", Text: learner})
+	}
+	msgs := make([]roles.Message, 0, len(m.Plan))
+	for _, t := range m.Plan {
+		msgs = append(msgs, roles.Message{Role: t.Role, Text: t.Text})
+	}
+	cap := roles.Capture{Text: m.Source.Text, URL: m.Source.URL, App: m.Source.App, Prompt: m.Prompt}
+	turn, err := roles.PlanCapture(s.chain, cap, m.Scale, msgs)
+	if err != nil && driveEnabled() && !s.chain.Status().Connected {
+		turn, err = stubPlan(m), nil
+	}
+	if err != nil {
+		if learner != "" {
+			m.Plan = m.Plan[:len(m.Plan)-1]
+		}
+		return roles.Elicitation{}, err
+	}
+	m.Plan = append(m.Plan, primer.Turn{Role: "tutor", Text: turn.ReplyMD})
+	if turn.Done {
+		m.Done, m.Brief = true, strings.TrimSpace(turn.Brief)
+		if t := strings.TrimSpace(turn.Title); t != "" {
+			m.Title = t
+		}
+	}
+	if err := primer.Save(s.primersRoot(), m); err != nil {
+		return roles.Elicitation{}, err
+	}
+	turn.Title = m.Title
+	return turn, nil
+}
+
+// stubPlan stands in for the planner on a dev server: one question, then
+// a brief made of what the reader said.
+func stubPlan(m *primer.Meta) roles.Elicitation {
+	learner := 0
+	for _, t := range m.Plan {
+		if t.Role == "learner" {
+			learner++
+		}
+	}
+	if learner == 0 {
+		return roles.Elicitation{ReplyMD: "[stub] What should it focus on?"}
+	}
+	return roles.Elicitation{ReplyMD: "[stub] Enough to build from.", Done: true,
+		Brief: m.Prompt + " " + m.Plan[len(m.Plan)-1].Text, Title: workingTitle(m.Prompt), Slug: slugify(m.Prompt)}
+}
+
+// The plan as the card shows it, for a draft reopened from the shelf.
+func (s *Server) handlePrimerPlan(w http.ResponseWriter, r *http.Request) {
+	m, ok := s.draft(r.PathValue("subject"))
+	if !ok {
+		writeError(w, http.StatusNotFound, "no draft %q", r.PathValue("subject"))
+		return
+	}
+	primersMu.Lock()
+	defer primersMu.Unlock()
+	writeJSON(w, http.StatusOK, planView(m))
+}
+
+func planView(m *primer.Meta) map[string]any {
+	plan := m.Plan
+	if plan == nil {
+		plan = []primer.Turn{}
+	}
+	src := m.Source
+	src.Text = clipText(src.Text, 600)
+	return map[string]any{
+		"id": m.ID, "title": m.Title, "scale": m.Scale, "status": m.Status, "error": m.Error,
+		"prompt": m.Prompt, "source": src, "brief": m.Brief, "done": m.Done, "plan": plan, "book": m.Book,
+	}
+}
+
+type planTurnRequest struct {
+	Text string `json:"text"`
+}
+
+// The reader's next line in the planning conversation.
+func (s *Server) handlePrimerPlanTurn(w http.ResponseWriter, r *http.Request) {
+	m, ok := s.draft(r.PathValue("subject"))
+	if !ok {
+		writeError(w, http.StatusNotFound, "no draft %q", r.PathValue("subject"))
+		return
+	}
+	if m.Status == primer.StatusBuilding {
+		writeError(w, http.StatusConflict, "%q is being built", m.ID)
+		return
+	}
+	var req planTurnRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "malformed request: %v", err)
+		return
+	}
+	req.Text = strings.TrimSpace(req.Text)
+	if req.Text == "" {
+		writeError(w, http.StatusUnprocessableEntity, "text is required")
+		return
+	}
+	turn, err := s.planTurn(m, req.Text)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "no reply: %v", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"subject": m.ID, "status": m.Status, "title": m.Title, "scale": m.Scale,
+		"reply_md": turn.ReplyMD, "done": turn.Done, "brief": turn.Brief,
+	})
+}
+
+// briefFor is what the writer gets: the brief the plan settled on, or,
+// when the reader builds before that, the question and what they said.
+func briefFor(m *primer.Meta) string {
+	if m.Brief != "" {
+		return m.Brief
+	}
+	var said []string
+	for _, t := range m.Plan {
+		if t.Role == "learner" {
+			said = append(said, t.Text)
+		}
+	}
+	if len(said) == 0 {
+		return ""
+	}
+	return "The reader also said: " + strings.Join(said, " ")
+}
+
+// Build: a primer is written now; a book's generation starts.
+func (s *Server) handlePrimerBuild(w http.ResponseWriter, r *http.Request) {
+	m, ok := s.draft(r.PathValue("subject"))
+	if !ok {
+		writeError(w, http.StatusConflict, "%q is not a draft to build", r.PathValue("subject"))
+		return
+	}
+	if m.Status == primer.StatusBuilding {
+		writeError(w, http.StatusConflict, "%q is already being built", m.ID)
+		return
+	}
+	primersMu.Lock()
+	defer primersMu.Unlock()
+	root := s.primersRoot()
+	brief := briefFor(m)
+	switch m.Scale {
+	case roles.ScaleBook:
+		slug := s.uniqueSlug(slugify(m.Title))
+		s.jobsMu.Lock()
+		s.jobs[slug] = &Job{Slug: slug, Title: m.Title, Stage: "queued"}
+		s.jobsMu.Unlock()
+		full := brief
+		if full == "" {
+			full = m.Prompt
+		}
+		full += "\n\nThe book grows from this material the reader captured:\n" + clipText(m.Source.Text, 8000)
+		m.Status, m.Error, m.Book = primer.StatusBuilding, "", slug
+		if err := primer.Save(root, m); err != nil {
+			writeError(w, http.StatusInternalServerError, "save draft: %v", err)
+			return
+		}
+		s.startGenerate(slug, m.Title, full)
+		writeJSON(w, http.StatusOK, map[string]any{"subject": m.ID, "status": m.Status, "book": slug})
+	default:
+		m.Status, m.Error = primer.StatusAuthoring, ""
+		if err := primer.Save(root, m); err != nil {
+			writeError(w, http.StatusInternalServerError, "save draft: %v", err)
+			return
+		}
+		s.renders.Add(1)
+		go func() {
+			defer s.renders.Done()
+			s.authorPrimer(m, brief)
+		}()
+		writeJSON(w, http.StatusOK, map[string]any{"subject": m.ID, "status": m.Status, "title": m.Title})
+	}
+}
+
+// uniqueSlug: the slug, or the slug with a counter when a subject or a
+// job has it.
+func (s *Server) uniqueSlug(base string) string {
+	if !slugOK.MatchString(base) {
+		base = "book"
+	}
+	slug := base
+	for n := 2; ; n++ {
+		_, taken := s.subject(slug)
+		s.jobsMu.Lock()
+		_, running := s.jobs[slug]
+		s.jobsMu.Unlock()
+		if !taken && !running {
+			return slug
+		}
+		slug = fmt.Sprintf("%s-%d", base, n)
+	}
+}
+
+// A draft the reader does not want after all.
+func (s *Server) handlePrimerDiscard(w http.ResponseWriter, r *http.Request) {
+	m, ok := s.draft(r.PathValue("subject"))
+	if !ok {
+		writeError(w, http.StatusConflict, "%q is not a draft to discard", r.PathValue("subject"))
+		return
+	}
+	if m.Status == primer.StatusBuilding {
+		writeError(w, http.StatusConflict, "%q is being built; it can be discarded when that is done", m.ID)
+		return
+	}
+	s.dropDraft(m)
+	writeJSON(w, http.StatusOK, map[string]any{"subject": m.ID, "discarded": true})
+}
+
+func (s *Server) dropDraft(m *primer.Meta) {
+	primersMu.Lock()
+	defer primersMu.Unlock()
+	if err := primer.Delete(s.primersRoot(), m.ID); err != nil {
+		log.Printf("discard %s: %v", m.ID, err)
+	}
+	s.primersMu.Lock()
+	delete(s.primers, m.ID)
+	s.primersMu.Unlock()
+}
+
+// sweepDrafts follows each book draft's generation: a failed job fails
+// the draft with the job's reason; a book that has arrived on the shelf
+// takes the draft's place.
+func (s *Server) sweepDrafts() {
+	s.primersMu.Lock()
+	var building []*primer.Meta
+	for _, m := range s.primers {
+		if m.Status == primer.StatusBuilding && m.Book != "" {
+			building = append(building, m)
+		}
+	}
+	s.primersMu.Unlock()
+	for _, m := range building {
+		if _, arrived := s.subject(m.Book); arrived {
+			s.dropDraft(m)
+			continue
+		}
+		s.jobsMu.Lock()
+		job, ok := s.jobs[m.Book]
+		var failed bool
+		var reason string
+		if ok && job.Done && job.Stage == "failed" {
+			failed, reason = true, job.Error
+		}
+		if !ok {
+			failed, reason = true, "the book's generation is gone"
+		}
+		s.jobsMu.Unlock()
+		if failed {
+			primersMu.Lock()
+			m.Status, m.Error = primer.StatusFailed, reason
+			primer.Save(s.primersRoot(), m)
+			primersMu.Unlock()
+		}
+	}
+}
+
+// progressOf says how far a book draft's generation is.
+func (s *Server) progressOf(m *primer.Meta) string {
+	if m.Status != primer.StatusBuilding {
+		return ""
+	}
+	s.jobsMu.Lock()
+	defer s.jobsMu.Unlock()
+	job, ok := s.jobs[m.Book]
+	if !ok {
+		return ""
+	}
+	switch job.Stage {
+	case "planning":
+		return "designing the syllabus"
+	case "authoring":
+		if job.UnitsTotal > 0 {
+			return fmt.Sprintf("writing chapter %d of %d", job.UnitsDone+1, job.UnitsTotal)
+		}
+		return "writing chapters"
+	}
+	return job.Stage
 }
 
 // uniquePrimerID: "primer-" plus a slug of the seed, with a counter when
@@ -185,29 +534,14 @@ func workingTitle(prompt string) string {
 	return strings.ToUpper(t[:1]) + t[1:]
 }
 
-func (s *Server) authorPrimer(m *primer.Meta, text string, png []byte) {
+func (s *Server) authorPrimer(m *primer.Meta, brief string) {
 	root := s.primersRoot()
 	fail := func(err error) {
 		m.Status, m.Error = primer.StatusFailed, err.Error()
 		primer.Save(root, m)
 		log.Printf("primer %s: %v", m.ID, err)
 	}
-	if text == "" && len(png) > 0 {
-		// The same vision path the ink check-in uses: the image becomes
-		// words, and the primer is written from the words.
-		tr := s.transcribe
-		if tr == nil {
-			tr = s.transcriberFor()
-		}
-		t, err := tr("captured image", png)
-		if err != nil {
-			fail(fmt.Errorf("transcribe the image: %w", err))
-			return
-		}
-		text = t
-		m.Source.Text = t
-	}
-	cap := roles.Capture{Text: text, URL: m.Source.URL, App: m.Source.App, Prompt: m.Prompt}
+	cap := roles.Capture{Text: m.Source.Text, URL: m.Source.URL, App: m.Source.App, Prompt: m.Prompt, Brief: brief}
 	title, doc, err := roles.AuthorPrimer(s.chain, cap)
 	if err != nil && driveEnabled() && !s.chain.Status().Connected {
 		title, doc, err = stubPrimer(cap)
@@ -334,6 +668,7 @@ func (s *Server) buildPrimerChapter(sub *Subject, unitID string) (*render.Chapte
 // primerRows lists primers still authoring or failed, which are not
 // subjects yet but belong on the shelf.
 func (s *Server) pendingPrimers() []*primer.Meta {
+	s.sweepDrafts()
 	s.primersMu.Lock()
 	defer s.primersMu.Unlock()
 	var out []*primer.Meta

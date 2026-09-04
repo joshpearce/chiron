@@ -164,6 +164,9 @@ type Server struct {
 
 	jobsMu sync.Mutex
 	jobs   map[string]*Job
+	// startGenerate begins a book's generation for a job already listed;
+	// tests replace it with a recorder.
+	startGenerate func(slug, title, brief string)
 
 	// renders tracks eager background page renders so tests (and shutdown)
 	// can wait for them instead of racing temp-dir cleanup.
@@ -186,12 +189,14 @@ func New(cfg *Config, root string) (*Server, error) {
 		rng:            rand.New(rand.NewSource(time.Now().UnixNano())),
 		subjects:       map[string]*Subject{},
 		jobs:           map[string]*Job{},
-		primers:        map[string]*primer.Meta{},
+
+		primers: map[string]*primer.Meta{},
 		chain: llm.New(llm.FactoryConfig{
 			Provider: cfg.Provider, AnthropicModel: cfg.AnthropicModel,
 			ClaudeCLIModel: cfg.ClaudeCLIModel, Upstreams: cfg.Upstreams, LLM: cfg.LLM,
 		}),
 	}
+	s.startGenerate = func(slug, title, brief string) { go s.generate(slug, title, brief) }
 	for _, spec := range cfg.Subjects {
 		if err := s.register(spec.ID, spec.Title,
 			resolve(root, spec.CorpusDir), resolve(root, spec.StateDir)); err != nil {
@@ -369,6 +374,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /ink/{subject}", s.handleInk)
 	mux.HandleFunc("POST /ask/{subject}", s.handleAsk)
 	mux.HandleFunc("POST /primer/capture", s.handlePrimerCapture)
+	mux.HandleFunc("GET /primer/{subject}/plan", s.handlePrimerPlan)
+	mux.HandleFunc("POST /primer/{subject}/plan", s.handlePrimerPlanTurn)
+	mux.HandleFunc("POST /primer/{subject}/build", s.handlePrimerBuild)
+	mux.HandleFunc("POST /primer/{subject}/discard", s.handlePrimerDiscard)
 	mux.HandleFunc("POST /primer/{subject}/extend", s.handlePrimerExtend)
 	mux.HandleFunc("POST /agent/pubkey", s.handleEnrolKey)
 	mux.HandleFunc("GET /agent/keys", s.handleListKeys)
@@ -467,6 +476,11 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 		Error      string         `json:"error,omitempty"`
 		Source     *primer.Source `json:"source,omitempty"`
 		CapturedAt string         `json:"captured_at,omitempty"`
+		// Drafts only: what the capture is to become, the book it is
+		// becoming, and how far that is.
+		Scale    string `json:"scale,omitempty"`
+		Book     string `json:"book,omitempty"`
+		Progress string `json:"progress,omitempty"`
 	}
 	out := []row{}
 	for _, sub := range s.allSubjects() {
@@ -492,6 +506,7 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 		out = append(out, row{
 			ID: m.ID, Title: m.Title, Kind: KindPrimer, Status: m.Status, Error: m.Error,
 			Source: &src, CapturedAt: m.CapturedAt.Format(time.RFC3339),
+			Scale: m.Scale, Book: m.Book, Progress: s.progressOf(m),
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{

@@ -31,6 +31,8 @@ type shelfRow struct {
 	Kind       string `json:"kind"`
 	Status     string `json:"status"`
 	Error      string `json:"error"`
+	Scale      string `json:"scale"`
+	Book       string `json:"book"`
 	UnitsTotal int    `json:"units_total"`
 	CapturedAt string `json:"captured_at"`
 	Source     *struct {
@@ -56,6 +58,8 @@ func shelf(t *testing.T, s *Server) map[string]shelfRow {
 	return out
 }
 
+// capture at the primer scale, built straight away: the plan's opening
+// question is left unanswered.
 func capture(t *testing.T, s *Server, body string) captureReply {
 	t.Helper()
 	w := do(t, s, "POST", "/primer/capture", body, "")
@@ -63,6 +67,14 @@ func capture(t *testing.T, s *Server, body string) captureReply {
 		t.Fatalf("capture -> %d: %s", w.Code, w.Body.String())
 	}
 	var rep captureReply
+	json.Unmarshal(w.Body.Bytes(), &rep)
+	if rep.Status != "planning" {
+		t.Fatalf("capture reply = %+v", rep)
+	}
+	w = do(t, s, "POST", "/primer/"+rep.Subject+"/build", "", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("build -> %d: %s", w.Code, w.Body.String())
+	}
 	json.Unmarshal(w.Body.Bytes(), &rep)
 	return rep
 }
@@ -187,14 +199,17 @@ func TestAnImageCaptureIsTranscribedFirst(t *testing.T) {
 	}
 }
 
-// A chain that answers when told to, so the shelf can be read mid-authoring.
+// A chain whose author answers when told to, so the shelf can be read
+// mid-authoring; the planner answers at once.
 type gatedChain struct {
 	release chan struct{}
 	payload map[string]any
 }
 
 func (c *gatedChain) Structured(role, system, user string, schema map[string]any, name string, out any) error {
-	<-c.release
+	if role == "author" {
+		<-c.release
+	}
 	data, _ := json.Marshal(c.payload)
 	return json.Unmarshal(data, out)
 }
@@ -248,8 +263,14 @@ func TestADevServerWithoutAModelWritesAStubPrimer(t *testing.T) {
 
 func TestAFailedPrimerSaysWhy(t *testing.T) {
 	s := newServer(t, "")
+	s.chain = &cannedChain{payload: map[string]any{"reply_md": "Which part?", "done": false}}
+	w := do(t, s, "POST", "/primer/capture", `{"text":"words","prompt":"why?"}`, "")
+	var rep captureReply
+	json.Unmarshal(w.Body.Bytes(), &rep)
 	s.chain = failingChain{}
-	rep := capture(t, s, `{"text":"words","prompt":"why?"}`)
+	if w := do(t, s, "POST", "/primer/"+rep.Subject+"/build", "", ""); w.Code != http.StatusOK {
+		t.Fatalf("build -> %d", w.Code)
+	}
 	s.renders.Wait()
 	row := shelf(t, s)[rep.Subject]
 	if row.Status != "failed" || !strings.Contains(row.Error, "no model") {

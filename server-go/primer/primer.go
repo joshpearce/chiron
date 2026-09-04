@@ -17,6 +17,10 @@ import (
 )
 
 const (
+	// A draft being planned in conversation, a book draft whose book is
+	// being generated, a primer being written, and the outcomes.
+	StatusPlanning  = "planning"
+	StatusBuilding  = "building"
 	StatusAuthoring = "authoring"
 	StatusReady     = "ready"
 	StatusFailed    = "failed"
@@ -42,6 +46,12 @@ type Entry struct {
 	At      time.Time `json:"at"`
 }
 
+// Turn is one exchange of the planning conversation.
+type Turn struct {
+	Role string `json:"role"` // learner | tutor
+	Text string `json:"text"`
+}
+
 type Meta struct {
 	ID         string    `json:"id"`
 	Title      string    `json:"title"`
@@ -52,6 +62,25 @@ type Meta struct {
 	CapturedAt time.Time `json:"captured_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 	Entries    []Entry   `json:"entries,omitempty"`
+	// Scale is "primer" or "book": what the capture is to become. The
+	// plan is the conversation so far, the brief what it settled on, and
+	// Done whether it did. Book names the subject a book draft grows into.
+	Scale string `json:"scale,omitempty"`
+	Plan  []Turn `json:"plan,omitempty"`
+	Brief string `json:"brief,omitempty"`
+	Done  bool   `json:"done,omitempty"`
+	Book  string `json:"book,omitempty"`
+}
+
+// Draft is true while the capture is still a plan, or failed before it
+// became anything.
+func (m *Meta) Draft() bool {
+	return m.Status == StatusPlanning || m.Status == StatusBuilding || (m.Status == StatusFailed && m.Scale != "")
+}
+
+// Delete removes a primer and everything under it.
+func Delete(root, id string) error {
+	return os.RemoveAll(Dir(root, id))
 }
 
 func Dir(root, id string) string       { return filepath.Join(root, id) }
