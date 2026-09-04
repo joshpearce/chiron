@@ -456,6 +456,7 @@ final class BookSessionTests: XCTestCase {
         XCTAssertTrue(s.marks.isEmpty)
         s.addMark(kind: .highlight, start: 10, end: 40, text: "a model trained to do nothing")
         s.saveInk(Data([1, 2, 3]))
+        s.persist()  // as closing the book does
 
         let s2 = session()
         await s2.open()
@@ -465,6 +466,7 @@ final class BookSessionTests: XCTestCase {
         XCTAssertEqual(s2.inkData, Data([1, 2, 3]))
         s2.removeMark(s2.marks[0].id)
         s2.saveInk(nil)
+        s2.persist()
 
         let s3 = session()
         await s3.open()

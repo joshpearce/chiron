@@ -582,14 +582,25 @@ final class BookSession: ObservableObject {
     /// hand pauses.
     func saveInk(_ data: Data?) {
         inkData = data
-        guard let unit = chapter?.unit else { return }
-        let url = dir.appendingPathComponent("ink-\(unit).pkdrawing")
+        inkDirty = true
         inkSave?.cancel()
         inkSave = Task {
             try? await Task.sleep(nanoseconds: 400_000_000)
             guard !Task.isCancelled else { return }
-            if let data { try? data.write(to: url) } else { try? FileManager.default.removeItem(at: url) }
+            flushInk()
         }
+    }
+
+    private var inkDirty = false
+
+    /// Write the ink now: the debounce's turn, and every persist (closing
+    /// the book, backgrounding), so nothing is lost to a quick exit.
+    private func flushInk() {
+        guard inkDirty, let unit = chapter?.unit else { return }
+        inkDirty = false
+        inkSave?.cancel()
+        let url = dir.appendingPathComponent("ink-\(unit).pkdrawing")
+        if let data = inkData { try? data.write(to: url) } else { try? FileManager.default.removeItem(at: url) }
     }
 
     private func loadMarks() {
@@ -649,6 +660,7 @@ final class BookSession: ObservableObject {
     }
 
     func persist() {
+        flushInk()
         if let ch = chapter, let d = try? JSONEncoder().encode(ch) {
             try? d.write(to: file("chapter"))
         } else {
