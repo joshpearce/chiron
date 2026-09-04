@@ -97,7 +97,12 @@ final class BookSession: ObservableObject {
         /// Primers only: a margin note that extends the document.
         case note
     }
-    @Published var tool: Tool = .none
+    @Published var tool: Tool = .none {
+        didSet { if oldValue != tool && oldValue != .none { lastTool = oldValue } }
+    }
+    /// The tool that was up before this one, for the Pencil's "switch to
+    /// the previous tool" and for the eraser to hand back to.
+    private var lastTool: Tool = .pen
 
     /// "book" or "primer". A primer has no check; its loop is read,
     /// annotate, and extend from margin notes.
@@ -114,9 +119,14 @@ final class BookSession: ObservableObject {
         tool = order[(i + 1) % order.count]
     }
 
-    /// Double-tap on a Pencil: pen and eraser trade places.
+    /// Double-tap on a Pencil: the eraser and whatever was up trade places.
     func flipEraser() {
-        tool = tool == .eraser ? .pen : .eraser
+        tool = tool == .eraser ? lastTool : .eraser
+    }
+
+    /// The Pencil's "switch to the last used tool".
+    func switchPrevious() {
+        tool = tool == lastTool ? .pen : lastTool
     }
 
     /// Mark the first occurrence of a run of the chapter's text (scripts,

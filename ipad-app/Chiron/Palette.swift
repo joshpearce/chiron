@@ -3,8 +3,8 @@ import SwiftUI
 /// The reader's tools, on the page's trailing edge: pen and eraser for ink,
 /// the highlighter for runs of text, and the ask tool, which highlights a
 /// run and opens the card for a question. Tapping the active tool puts it
-/// down. A Pencil Pro squeeze cycles the tools; a double-tap flips pen and
-/// eraser.
+/// down. The Pencil Pro's squeeze and double-tap do what Settings says
+/// they do, with "show the palette" read as "next tool".
 struct Palette: View {
     @EnvironmentObject var session: BookSession
 

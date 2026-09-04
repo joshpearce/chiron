@@ -4,6 +4,8 @@ import PencilKit
 
 struct ReaderContainer: View {
     @EnvironmentObject var session: BookSession
+    @Environment(\.preferredPencilDoubleTapAction) private var doubleTapAction
+    @Environment(\.preferredPencilSqueezeAction) private var squeezeAction
     /// Passed in rather than read from the session. Leaving the reader to
     /// unwrap `session.chapter` itself crashed on the way out: closing the
     /// book nils the chapter and switches screen, and SwiftUI re-evaluated
@@ -33,6 +35,21 @@ struct ReaderContainer: View {
         }
         .animation(.easeInOut(duration: 0.2), value: session.chromeHidden)
         .animation(.easeInOut(duration: 0.2), value: session.asking != nil)
+        // The Pencil Pro's gestures do what the reader chose for them in
+        // Settings, as the Pencil settings promise; "show the palette" is
+        // read as "next tool", since the palette is already on the page.
+        .onPencilDoubleTap { _ in perform(doubleTapAction) }
+        .onPencilSqueeze { phase in
+            if case .ended = phase { perform(squeezeAction) }
+        }
+    }
+
+    private func perform(_ action: PencilPreferredAction) {
+        if action == .ignore || action == .runSystemShortcut { return }
+        if action == .switchEraser { session.flipEraser() }
+        else if action == .switchPrevious { session.switchPrevious() }
+        else if action == .showColorPalette || action == .showInkAttributes { session.tool = .pen }
+        else { session.cycleTool() }
     }
 
     private var bottomBar: some View {
@@ -71,10 +88,10 @@ struct ReaderContainer: View {
     }
 }
 
-/// The chapter page: a web view for the prose, with the reader's ink riding
-/// inside its scroll view so it scrolls with the text, and a gesture layer
-/// over it that turns a drag into a run of text for the highlighter and the
-/// ask tool. The Pencil Pro's squeeze and double-tap land here too.
+/// The chapter page: a web view for the prose, the reader's ink as a
+/// layer over it that follows the page's scrolling, and a pan on the page
+/// that turns a drag into a run of text for the highlighter and the ask
+/// tool.
 struct ReaderView: UIViewRepresentable {
     let chapter: ChapterPayload
     @EnvironmentObject var session: BookSession
@@ -131,8 +148,7 @@ struct ReaderView: UIViewRepresentable {
         web.loadFileURL(template, allowingReadAccessTo: template.deletingLastPathComponent())
     }
 
-    final class Coordinator: NSObject, WKScriptMessageHandler, PKCanvasViewDelegate,
-                             UIPencilInteractionDelegate, PageBridge {
+    final class Coordinator: NSObject, WKScriptMessageHandler, PKCanvasViewDelegate, PageBridge {
         let session: BookSession
         weak var web: WKWebView?
         var loadedUnit: String?
@@ -166,15 +182,15 @@ struct ReaderView: UIViewRepresentable {
             // only showed once the Pencil lifted. The canvas is itself a
             // scroll view; its content mirrors the page's size and offset,
             // so strokes are stored in page coordinates and stay with the
-            // text they annotate. With the default drawing policy a paired
-            // Pencil draws and fingers keep scrolling; without one, fingers
-            // draw (the Simulator).
+            // text they annotate. On the iPad only the Pencil draws and a
+            // finger scrolls the page underneath, whatever the system's
+            // "only draw with Apple Pencil" setting says: the pen tool is
+            // for the Pencil. The Simulator has no Pencil; the tests draw
+            // with a finger.
             #if targetEnvironment(simulator)
-            // The Simulator has no Pencil and the default policy draws
-            // nothing there; the tests draw with a finger.
             canvas.drawingPolicy = .anyInput
             #else
-            canvas.drawingPolicy = .default
+            canvas.drawingPolicy = .pencilOnly
             #endif
             canvas.backgroundColor = .clear
             canvas.isOpaque = false
@@ -211,8 +227,6 @@ struct ReaderView: UIViewRepresentable {
             selector.isEnabled = false
             selector.addTarget(self, action: #selector(selectPan(_:)))
             web.addGestureRecognizer(selector)
-
-            web.addInteraction(UIPencilInteraction(delegate: self))
         }
 
         // MARK: tools
@@ -337,17 +351,6 @@ struct ReaderView: UIViewRepresentable {
             return (start, end, found)
         }
 
-        // MARK: pencil
-
-        func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
-            Task { @MainActor in self.session.flipEraser() }
-        }
-
-        func pencilInteraction(_ interaction: UIPencilInteraction, didReceiveSqueeze squeeze: UIPencilInteraction.Squeeze) {
-            guard squeeze.phase == .ended else { return }
-            Task { @MainActor in self.session.cycleTool() }
-        }
-
         // MARK: the page's messages
 
         func userContentController(_ ucc: WKUserContentController,
@@ -393,10 +396,8 @@ struct ReaderView: UIViewRepresentable {
 /// moves (for the provisional highlight) and when it ends.
 
 /// The ink layer. It sits over the page, so a finger that should scroll
-/// the page must fall through it: when the iPad is set to draw only with
-/// the Pencil, anything but a Pencil touch is not ours. Elsewhere (no
-/// Pencil paired, the Simulator) fingers draw, as PencilKit's default
-/// policy intends.
+/// the page must fall through it: on the iPad anything but a Pencil touch
+/// is not ours. In the Simulator, which has no Pencil, fingers draw.
 final class PageInkCanvas: PKCanvasView {
     #if DEBUG
     /// Touches that reached the canvas, for the harness.
@@ -408,10 +409,11 @@ final class PageInkCanvas: PKCanvasView {
     #endif
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        if UIPencilInteraction.prefersPencilOnlyDrawing,
-           let touch = event?.allTouches?.first, touch.type != .pencil {
+        #if !targetEnvironment(simulator)
+        if let touch = event?.allTouches?.first, touch.type != .pencil {
             return nil
         }
+        #endif
         return super.hitTest(point, with: event)
     }
 }

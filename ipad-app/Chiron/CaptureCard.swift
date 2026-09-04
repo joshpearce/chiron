@@ -48,7 +48,7 @@ struct CaptureCard: View {
                 } header: {
                     Text("Your question")
                 } footer: {
-                    Text("The server writes a short primer that answers it from what you captured. It appears on the shelf in about a minute; margin notes extend it later.")
+                    Text("The server writes a short primer that answers it from what you captured. It takes about a minute and opens by itself; margin notes extend it later.")
                 }
             }
             .navigationTitle("New primer")

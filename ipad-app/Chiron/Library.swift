@@ -13,6 +13,11 @@ final class Library: ObservableObject {
     /// A capture waiting for its question; the capture card shows it.
     @Published var pendingCapture: Capture?
     private var shelfPoller: Task<Void, Never>?
+    /// How often the shelf checks back while a primer is being written.
+    var shelfPollInterval: TimeInterval = 4
+    /// The primer the reader just asked for: it opens on its own once the
+    /// server has written it, as long as the reader is still on the shelf.
+    private var awaitedPrimer: String?
     @Published var subjects: [SubjectInfo] = []
     /// The book the server says was last open, across every client.
     @Published var activeSubjectID: String?
@@ -23,11 +28,15 @@ final class Library: ObservableObject {
     @Published var loadingShelf = false
 
     let sync = Sync()
+    /// What the shelf and its books talk to: the connection, or a stand-in
+    /// under test.
+    let service: ChironService
     private var sessions: [String: BookSession] = [:]
     let storage: URL
 
-    init(storage: URL? = nil) {
+    init(storage: URL? = nil, service: ChironService? = nil) {
         self.storage = storage ?? Library.defaultStorage()
+        self.service = service ?? sync
         agent.attach(self)
     }
 
@@ -47,21 +56,25 @@ final class Library: ObservableObject {
         loadingShelf = true
         defer { loadingShelf = false }
         do {
-            let shelf = try await sync.subjects()
+            let shelf = try await service.subjects()
             subjects = shelf.subjects
             activeSubjectID = shelf.activeID
             shelfError = nil
         } catch {
             shelfError = BookSession.unreachable
         }
+        if let id = awaitedPrimer, let primer = subjects.first(where: { $0.id == id }), !primer.authoring {
+            awaitedPrimer = nil
+            if !primer.failed && session == nil { await open(id) }
+        }
         // A primer still authoring turns into a book without the reader
         // asking: the shelf checks back while any card is grey.
         if subjects.contains(where: \.authoring), shelfPoller == nil {
             shelfPoller = Task { [weak self] in
-                try? await Task.sleep(nanoseconds: 4_000_000_000)
                 guard let self else { return }
+                try? await Task.sleep(nanoseconds: UInt64(self.shelfPollInterval * 1_000_000_000))
                 self.shelfPoller = nil
-                if self.session == nil { await self.refresh() }
+                if self.session == nil || self.awaitedPrimer != nil { await self.refresh() }
             }
         }
     }
@@ -74,8 +87,13 @@ final class Library: ObservableObject {
         if let png = c.imagePNG { req.imagePngB64 = png.base64EncodedString() }
         req.sourceUrl = c.sourceURL
         req.sourceApp = c.sourceApp
-        let reply = try await sync.capture(req)
+        let reply = try await service.capture(req)
         pendingCapture = nil
+        // The reader watches the card on the shelf; the primer opens from
+        // there when it is ready.
+        awaitedPrimer = reply.subject
+        session?.persist()
+        session = nil
         await refresh()
         return reply.subject
     }
@@ -99,7 +117,7 @@ final class Library: ObservableObject {
         let s = sessions[id] ?? BookSession(
             subjectID: id,
             title: info?.title ?? id,
-            service: sync, storage: storage)
+            service: service, storage: storage)
         if let k = info?.kind { s.kind = k }
         sessions[id] = s
         session = s
