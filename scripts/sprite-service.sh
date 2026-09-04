@@ -23,9 +23,14 @@ sprite_anthropic_token() {
   op read 'op://<vault>/<item>/credential' --account my 2>/dev/null | tr -d ' \n\t'
 }
 
+# The model runs through headless Claude Code (`claude -p`) on the sprite,
+# the subscription's sanctioned path: the OAuth token works on the raw API
+# for Haiku only (Opus and Sonnet answer 429, 2026-09-03). The token stays
+# in the env for the vision transcriber, which is Haiku. PATH is set because
+# a service starts with none of the shell's, and `claude` lives in ~/.local.
 sprite_service_script() {
   local key="$1" model="${2:-}"
-  local env="CHIRON_AUTH_TOKEN=${key},CHIRON_AUTHORIZED_KEYS=/home/sprite/.ssh/authorized_keys,CHIRON_PROVIDER=anthropic,CHIRON_RENDER=0"
+  local env="CHIRON_AUTH_TOKEN=${key},CHIRON_AUTHORIZED_KEYS=/home/sprite/.ssh/authorized_keys,CHIRON_PROVIDER=claude-cli,CHIRON_RENDER=0,PATH=/home/sprite/.local/bin:/usr/local/bin:/usr/bin:/bin"
   [ -n "$model" ] && env="${env},ANTHROPIC_AUTH_TOKEN=${model}"
   cat <<EOF
 set -e
