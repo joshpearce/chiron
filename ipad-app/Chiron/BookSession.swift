@@ -541,7 +541,7 @@ final class BookSession: ObservableObject {
         if followUp {
             var thread = a.mark.thread ?? []
             // A failed follow-up is retried in place, not appended twice.
-            if thread.last?.answer == nil { thread.removeLast() }
+            if let last = thread.last, last.answer == nil { thread.removeLast() }
             thread.append(QA(question: q, answer: nil))
             a.mark.thread = thread
         } else {
