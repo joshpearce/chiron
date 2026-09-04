@@ -146,9 +146,9 @@ struct ReaderView: UIViewRepresentable {
         private var appliedInk: Data?
         private var loadingInk = false
 
-        private let canvas = PKCanvasView()
+        private let canvas = PageInkCanvas()
         private let marker = MarkGestureView()
-        private var contentSizeObservation: NSKeyValueObservation?
+        private var scrollObservations: [NSKeyValueObservation] = []
 
         init(session: BookSession) {
             self.session = session
@@ -159,20 +159,47 @@ struct ReaderView: UIViewRepresentable {
         func attach(to web: WKWebView) {
             self.web = web
 
-            // The ink lives inside the page's scroll view, sized to the
-            // content, so it scrolls with the text it annotates. With the
-            // default drawing policy a paired Pencil draws and fingers keep
-            // scrolling; without one, fingers draw.
+            // The ink is a layer over the web view, not inside its scroll
+            // view: WebKit holds touches inside its own scroll view for the
+            // page's sake and hands them on late, so a stroke drawn there
+            // only showed once the Pencil lifted. The canvas is itself a
+            // scroll view; its content mirrors the page's size and offset,
+            // so strokes are stored in page coordinates and stay with the
+            // text they annotate. With the default drawing policy a paired
+            // Pencil draws and fingers keep scrolling; without one, fingers
+            // draw (the Simulator).
+            #if targetEnvironment(simulator)
+            // The Simulator has no Pencil and the default policy draws
+            // nothing there; the tests draw with a finger.
+            canvas.drawingPolicy = .anyInput
+            #else
             canvas.drawingPolicy = .default
+            #endif
             canvas.backgroundColor = .clear
             canvas.isOpaque = false
             canvas.isScrollEnabled = false
+            canvas.contentInsetAdjustmentBehavior = .never
             canvas.delegate = self
             canvas.isUserInteractionEnabled = false
-            web.scrollView.addSubview(canvas)
-            contentSizeObservation = web.scrollView.observe(\.contentSize, options: [.initial, .new]) { [weak self] sv, _ in
-                self?.canvas.frame = CGRect(origin: .zero, size: sv.contentSize)
-            }
+            canvas.translatesAutoresizingMaskIntoConstraints = false
+            web.addSubview(canvas)
+            NSLayoutConstraint.activate([
+                canvas.leadingAnchor.constraint(equalTo: web.leadingAnchor),
+                canvas.trailingAnchor.constraint(equalTo: web.trailingAnchor),
+                canvas.topAnchor.constraint(equalTo: web.topAnchor),
+                canvas.bottomAnchor.constraint(equalTo: web.bottomAnchor),
+            ])
+            scrollObservations = [
+                web.scrollView.observe(\.contentSize, options: [.initial, .new]) { [weak self] sv, _ in
+                    guard let self else { return }
+                    self.canvas.contentSize = CGSize(width: max(sv.contentSize.width, sv.bounds.width),
+                                                     height: max(sv.contentSize.height, sv.bounds.height))
+                    self.canvas.contentOffset = sv.contentOffset
+                },
+                web.scrollView.observe(\.contentOffset, options: [.initial, .new]) { [weak self] sv, _ in
+                    self?.canvas.contentOffset = sv.contentOffset
+                },
+            ]
 
             // The text-selection layer sits over the viewport (the page's
             // caret lookup works in viewport coordinates).
@@ -205,6 +232,8 @@ struct ReaderView: UIViewRepresentable {
             ink.color.getRed(&r, green: &g, blue: &b, alpha: &a)
             return String(format: "pen rgb(%.0f,%.0f,%.0f) w%.1f", r * 255, g * 255, b * 255, ink.width)
         }
+        var canvasTouches: Int { canvas.touchesSeen }
+        var canvasFrame: String { "\(canvas.frame) content \(canvas.contentSize) offset \(canvas.contentOffset) enabled \(canvas.isUserInteractionEnabled)" }
         #endif
 
         func apply(tool: BookSession.Tool, color: UIColor) {
@@ -363,5 +392,29 @@ final class MarkGestureView: UIView {
         case .ended: onSelect?(start, p)
         default: break
         }
+    }
+}
+
+/// The ink layer. It sits over the page, so a finger that should scroll
+/// the page must fall through it: when the iPad is set to draw only with
+/// the Pencil, anything but a Pencil touch is not ours. Elsewhere (no
+/// Pencil paired, the Simulator) fingers draw, as PencilKit's default
+/// policy intends.
+final class PageInkCanvas: PKCanvasView {
+    #if DEBUG
+    /// Touches that reached the canvas, for the harness.
+    private(set) var touchesSeen = 0
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        touchesSeen += touches.count
+        super.touchesBegan(touches, with: event)
+    }
+    #endif
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        if UIPencilInteraction.prefersPencilOnlyDrawing,
+           let touch = event?.allTouches?.first, touch.type != .pencil {
+            return nil
+        }
+        return super.hitTest(point, with: event)
     }
 }

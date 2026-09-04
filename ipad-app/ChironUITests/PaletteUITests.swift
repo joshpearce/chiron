@@ -77,3 +77,68 @@ final class PaletteUITests: XCTestCase {
         XCTAssertNil(try state()["asking"], "the card closed on its own button")
     }
 }
+
+/// The ink layer over the page: a finger scrolls the page while the pen is
+/// up, a stroke lands as ink, and the highlighter's drag still selects.
+final class InkUITests: XCTestCase {
+    private let harness = URL(string: "http://localhost:8087")!
+
+    private func state() throws -> [String: Any] {
+        let data = try Data(contentsOf: harness.appendingPathComponent("state"))
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    private func post(_ path: String, _ body: [String: Any]) throws {
+        var req = URLRequest(url: harness.appendingPathComponent(path))
+        req.httpMethod = "POST"
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let done = expectation(description: path)
+        URLSession.shared.dataTask(with: req) { _, _, _ in done.fulfill() }.resume()
+        wait(for: [done], timeout: 30)
+    }
+
+    func testFingersScrollDrawAndHighlightOverThePage() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["harness"]
+        app.launchEnvironment["CHIRON_SERVER"] = ProcessInfo.processInfo.environment["CHIRON_SERVER"] ?? "http://localhost:8084"
+        app.launch()
+        let deadline = Date().addingTimeInterval(20)
+        while Date() < deadline, (try? state()) == nil { Thread.sleep(forTimeInterval: 0.5) }
+        try post("open", ["subject": "ai"])
+        XCTAssertTrue(app.buttons["Pen"].waitForExistence(timeout: 15))
+        Thread.sleep(forTimeInterval: 2)
+
+        // With the pen up, a finger drag draws (no Pencil in the Simulator).
+        try post("tool", ["tool": "pen"])
+        Thread.sleep(forTimeInterval: 0.5)
+        let page = app.webViews.firstMatch
+        XCTAssertTrue(page.waitForExistence(timeout: 10))
+        let strokesBefore = try state()["ink_strokes"] as? Int ?? 0
+        let from = page.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+        let to = page.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.55))
+        from.press(forDuration: 0.1, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.1)
+        Thread.sleep(forTimeInterval: 1.0)
+        let drawn = try state()
+        XCTAssertEqual(drawn["ink_strokes"] as? Int, strokesBefore + 1,
+                       "one stroke of ink; canvas touches=\(drawn["canvas_touches"] ?? "?") frame=\(drawn["canvas_frame"] ?? "?") pen=\(drawn["canvas_pen"] ?? "?")")
+
+        // The highlighter's drag selects a run of text.
+        try post("tool", ["tool": "highlighter"])
+        Thread.sleep(forTimeInterval: 0.5)
+        page.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.4))
+            .press(forDuration: 0.05, thenDragTo: page.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4)))
+        Thread.sleep(forTimeInterval: 1.0)
+        let marks = try state()["marks"] as? [[String: Any]] ?? []
+        XCTAssertTrue(marks.contains { $0["kind"] as? String == "highlight" }, "a highlight from the drag: \(marks)")
+        // With no tool, a finger swipe scrolls the page.
+        try post("tool", ["tool": "none"])
+        Thread.sleep(forTimeInterval: 0.5)
+        let before = try state()["position"] as? Double ?? 0
+        page.swipeUp()
+        Thread.sleep(forTimeInterval: 1.5)
+        let after = try state()["position"] as? Double ?? 0
+        XCTAssertGreaterThan(after, before, "the page scrolled")
+
+    }
+}

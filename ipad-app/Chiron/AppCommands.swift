@@ -1,4 +1,5 @@
 import Foundation
+import PencilKit
 import UIKit
 
 /// The verbs a script or the sprite's agent can run against the app. They
@@ -203,8 +204,12 @@ enum AppCommands {
             out["chrome_hidden"] = s.chromeHidden
             out["tool"] = s.tool.rawValue
             out["pen_color"] = s.penColor.rawValue
+            out["ink_strokes"] = s.inkData.flatMap { try? PKDrawing(data: $0) }?.strokes.count ?? 0
+            out["position"] = s.chapter.map { s.position(for: $0.unit) } ?? 0
             #if DEBUG
             out["canvas_pen"] = ReaderView.Coordinator.probe?.canvasPen ?? ""
+            out["canvas_touches"] = ReaderView.Coordinator.probe?.canvasTouches ?? -1
+            out["canvas_frame"] = ReaderView.Coordinator.probe?.canvasFrame ?? ""
             #endif
             out["marks"] = s.marks.map { ["kind": $0.kind.rawValue, "text": $0.text, "answered": $0.answer != nil] }
             if let a = s.asking {
