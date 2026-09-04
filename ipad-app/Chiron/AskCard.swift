@@ -1,14 +1,19 @@
 import SwiftUI
 
-/// A question about a highlighted passage, and the tutor's answer. A card
-/// over the page's corner rather than a sheet: the passage stays readable
-/// while the question is typed and the answer read.
+/// A question about a highlighted passage, the tutor's answer, and the
+/// exchange that follows. A card over the page's corner rather than a
+/// sheet: the passage stays readable while the question is typed and the
+/// answer read. Closing keeps the highlight and its badge on the page;
+/// the bin removes the question with its highlight. On a primer the same
+/// card carries a margin note, whose answer is a new section on the page.
 struct AskCard: View {
     @EnvironmentObject var session: BookSession
     @State private var question = ""
     @FocusState private var typing: Bool
 
     private var asking: BookSession.Asking? { session.asking }
+    private var isNote: Bool { asking?.mark.kind == .note }
+    private var answered: Bool { asking?.mark.answer != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -18,6 +23,18 @@ struct AskCard: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
                 Spacer(minLength: 8)
+                if answered || asking?.mark.question != nil {
+                    Button {
+                        session.deleteAsking()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Delete")
+                    .accessibilityHint(isNote ? "Removes the note; the section it added stays" : "Removes the question and its highlight")
+                }
                 Button {
                     session.closeAsking()
                 } label: {
@@ -31,8 +48,17 @@ struct AskCard: View {
             }
 
             if let a = asking, let q = a.mark.question {
-                Text(q)
-                    .font(Typography.sans(17, weight: .semibold))
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        turn(question: q, answer: a.mark.answer)
+                        ForEach(Array((a.mark.thread ?? []).enumerated()), id: \.offset) { _, t in
+                            Divider()
+                            turn(question: t.question, answer: t.answer)
+                        }
+                    }
+                }
+                .frame(maxHeight: 360)
+                .fixedSize(horizontal: false, vertical: true)
                 if a.busy {
                     HStack(spacing: 10) {
                         ProgressView()
@@ -40,40 +66,19 @@ struct AskCard: View {
                             .font(Typography.serif(16))
                             .foregroundStyle(.secondary)
                     }
-                } else if let answer = a.mark.answer {
-                    if isNote {
-                        // The section is on the page; the card only says where.
-                        Label("Added at the end: \(answer)", systemImage: "text.append")
-                            .font(Typography.serif(16))
-                    } else {
-                        // Hugs a short answer; scrolls a long one.
-                        ScrollView {
-                            MathText(text: answer, size: 16, rich: true)
-                        }
-                        .frame(maxHeight: 320)
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
                 } else if let err = a.error {
                     Text(err)
                         .font(Typography.serif(16))
                         .foregroundStyle(.red)
-                    Button("Try again") { Task { await send(q) } }
+                    Button("Try again") { Task { await retry(a) } }
                         .buttonStyle(.bordered)
+                } else if answered && !isNote {
+                    // Keep chatting: the next question joins the thread.
+                    askField(placeholder: "Ask more about this", label: "Ask")
                 }
             } else {
-                TextField(isNote ? "Your note on this passage" : "Your question about this passage", text: $question, axis: .vertical)
-                    .font(Typography.serif(17))
-                    .lineLimit(1...4)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($typing)
-                    .onSubmit { submit() }
-                HStack {
-                    Spacer()
-                    Button(isNote ? "Add to the primer" : "Ask") { submit() }
-                        .buttonStyle(.borderedProminent)
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
+                askField(placeholder: isNote ? "Your note on this passage" : "Your question about this passage",
+                         label: isNote ? "Add to the primer" : "Ask")
             }
         }
         .padding(16)
@@ -87,15 +92,53 @@ struct AskCard: View {
         }
     }
 
-    private var isNote: Bool { asking?.mark.kind == .note }
+    @ViewBuilder
+    private func turn(question: String, answer: String?) -> some View {
+        Text(question)
+            .font(Typography.sans(17, weight: .semibold))
+        if let answer {
+            if isNote {
+                // The section is on the page; the card only says where.
+                Label("Added at the end: \(answer)", systemImage: "text.append")
+                    .font(Typography.serif(16))
+            } else {
+                MathText(text: answer, size: 16, rich: true)
+            }
+        }
+    }
+
+    private func askField(placeholder: String, label: String) -> some View {
+        Group {
+            TextField(placeholder, text: $question, axis: .vertical)
+                .font(Typography.serif(17))
+                .lineLimit(1...4)
+                .textFieldStyle(.roundedBorder)
+                .focused($typing)
+                .onSubmit { submit() }
+            HStack {
+                Spacer()
+                Button(label) { submit() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+    }
 
     private func submit() {
         let q = question
         guard !q.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        question = ""
         Task { await send(q) }
     }
 
     private func send(_ q: String) async {
         if isNote { await session.extend(q) } else { await session.ask(q) }
+    }
+
+    /// The question that failed is the last one in hand.
+    private func retry(_ a: BookSession.Asking) async {
+        let q = a.mark.thread?.last.flatMap { $0.answer == nil ? $0.question : nil } ?? a.mark.question ?? ""
+        await send(q)
     }
 }

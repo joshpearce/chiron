@@ -251,7 +251,7 @@ func TestAnswerIsGroundedInTheQuotedSection(t *testing.T) {
 	// A quote as the rendered page would give it: rewrapped whitespace.
 	quote := "Frequent words become single symbols, rare words decompose into pieces"
 	chain := &capturingChain{}
-	if _, err := AnswerQuestion(chain, unit, quote, "why not just use words?", l); err == nil {
+	if _, err := AnswerQuestion(chain, unit, quote, "why not just use words?", nil, l); err == nil {
 		t.Fatal("captured chain should fail")
 	}
 	if !strings.Contains(chain.user, "why not just use words?") {
@@ -266,7 +266,7 @@ func TestAnswerIsGroundedInTheQuotedSection(t *testing.T) {
 
 	// A quote nothing matches falls back to the whole unit.
 	chain = &capturingChain{}
-	AnswerQuestion(chain, unit, "text the author rewrote entirely", "what?", l)
+	AnswerQuestion(chain, unit, "text the author rewrote entirely", "what?", nil, l)
 	if !strings.Contains(chain.user, "Embeddings are coordinates") || !strings.Contains(chain.user, "Tokens: BPE") {
 		t.Errorf("fallback should carry the whole unit")
 	}
@@ -290,5 +290,26 @@ func TestPlannerSeesRecentQuestions(t *testing.T) {
 	PlanDirectives(chain, l2, c.Units["u2"], "Check u1: 50% (below gate). ")
 	if !strings.Contains(chain.user, "QUESTIONS THE READER ASKED WHILE READING (newest last):\n(none)") {
 		t.Errorf("no questions should read as none:\n%s", chain.user)
+	}
+}
+
+// A follow-up carries the exchange so far, so the tutor can build on it.
+func TestAFollowUpCarriesTheThread(t *testing.T) {
+	c, err := corpus.Load(filepath.Join("..", "..", "corpus"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	unit := c.Units["u1"]
+	l, _ := state.Open(t.TempDir(), c)
+	chain := &primerChain{payload: map[string]any{"answer_md": "Building on that: subwords."}}
+	history := []Turn{{Question: "why tokens?", Answer: "Because words are open-ended."}}
+	got, err := AnswerQuestion(chain, unit, "predict the next token", "and why subwords?", history, l)
+	if err != nil || got != "Building on that: subwords." {
+		t.Fatalf("%q %v", got, err)
+	}
+	for _, want := range []string{"EARLIER IN THIS EXCHANGE", "Reader: why tokens?", "Tutor: Because words are open-ended.", "READER'S QUESTION:\nand why subwords?"} {
+		if !strings.Contains(chain.user, want) {
+			t.Errorf("prompt lacks %q:\n%s", want, chain.user)
+		}
 	}
 }

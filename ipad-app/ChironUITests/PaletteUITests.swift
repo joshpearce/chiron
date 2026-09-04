@@ -142,3 +142,74 @@ final class InkUITests: XCTestCase {
 
     }
 }
+
+/// A question's life on the page: asked, closed with its badge left
+/// behind, reopened by tapping the badge, and deleted from the card.
+final class AskCardUITests: XCTestCase {
+    private let harness = URL(string: "http://localhost:8087")!
+
+    private func state() throws -> [String: Any] {
+        let data = try Data(contentsOf: harness.appendingPathComponent("state"))
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    private func post(_ path: String, _ body: [String: Any]) throws -> [String: Any] {
+        var req = URLRequest(url: harness.appendingPathComponent(path))
+        req.httpMethod = "POST"
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        var out: [String: Any] = [:]
+        let done = expectation(description: path)
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            out = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 60)
+        return out
+    }
+
+    func testBadgeReopensAndDeleteRemoves() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["harness"]
+        app.launchEnvironment["CHIRON_SERVER"] = ProcessInfo.processInfo.environment["CHIRON_SERVER"] ?? "http://localhost:8084"
+        app.launch()
+        let deadline = Date().addingTimeInterval(20)
+        while Date() < deadline, (try? state()) == nil { Thread.sleep(forTimeInterval: 0.5) }
+        _ = try post("open", ["subject": "ai"])
+        XCTAssertTrue(app.buttons["Pen"].waitForExistence(timeout: 15))
+        Thread.sleep(forTimeInterval: 2)
+        // Start clean: any marks from an earlier run go.
+        for m in (try state()["marks"] as? [[String: Any]]) ?? [] {
+            if let id = m["id"] as? String { _ = try post("unmark", ["id": id]) }
+        }
+
+        let asked = try post("ask", ["text": "at sufficient scale", "question": "What counts as sufficient scale?"])
+        let asking = try XCTUnwrap(asked["asking"] as? [String: Any])
+        XCTAssertEqual(asking["answered"] as? Bool, true)
+        XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
+        app.buttons["Close"].tap()
+        Thread.sleep(forTimeInterval: 0.5)
+        var s = try state()
+        XCTAssertNil(s["asking"], "the card closed")
+        let marks = try XCTUnwrap(s["marks"] as? [[String: Any]])
+        XCTAssertEqual(marks.count, 1, "the highlight stayed")
+        let id = try XCTUnwrap(marks[0]["id"] as? String)
+
+        // Tap the badge on the page as a finger would.
+        let rect = try post("mark/rect", ["id": id])
+        XCTAssertEqual(rect["found"] as? Bool, true, "the mark is on the page: \(rect)")
+        let page = app.webViews.firstMatch
+        let x = (rect["x"] as? Double ?? 0) + (rect["width"] as? Double ?? 0) - 6
+        let y = (rect["y"] as? Double ?? 0) + (rect["height"] as? Double ?? 0) / 2
+        page.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y)).tap()
+        Thread.sleep(forTimeInterval: 0.8)
+        s = try state()
+        XCTAssertNotNil(s["asking"], "tapping the badge reopened the card")
+        XCTAssertTrue(app.buttons["Delete"].waitForExistence(timeout: 5))
+        app.buttons["Delete"].tap()
+        Thread.sleep(forTimeInterval: 0.5)
+        s = try state()
+        XCTAssertNil(s["asking"])
+        XCTAssertEqual((s["marks"] as? [[String: Any]])?.count, 0, "delete removed the question and its highlight")
+    }
+}

@@ -18,6 +18,8 @@ type askRequest struct {
 	Unit     string `json:"unit"`
 	Quote    string `json:"quote"`
 	Question string `json:"question"`
+	// History is the exchange so far on this passage, for a follow-up.
+	History []roles.Turn `json:"history"`
 }
 
 func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +50,7 @@ func (s *Server) handleAsk(w http.ResponseWriter, r *http.Request) {
 	}
 	s.markActive(sub.ID)
 
-	answer, err := roles.AnswerQuestion(s.chain, unit, req.Quote, req.Question, sub.Learner)
+	answer, err := roles.AnswerQuestion(s.chain, unit, req.Quote, req.Question, req.History, sub.Learner)
 	if err != nil && driveEnabled() && !s.chain.Status().Connected {
 		// A dev server without a model still lets a client exercise the
 		// whole ask flow; the stub names itself.

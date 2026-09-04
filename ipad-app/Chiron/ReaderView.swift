@@ -147,7 +147,8 @@ struct ReaderView: UIViewRepresentable {
         private var loadingInk = false
 
         private let canvas = PageInkCanvas()
-        private let marker = MarkGestureView()
+        private let selector = UIPanGestureRecognizer()
+        private var selectionStart: CGPoint = .zero
         private var scrollObservations: [NSKeyValueObservation] = []
 
         init(session: BookSession) {
@@ -201,19 +202,15 @@ struct ReaderView: UIViewRepresentable {
                 },
             ]
 
-            // The text-selection layer sits over the viewport (the page's
-            // caret lookup works in viewport coordinates).
-            marker.translatesAutoresizingMaskIntoConstraints = false
-            marker.isUserInteractionEnabled = false
-            marker.onPreview = { [weak self] a, b in self?.preview(from: a, to: b) }
-            marker.onSelect = { [weak self] a, b in self?.select(from: a, to: b) }
-            web.addSubview(marker)
-            NSLayoutConstraint.activate([
-                marker.leadingAnchor.constraint(equalTo: web.leadingAnchor),
-                marker.trailingAnchor.constraint(equalTo: web.trailingAnchor),
-                marker.topAnchor.constraint(equalTo: web.topAnchor),
-                marker.bottomAnchor.constraint(equalTo: web.bottomAnchor),
-            ])
+            // Text selection is a pan on the web view itself rather than a
+            // layer over it, so a tap still reaches the page: tapping a
+            // mark's badge is how a question reopens. While a selecting
+            // tool is up the page does not scroll; the drag is the selection.
+            selector.maximumNumberOfTouches = 1
+            selector.cancelsTouchesInView = false
+            selector.isEnabled = false
+            selector.addTarget(self, action: #selector(selectPan(_:)))
+            web.addGestureRecognizer(selector)
 
             web.addInteraction(UIPencilInteraction(delegate: self))
         }
@@ -244,17 +241,21 @@ struct ReaderView: UIViewRepresentable {
             case .pen:
                 canvas.tool = PKInkingTool(.pen, color: color, width: 2.5)
                 canvas.isUserInteractionEnabled = true
-                marker.isUserInteractionEnabled = false
+                selector.isEnabled = false
+                web?.scrollView.isScrollEnabled = true
             case .eraser:
                 canvas.tool = PKEraserTool(.vector)
                 canvas.isUserInteractionEnabled = true
-                marker.isUserInteractionEnabled = false
+                selector.isEnabled = false
+                web?.scrollView.isScrollEnabled = true
             case .highlighter, .ask, .note:
                 canvas.isUserInteractionEnabled = false
-                marker.isUserInteractionEnabled = true
+                selector.isEnabled = true
+                web?.scrollView.isScrollEnabled = false
             case .none:
                 canvas.isUserInteractionEnabled = false
-                marker.isUserInteractionEnabled = false
+                selector.isEnabled = false
+                web?.scrollView.isScrollEnabled = true
             }
         }
 
@@ -287,6 +288,17 @@ struct ReaderView: UIViewRepresentable {
             }
         }
 
+        @objc private func selectPan(_ g: UIPanGestureRecognizer) {
+            guard let web else { return }
+            let p = g.location(in: web)
+            switch g.state {
+            case .began: selectionStart = p
+            case .changed: preview(from: selectionStart, to: p)
+            case .ended: select(from: selectionStart, to: p)
+            default: break
+            }
+        }
+
         private func preview(from a: CGPoint, to b: CGPoint) {
             web?.evaluateJavaScript("previewRange(\(a.x), \(a.y), \(b.x), \(b.y))")
         }
@@ -305,6 +317,16 @@ struct ReaderView: UIViewRepresentable {
                     self.session.addMark(kind: kind, start: start, end: end, text: text)
                 }
             }
+        }
+
+        /// Where a mark's badge is on screen, in the web view's coordinates.
+        func rect(of markID: String) async -> CGRect? {
+            guard let web, pageReady else { return nil }
+            let escaped = markID.replacingOccurrences(of: "'", with: "\\'")
+            guard let r = try? await web.evaluateJavaScript("markRect('\(escaped)')") as? [String: Any],
+                  let x = r["x"] as? Double, let y = r["y"] as? Double,
+                  let w = r["width"] as? Double, let h = r["height"] as? Double else { return nil }
+            return CGRect(x: x, y: y, width: w, height: h)
         }
 
         func find(_ text: String) async -> (start: Int, end: Int, text: String)? {
@@ -369,31 +391,6 @@ struct ReaderView: UIViewRepresentable {
 
 /// A drag across the page selects a run of text. Reports the drag as it
 /// moves (for the provisional highlight) and when it ends.
-final class MarkGestureView: UIView {
-    var onPreview: ((CGPoint, CGPoint) -> Void)?
-    var onSelect: ((CGPoint, CGPoint) -> Void)?
-    private var start: CGPoint = .zero
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        backgroundColor = .clear
-        let pan = UIPanGestureRecognizer(target: self, action: #selector(pan(_:)))
-        pan.maximumNumberOfTouches = 1
-        addGestureRecognizer(pan)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    @objc private func pan(_ g: UIPanGestureRecognizer) {
-        let p = g.location(in: self)
-        switch g.state {
-        case .began: start = p
-        case .changed: onPreview?(start, p)
-        case .ended: onSelect?(start, p)
-        default: break
-        }
-    }
-}
 
 /// The ink layer. It sits over the page, so a finger that should scroll
 /// the page must fall through it: when the iPad is set to draw only with

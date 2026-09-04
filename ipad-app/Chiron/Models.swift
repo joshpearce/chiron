@@ -520,6 +520,23 @@ struct Mark: Codable, Identifiable, Equatable {
     let text: String
     var question: String?
     var answer: String?
+    /// Follow-ups after the first question, oldest first.
+    var thread: [QA]?
+
+    /// Every turn so far, the first question included, for a follow-up's
+    /// history: only turns that were answered.
+    var history: [QA] {
+        var turns: [QA] = []
+        if let q = question, let a = answer { turns.append(QA(question: q, answer: a)) }
+        for t in thread ?? [] where t.answer != nil { turns.append(t) }
+        return turns
+    }
+}
+
+/// One question and its answer in a thread on a passage.
+struct QA: Codable, Equatable {
+    var question: String
+    var answer: String?
 }
 
 /// A key sshd on the sprite accepts; the app's own shows up here after

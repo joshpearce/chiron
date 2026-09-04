@@ -527,18 +527,35 @@ final class BookSession: ObservableObject {
         asking = nil
     }
 
-    /// Send the question with its passage; the answer lands on the mark.
+    /// Send the question with its passage; the answer lands on the mark. A
+    /// second question on an answered mark is a follow-up: it joins the
+    /// thread and the tutor sees the exchange so far.
     func ask(_ question: String) async {
         guard var a = asking, let unit = chapter?.unit else { return }
         let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !a.busy else { return }
+        let followUp = a.mark.answer != nil
+        let history = a.mark.history
         a.busy = true
         a.error = nil
-        a.mark.question = q
+        if followUp {
+            var thread = a.mark.thread ?? []
+            // A failed follow-up is retried in place, not appended twice.
+            if thread.last?.answer == nil { thread.removeLast() }
+            thread.append(QA(question: q, answer: nil))
+            a.mark.thread = thread
+        } else {
+            a.mark.question = q
+        }
         asking = a
         do {
-            let reply = try await service.ask(subject: subjectID, unit: unit, quote: a.mark.text, question: q)
-            a.mark.answer = reply.answerMd
+            let reply = try await service.ask(subject: subjectID, unit: unit, quote: a.mark.text, question: q, history: history)
+            if followUp, var thread = a.mark.thread, !thread.isEmpty {
+                thread[thread.count - 1].answer = reply.answerMd
+                a.mark.thread = thread
+            } else {
+                a.mark.answer = reply.answerMd
+            }
         } catch {
             a.error = "The tutor can't be reached. Try again."
         }
@@ -546,6 +563,12 @@ final class BookSession: ObservableObject {
         asking = a
         if let i = marks.firstIndex(where: { $0.id == a.mark.id }) { marks[i] = a.mark }
         persistMarks()
+    }
+
+    /// The question, its thread and its highlight go together.
+    func deleteAsking() {
+        guard let a = asking else { return }
+        removeMark(a.mark.id)
     }
 
     /// A margin note on a primer: the passage and the note go to the
@@ -683,4 +706,6 @@ final class BookSession: ObservableObject {
 protocol PageBridge: AnyObject {
     /// Offsets of the first occurrence of text in the chapter, or nil.
     func find(_ text: String) async -> (start: Int, end: Int, text: String)?
+    /// Where a mark's badge is drawn, in the page view's coordinates.
+    func rect(of markID: String) async -> CGRect?
 }

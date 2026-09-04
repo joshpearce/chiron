@@ -31,13 +31,30 @@ Rules:
 - Under 200 words unless a derivation is genuinely needed. Real equations in $...$ with every symbol defined at first use. Hyphens only, no em dashes.
 - If the question shows a wrong model, state the wrong model in one clause and then the right one - do not lecture.
 - Never reveal answers to the chapter's check questions. The reader is mid-chapter and the check is closed-book.
+- A follow-up continues the exchange you are shown: build on what you said, do not repeat it.
 - Audience: expert software engineer, novice at ML math.`
 
+// Turn is one earlier question and answer on the same passage: a reader
+// who keeps chatting gets a tutor who remembers what it just said.
+type Turn struct {
+	Question string `json:"question"`
+	Answer   string `json:"answer"`
+}
+
 // AnswerQuestion answers a reader's question about a quoted passage of unit.
-func AnswerQuestion(chain llm.Chain, unit *corpus.Unit, quote, question string, l *state.Learner) (string, error) {
+// history holds the exchange so far on that passage, oldest first.
+func AnswerQuestion(chain llm.Chain, unit *corpus.Unit, quote, question string, history []Turn, l *state.Learner) (string, error) {
 	section := sectionContaining(unit, quote)
 	snapshot := l.Snapshot()
 	active := l.ActiveMisconceptions()
+
+	var thread strings.Builder
+	if len(history) > 0 {
+		thread.WriteString("EARLIER IN THIS EXCHANGE, ON THE SAME PASSAGE (oldest first):\n")
+		for _, t := range history {
+			fmt.Fprintf(&thread, "Reader: %s\nTutor: %s\n\n", strings.TrimSpace(t.Question), clip(strings.TrimSpace(t.Answer), 4000))
+		}
+	}
 
 	user := fmt.Sprintf(`UNIT: %s %q
 
@@ -47,13 +64,14 @@ SECTION THE PASSAGE IS FROM:
 PASSAGE THE READER HIGHLIGHTED:
 %q
 
-READER'S QUESTION:
+%sREADER'S QUESTION:
 %s
 
 READER: self-rated start %s; active misconceptions: %s; state summary: %s`,
 		unit.ID, unit.Title,
 		clip(section, 60000),
 		quote,
+		thread.String(),
 		question,
 		selfRatingLine(snapshot.Profile.SelfRating),
 		orNone(strings.Join(active, ", ")),

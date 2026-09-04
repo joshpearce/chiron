@@ -8,7 +8,7 @@ protocol ChironService: AnyObject {
     func chapter(subject: String) async throws -> ChapterStatus
     func exchange(_ request: ExchangeRequest) async throws -> ExchangeResponse
     func ink(subject: String, _ submission: InkSubmission) async throws -> ExchangeResponse
-    func ask(subject: String, unit: String, quote: String, question: String) async throws -> AskResponse
+    func ask(subject: String, unit: String, quote: String, question: String, history: [QA]) async throws -> AskResponse
     func capture(_ request: CaptureRequest) async throws -> CaptureResponse
     func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse
     func reset(subject: String) async throws -> BookState
@@ -87,10 +87,13 @@ final class Sync: ObservableObject, ChironService {
     }
 
     /// One model call; the answer comes back in the same request.
-    func ask(subject: String, unit: String, quote: String, question: String) async throws -> AskResponse {
-        struct Body: Encodable { let unit, quote, question: String }
+    func ask(subject: String, unit: String, quote: String, question: String, history: [QA]) async throws -> AskResponse {
+        struct Body: Encodable {
+            let unit, quote, question: String
+            let history: [QA]
+        }
         return try await post("/ask/\(subject)",
-                              body: try JSONEncoder().encode(Body(unit: unit, quote: quote, question: question)),
+                              body: try JSONEncoder().encode(Body(unit: unit, quote: quote, question: question, history: history)),
                               timeout: 120)
     }
 

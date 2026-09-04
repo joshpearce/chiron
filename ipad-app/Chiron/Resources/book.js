@@ -50,6 +50,16 @@ window.addEventListener("scroll", () => {
 
 /* A tap on the page itself (not on anything that answers or links) toggles
  * the reader's chrome. */
+/* The last segment of a mark carries its badge; its box on screen, for a
+ * script that wants to tap it the way a reader would. */
+function markRect(id) {
+  const last = document.querySelector(`mark[data-id="${id}"][data-last="1"]`)
+    || document.querySelector(`mark[data-id="${id}"]`);
+  if (!last) return null;
+  const r = last.getBoundingClientRect();
+  return { x: r.left, y: r.top, width: r.width, height: r.height };
+}
+
 document.addEventListener("click", (e) => {
   if (e.target.closest("a, button, input, textarea, select, .beat, mark.mark")) return;
   post({ type: "tap" });

@@ -79,6 +79,10 @@ enum AppCommands {
             guard let text = args["text"] as? String else { throw Failure.badArguments("shell/type needs text") }
             library.shell.send(text: text)
             try? await Task.sleep(nanoseconds: 300_000_000)
+        case "mark/rect":
+            guard let s = library.session, let id = args["id"] as? String else { throw Failure.badArguments("mark/rect needs id") }
+            guard let r = await s.page?.rect(of: id) else { return ["found": false] }
+            return ["found": true, "x": r.minX, "y": r.minY, "width": r.width, "height": r.height]
         case "shell/screen":
             var out: [String: Any] = ["phase": shellPhase(library.shell.phase)]
             #if DEBUG
@@ -128,6 +132,11 @@ enum AppCommands {
             }
         case "close":
             session.closeAsking()
+        case "delete":
+            session.deleteAsking()
+        case "unmark":
+            guard let id = args["id"] as? String else { throw Failure.badArguments("unmark needs id") }
+            session.removeMark(id)
         case "answer":
             guard let ch = session.chapter else { throw Failure.noBook }
             await session.submitCheck(answers(for: ch, mode: args["mode"] as? String ?? "correct", llm: llm))
@@ -211,9 +220,9 @@ enum AppCommands {
             out["canvas_touches"] = ReaderView.Coordinator.probe?.canvasTouches ?? -1
             out["canvas_frame"] = ReaderView.Coordinator.probe?.canvasFrame ?? ""
             #endif
-            out["marks"] = s.marks.map { ["kind": $0.kind.rawValue, "text": $0.text, "answered": $0.answer != nil] }
+            out["marks"] = s.marks.map { ["id": $0.id, "kind": $0.kind.rawValue, "text": $0.text, "answered": $0.answer != nil, "turns": $0.history.count] }
             if let a = s.asking {
-                out["asking"] = ["question": a.mark.question ?? "", "busy": a.busy, "answered": a.mark.answer != nil, "error": a.error ?? ""]
+                out["asking"] = ["question": a.mark.question ?? "", "busy": a.busy, "answered": a.mark.answer != nil, "error": a.error ?? "", "turns": a.mark.history.count]
             }
             out["error"] = s.errorMessage ?? ""
             if case .results(let doc, _) = s.screen {

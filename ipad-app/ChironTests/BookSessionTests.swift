@@ -18,6 +18,7 @@ final class FakeService: ChironService {
     var exchanges: [ExchangeRequest] = []
     var inks: [InkSubmission] = []
     var asks: [(unit: String, quote: String, question: String)] = []
+    var histories: [[QA]] = []
     var chapterPolls = 0
 
     func subjects() async throws -> SubjectsResponse { try onSubjects() }
@@ -34,8 +35,9 @@ final class FakeService: ChironService {
         inks.append(submission)
         return try onInk(subject, submission)
     }
-    func ask(subject: String, unit: String, quote: String, question: String) async throws -> AskResponse {
+    func ask(subject: String, unit: String, quote: String, question: String, history: [QA]) async throws -> AskResponse {
         asks.append((unit, quote, question))
+        histories.append(history)
         return try onAsk(unit, quote, question)
     }
     func reset(subject: String) async throws -> BookState { try onReset(subject) }
@@ -545,5 +547,43 @@ final class InkTests: XCTestCase {
         try await Task.sleep(nanoseconds: 700_000_000)
         XCTAssertEqual(try Data(contentsOf: file), Data([1, 2]))
         UserDefaults.standard.removeObject(forKey: "penColor")
+    }
+}
+
+@MainActor
+final class AskThreadTests: XCTestCase {
+    private func session(_ fake: FakeService) -> BookSession {
+        let storage = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let s = BookSession(subjectID: "ai", title: "AI", service: fake, storage: storage)
+        let json = #"{"unit":"u1","title":"T","minutes":1,"html":"<p>predict the next token</p>","beats":[],"pretest":[],"check":[],"next_action":"read"}"#
+        s.setChapterForTesting(try! JSONDecoder().decode(ChapterPayload.self, from: Data(json.utf8)))
+        return s
+    }
+
+    func testAFollowUpCarriesTheThreadAndCloseKeepsTheMark() async throws {
+        let fake = FakeService()
+        var n = 0
+        fake.onAsk = { _, _, q in n += 1; return AskResponse(unit: "u1", answerMd: "answer \(n) to \(q)") }
+        let s = session(fake)
+        let mark = s.addMark(kind: .question, start: 0, end: 22, text: "predict the next token")
+        await s.ask("why tokens?")
+        XCTAssertEqual(s.asking?.mark.answer, "answer 1 to why tokens?")
+        XCTAssertEqual(fake.histories.first?.count, 0)
+
+        await s.ask("and subwords?")
+        XCTAssertEqual(fake.histories.last, [QA(question: "why tokens?", answer: "answer 1 to why tokens?")])
+        XCTAssertEqual(s.asking?.mark.thread?.count, 1)
+        XCTAssertEqual(s.asking?.mark.thread?.first?.answer, "answer 2 to and subwords?")
+        XCTAssertEqual(s.marks.first?.thread?.count, 1, "the thread lives on the mark")
+
+        s.closeAsking()
+        XCTAssertNil(s.asking)
+        XCTAssertEqual(s.marks.count, 1, "closing keeps the mark and its thread")
+        s.openMark(mark.id)
+        XCTAssertEqual(s.asking?.mark.history.count, 2)
+
+        s.deleteAsking()
+        XCTAssertNil(s.asking)
+        XCTAssertTrue(s.marks.isEmpty, "delete removes the question and its highlight")
     }
 }

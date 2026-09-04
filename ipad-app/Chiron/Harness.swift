@@ -19,7 +19,9 @@ import Network
 ///   POST /tool {tool}        pick a palette tool: none | pen | highlighter | ask | eraser
 ///   POST /mark {text, kind}  highlight the first occurrence of text (kind: highlight | question)
 ///   POST /ask {text, question}  mark text as a question and ask it
-///   POST /close              close the ask card
+///   POST /close              close the ask card (the mark and its badge stay)
+///   POST /delete             delete the question in hand with its highlight
+///   POST /mark/rect {id}     where a mark's badge is, in page-view points
 ///   POST /answer {mode}      answer every item of the current chapter:
 ///                            correct | idk | wrong | mixed (default correct;
 ///                            mixed inks one item, passes on one, types the rest)
