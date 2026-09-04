@@ -30,7 +30,7 @@ struct PlacementView: View {
                             }
                             .padding(.vertical, 14).padding(.horizontal, 16)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.gray.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                            .background(.fill.tertiary, in: .rect(cornerRadius: 16))
                         }
                         .buttonStyle(.plain)
                         .hoverEffect()

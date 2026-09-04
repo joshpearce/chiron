@@ -102,7 +102,7 @@ final class PrimerTests: XCTestCase {
         s.cycleTool()
         XCTAssertEqual(s.tool, .note)
         s.cycleTool()
-        XCTAssertEqual(s.tool, .none)
+        XCTAssertEqual(s.tool, .eraser)
     }
 
     func testAFailedExtendKeepsTheNoteAndSaysSo() async {

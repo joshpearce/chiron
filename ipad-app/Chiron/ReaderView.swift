@@ -33,13 +33,16 @@ struct ReaderContainer: View {
         // The Pencil Pro's gestures do what the reader chose for them in
         // Settings, as the Pencil settings promise; "show the palette" is
         // read as "next tool", since the palette is already on the page.
-        .onPencilDoubleTap { _ in perform(doubleTapAction) }
+        .onPencilDoubleTap { _ in perform(doubleTapAction, from: "double-tap") }
         .onPencilSqueeze { phase in
-            if case .ended = phase { perform(squeezeAction) }
+            if case .ended = phase { perform(squeezeAction, from: "squeeze") }
         }
     }
 
-    private func perform(_ action: PencilPreferredAction) {
+    private func perform(_ action: PencilPreferredAction, from gesture: String) {
+        #if DEBUG
+        session.lastPencil = "\(gesture): \(action)"
+        #endif
         if action == .ignore || action == .runSystemShortcut { return }
         if action == .switchEraser { session.flipEraser() }
         else if action == .switchPrevious { session.switchPrevious() }
@@ -75,6 +78,8 @@ struct ReaderView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "bridge")
         let web = WKWebView(frame: .zero, configuration: config)
         web.isInspectable = true
+        web.backgroundColor = .systemBackground
+        web.scrollView.backgroundColor = .systemBackground
         // The bars over the page are the scroll view's safe area; the
         // content starts below the top one and scrolls beneath both.
         web.scrollView.contentInsetAdjustmentBehavior = .always
@@ -145,11 +150,11 @@ struct ReaderView: UIViewRepresentable {
             // only showed once the Pencil lifted. The canvas is itself a
             // scroll view; its content mirrors the page's size and offset,
             // so strokes are stored in page coordinates and stay with the
-            // text they annotate. On the iPad only the Pencil draws and a
-            // finger scrolls the page underneath, whatever the system's
-            // "only draw with Apple Pencil" setting says: the pen tool is
-            // for the Pencil. The Simulator has no Pencil; the tests draw
-            // with a finger.
+            // text they annotate. On the iPad only the Pencil draws, and a
+            // finger scrolls: the canvas is the scroll view a finger moves
+            // while the pen is up (the page follows it), whatever the
+            // system's "only draw with Apple Pencil" setting says. The
+            // Simulator has no Pencil; the tests draw with a finger.
             #if targetEnvironment(simulator)
             canvas.drawingPolicy = .anyInput
             #else
@@ -158,6 +163,8 @@ struct ReaderView: UIViewRepresentable {
             canvas.backgroundColor = .clear
             canvas.isOpaque = false
             canvas.isScrollEnabled = false
+            canvas.alwaysBounceVertical = true
+            canvas.showsVerticalScrollIndicator = false
             canvas.contentInsetAdjustmentBehavior = .never
             canvas.delegate = self
             canvas.isUserInteractionEnabled = false
@@ -181,8 +188,12 @@ struct ReaderView: UIViewRepresentable {
                     guard let self else { return }
                     // The inset follows the bars, which come and go with a
                     // tap; the offset is measured from the same origin.
+                    // While a finger moves the canvas, the page follows the
+                    // canvas, not the other way round.
                     self.canvas.contentInset = sv.adjustedContentInset
-                    self.canvas.contentOffset = sv.contentOffset
+                    if !self.fingerScrolling, self.canvas.contentOffset != sv.contentOffset {
+                        self.canvas.contentOffset = sv.contentOffset
+                    }
                 },
             ]
 
@@ -223,21 +234,42 @@ struct ReaderView: UIViewRepresentable {
             case .pen:
                 canvas.tool = PKInkingTool(.pen, color: color, width: 2.5)
                 canvas.isUserInteractionEnabled = true
+                canvas.isScrollEnabled = true
                 selector.isEnabled = false
                 web?.scrollView.isScrollEnabled = true
             case .eraser:
                 canvas.tool = PKEraserTool(.vector)
                 canvas.isUserInteractionEnabled = true
+                canvas.isScrollEnabled = true
                 selector.isEnabled = false
                 web?.scrollView.isScrollEnabled = true
             case .highlighter, .ask, .note:
                 canvas.isUserInteractionEnabled = false
+                canvas.isScrollEnabled = false
                 selector.isEnabled = true
                 web?.scrollView.isScrollEnabled = false
             case .none:
                 canvas.isUserInteractionEnabled = false
+                canvas.isScrollEnabled = false
                 selector.isEnabled = false
                 web?.scrollView.isScrollEnabled = true
+            }
+        }
+
+        // MARK: a finger on the canvas
+
+        private var fingerScrolling: Bool {
+            canvas.isTracking || canvas.isDragging || canvas.isDecelerating
+        }
+
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            guard scrollView === canvas, fingerScrolling, let web else { return }
+            let sv = web.scrollView
+            let top = -sv.adjustedContentInset.top
+            let bottom = max(top, sv.contentSize.height - sv.bounds.height + sv.adjustedContentInset.bottom)
+            let y = min(max(canvas.contentOffset.y, top), bottom)
+            if abs(sv.contentOffset.y - y) > 0.5 {
+                sv.contentOffset = CGPoint(x: sv.contentOffset.x, y: y)
             }
         }
 
@@ -373,9 +405,7 @@ struct ReaderView: UIViewRepresentable {
 /// A drag across the page selects a run of text. Reports the drag as it
 /// moves (for the provisional highlight) and when it ends.
 
-/// The ink layer. It sits over the page, so a finger that should scroll
-/// the page must fall through it: on the iPad anything but a Pencil touch
-/// is not ours. In the Simulator, which has no Pencil, fingers draw.
+/// The ink layer over the page.
 final class PageInkCanvas: PKCanvasView {
     #if DEBUG
     /// Touches that reached the canvas, for the harness.
@@ -385,13 +415,4 @@ final class PageInkCanvas: PKCanvasView {
         super.touchesBegan(touches, with: event)
     }
     #endif
-
-    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        #if !targetEnvironment(simulator)
-        if let touch = event?.allTouches?.first, touch.type != .pencil {
-            return nil
-        }
-        #endif
-        return super.hitTest(point, with: event)
-    }
 }

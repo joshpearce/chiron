@@ -113,11 +113,19 @@ final class BookSession: ObservableObject {
     weak var page: PageBridge?
 
     /// Squeeze on a Pencil Pro: the next tool round the palette.
+    /// Squeeze on a Pencil: the next tool on the palette, round and round;
+    /// with nothing up, the pen. Putting a tool down is a tap on it.
     func cycleTool() {
-        let order: [Tool] = isPrimer ? [.none, .pen, .highlighter, .ask, .note] : [.none, .pen, .highlighter, .ask]
-        let i = order.firstIndex(of: tool) ?? 0
+        let order: [Tool] = isPrimer ? [.pen, .highlighter, .ask, .note, .eraser] : [.pen, .highlighter, .ask, .eraser]
+        guard let i = order.firstIndex(of: tool) else { tool = .pen; return }
         tool = order[(i + 1) % order.count]
     }
+
+    #if DEBUG
+    /// The last Pencil gesture and what Settings asked of it, for the
+    /// harness: the Simulator has no Pencil, so the iPad reports instead.
+    var lastPencil = ""
+    #endif
 
     /// Double-tap on a Pencil: the eraser and whatever was up trade places.
     func flipEraser() {

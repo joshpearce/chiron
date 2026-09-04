@@ -13,15 +13,17 @@
   color-scheme: light dark;
   /* Dynamic Type scale, set by the native side (setScale). */
   --scale: 1;
-  --ink: #1a1a1a;
-  --paper: #faf6ef;
-  --accent: #7a5c2e;
-  --beat-bg: #f0e9dc;
-  --ok: #2e7d32;
-  --bad: #c62828;
-}
-@media (prefers-color-scheme: dark) {
-  :root { --ink: #d8d3c8; --paper: #14120e; --accent: #c9a86a; --beat-bg: #201c14; }
+  /* The system's colours, by their names: label, secondary label, the
+   * backgrounds, the separator, and blue, green, red, yellow. */
+  --ink: light-dark(#000000, #ffffff);
+  --ink-secondary: light-dark(rgba(60, 60, 67, 0.6), rgba(235, 235, 245, 0.6));
+  --paper: light-dark(#ffffff, #000000);
+  --paper-secondary: light-dark(#f2f2f7, #1c1c1e);
+  --separator: light-dark(rgba(60, 60, 67, 0.29), rgba(84, 84, 88, 0.6));
+  --accent: light-dark(#007aff, #0a84ff);
+  --beat-bg: var(--paper-secondary);
+  --ok: light-dark(#34c759, #30d158);
+  --bad: light-dark(#ff3b30, #ff453a);
 }
 html { -webkit-text-size-adjust: 100%; }
 body {
@@ -38,8 +40,8 @@ body {
   padding: 1.6em 1.4em 8em;
 }
 h1 { font-size: 1.9em; line-height: 1.2; margin: 0 0 0.3em; }
-h2 { font-size: 1.35em; margin-top: 2.2em; border-bottom: 1px solid color-mix(in srgb, var(--ink) 20%, transparent); padding-bottom: 0.25em; }
-.chapter-meta { color: color-mix(in srgb, var(--ink) 55%, transparent); font-size: 0.85em; margin-bottom: 2.5em; }
+h2 { font-size: 1.35em; margin-top: 2.2em; border-bottom: 1px solid var(--separator); padding-bottom: 0.25em; }
+.chapter-meta { color: var(--ink-secondary); font-size: 0.85em; margin-bottom: 2.5em; }
 p { margin: 0.9em 0; }
 code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.85em; }
 pre { background: var(--beat-bg); padding: 1em; border-radius: 8px; overflow-x: auto; }
@@ -48,18 +50,17 @@ pre { background: var(--beat-bg); padding: 1em; border-radius: 8px; overflow-x: 
   padding: 0.6em 1em;
   margin: 1.5em 0;
   font-style: italic;
-  background: color-mix(in srgb, var(--accent) 7%, transparent);
-  border-radius: 0 8px 8px 0;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-radius: 0 10px 10px 0;
 }
 .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.2em 0; }
 table { border-collapse: collapse; margin: 1em 0; }
-th, td { border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent); padding: 0.4em 0.8em; }
+th, td { border: 1px solid var(--separator); padding: 0.4em 0.8em; }
 
 /* ------- beats ------- */
 .beat {
   background: var(--beat-bg);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 1.1em 1.3em;
   margin: 1.8em 0;
   font-family: "Source Sans 3", -apple-system, system-ui, sans-serif;
@@ -78,8 +79,8 @@ th, td { border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent); padd
   box-sizing: border-box;
   font: inherit;
   padding: 0.6em;
-  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
-  border-radius: 8px;
+  border: 1px solid var(--separator);
+  border-radius: 10px;
   background: var(--paper);
   color: var(--ink);
 }
@@ -95,8 +96,8 @@ th, td { border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent); padd
   background: var(--accent);
   color: var(--paper);
 }
-.beat button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
-.beat .reveal { margin-top: 1em; padding-top: 1em; border-top: 1px dashed color-mix(in srgb, var(--ink) 30%, transparent); }
+.beat button.secondary { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.beat .reveal { margin-top: 1em; padding-top: 1em; border-top: 1px solid var(--separator); }
 .beat .verdict-ok { color: var(--ok); font-weight: 600; }
 .beat .verdict-bad { color: var(--bad); font-weight: 600; }
 .beat.done { opacity: 0.92; }

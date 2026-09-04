@@ -97,7 +97,7 @@ struct GateBar: View {
         VStack(alignment: .leading, spacing: 6) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.18))
+                    RoundedRectangle(cornerRadius: 4).fill(.fill.tertiary)
                     RoundedRectangle(cornerRadius: 4)
                         .fill(passed ? Color.green.opacity(0.7) : Color.orange.opacity(0.8))
                         .frame(width: geo.size.width * CGFloat(min(max(score, 0), 1)))

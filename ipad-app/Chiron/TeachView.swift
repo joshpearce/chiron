@@ -238,8 +238,8 @@ struct TeachView: View {
             if m.role == "learner" { Spacer(minLength: 60) }
             Text(m.text)
                 .padding(12)
-                .background(m.role == "learner" ? Color.accentColor.opacity(0.16) : Color.gray.opacity(0.14),
-                            in: RoundedRectangle(cornerRadius: 12))
+                .background(m.role == "learner" ? AnyShapeStyle(Color.accentColor.opacity(0.15)) : AnyShapeStyle(.fill.tertiary),
+                            in: .rect(cornerRadius: 16))
                 .frame(maxWidth: .infinity, alignment: m.role == "learner" ? .trailing : .leading)
             if m.role != "learner" { Spacer(minLength: 60) }
         }

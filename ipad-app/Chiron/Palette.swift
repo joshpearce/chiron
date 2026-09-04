@@ -25,26 +25,29 @@ struct Palette: View {
         // One glass control per tool, sharing a container so the colours
         // grow out of the pen rather than appearing beside it.
         GlassEffectContainer(spacing: 8) {
-            VStack(spacing: 8) {
+            VStack(alignment: .trailing, spacing: 8) {
                 ForEach(tools, id: \.0) { tool, symbol, label in
-                    toolButton(tool, symbol, label)
-                    // The pen's colours, right under the pen while it is up.
-                    if tool == .pen && session.tool == .pen {
-                        ForEach(BookSession.PenColor.allCases, id: \.self) { c in
-                            Button {
-                                session.penColor = c
-                            } label: {
-                                Circle()
-                                    .fill(Color(c.uiColor))
-                                    .frame(width: 16, height: 16)
-                                    .overlay(Circle().stroke(Color.primary.opacity(session.penColor == c ? 0.9 : 0), lineWidth: 2))
-                                    .frame(width: 22, height: 22)
+                    HStack(spacing: 8) {
+                        // The pen's colours beside the pen while it is up,
+                        // so the tools below keep their places.
+                        if tool == .pen && session.tool == .pen {
+                            ForEach(BookSession.PenColor.allCases, id: \.self) { c in
+                                Button {
+                                    session.penColor = c
+                                } label: {
+                                    Circle()
+                                        .fill(Color(c.uiColor))
+                                        .frame(width: 16, height: 16)
+                                        .overlay(Circle().stroke(Color.primary.opacity(session.penColor == c ? 0.9 : 0), lineWidth: 2))
+                                        .frame(width: 22, height: 22)
+                                }
+                                .buttonStyle(.glass)
+                                .glassEffectID("colour-\(c.rawValue)", in: palette)
+                                .accessibilityLabel("\(c.rawValue) pen")
+                                .accessibilityAddTraits(session.penColor == c ? .isSelected : [])
                             }
-                            .buttonStyle(.glass)
-                            .glassEffectID("colour-\(c.rawValue)", in: palette)
-                            .accessibilityLabel("\(c.rawValue) pen")
-                            .accessibilityAddTraits(session.penColor == c ? .isSelected : [])
                         }
+                        toolButton(tool, symbol, label)
                     }
                 }
             }

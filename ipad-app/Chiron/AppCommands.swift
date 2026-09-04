@@ -218,6 +218,7 @@ enum AppCommands {
             #if DEBUG
             out["canvas_pen"] = ReaderView.Coordinator.probe?.canvasPen ?? ""
             out["canvas_touches"] = ReaderView.Coordinator.probe?.canvasTouches ?? -1
+            out["pencil"] = s.lastPencil
             out["canvas_frame"] = ReaderView.Coordinator.probe?.canvasFrame ?? ""
             #endif
             out["marks"] = s.marks.map { ["id": $0.id, "kind": $0.kind.rawValue, "text": $0.text, "answered": $0.answer != nil, "turns": $0.history.count] }
