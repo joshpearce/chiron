@@ -17,7 +17,7 @@ struct CaptureCard: View {
     private var fromElsewhere: Bool { capture.sourceApp != nil || capture.sourceURL != nil || capture.imagePNG != nil }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section {
                     if let png = capture.imagePNG, let image = UIImage(data: png) {
@@ -53,10 +53,10 @@ struct CaptureCard: View {
             }
             .navigationTitle("New primer")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { library.pendingCapture = nil }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button {
                         submit()
                     } label: {
@@ -67,7 +67,6 @@ struct CaptureCard: View {
             }
             .onAppear { typing = true }
         }
-        .navigationViewStyle(.stack)
         .presentationSizing(.form)
     }
 

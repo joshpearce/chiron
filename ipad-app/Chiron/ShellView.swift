@@ -8,29 +8,23 @@ struct ShellView: View {
     @ObservedObject var shell: ShellSession
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Image(systemName: "terminal")
-                Text(status).font(Typography.sans(15))
-                    .foregroundStyle(statusColor)
-                    .lineLimit(2)
-                Spacer()
-                if case .closed = shell.phase {
-                    Button("Reconnect") { open() }
-                        .buttonStyle(.bordered)
-                }
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill").font(.title3).foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close the shell")
-            }
-            .padding(.horizontal, 14).padding(.vertical, 10)
-            .background(.bar)
+        NavigationStack {
             TerminalHost(shell: shell)
                 .ignoresSafeArea(.keyboard)
+                .navigationTitle("Shell")
+                .navigationSubtitle(status)
+                .toolbarTitleDisplayMode(.inline)
+                .toolbar {
+                    if case .closed = shell.phase {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button("Reconnect") { open() }
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                            .accessibilityLabel("Close the shell")
+                    }
+                }
         }
         .onAppear { open() }
         // The view's first measurement can land before the PTY exists; once
@@ -54,10 +48,6 @@ struct ShellView: View {
         }
     }
 
-    private var statusColor: SwiftUI.Color {
-        if case .closed(let err) = shell.phase, err != nil { return .red }
-        return .secondary
-    }
 }
 
 /// SwiftTerm's view, wired to the session: keys go out, bytes come in,

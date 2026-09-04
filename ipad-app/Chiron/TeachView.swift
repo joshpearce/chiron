@@ -187,25 +187,22 @@ struct TeachView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-            Divider()
             transcript
             Divider()
             footer
         }
         .frame(maxWidth: 760)
-        .task { await teach.adoptRunningJob() }
-    }
-
-    private var header: some View {
-        HStack {
-            Text("Teach me something else")
-                .font(.system(size: 24, weight: .semibold, design: .serif))
-            Spacer()
-            Button("Library") { library.teaching = false }
-                .buttonStyle(.plain).foregroundStyle(.secondary)
+        .navigationTitle("Teach me something else")
+        .toolbarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { library.teaching = false } label: {
+                    Label("Bookshelf", systemImage: "books.vertical")
+                }
+                .accessibilityLabel("Bookshelf")
+            }
         }
-        .padding()
+        .task { await teach.adoptRunningJob() }
     }
 
     private var transcript: some View {

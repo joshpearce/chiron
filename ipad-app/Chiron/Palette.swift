@@ -22,46 +22,55 @@ struct Palette: View {
     }
 
     var body: some View {
-        VStack(spacing: 6) {
-            ForEach(tools, id: \.0) { tool, symbol, label in
-                Button {
-                    session.tool = session.tool == tool ? .none : tool
-                } label: {
-                    Image(systemName: symbol)
-                        .font(.system(size: 18, weight: .medium))
-                        .frame(width: 40, height: 40)
-                        .foregroundStyle(session.tool == tool ? Color.white : Color.primary)
-                        .background(
-                            Circle().fill(session.tool == tool ? Color.accentColor : Color.clear))
-                }
-                .buttonStyle(.plain)
-                .hoverEffect()
-                .accessibilityLabel(label)
-                .accessibilityAddTraits(session.tool == tool ? .isSelected : [])
-                // The pen's colours, right under the pen while it is up.
-                if tool == .pen && session.tool == .pen {
-                    ForEach(BookSession.PenColor.allCases, id: \.self) { c in
-                        Button {
-                            session.penColor = c
-                        } label: {
-                            Circle()
-                                .fill(Color(c.uiColor))
-                                .frame(width: 18, height: 18)
-                                .overlay(Circle().stroke(Color.primary.opacity(session.penColor == c ? 0.9 : 0), lineWidth: 2))
-                                .frame(width: 40, height: 26)
+        // One glass control per tool, sharing a container so the colours
+        // grow out of the pen rather than appearing beside it.
+        GlassEffectContainer(spacing: 8) {
+            VStack(spacing: 8) {
+                ForEach(tools, id: \.0) { tool, symbol, label in
+                    toolButton(tool, symbol, label)
+                    // The pen's colours, right under the pen while it is up.
+                    if tool == .pen && session.tool == .pen {
+                        ForEach(BookSession.PenColor.allCases, id: \.self) { c in
+                            Button {
+                                session.penColor = c
+                            } label: {
+                                Circle()
+                                    .fill(Color(c.uiColor))
+                                    .frame(width: 16, height: 16)
+                                    .overlay(Circle().stroke(Color.primary.opacity(session.penColor == c ? 0.9 : 0), lineWidth: 2))
+                                    .frame(width: 22, height: 22)
+                            }
+                            .buttonStyle(.glass)
+                            .glassEffectID("colour-\(c.rawValue)", in: palette)
+                            .accessibilityLabel("\(c.rawValue) pen")
+                            .accessibilityAddTraits(session.penColor == c ? .isSelected : [])
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("\(c.rawValue) pen")
-                        .accessibilityAddTraits(session.penColor == c ? .isSelected : [])
                     }
                 }
             }
         }
-        .padding(6)
-        // Material, not glass: glassEffect, plain or interactive, swallowed
-        // every tap on the palette's buttons (the UI test proves it).
-        .background(.thinMaterial, in: Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Tools")
+    }
+
+    @Namespace private var palette
+
+    @ViewBuilder
+    private func toolButton(_ tool: BookSession.Tool, _ symbol: String, _ label: String) -> some View {
+        let button = Button {
+            session.tool = session.tool == tool ? .none : tool
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 18, weight: .medium))
+                .frame(width: 26, height: 26)
+        }
+        .glassEffectID(tool.rawValue, in: palette)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(session.tool == tool ? .isSelected : [])
+        if session.tool == tool {
+            button.buttonStyle(.glassProminent)
+        } else {
+            button.buttonStyle(.glass)
+        }
     }
 }

@@ -13,27 +13,22 @@ struct ReaderContainer: View {
     let chapter: ChapterPayload
 
     var body: some View {
-        VStack(spacing: 0) {
-            ReaderView(chapter: chapter)
-                .ignoresSafeArea(edges: .bottom)
-                .overlay(alignment: .trailing) {
-                    Palette()
-                        .padding(.trailing, 10)
-                }
-                .overlay(alignment: .bottomTrailing) {
-                    if session.asking != nil {
-                        AskCard()
-                            .padding(16)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
-                }
-            // A primer has no check: nothing to take, nothing to skip.
-            if !session.chromeHidden && !session.isPrimer {
-                Divider()
-                bottomBar
+        // The page runs under the bars, as the system's bars expect; the
+        // web view insets its content by what they cover. The palette and
+        // the card stay within the safe area.
+        ReaderView(chapter: chapter)
+            .ignoresSafeArea()
+            .overlay(alignment: .trailing) {
+                Palette()
+                    .padding(.trailing, 10)
             }
-        }
-        .animation(.easeInOut(duration: 0.2), value: session.chromeHidden)
+            .overlay(alignment: .bottomTrailing) {
+                if session.asking != nil {
+                    AskCard()
+                        .padding(16)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
         .animation(.easeInOut(duration: 0.2), value: session.asking != nil)
         // The Pencil Pro's gestures do what the reader chose for them in
         // Settings, as the Pencil settings promise; "show the palette" is
@@ -52,40 +47,6 @@ struct ReaderContainer: View {
         else { session.cycleTool() }
     }
 
-    private var bottomBar: some View {
-        Group {
-            HStack {
-                if let state = session.bookState, !state.debt.isEmpty {
-                    Button {
-                        Task { await session.catchMeUp() }
-                    } label: {
-                        Label("Catch me up", systemImage: "arrow.uturn.backward.circle")
-                    }
-                    .buttonStyle(.bordered)
-                }
-                Spacer()
-                Text("\(chapter.check.count) questions")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Button {
-                    session.beginCheck()
-                } label: {
-                    Label("Take the check", systemImage: "checkmark.seal")
-                        .padding(.horizontal, 8)
-                }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.return, modifiers: .command)
-                Button("Skip") {
-                    Task { await session.skipCheck() }
-                }
-                .buttonStyle(.bordered)
-                .tint(.orange)
-            }
-            .disabled(session.busy)
-            .padding(12)
-            .background(.bar)
-        }
-    }
 }
 
 /// The chapter page: a web view for the prose, the reader's ink as a
@@ -114,7 +75,9 @@ struct ReaderView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "bridge")
         let web = WKWebView(frame: .zero, configuration: config)
         web.isInspectable = true
-        web.scrollView.contentInsetAdjustmentBehavior = .never
+        // The bars over the page are the scroll view's safe area; the
+        // content starts below the top one and scrolls beneath both.
+        web.scrollView.contentInsetAdjustmentBehavior = .always
         context.coordinator.attach(to: web)
         load(into: web, context: context)
         return web
@@ -211,10 +174,15 @@ struct ReaderView: UIViewRepresentable {
                     guard let self else { return }
                     self.canvas.contentSize = CGSize(width: max(sv.contentSize.width, sv.bounds.width),
                                                      height: max(sv.contentSize.height, sv.bounds.height))
+                    self.canvas.contentInset = sv.adjustedContentInset
                     self.canvas.contentOffset = sv.contentOffset
                 },
                 web.scrollView.observe(\.contentOffset, options: [.initial, .new]) { [weak self] sv, _ in
-                    self?.canvas.contentOffset = sv.contentOffset
+                    guard let self else { return }
+                    // The inset follows the bars, which come and go with a
+                    // tap; the offset is measured from the same origin.
+                    self.canvas.contentInset = sv.adjustedContentInset
+                    self.canvas.contentOffset = sv.contentOffset
                 },
             ]
 
@@ -302,9 +270,18 @@ struct ReaderView: UIViewRepresentable {
             }
         }
 
+        /// The page measures from the top of its content, which sits below
+        /// the bar; the view measures from its own top. Both ways.
+        private var pageOrigin: CGPoint {
+            guard let web else { return .zero }
+            let inset = web.scrollView.adjustedContentInset
+            return CGPoint(x: inset.left, y: inset.top)
+        }
+
         @objc private func selectPan(_ g: UIPanGestureRecognizer) {
             guard let web else { return }
-            let p = g.location(in: web)
+            let o = pageOrigin
+            let p = CGPoint(x: g.location(in: web).x - o.x, y: g.location(in: web).y - o.y)
             switch g.state {
             case .began: selectionStart = p
             case .changed: preview(from: selectionStart, to: p)
@@ -340,7 +317,8 @@ struct ReaderView: UIViewRepresentable {
             guard let r = try? await web.evaluateJavaScript("markRect('\(escaped)')") as? [String: Any],
                   let x = r["x"] as? Double, let y = r["y"] as? Double,
                   let w = r["width"] as? Double, let h = r["height"] as? Double else { return nil }
-            return CGRect(x: x, y: y, width: w, height: h)
+            let o = pageOrigin
+            return CGRect(x: x + o.x, y: y + o.y, width: w, height: h)
         }
 
         func find(_ text: String) async -> (start: Int, end: Int, text: String)? {

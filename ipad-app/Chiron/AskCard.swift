@@ -34,7 +34,7 @@ struct AskCard: View {
                             .font(.body)
                             .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.borderless)
                     .accessibilityLabel("Delete")
                     .accessibilityHint(isNote ? "Removes the note; the section it added stays" : "Removes the question and its highlight")
                     .confirmationDialog(isNote ? "Delete this note?" : "Delete this question?",
@@ -54,7 +54,7 @@ struct AskCard: View {
                         .font(.title3)
                         .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
                 .accessibilityLabel("Close")
                 .keyboardShortcut(.cancelAction)
             }
@@ -93,10 +93,13 @@ struct AskCard: View {
                          label: isNote ? "Add to the primer" : "Ask")
             }
         }
-        .padding(16)
+        .padding(18)
         .frame(width: 400)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
-        .shadow(color: .black.opacity(0.12), radius: 14, y: 4)
+        // Material, not glass: a glass surface takes the taps meant for the
+        // buttons on it (the UI test proves it), and the card carries text
+        // to read, which the guidance keeps off glass anyway.
+        .background(.regularMaterial, in: .rect(cornerRadius: 26))
+        .shadow(color: .black.opacity(0.1), radius: 16, y: 4)
         .onAppear { typing = asking?.mark.question == nil }
         .onChange(of: asking?.mark.id) { _, _ in
             question = ""

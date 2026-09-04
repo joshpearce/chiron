@@ -53,6 +53,6 @@ struct ChironShortcuts: AppShortcutsProvider {
             intent: CapturePrimerIntent(),
             phrases: ["Make a \(.applicationName) primer", "Ask \(.applicationName) about this"],
             shortTitle: "Make a primer",
-            systemImageName: "doc.text.badge.plus")
+            systemImageName: "text.badge.plus")
     }
 }

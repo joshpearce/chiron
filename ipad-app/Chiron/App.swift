@@ -48,7 +48,9 @@ struct ContentView: View {
     var body: some View {
         Group {
             if library.teaching {
-                TeachView(sync: library.sync, demo: SelfTest.teachDemo)
+                NavigationStack {
+                    TeachView(sync: library.sync, demo: SelfTest.teachDemo)
+                }
             } else if let session = library.session {
                 BookView()
                     .environmentObject(session)
@@ -107,105 +109,125 @@ struct BookView: View {
         }
     }
 
+    /// The page's chrome is the navigation bar and, while reading a book,
+    /// a bottom bar: system bars, so they take the system's glass and the
+    /// page scrolls beneath them. A tap on the page hides both.
     private var page: some View {
-        ZStack {
-            switch session.screen {
-            case .empty:
-                Color.clear
-            case .placement:
-                if let screener = session.chapter?.screener {
-                    PlacementView(screener: screener)
-                }
-            case .series:
-                if let ch = session.chapter {
-                    ItemFlowView(
-                        title: ch.title,
-                        subtitle: "A measurement, not a test. Answer what you can; \"I don't know\" is an answer.",
-                        items: ch.check,
-                        reveal: false,
-                        submitLabel: "Finish"
-                    ) { responses in
-                        await session.submitCheck(responses)
+        NavigationStack {
+            ZStack {
+                switch session.screen {
+                case .empty:
+                    Color.clear
+                case .placement:
+                    if let screener = session.chapter?.screener {
+                        PlacementView(screener: screener)
                     }
-                }
-            case .reading:
-                if let chapter = session.chapter {
-                    ReaderContainer(chapter: chapter)
-                }
-            case .pretest:
-                if let ch = session.chapter {
-                    ItemFlowView(
-                        title: "Before you read",
-                        subtitle: "You are not supposed to know these yet - answering wrong here is part of how the chapter calibrates.",
-                        items: ch.pretest,
-                        reveal: true,
-                        submitLabel: "Start the chapter"
-                    ) { responses in
-                        await session.submitPretest(responses)
+                case .series:
+                    if let ch = session.chapter {
+                        ItemFlowView(
+                            title: ch.title,
+                            subtitle: "A measurement, not a test. Answer what you can; \"I don't know\" is an answer.",
+                            items: ch.check,
+                            reveal: false,
+                            submitLabel: "Finish"
+                        ) { responses in
+                            await session.submitCheck(responses)
+                        }
                     }
-                }
-            case .check:
-                if let ch = session.chapter {
-                    ItemFlowView(
-                        title: "Comprehension check - \(ch.title)",
-                        subtitle: "Closed book. Rate your confidence before each reveal.",
-                        items: ch.check,
-                        reveal: true,
-                        submitLabel: "Submit check",
-                        onExit: { session.leaveCheck() }
-                    ) { responses in
-                        await session.submitCheck(responses)
+                case .reading:
+                    if let chapter = session.chapter {
+                        ReaderContainer(chapter: chapter)
                     }
+                case .pretest:
+                    if let ch = session.chapter {
+                        ItemFlowView(
+                            title: "Before you read",
+                            subtitle: "You are not supposed to know these yet - answering wrong here is part of how the chapter calibrates.",
+                            items: ch.pretest,
+                            reveal: true,
+                            submitLabel: "Start the chapter"
+                        ) { responses in
+                            await session.submitPretest(responses)
+                        }
+                    }
+                case .check:
+                    if let ch = session.chapter {
+                        ItemFlowView(
+                            title: "Comprehension check - \(ch.title)",
+                            subtitle: "Closed book. Rate your confidence before each reveal.",
+                            items: ch.check,
+                            reveal: true,
+                            submitLabel: "Submit check",
+                            onExit: { session.leaveCheck() }
+                        ) { responses in
+                            await session.submitCheck(responses)
+                        }
+                    }
+                case .results(let doc, let gate):
+                    ResultsView(doc: doc, gate: gate)
+                case .authoring:
+                    AuthoringView()
+                case .takingBreak(let suggestion):
+                    BreakView(suggestion: suggestion)
+                case .error(let message):
+                    ErrorView(message: message)
                 }
-            case .results(let doc, let gate):
-                ResultsView(doc: doc, gate: gate)
-            case .authoring:
-                AuthoringView()
-            case .takingBreak(let suggestion):
-                BreakView(suggestion: suggestion)
-            case .error(let message):
-                ErrorView(message: message)
-            }
 
-            if let wait = session.wait {
-                WaitOverlay(text: wait.rawValue)
+                if let wait = session.wait {
+                    WaitOverlay(text: wait.rawValue)
+                }
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // The chrome takes its own strip at the top rather than floating
-        // over the page: at large text sizes a floating strip sat on the
-        // headline. A tap on the page hides it while reading. Labelled, not
-        // bare glyphs: on the mini these were two small icons in the corner
-        // with nothing to say what they did, and the way back out of a
-        // chapter should not be a guess.
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if !chromeHidden {
-                HStack(spacing: 10) {
-                    Spacer()
-                    ConnectionBadge()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationTitle(session.title)
+            .toolbarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { library.closeBook() } label: {
+                        Label("Bookshelf", systemImage: "books.vertical")
+                    }
+                    .accessibilityLabel("Bookshelf")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    ConnectionBadge(compact: true)
+                }
+                ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                ToolbarItemGroup(placement: .topBarTrailing) {
                     Button { session.contentsShown.toggle() } label: {
                         Label("Contents", systemImage: "list.bullet.rectangle")
-                            .font(.footnote)
-                            .padding(.horizontal, 10).padding(.vertical, 6)
                     }
-                    .background(.thinMaterial, in: Capsule())
-                    .hoverEffect()
                     .keyboardShortcut("c", modifiers: [.command, .shift])
                     .accessibilityLabel("Contents")
                     ShellButton()
-                    Button { library.closeBook() } label: {
-                        Label("Bookshelf", systemImage: "books.vertical")
-                            .font(.footnote)
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                    }
-                    .background(.thinMaterial, in: Capsule())
-                    .hoverEffect()
-                    .accessibilityLabel("Bookshelf")
                 }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                if case .reading = session.screen, !session.isPrimer, let chapter = session.chapter {
+                    ToolbarItemGroup(placement: .bottomBar) {
+                        if let state = session.bookState, !state.debt.isEmpty {
+                            Button {
+                                Task { await session.catchMeUp() }
+                            } label: {
+                                Label("Catch me up", systemImage: "arrow.uturn.backward.circle")
+                            }
+                            .disabled(session.busy)
+                        }
+                        Spacer()
+                        Button {
+                            session.beginCheck()
+                        } label: {
+                            Text("Take the check")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.return, modifiers: .command)
+                        .disabled(session.busy)
+                        .accessibilityHint("\(chapter.check.count) questions, closed book")
+                        Button("Skip") {
+                            Task { await session.skipCheck() }
+                        }
+                        .tint(.orange)
+                        .disabled(session.busy)
+                    }
+                }
             }
+            .toolbar(chromeHidden ? .hidden : .visible, for: .navigationBar, .bottomBar)
         }
         .animation(.easeInOut(duration: 0.2), value: chromeHidden)
     }
@@ -217,6 +239,45 @@ struct BookshelfView: View {
     @State private var showSettings = false
 
     var body: some View {
+        NavigationStack {
+            shelf
+                .toolbarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        ConnectionBadge(compact: true)
+                    }
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        Button {
+                            library.pendingCapture = Capture()
+                        } label: {
+                            Label("Capture", systemImage: "text.badge.plus")
+                        }
+                        .disabled(!library.sync.connected)
+                        .accessibilityHint("Paste something and ask about it; a primer appears on the shelf")
+                        Button {
+                            library.teaching = true
+                        } label: {
+                            Label("Teach me something else", systemImage: "sparkles")
+                        }
+                        .disabled(!library.sync.connected)
+                    }
+                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        Button {
+                            Task { await library.refresh() }
+                        } label: { Label("Refresh the shelf", systemImage: "arrow.clockwise") }
+                        Button {
+                            showSettings = true
+                        } label: { Label("Server", systemImage: "gearshape") }
+                        ShellButton()
+                    }
+                }
+        }
+        .task { await library.refresh() }
+        .sheet(isPresented: $showSettings) { ConnectionSettings(store: library.sync.servers) }
+    }
+
+    private var shelf: some View {
         VStack(spacing: 28) {
             VStack(spacing: 10) {
                 Image("Logo")
@@ -238,55 +299,18 @@ struct BookshelfView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            HStack(spacing: 12) {
-                Button {
-                    library.teaching = true
-                } label: {
-                    Label("Teach me something else", systemImage: "sparkles")
-                        .font(.callout)
-                }
-                .buttonStyle(.bordered)
-                .disabled(!library.sync.connected)
-                Button {
-                    library.pendingCapture = Capture()
-                } label: {
-                    Label("Capture", systemImage: "doc.text.badge.plus")
-                        .font(.callout)
-                }
-                .buttonStyle(.bordered)
-                .disabled(!library.sync.connected)
-                .accessibilityHint("Paste something and ask about it; a primer appears on the shelf")
-            }
-            HStack(spacing: 14) {
-                ConnectionBadge()
-                Button {
-                    Task { await library.refresh() }
-                } label: { Image(systemName: "arrow.clockwise") }
-                    .accessibilityLabel("Refresh the shelf")
-                Button {
-                    showSettings = true
-                } label: { Label("Server", systemImage: "gearshape") }
-                    .font(.callout)
-                Button {
-                    library.shellShown = true
-                } label: { Label("Shell", systemImage: "terminal") }
-                    .font(.callout)
-                    .keyboardShortcut("`", modifiers: [.command])
-                    .accessibilityLabel("Shell")
-            }
             if let err = library.shelfError, !library.subjects.isEmpty {
                 Text(err).foregroundStyle(.red).font(.callout)
             }
         }
-        .task { await library.refresh() }
-        .sheet(isPresented: $showSettings) { ConnectionSettings(store: library.sync.servers) }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
 /// Saved servers: pick one, add, edit, delete.
 struct ConnectionSettings: View {
     @EnvironmentObject var library: Library
-    @Environment(\.presentationMode) private var presentation
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject private var store: ServerStore
     @State private var editing: SavedServer?
     @State private var addingNew = false
@@ -294,7 +318,7 @@ struct ConnectionSettings: View {
     init(store: ServerStore) { self.store = store }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Section {
                     if store.servers.isEmpty {
@@ -353,12 +377,11 @@ struct ConnectionSettings: View {
             }
             .navigationTitle("Connection")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { presentation.wrappedValue.dismiss() }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
                 }
             }
         }
-        .navigationViewStyle(.stack)
         .sheet(isPresented: $addingNew) {
             ServerEditor(store: store, server: nil) { Task { await refresh() } }
         }
@@ -494,11 +517,7 @@ struct ShellButton: View {
     var body: some View {
         Button { library.shellShown = true } label: {
             Label("Shell", systemImage: "terminal")
-                .font(.footnote)
-                .padding(.horizontal, 10).padding(.vertical, 6)
         }
-        .background(.thinMaterial, in: Capsule())
-        .hoverEffect()
         .keyboardShortcut("`", modifiers: [.command])
         .accessibilityLabel("Shell")
     }
@@ -506,7 +525,7 @@ struct ShellButton: View {
 
 /// Add or edit one server.
 struct ServerEditor: View {
-    @Environment(\.presentationMode) private var presentation
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var store: ServerStore
     let server: SavedServer?
     let onSave: () -> Void
@@ -519,16 +538,16 @@ struct ServerEditor: View {
     @State private var revealKey = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section("Name") {
                     TextField("Mac, sprite, ...", text: $name)
-                        .disableAutocorrection(true)
+                        .autocorrectionDisabled()
                 }
                 Section("Address") {
                     TextField("http://192.168.2.1:8080", text: $url)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                         .keyboardType(.URL)
                 }
                 Section {
@@ -540,8 +559,8 @@ struct ServerEditor: View {
                                 SecureField("blank on the local network", text: $key)
                             }
                         }
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                         Button {
                             revealKey.toggle()
                         } label: {
@@ -558,10 +577,10 @@ struct ServerEditor: View {
             }
             .navigationTitle(server == nil ? "Add a server" : "Edit server")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { presentation.wrappedValue.dismiss() }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         if let existing = server {
                             store.update(existing, name: name, url: url, key: key)
@@ -569,7 +588,7 @@ struct ServerEditor: View {
                             store.add(name: name, url: url, key: key)
                         }
                         onSave()
-                        presentation.wrappedValue.dismiss()
+                        dismiss()
                     }
                     .disabled(url.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
@@ -582,36 +601,44 @@ struct ServerEditor: View {
                 }
             }
         }
-        .navigationViewStyle(.stack)
     }
 }
 
+/// Whether the server is reachable, and whether the sprite's agent has the
+/// app. In a toolbar it is the symbols alone; on a page, the words too.
 struct ConnectionBadge: View {
     @EnvironmentObject var library: Library
     @ObservedObject private var agentState = AgentBadgeState.shared
+    var compact = false
 
     var body: some View {
         let connected = library.sync.connected
-        if agentState.driven {
-            Label("driven by the agent", systemImage: "hand.point.up.left.fill")
-                .font(.caption)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(.thinMaterial, in: Capsule())
-                .foregroundStyle(.purple)
-                .accessibilityLabel("The sprite's agent is driving this app")
-        }
-        Label(connected ? "connected" : "offline", systemImage: connected ? "wifi" : "wifi.slash")
-            .font(.caption)
-            .padding(.horizontal, 8).padding(.vertical, 4)
-            .background(.thinMaterial, in: Capsule())
-            .foregroundStyle(connected ? .green : .orange)
-            .accessibilityLabel(connected ? "Server connected" : "Server offline")
-            .task {
-                while !Task.isCancelled {
-                    await library.sync.probe()
-                    try? await Task.sleep(nanoseconds: 15_000_000_000)
-                }
+        Group {
+            if compact {
+                labels(connected).labelStyle(.iconOnly).font(.body)
+            } else {
+                labels(connected).labelStyle(.titleAndIcon).font(.caption)
             }
+        }
+        .task {
+            while !Task.isCancelled {
+                await library.sync.probe()
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
+            }
+        }
+    }
+
+    private func labels(_ connected: Bool) -> some View {
+        HStack(spacing: 10) {
+            if agentState.driven {
+                Label("driven by the agent", systemImage: "hand.point.up.left.fill")
+                    .foregroundStyle(.purple)
+                    .accessibilityLabel("The sprite's agent is driving this app")
+            }
+            Label(connected ? "connected" : "offline", systemImage: connected ? "wifi" : "wifi.slash")
+                .foregroundStyle(connected ? .green : .orange)
+                .accessibilityLabel(connected ? "Server connected" : "Server offline")
+        }
     }
 }
 
@@ -659,10 +686,10 @@ struct ShelfCard: View {
                 Spacer()
                 Image(systemName: "chevron.right").foregroundStyle(.secondary)
             }
-            .padding(16)
+            .padding(18)
             .padding(.bottom, 10)
             .frame(maxWidth: 480)
-            .background(Color.gray.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
+            .background(.fill.tertiary, in: .rect(cornerRadius: 22))
             .overlay(alignment: .bottomTrailing) {
                 Image(systemName: subject.isPrimer ? "doc.text" : "brain")
                     .font(.footnote)

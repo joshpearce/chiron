@@ -326,16 +326,15 @@ struct ContentsView: View {
     @EnvironmentObject var session: BookSession
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ContentsList()
                 .navigationTitle("Contents")
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .confirmationAction) {
                         Button("Done") { session.contentsShown = false }
                     }
                 }
         }
-        .navigationViewStyle(.stack)
     }
 }
 
