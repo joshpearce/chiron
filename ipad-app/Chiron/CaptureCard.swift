@@ -2,14 +2,16 @@ import SwiftUI
 import Combine
 
 /// "What do you want to know about this?" A capture arrives with its text
-/// or image; the reader adds the question and the primer starts on the
-/// shelf. From the shelf's Capture button the text is the reader's to
-/// paste.
+/// or image; the reader adds the question and says how much they want
+/// back. A summary or a description is answered here in the card; a
+/// primer or a smart book goes on to its planning conversation. From the
+/// shelf's Capture button the text is the reader's to paste.
 struct CaptureCard: View {
     @EnvironmentObject var library: Library
     @Environment(\.dismiss) private var dismiss
     @State var capture: Capture
     @State private var prompt = ""
+    @State private var scale: CaptureScale = .primer
     @State private var sending = false
     @State private var error: String?
     @FocusState private var typing: Bool
@@ -19,6 +21,21 @@ struct CaptureCard: View {
     var body: some View {
         NavigationStack {
             Form {
+                // The answer, when there is one, above everything else.
+                if let answer = library.captureAnswer {
+                    Section {
+                        MathText(text: answer, size: 16, rich: true)
+                        Button {
+                            scale = .primer
+                            submit()
+                        } label: {
+                            Label("Go on: make it a primer", systemImage: "doc.text")
+                        }
+                        .disabled(sending)
+                    } header: {
+                        Text("The answer")
+                    }
+                }
                 Section {
                     if let png = capture.imagePNG, let image = UIImage(data: png) {
                         Image(uiImage: image)
@@ -47,31 +64,55 @@ struct CaptureCard: View {
                     }
                 } header: {
                     Text("Your question")
+                }
+                Section {
+                    Picker("How much", selection: $scale) {
+                        ForEach(CaptureScale.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityLabel("How much you want back")
+                } header: {
+                    Text("How much")
                 } footer: {
-                    Text("The server writes a short primer that answers it from what you captured. It takes about a minute and opens by itself; margin notes extend it later.")
+                    Text(scale.footer)
                 }
             }
-            .navigationTitle("New primer")
+            .navigationTitle(library.captureAnswer == nil ? "Capture" : "Answered")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { library.pendingCapture = nil }
+                    Button(library.captureAnswer == nil ? "Cancel" : "Done") {
+                        library.pendingCapture = nil
+                        library.captureAnswer = nil
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
                         submit()
                     } label: {
-                        if sending { ProgressView() } else { Text("Make a primer") }
+                        if sending { ProgressView() } else { Text(submitLabel) }
                     }
                     .disabled(!canSubmit)
                 }
             }
             .onAppear { typing = true }
+            .onChange(of: library.captureAnswer) { _, answer in
+                if answer != nil { typing = false }
+            }
         }
         .presentationSizing(.form)
     }
 
     private var canSubmit: Bool {
         !sending && !capture.isEmpty && !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var submitLabel: String {
+        switch scale {
+        case .summary: return "Summarise"
+        case .description: return "Describe"
+        case .primer: return "Plan a primer"
+        case .book: return "Plan a book"
+        }
     }
 
     private var sourceLine: String? {
@@ -87,11 +128,11 @@ struct CaptureCard: View {
         error = nil
         Task {
             do {
-                _ = try await library.submitCapture(capture, prompt: prompt)
+                try await library.submitCapture(capture, prompt: prompt, scale: scale)
             } catch {
                 self.error = "The server did not take the capture. Try again."
-                sending = false
             }
+            sending = false
         }
     }
 }

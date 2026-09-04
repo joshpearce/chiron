@@ -12,8 +12,14 @@ final class FakeService: ChironService {
     var onInk: (String, InkSubmission) throws -> ExchangeResponse = { _, _ in throw URLError(.cannotConnectToHost) }
     var onAsk: (String, String, String) throws -> AskResponse = { _, _, _ in throw URLError(.cannotConnectToHost) }
     var onCapture: (CaptureRequest) throws -> CaptureResponse = { _ in throw URLError(.cannotConnectToHost) }
+    var onPlan: (String) throws -> PlanState = { _ in throw URLError(.cannotConnectToHost) }
+    var onPlanTurn: (String, String) throws -> CaptureResponse = { _, _ in throw URLError(.cannotConnectToHost) }
+    var onBuild: (String) throws -> BuildResponse = { _ in throw URLError(.cannotConnectToHost) }
     var onExtend: (String, String, String) throws -> ExtendResponse = { _, _, _ in throw URLError(.cannotConnectToHost) }
     var captures: [CaptureRequest] = []
+    var planTurns: [(subject: String, text: String)] = []
+    var builds: [String] = []
+    var discards: [String] = []
     var extends: [(subject: String, quote: String, note: String)] = []
     var exchanges: [ExchangeRequest] = []
     var inks: [InkSubmission] = []
@@ -45,6 +51,16 @@ final class FakeService: ChironService {
         captures.append(request)
         return try onCapture(request)
     }
+    func plan(subject: String) async throws -> PlanState { try onPlan(subject) }
+    func planTurn(subject: String, text: String) async throws -> CaptureResponse {
+        planTurns.append((subject, text))
+        return try onPlanTurn(subject, text)
+    }
+    func build(subject: String) async throws -> BuildResponse {
+        builds.append(subject)
+        return try onBuild(subject)
+    }
+    func discard(subject: String) async throws { discards.append(subject) }
     func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse {
         extends.append((subject, quote, note))
         return try onExtend(subject, quote, note)

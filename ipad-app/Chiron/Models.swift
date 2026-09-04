@@ -178,26 +178,40 @@ struct SubjectInfo: Codable, Identifiable {
     let debt: Int?
     /// "book" or "primer"; a server before primers sends nothing.
     let kind: String?
-    /// Primers only: authoring | ready | failed, why it failed, and where
-    /// the capture came from.
+    /// Primers only: planning | building | authoring | ready | failed, why
+    /// it failed, and where the capture came from.
     let status: String?
     let error: String?
     let source: PrimerSource?
     let capturedAt: String?
+    /// Drafts only: what the capture is to become ("primer" or "book"),
+    /// the book it is becoming, and how far that is.
+    let scale: String?
+    let book: String?
+    let progress: String?
 
     init(id: String, title: String, unitsTotal: Int? = nil, unitsCleared: Int? = nil, currentUnit: String? = nil,
          debt: Int? = nil, kind: String? = nil, status: String? = nil, error: String? = nil,
-         source: PrimerSource? = nil, capturedAt: String? = nil) {
+         source: PrimerSource? = nil, capturedAt: String? = nil, scale: String? = nil, book: String? = nil,
+         progress: String? = nil) {
         self.id = id; self.title = title; self.unitsTotal = unitsTotal; self.unitsCleared = unitsCleared
         self.currentUnit = currentUnit; self.debt = debt; self.kind = kind; self.status = status
         self.error = error; self.source = source; self.capturedAt = capturedAt
+        self.scale = scale; self.book = book; self.progress = progress
     }
 
     var isPrimer: Bool { kind == "primer" }
-    var authoring: Bool { isPrimer && status == "authoring" }
+    /// The server is writing it: a primer being authored, a book being built.
+    var authoring: Bool { isPrimer && (status == "authoring" || status == "building") }
     var failed: Bool { isPrimer && status == "failed" }
+    /// A capture still being planned, or a draft that failed and can be
+    /// planned again: opens the planning card, not a book.
+    var drafting: Bool { isPrimer && scale != nil && (status == "planning" || status == "failed") }
+    var building: Bool { isPrimer && status == "building" }
 
     var progressLine: String {
+        if drafting { return "Planning the \(scale == "book" ? "book" : "primer") · \(sourceLine)" }
+        if building { return progress.map { "Building the book · \($0)" } ?? "Building the book" }
         if isPrimer { return sourceLine }
         var parts: [String] = []
         if let c = unitsCleared, let t = unitsTotal { parts.append("\(c)/\(t) units") }
@@ -223,7 +237,7 @@ struct SubjectInfo: Codable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, debt, kind, status, error, source
+        case id, title, debt, kind, status, error, source, scale, book, progress
         case unitsTotal = "units_total"
         case unitsCleared = "units_cleared"
         case currentUnit = "current_unit"
@@ -237,7 +251,34 @@ struct PrimerSource: Codable, Equatable {
     let app: String?
 }
 
-/// POST /primer/capture: what was captured and what the reader asks of it.
+/// How much a capture asks for.
+enum CaptureScale: String, CaseIterable, Codable {
+    case summary, description, primer, book
+
+    var label: String {
+        switch self {
+        case .summary: return "Summary"
+        case .description: return "Description"
+        case .primer: return "Primer"
+        case .book: return "Smart book"
+        }
+    }
+
+    /// Answered in the card, or planned and built.
+    var immediate: Bool { self == .summary || self == .description }
+
+    var footer: String {
+        switch self {
+        case .summary: return "A paragraph answering the question, here in the card."
+        case .description: return "A few paragraphs: the answer and what it rests on, here in the card."
+        case .primer: return "A short document on the shelf. The tutor asks a question or two first, so it is the primer you meant; margin notes extend it later."
+        case .book: return "A whole book with checks, as \"Teach me something else\" makes. The tutor asks what you want from it first; writing it takes a while."
+        }
+    }
+}
+
+/// POST /primer/capture: what was captured, what the reader asks of it,
+/// and how much they want back.
 struct CaptureRequest: Codable {
     var text: String?
     var imagePngB64: String?
@@ -245,19 +286,65 @@ struct CaptureRequest: Codable {
     var sourceApp: String?
     var prompt: String
     var title: String?
+    var scale: CaptureScale = .primer
 
     enum CodingKeys: String, CodingKey {
-        case text, prompt, title
+        case text, prompt, title, scale
         case imagePngB64 = "image_png_b64"
         case sourceUrl = "source_url"
         case sourceApp = "source_app"
     }
 }
 
+/// The capture's reply, and each planning turn's: an answer for a summary
+/// or a description; for a draft, the tutor's line, and the brief once
+/// the tutor has one.
 struct CaptureResponse: Codable {
+    var scale: String?
+    var answerMd: String?
+    var subject: String?
+    var status: String?
+    var title: String?
+    var replyMd: String?
+    var done: Bool?
+    var brief: String?
+
+    enum CodingKeys: String, CodingKey {
+        case scale, subject, status, title, done, brief
+        case answerMd = "answer_md"
+        case replyMd = "reply_md"
+    }
+}
+
+/// One line of a draft's planning conversation.
+struct PlanMessage: Codable, Equatable {
+    let role: String    // learner | tutor
+    let text: String
+}
+
+/// GET /primer/{id}/plan: a draft as the planning card shows it.
+struct PlanState: Codable, Identifiable {
+    let id: String
+    var title: String
+    let scale: String
+    var status: String
+    var error: String?
+    let prompt: String
+    let source: PrimerSource?
+    var brief: String?
+    var done: Bool
+    var plan: [PlanMessage]
+    var book: String?
+
+    var isBook: Bool { scale == "book" }
+}
+
+/// POST /primer/{id}/build: what the draft is becoming.
+struct BuildResponse: Codable {
     let subject: String
     let status: String
-    let title: String
+    let title: String?
+    let book: String?
 }
 
 /// POST /primer/{id}/extend: the document with its new section.

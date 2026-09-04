@@ -48,6 +48,7 @@ final class PrimerTests: XCTestCase {
         XCTAssertEqual(obj["source_app"] as? String, "Safari")
         XCTAssertEqual(obj["image_png_b64"] as? String, "AAAA")
         XCTAssertEqual(obj["prompt"] as? String, "why?")
+        XCTAssertEqual(obj["scale"] as? String, "primer", "a primer unless the reader picks otherwise")
     }
 
     func testCaptureInboxRoundTrip() throws {

@@ -14,6 +14,7 @@
 		2BE94F6FD00ED91819B86BFA /* AgentLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7A860ADDAE2193268BFB3D /* AgentLink.swift */; };
 		2D51AF2CD69C2BE7AD68D899 /* ChironShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 28F7F88426CD4C968CC09D9B /* ChironShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		32CA8ADA55C01966DD6D5E6A /* DeviceKeyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F506717299A374C8AA31320C /* DeviceKeyTests.swift */; };
+		3769CB216DED3B8C1AC9C861 /* PlanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CA421A578F067BB18B014B8 /* PlanCard.swift */; };
 		3F19963DB080F3508ECC7EBF /* fixtures in Resources */ = {isa = PBXBuildFile; fileRef = 2A02C9562B8ECB9AF3BB69E3 /* fixtures */; };
 		447F160110B9562D6CFC7164 /* DeviceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEE5BEC3075A333377FEE436 /* DeviceKey.swift */; };
 		4539CA3758EB6F2D6CB92C76 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC744D76E92336367D5C87CA /* ShareViewController.swift */; };
@@ -142,6 +143,7 @@
 		89B2BA152D8A07FC89372909 /* InkBox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkBox.swift; sourceTree = "<group>"; };
 		8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
 		8BD9678583BF94A4041315CC /* ChironUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ChironUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8CA421A578F067BB18B014B8 /* PlanCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCard.swift; sourceTree = "<group>"; };
 		AD7A860ADDAE2193268BFB3D /* AgentLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLink.swift; sourceTree = "<group>"; };
 		B2E5D9B01B743228E1E20CC2 /* TunnelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelTests.swift; sourceTree = "<group>"; };
 		C320D198DDCC096C88C8AE72 /* ToolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolTests.swift; sourceTree = "<group>"; };
@@ -205,6 +207,7 @@
 				6CE4AEBB512C66BBEEE9B508 /* Models.swift */,
 				09BB0CC993F9898C0640FD10 /* Palette.swift */,
 				34A9FA4F8B8DAA26FA36F1D4 /* PlacementView.swift */,
+				8CA421A578F067BB18B014B8 /* PlanCard.swift */,
 				8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */,
 				79FB25B2A0E99E8DF4A73477 /* ResultsView.swift */,
 				87AA842BA32080A6287EB9A6 /* SelfTest.swift */,
@@ -465,6 +468,7 @@
 				AF29D4E2D309DDDCBC3C20E1 /* Models.swift in Sources */,
 				B6C8F1C6D6698FD57D2187BC /* Palette.swift in Sources */,
 				EA6D6DFB6801ED51ECF51D49 /* PlacementView.swift in Sources */,
+				3769CB216DED3B8C1AC9C861 /* PlanCard.swift in Sources */,
 				B512708502B49BDBA48396AE /* ReaderView.swift in Sources */,
 				F05899EFFD330B9C8D2E40DE /* ResultsView.swift in Sources */,
 				5C223EEF7AE0AF48A9942AE5 /* SelfTest.swift in Sources */,

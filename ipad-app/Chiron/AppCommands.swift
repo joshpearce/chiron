@@ -49,11 +49,24 @@ enum AppCommands {
             try? await Task.sleep(nanoseconds: 500_000_000)
         case "capture":
             guard let prompt = args["prompt"] as? String else { throw Failure.badArguments("capture needs prompt") }
+            let scale = CaptureScale(rawValue: args["scale"] as? String ?? "primer")
+            guard let scale else { throw Failure.badArguments("scale must be summary, description, primer or book") }
             let c = Capture(text: args["text"] as? String ?? "", sourceURL: args["url"] as? String, sourceApp: args["app"] as? String)
-            let id = try await library.submitCapture(c, prompt: prompt)
+            let reply = try await library.submitCapture(c, prompt: prompt, scale: scale)
             var out = state(library)
-            out["subject"] = id
+            out["subject"] = reply.subject ?? ""
+            out["answer"] = reply.answerMd ?? ""
             return out
+        case "draft/open":
+            guard let id = args["id"] as? String else { throw Failure.badArguments("draft/open needs id") }
+            await library.openDraft(id)
+        case "plan":
+            guard let text = args["text"] as? String else { throw Failure.badArguments("plan needs text") }
+            await library.planReply(text)
+        case "build":
+            await library.buildDraft()
+        case "discard":
+            await library.discardDraft()
         case "capture/card":
             // The card as the share extension would open it.
             let c = Capture(text: args["text"] as? String ?? "", sourceURL: args["url"] as? String, sourceApp: args["app"] as? String)
@@ -61,6 +74,8 @@ enum AppCommands {
             library.receiveCapture(id: c.id)
         case "capture/close":
             library.pendingCapture = nil
+            library.captureAnswer = nil
+            library.planning = nil
         case "note":
             guard let s = library.session else { throw Failure.noBook }
             guard let text = args["text"] as? String, let note = args["note"] as? String else {
@@ -200,8 +215,13 @@ enum AppCommands {
             "connected": library.sync.connected,
             "agent": library.agent.connected,
             "capture_card": library.pendingCapture != nil,
-            "shelf_rows": library.subjects.map { ["id": $0.id, "kind": $0.kind ?? "book", "status": $0.status ?? ""] },
+            "capture_answer": library.captureAnswer ?? "",
+            "shelf_rows": library.subjects.map { ["id": $0.id, "kind": $0.kind ?? "book", "status": $0.status ?? "", "scale": $0.scale ?? "", "progress": $0.progress ?? ""] },
         ]
+        if let p = library.planning {
+            out["plan_card"] = ["id": p.id, "title": p.title, "scale": p.scale, "done": p.done, "turns": p.plan.count,
+                                "last": p.plan.last?.text ?? "", "busy": library.planBusy, "error": library.planError ?? ""]
+        }
         if let s = library.session {
             out["subject"] = s.subjectID
             out["kind"] = s.kind

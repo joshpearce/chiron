@@ -73,6 +73,10 @@ struct ContentView: View {
             CaptureCard(capture: capture)
                 .environmentObject(library)
         }
+        .sheet(item: $library.planning) { _ in
+            PlanCard()
+                .environmentObject(library)
+        }
     }
 }
 
@@ -660,11 +664,13 @@ struct ShelfCard: View {
     @EnvironmentObject var library: Library
     let subject: SubjectInfo
 
-    private var openable: Bool { !subject.authoring && !subject.failed }
+    private var openable: Bool { subject.drafting || (!subject.authoring && !subject.failed) }
 
     var body: some View {
         Button {
-            Task { await library.open(subject.id) }
+            Task {
+                if subject.drafting { await library.openDraft(subject.id) } else { await library.open(subject.id) }
+            }
         } label: {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -672,9 +678,12 @@ struct ShelfCard: View {
                     if subject.authoring {
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
-                            Text("Writing the primer · \(subject.sourceLine)")
+                            Text(subject.building ? subject.progressLine : "Writing the primer · \(subject.sourceLine)")
                         }
                         .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.secondary)
+                    } else if subject.drafting && !subject.failed {
+                        Text(subject.progressLine)
+                            .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.secondary)
                     } else if subject.failed {
                         Text(subject.error ?? "The primer could not be written.")
                             .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.red)
@@ -691,11 +700,16 @@ struct ShelfCard: View {
             .frame(maxWidth: 480)
             .background(.fill.tertiary, in: .rect(cornerRadius: 22))
             .overlay(alignment: .bottomTrailing) {
-                Image(systemName: subject.isPrimer ? "doc.text" : "brain")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(10)
-                    .accessibilityLabel(subject.isPrimer ? "Primer" : "Smart book")
+                // A draft wears a hammer beside what it will be: work in
+                // progress the reader can pick up again.
+                HStack(spacing: 4) {
+                    if subject.drafting || subject.building { Text("🔨").font(.footnote) }
+                    Image(systemName: subject.scale == "book" || !subject.isPrimer ? "brain" : "doc.text")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(10)
+                .accessibilityLabel(subject.drafting || subject.building ? "Draft" : (subject.isPrimer ? "Primer" : "Smart book"))
             }
             .opacity(openable ? 1 : 0.55)
         }

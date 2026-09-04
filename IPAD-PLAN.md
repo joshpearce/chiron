@@ -500,3 +500,22 @@ document reloading in place with the new section and the mark keeping its
 in Shortcuts and the Pencil squeeze menu, and App Group provisioning under
 automatic signing. Not built: promotion of a primer to a smart book (the
 open decision above).
+
+**Status (2026-09-04, scales and plan mode).** The capture card asks how
+much the reader wants back: summary, description, primer, smart book. A
+summary or a description is one model call answered in the card, with "Go
+on: make it a primer" under it. A primer or a book becomes a draft on the
+shelf, marked with a hammer, and opens a planning conversation
+(`PlanCard.swift`): two questions at most for a primer, the Teach-me
+elicitation seeded with the capture for a book. "Later" keeps the draft to
+come back to; "Write the primer" / "Build the book" is there from the first
+turn and prominent once the tutor has a brief; a bin discards. A build
+sends the reader to the shelf and the primer, or the book, opens when the
+server is done. Server: `scale` on `POST /primer/capture`,
+`GET|POST /primer/{id}/plan`, `POST /primer/{id}/build`,
+`POST /primer/{id}/discard`; drafts live in the primers directory with
+their transcript (`primer.Meta.Plan`); a book draft is a Teach-me job and
+leaves the shelf when its book registers. Harness verbs: `capture` takes
+`scale`; `draft/open`, `plan`, `build`, `discard`; state carries
+`capture_answer` and `plan_card`. The open decision above is settled by
+this: a primer is not promoted; the reader picks the scale at capture.

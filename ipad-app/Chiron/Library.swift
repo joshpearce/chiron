@@ -12,6 +12,12 @@ final class Library: ObservableObject {
     let agent = AgentLink()
     /// A capture waiting for its question; the capture card shows it.
     @Published var pendingCapture: Capture?
+    /// A summary or a description, answered in the capture card.
+    @Published var captureAnswer: String?
+    /// A draft being planned in conversation; the planning card shows it.
+    @Published var planning: PlanState?
+    @Published var planBusy = false
+    @Published var planError: String?
     private var shelfPoller: Task<Void, Never>?
     /// How often the shelf checks back while a primer is being written.
     var shelfPollInterval: TimeInterval = 4
@@ -79,23 +85,105 @@ final class Library: ObservableObject {
         }
     }
 
-    /// A capture with its question becomes a primer on the shelf.
-    func submitCapture(_ c: Capture, prompt: String) async throws -> String {
-        var req = CaptureRequest(prompt: prompt)
+    /// A capture with its question and its scale: a summary or a
+    /// description comes back into the card; a primer or a book opens its
+    /// planning conversation.
+    @discardableResult
+    func submitCapture(_ c: Capture, prompt: String, scale: CaptureScale = .primer) async throws -> CaptureResponse {
+        var req = CaptureRequest(prompt: prompt, scale: scale)
         let text = c.text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !text.isEmpty { req.text = text }
         if let png = c.imagePNG { req.imagePngB64 = png.base64EncodedString() }
         req.sourceUrl = c.sourceURL
         req.sourceApp = c.sourceApp
         let reply = try await service.capture(req)
+        if scale.immediate {
+            captureAnswer = reply.answerMd ?? ""
+            return reply
+        }
+        guard let id = reply.subject else { throw URLError(.badServerResponse) }
+        var plan: [PlanMessage] = []
+        if let line = reply.replyMd, !line.isEmpty { plan.append(PlanMessage(role: "tutor", text: line)) }
+        let state = PlanState(id: id, title: reply.title ?? prompt, scale: scale.rawValue, status: reply.status ?? "planning",
+                              error: nil, prompt: prompt,
+                              source: PrimerSource(text: text.isEmpty ? nil : text, url: c.sourceURL, app: c.sourceApp),
+                              brief: reply.brief, done: reply.done ?? false, plan: plan, book: nil)
         pendingCapture = nil
-        // The reader watches the card on the shelf; the primer opens from
-        // there when it is ready.
-        awaitedPrimer = reply.subject
-        session?.persist()
-        session = nil
+        captureAnswer = nil
         await refresh()
-        return reply.subject
+        // One sheet gives way to the next; presenting both in the same
+        // beat leaves the second unshown.
+        try? await Task.sleep(nanoseconds: 350_000_000)
+        planning = state
+        return reply
+    }
+
+    /// A draft on the shelf reopens its conversation.
+    func openDraft(_ id: String) async {
+        do {
+            planning = try await service.plan(subject: id)
+            planError = nil
+        } catch {
+            shelfError = BookSession.unreachable
+        }
+    }
+
+    /// The reader's next line to the tutor.
+    func planReply(_ text: String) async {
+        guard var state = planning else { return }
+        let line = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !line.isEmpty else { return }
+        state.plan.append(PlanMessage(role: "learner", text: line))
+        planning = state
+        planBusy = true
+        planError = nil
+        defer { planBusy = false }
+        do {
+            let turn = try await service.planTurn(subject: state.id, text: line)
+            guard var now = planning, now.id == state.id else { return }
+            if let reply = turn.replyMd { now.plan.append(PlanMessage(role: "tutor", text: reply)) }
+            if turn.done == true {
+                now.done = true
+                now.brief = turn.brief
+                if let t = turn.title, !t.isEmpty { now.title = t }
+            }
+            planning = now
+        } catch {
+            // The line stays in the transcript; the next send carries on.
+            planError = "The tutor could not be reached. Send again."
+        }
+    }
+
+    /// Build what the plan has: the reader lands on the shelf and the
+    /// primer, or the book, opens when it is done.
+    func buildDraft() async {
+        guard let state = planning else { return }
+        planBusy = true
+        defer { planBusy = false }
+        do {
+            let built = try await service.build(subject: state.id)
+            awaitedPrimer = built.book ?? built.subject
+            planning = nil
+            planError = nil
+            session?.persist()
+            session = nil
+            await refresh()
+        } catch {
+            planError = "The server could not start the build. Try again."
+        }
+    }
+
+    /// The draft is not wanted after all.
+    func discardDraft() async {
+        guard let state = planning else { return }
+        do {
+            try await service.discard(subject: state.id)
+            planning = nil
+            planError = nil
+            await refresh()
+        } catch {
+            planError = "The server could not discard it. Try again."
+        }
     }
 
     /// A chiron://capture/<id> URL, from the share extension or an intent.

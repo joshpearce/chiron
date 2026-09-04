@@ -10,6 +10,10 @@ protocol ChironService: AnyObject {
     func ink(subject: String, _ submission: InkSubmission) async throws -> ExchangeResponse
     func ask(subject: String, unit: String, quote: String, question: String, history: [QA]) async throws -> AskResponse
     func capture(_ request: CaptureRequest) async throws -> CaptureResponse
+    func plan(subject: String) async throws -> PlanState
+    func planTurn(subject: String, text: String) async throws -> CaptureResponse
+    func build(subject: String) async throws -> BuildResponse
+    func discard(subject: String) async throws
     func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse
     func reset(subject: String) async throws -> BookState
 }
@@ -123,8 +127,28 @@ final class Sync: ObservableObject, ChironService {
 
     /// A capture becomes a primer on the shelf; authoring runs on the
     /// server after this returns.
+    /// A summary or a description is a model call answered in the request;
+    /// a draft's opening question is one too.
     func capture(_ request: CaptureRequest) async throws -> CaptureResponse {
-        try await post("/primer/capture", body: try JSONEncoder().encode(request), timeout: 60)
+        try await post("/primer/capture", body: try JSONEncoder().encode(request), timeout: 180)
+    }
+
+    func plan(subject: String) async throws -> PlanState {
+        try await get("/primer/\(subject)/plan", timeout: 10)
+    }
+
+    func planTurn(subject: String, text: String) async throws -> CaptureResponse {
+        struct Body: Encodable { let text: String }
+        return try await post("/primer/\(subject)/plan", body: try JSONEncoder().encode(Body(text: text)), timeout: 180)
+    }
+
+    func build(subject: String) async throws -> BuildResponse {
+        try await post("/primer/\(subject)/build", body: Data("{}".utf8), timeout: 30)
+    }
+
+    func discard(subject: String) async throws {
+        struct Reply: Decodable { let discarded: Bool }
+        let _: Reply = try await post("/primer/\(subject)/discard", body: Data("{}".utf8), timeout: 30)
     }
 
     /// A margin note extends the primer; the whole document comes back.
