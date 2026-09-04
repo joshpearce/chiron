@@ -80,7 +80,13 @@ struct ReaderView: UIViewRepresentable {
     @EnvironmentObject var session: BookSession
     @Environment(\.sizeCategory) private var sizeCategory
 
-    func makeCoordinator() -> Coordinator { Coordinator(session: session) }
+    func makeCoordinator() -> Coordinator {
+        let c = Coordinator(session: session)
+        #if DEBUG
+        Coordinator.probe = c
+        #endif
+        return c
+    }
 
     /// The system's body text scale, handed to the stylesheet so the page
     /// reflows with Dynamic Type rather than zooming.
@@ -188,6 +194,18 @@ struct ReaderView: UIViewRepresentable {
         // MARK: tools
 
         private var appliedColor: UIColor?
+
+        #if DEBUG
+        /// The harness reads what the canvas actually holds, not what the
+        /// session thinks it asked for.
+        static weak var probe: Coordinator?
+        var canvasPen: String {
+            guard let ink = canvas.tool as? PKInkingTool else { return String(describing: type(of: canvas.tool)) }
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            ink.color.getRed(&r, green: &g, blue: &b, alpha: &a)
+            return String(format: "pen rgb(%.0f,%.0f,%.0f) w%.1f", r * 255, g * 255, b * 255, ink.width)
+        }
+        #endif
 
         func apply(tool: BookSession.Tool, color: UIColor) {
             guard tool != appliedTool || (tool == .pen && color != appliedColor) else { return }

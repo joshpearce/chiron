@@ -33,6 +33,7 @@
 		8ED6D42621BE0FB6FC4AF42C /* CaptureInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB9D6BA4C97360F27B08C71 /* CaptureInbox.swift */; };
 		92A27FDF307807755C3BF474 /* InkBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B2BA152D8A07FC89372909 /* InkBox.swift */; };
 		9A12A71D111DEE5FB1A1265C /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A19EB4693171E14B4F6BAD /* App.swift */; };
+		9C1950B7926C42C901494D19 /* PaletteUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8E1C5648D62DB91C6D0526E /* PaletteUITests.swift */; };
 		A0641BBC47F65EC186C3AA87 /* Sync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDBD0C79377E20146856D09 /* Sync.swift */; };
 		A67BB45B6191D6A590258527 /* CheckViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E21F930C36788EA6466D67F /* CheckViews.swift */; };
 		AE21F9C86BD4FCE4E1716EA4 /* ShellSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2439EC313A18D920AF6BD7D7 /* ShellSession.swift */; };
@@ -64,6 +65,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = DB5A1C674DC8A751C31B913E;
 			remoteInfo = ChironShare;
+		};
+		8EC40D9A6E0CE8F6AC9B7AD8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 88AF112FA0F27BB17F7933AB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D2AE88B4FBD262E09816A6CA;
+			remoteInfo = Chiron;
 		};
 		9EE958C4777E89E339F23EFB /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -129,8 +137,10 @@
 		88A8C3D184F56D0B771B098F /* BookSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookSession.swift; sourceTree = "<group>"; };
 		89B2BA152D8A07FC89372909 /* InkBox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InkBox.swift; sourceTree = "<group>"; };
 		8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
+		8BD9678583BF94A4041315CC /* ChironUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ChironUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AD7A860ADDAE2193268BFB3D /* AgentLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLink.swift; sourceTree = "<group>"; };
 		B2E5D9B01B743228E1E20CC2 /* TunnelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelTests.swift; sourceTree = "<group>"; };
+		C8E1C5648D62DB91C6D0526E /* PaletteUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaletteUITests.swift; sourceTree = "<group>"; };
 		DEE5BEC3075A333377FEE436 /* DeviceKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceKey.swift; sourceTree = "<group>"; };
 		DF7A7AA69D4E3E6C07183050 /* MathText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathText.swift; sourceTree = "<group>"; };
 		EC744D76E92336367D5C87CA /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
@@ -215,8 +225,17 @@
 				239752A9BB87BA2A94EADF28 /* Chiron */,
 				CD42F8DDD56D58AF332BFDAC /* ChironShare */,
 				9DFC80362E7EF6702AF2C424 /* ChironTests */,
+				8FBF47C7A0AB2931F2BDAB21 /* ChironUITests */,
 				927FE4EDAA74BD3F9BCB9D38 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		8FBF47C7A0AB2931F2BDAB21 /* ChironUITests */ = {
+			isa = PBXGroup;
+			children = (
+				C8E1C5648D62DB91C6D0526E /* PaletteUITests.swift */,
+			);
+			path = ChironUITests;
 			sourceTree = "<group>";
 		};
 		927FE4EDAA74BD3F9BCB9D38 /* Products */ = {
@@ -225,6 +244,7 @@
 				2D6F3642FDD052AC3AE16540 /* Chiron.app */,
 				28F7F88426CD4C968CC09D9B /* ChironShare.appex */,
 				7B0F074E09B2872B0CA5A339 /* ChironTests.xctest */,
+				8BD9678583BF94A4041315CC /* ChironUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -322,6 +342,24 @@
 			productReference = 28F7F88426CD4C968CC09D9B /* ChironShare.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		F7086826F08D55654E4D1EF4 /* ChironUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0930265D7D89627B6BA3D240 /* Build configuration list for PBXNativeTarget "ChironUITests" */;
+			buildPhases = (
+				7D1669A85394AEA6DB79BC1C /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				68334B7AF37C4F0EFBB489DE /* PBXTargetDependency */,
+			);
+			name = ChironUITests;
+			packageProductDependencies = (
+			);
+			productName = ChironUITests;
+			productReference = 8BD9678583BF94A4041315CC /* ChironUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -338,6 +376,9 @@
 					DB5A1C674DC8A751C31B913E = {
 						DevelopmentTeam = ${CHIRON_TEAM_ID};
 						ProvisioningStyle = Automatic;
+					};
+					F7086826F08D55654E4D1EF4 = {
+						TestTargetID = D2AE88B4FBD262E09816A6CA;
 					};
 				};
 			};
@@ -361,6 +402,7 @@
 			targets = (
 				D2AE88B4FBD262E09816A6CA /* Chiron */,
 				DB5A1C674DC8A751C31B913E /* ChironShare */,
+				F7086826F08D55654E4D1EF4 /* ChironUITests */,
 				A4F43552C3F139E136515CC3 /* ChironTests */,
 			);
 		};
@@ -441,6 +483,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7D1669A85394AEA6DB79BC1C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9C1950B7926C42C901494D19 /* PaletteUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BE9B56A8C6F886DD8019C6FE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -453,6 +503,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		68334B7AF37C4F0EFBB489DE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D2AE88B4FBD262E09816A6CA /* Chiron */;
+			targetProxy = 8EC40D9A6E0CE8F6AC9B7AD8 /* PBXContainerItemProxy */;
+		};
 		A2E4C155BE77AC9B9ACF08A7 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = D2AE88B4FBD262E09816A6CA /* Chiron */;
@@ -651,6 +706,23 @@
 			};
 			name = Debug;
 		};
+		AE09B735968908C5EC5EE561 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mjbraun.ChironUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Chiron;
+			};
+			name = Debug;
+		};
 		BB7891831DBE7291C5C71359 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -690,6 +762,23 @@
 			};
 			name = Debug;
 		};
+		EB67968C5DB2C37D55AAE38A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mjbraun.ChironUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Chiron;
+			};
+			name = Release;
+		};
 		FDD2C5FC2E28D39333140114 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -710,6 +799,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		0930265D7D89627B6BA3D240 /* Build configuration list for PBXNativeTarget "ChironUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AE09B735968908C5EC5EE561 /* Debug */,
+				EB67968C5DB2C37D55AAE38A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		4AA5A0B242E723BACDD1A52C /* Build configuration list for PBXNativeTarget "ChironShare" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

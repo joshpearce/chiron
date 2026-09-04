@@ -109,6 +109,11 @@ enum AppCommands {
                 throw Failure.badArguments("tool must be none | pen | highlighter | ask | eraser")
             }
             session.tool = t
+        case "pen":
+            guard let name = args["color"] as? String, let c = BookSession.PenColor(rawValue: name) else {
+                throw Failure.badArguments("pen color must be red | blue | green | black")
+            }
+            session.penColor = c
         case "mark":
             guard let text = args["text"] as? String else { throw Failure.badArguments("mark needs text") }
             let kind: Mark.Kind = (args["kind"] as? String) == "question" ? .question : .highlight
@@ -197,6 +202,10 @@ enum AppCommands {
             out["contents"] = s.contentsShown
             out["chrome_hidden"] = s.chromeHidden
             out["tool"] = s.tool.rawValue
+            out["pen_color"] = s.penColor.rawValue
+            #if DEBUG
+            out["canvas_pen"] = ReaderView.Coordinator.probe?.canvasPen ?? ""
+            #endif
             out["marks"] = s.marks.map { ["kind": $0.kind.rawValue, "text": $0.text, "answered": $0.answer != nil] }
             if let a = s.asking {
                 out["asking"] = ["question": a.mark.question ?? "", "busy": a.busy, "answered": a.mark.answer != nil, "error": a.error ?? ""]

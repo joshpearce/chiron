@@ -118,6 +118,18 @@ targets:
       properties:
         com.apple.security.application-groups:
           - group.dev.mjbraun.chiron
+  # Tap-level checks against the running app, read back through the harness.
+  ChironUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: ChironUITests
+    dependencies:
+      - target: Chiron
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Chiron
   ChironTests:
     type: bundle.unit-test
     platform: iOS
@@ -132,3 +144,13 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Chiron:
+    build:
+      targets:
+        Chiron: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: [ChironTests, ChironUITests]

@@ -58,7 +58,9 @@ struct Palette: View {
             }
         }
         .padding(6)
-        .glassEffect(.regular, in: Capsule())
+        // Material, not glass: glassEffect, plain or interactive, swallowed
+        // every tap on the palette's buttons (the UI test proves it).
+        .background(.thinMaterial, in: Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Tools")
     }

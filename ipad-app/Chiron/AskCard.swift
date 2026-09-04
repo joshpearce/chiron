@@ -78,7 +78,7 @@ struct AskCard: View {
         }
         .padding(16)
         .frame(width: 400)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
         .shadow(color: .black.opacity(0.12), radius: 14, y: 4)
         .onAppear { typing = asking?.mark.question == nil }
         .onChange(of: asking?.mark.id) { _, _ in
