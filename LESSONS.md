@@ -95,6 +95,17 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
 - **A test that gates every model call deadlocks a new call in front of
   it (2026-09-04).** `gatedChain` now gates the author only.
 
+- **The CLI model writes about 33 tokens a second, and a depth variant
+  of a long chapter is a 10k-token reply (2026-09-05).** Three units of
+  the first sourced book timed out at fifteen minutes on deeper-math.md,
+  three runs in a row; the author's limit is now thirty. And only the
+  canon call needs the source material: the later five files are written
+  from canon.md, and carrying 30k tokens of sources into them made every
+  call slower for nothing.
+- **A failed `go test` hidden behind a pipe (2026-09-05).** `go test ./x |
+  tail -1 && git push ...` pushed a failing test because the pipe's status
+  is tail's; the sprite's `make deploy` then refused, and a book resumed
+  on the old binary. Gate on `go test` itself, never on a pipe.
 - **The served corpus on the sprite is a copy, not the checkout
   (2026-09-05).** `/home/sprite/chiron/corpus` was copied once in August;
   `make deploy` swapped only the binary, so the new source index was not
