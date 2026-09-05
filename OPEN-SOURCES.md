@@ -36,7 +36,7 @@ Barto, Jurafsky and Martin, Boyd, MML, Murphy, OSTEP, Feynman) are free to read
 but not adaptable; they are quotation-and-citation sources only. For question banks, MIT OCW problem sets with solutions, OpenStax
 CNXML exercises with inline solutions, QuantEcon's exercise-and-solution
 directives, Hefferon's full answer book and Downey's solution notebooks are
-the sources worth building a parser for (section 3.5). The honest
+the sources worth building a parser for (section 2d). The honest
 catalogue picture: Open Textbook Library has the only clean, keyless JSON
 API; OER Commons needs a token by email; MERLOT needs a licence key; Pressbooks
 Directory has no documented API but every Pressbooks network exposes a REST
@@ -239,6 +239,97 @@ Grouped by subject. "Source format" is what a pipeline actually gets.
 |---|---|---|---|---|---|---|
 | arXiv | STEM research papers, many tutorial-style surveys and lecture notes | **Per paper.** Options are CC BY 4.0, CC BY-SA 4.0, CC BY-NC-SA 4.0, CC BY-NC-ND 4.0, CC0, and the default arXiv perpetual non-exclusive licence which grants no adaptation right (https://info.arxiv.org/help/license/index.html). Most papers use the default, so most are **Q**; filter on licence. | arXiv API (`export.arxiv.org/api/query`), OAI-PMH metadata includes the licence URL; LaTeX source via `arxiv.org/e-print/<id>`; HTML via `arxiv.org/html/<id>` for recent papers. | Lecture notes and tutorials on arXiv (e.g. "Lectures on ...") are often the best deep treatment of a topic; the voice is academic. | `arxiv.org/e-print/<id>` tarball, main `.tex`. | Lecture-note style papers sometimes carry exercises, rarely solutions. |
 
+### 2d. The best question-set sources
+
+Ranked by how much of a Chiron check bank can be lifted mechanically:
+prompt plus answer in a parseable form, under the same licence as the prose.
+Chiron's `questions.yaml` wants constructed items with answers and rubrics
+first, and MCQs whose distractors map to misconceptions second.
+
+1. **MIT OCW problem sets, exams and solutions** (CC BY-NC-SA 4.0, same as
+   the notes). Every quantitative course has them; 18.05 alone has problem
+   sets, in-class problems and exams, all with solutions (verified in its
+   `data.json`: `Problem Sets`, `Problem Set Solutions`, `Exams`, `Exam
+   Solutions`, `Activity Assignments with Examples`). Form: paired PDFs.
+   Fetch: `GET https://ocw.mit.edu/courses/<slug>/data.json`, then the
+   course zip at `https://ocw.mit.edu/courses/<slug>/download/`, pair
+   `*ps<N>*.pdf` with `*ps<N>*sol*.pdf` by filename, extract text, split
+   into items with an LLM pass. Constructed responses with worked solutions.
+2. **OpenStax CNXML exercises** (CC BY-NC-SA 4.0, same as the prose).
+   `<exercise><problem>...</problem><solution>...</solution></exercise>`
+   inside the section module, so prompt, answer and section come from one
+   XML parse (verified: module m54038 of Introductory Business Statistics 2e
+   has 17 exercises and 16 solutions). The built book prints odd-numbered
+   answers only; the CNXML holds every solution OpenStax wrote. Fetch:
+   `raw.githubusercontent.com/openstax/osbooks-<book>/main/modules/<mid>/index.cnxml`,
+   module ids from `collections/<book>.collection.xml`. Instructor solution
+   manuals and test banks are behind login and not under the licence.
+3. **QuantEcon** (CC BY-SA 4.0). `exercise-start` and `solution-start`
+   MyST directives in the lecture markdown with full solutions and code
+   (verified in `lectures/prob_dist.md`). Fetch:
+   `raw.githubusercontent.com/QuantEcon/lecture-python-intro/main/lectures/<slug>.md`
+   and split on the directives. Economics and computational math only.
+4. **Hefferon's Linear Algebra** (GFDL or CC BY-SA 3.0 US). Every exercise
+   answered in a separate book, `https://jheffero.w3.uvm.edu/linearalgebra/jhanswer.pdf`
+   (verified link), keyed by section and exercise number. Fetch the text
+   PDF and the answer PDF, align by number.
+5. **Downey's Think Bayes 2e and Think Python 3e** (CC BY-NC-SA). Exercises
+   and solutions in the same notebook (verified: `notebooks/chap02.ipynb`
+   has 4 exercises and 5 solution cells) or a `ThinkPythonSolutions`
+   directory (verified listing). Fetch:
+   `raw.githubusercontent.com/AllenDowney/ThinkBayes2/master/notebooks/chap<NN>.ipynb`,
+   take cells whose source starts with `**Exercise` and the following
+   `# Solution` cells.
+6. **OpenIntro IMS and OpenIntro Statistics** (CC BY-SA 3.0). End-of-chapter
+   exercises with an Appendix A of solutions (verified at
+   https://openintro-ims.netlify.app/exercise-solutions; odd-only coverage
+   unverified). Fetch the Quarto source from the GitHub repo linked on the
+   IMS site, chapter `.qmd` plus the appendix, align by number.
+7. **Stanford SEE problem sets with solutions** (CC BY-NC-SA 3.0). Same shape
+   as OCW, ten courses; CS229 and EE364A are the useful ones. Fetch:
+   `https://see.stanford.edu/materials/aimlcs229/problemset<N>.pdf` and
+   `.../ps<N>_solution.pdf` (verified links).
+8. **LibreTexts exercise pages** (per-page licence, mostly CC BY and
+   CC BY-NC-SA). Each chapter's `N.E: <title> (Exercises)` page with inline
+   `Answer` reveals for about half the items (verified: 35 exercises, 17
+   answers on Introductory Statistics 1e chapter 1). Fetch the page HTML with
+   a browser User-Agent and parse `section.mt-content-container`.
+9. **Bayes Rules!** (CC BY-NC-SA 4.0). Quiz-yourself items with answers at
+   chapter end and numbered conceptual and applied exercises without
+   solutions (verified: 8 exercises in chapter 1). Fetch:
+   `https://www.bayesrulesbook.com/chapter-<N>`.
+10. **Google Machine Learning Crash Course** (CC BY 4.0) and **Microsoft
+    ML-For-Beginners quizzes** (MIT). Ready-made MCQs: Google's "Test your
+    knowledge" items carry explanations (verified module listing), Microsoft's
+    52 lessons of pre- and post-quizzes sit in one JSON with `questionText`,
+    `answerOptions[]` and `isCorrect` (verified), no explanations. Fetch:
+    `raw.githubusercontent.com/microsoft/ML-For-Beginners/main/quiz-app/src/assets/translations/en.json`.
+    Shallow, but the only open MCQ banks with machine-readable structure.
+
+Rich prompts with no answers, still worth lifting as `constructed` items the
+author LLM must solve and write a rubric for: Erickson's Algorithms
+("Please do not ask me for solutions to the exercises", verified), d2l.ai
+(`## Exercises` per section, verified), Software Foundations ("Please do
+not post solutions", verified), Lebl's Basic Analysis ("There is no
+solutions manual", verified), Nielsen, SICP, PLFA, Open Logic. The spec's
+`check: llm` with a rubric makes these usable at the cost of model time per
+item and a verification pass.
+
+Sources whose exercise licence differs from the text:
+
+- **Saylor** excludes course final exams from its CC BY 3.0 grant (verified
+  footer); unit review quizzes are covered, finals are not.
+- **Erickson** licenses the book CC BY 4.0 but the homework and exam archive
+  CC BY-NC-SA 4.0 (verified statement on the book page).
+- **OpenStax** instructor solution manuals and test banks are behind an
+  instructor login with no open licence; only the CNXML is licensed.
+- **NOBA**'s instructor test bank and **OLI**'s formative items sit behind
+  accounts with unstated licences.
+- **Rust book (Brown edition) quizzes** and **Missing Semester solutions**
+  have unverified licences.
+- **forall x: Calgary** solutions exist only in the PDF, not the HTML
+  (verified), same CC BY 4.0.
+
 ## 3. Discovery: finding the two or three best open texts for a brief
 
 Nothing offers full-text search across OER. The practical design is a
@@ -384,73 +475,6 @@ wants above the fold.
 - DOAB `dc.subject.classification`: Thema codes ("P Mathematics and Science").
 - Gutenberg: Library of Congress classification in `LoCC` plus free-text `Bookshelves`.
 
-### 3.5 The best question-set sources, ranked
-
-Ranked by how much of a Chiron check bank can be lifted mechanically:
-prompt plus answer in a parseable form, under the same licence as the prose.
-
-1. **MIT OCW problem sets, exams and solutions** (CC BY-NC-SA 4.0). Every
-   quantitative course has them; 18.05 alone has problem sets, in-class
-   problems, exams, all with solutions. Form: paired PDFs (`ps1.pdf`,
-   `ps1_sol.pdf`) listed under `Problem Sets` and `Problem Set Solutions`
-   in the course's `learning_resource_types`. Needs PDF text extraction and
-   pairing by filename, then an LLM pass to split into items. Constructed
-   responses with worked solutions, exactly the `kind: constructed` items the
-   spec wants most.
-2. **OpenStax CNXML exercises** (CC BY-NC-SA 4.0). `<exercise>` elements
-   with `<problem>` and `<solution>` children inside the section module, so
-   prompt, answer and concept location come from one XML parse with no LLM
-   in the loop. Odd-numbered answers only in the built book, but the CNXML
-   in the `osbooks-*` repos holds the solution element wherever OpenStax wrote
-   one. MCQ review questions exist in some titles (economics, biology) but
-   without distractor explanations.
-3. **QuantEcon** (CC BY-SA 4.0). `exercise-start` and `solution-start`
-   directives in the lecture markdown: prompt and full solution, mechanically
-   separable, code included. Economics and computational math only.
-4. **Hefferon's Linear Algebra answer book** (GFDL or CC BY-SA 3.0 US).
-   Every exercise answered in `jhanswer.pdf`, keyed by section and number.
-   Two PDFs to align, then done.
-5. **Downey's Think Bayes 2e and Think Python 3e** (CC BY-NC-SA). Exercises
-   and solutions in the same notebook (Think Bayes) or a solutions notebook
-   set (Think Python). One notebook parse per chapter.
-6. **OpenIntro IMS and OpenIntro Statistics** (CC BY-SA 3.0). End-of-chapter
-   exercises plus a solutions appendix in the Quarto/LaTeX source. Needs
-   alignment by exercise number.
-7. **Stanford SEE problem sets with solutions** (CC BY-NC-SA 3.0). Same shape
-   as OCW, ten courses only, CS229 and EE364A the useful ones.
-8. **LibreTexts exercise pages** (per-page licence). `N.E` pages with inline
-   `Answer` reveals for roughly half the items; HTML parse.
-9. **Bayes Rules! quizzes and exercises** (CC BY-NC-SA 4.0). Quiz-yourself
-   items with answers at chapter end; exercise sets without solutions.
-10. **Google Machine Learning Crash Course** (CC BY 4.0) and **Microsoft
-    ML-For-Beginners quizzes** (MIT). Ready-made MCQs; Google's carry
-    explanations, Microsoft's carry only `isCorrect`. Shallow, but they are
-    the only open MCQ banks with machine-readable structure, and MCQ
-    distractors are the hardest items to author well.
-
-Rich prompts with no answers, still worth lifting as `constructed` items
-the author LLM must solve and rubric itself: Erickson's Algorithms, d2l.ai,
-Software Foundations, Lebl's Basic Analysis, Nielsen, SICP, PLFA, Open Logic.
-The spec's `check: llm` with a rubric makes these usable, at the cost of
-model time per item and a verification pass.
-
-Licence differences to remember:
-
-- **Saylor** excludes course final exams from its CC BY 3.0 grant; unit
-  quizzes are fine, finals are not.
-- **Erickson** licenses the book CC BY 4.0 but the homework and exam
-  archive CC BY-NC-SA 4.0.
-- **Software Foundations** and **Erickson** both ask that solutions not be
-  published; a private Chiron bank does not publish, but the generated
-  answers are Chiron's own work, not lifted.
-- **OpenStax** instructor solution manuals and test banks sit behind an
-  instructor login and are not under the open licence; only what is in the
-  CNXML is.
-- **NOBA**'s instructor test bank and **OLI**'s formative items are behind
-  accounts with unstated licences.
-- **Rust book (Brown edition) quizzes** and **Missing Semester solutions**
-  have unverified licences; check before use.
-
 ## 4. Licence handling rules for the pipeline
 
 1. **Record provenance on every fetched chunk**: source name, URL, licence
@@ -501,7 +525,7 @@ Licence differences to remember:
    Smarthistory and Khan are behind Cloudflare and stay manual until they
    publish an API.
 10. **Question sets follow the same A/Q/R verdict as their book**, with the
-    exceptions listed in section 3.5. Lifted items keep their source id
+    exceptions listed in section 2d. Lifted items keep their source id
     (book, chapter, exercise number) in the `questions.yaml` item so a bad
     answer can be traced. Solutions the author LLM writes for prompt-only
     sources are marked as Chiron-authored, not attributed to the source.
@@ -550,7 +574,7 @@ fetcher and its parameters (`github-raw` with repo, ref and path pattern;
 with the site and page prefix; `ocw` with the course id; `gutenberg` with
 the ebook id; `pressbooks` with the network and book slug), plus a
 `contents` recipe for the table of contents and an `exercises` note from
-3.5. Hand-curated, about 130 entries; a lint checks every A entry has a
+2d. Hand-curated, about 130 entries; a lint checks every A entry has a
 fetch recipe and a licence URL.
 
 ### 6.2 Find
@@ -616,7 +640,7 @@ particular should prefer the source's own derivations.
 
 ### 6.6 Question banks from the sources' exercises
 
-For every A source in a unit, the exercises and their answers (the 3.5
+For every A source in a unit, the exercises and their answers (the 2d
 paths) go through `roles.ImportItems`: each exercise becomes an item in
 `questions.yaml`'s schema with `check` chosen from the answer's shape
 (numeric with a tolerance, exact, choice, or rubric when the answer is a
