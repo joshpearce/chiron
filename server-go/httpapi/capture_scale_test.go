@@ -182,6 +182,32 @@ func TestABuildBeforeThePlanIsDoneUsesWhatWasSaid(t *testing.T) {
 	}
 }
 
+// An agent, or a reader who knows what they want, hands the brief to the
+// build itself: no planning turns, and the brief is what the writer gets.
+func TestABuildCanBringItsOwnBrief(t *testing.T) {
+	s := newServer(t, "")
+	chain := &cannedChain{payload: map[string]any{"reply_md": "Which part?", "done": false, "brief": "", "title": "", "slug": ""}}
+	s.chain = chain
+	rep := captureScaled(t, s, `{"text":"the words","prompt":"why?","scale":"primer","title":"Hash tables"}`)
+	chain.payload = primerPayload()
+	if w := do(t, s, "POST", "/primer/"+rep.Subject+"/build", `{"brief":"Derive it from first principles; assume no background."}`, ""); w.Code != http.StatusOK {
+		t.Fatalf("build -> %d: %s", w.Code, w.Body.String())
+	}
+	s.renders.Wait()
+	if !strings.Contains(chain.user, "from first principles") {
+		t.Errorf("author prompt lacks the brief given at build:\n%s", chain.user)
+	}
+	s.primersMu.Lock()
+	m := s.primers[rep.Subject]
+	s.primersMu.Unlock()
+	if m.Brief != "Derive it from first principles; assume no background." || !m.Done {
+		t.Fatalf("meta = %+v", m)
+	}
+	if row := shelf(t, s)[rep.Subject]; row.Status != "ready" || row.Title != "Hash tables" {
+		t.Fatalf("the title given at capture should stay; row = %+v", row)
+	}
+}
+
 func TestABookCaptureBecomesAGenerationJob(t *testing.T) {
 	s := newServer(t, "")
 	chain := &cannedChain{payload: map[string]any{"reply_md": "That is enough to plan from.", "done": true,

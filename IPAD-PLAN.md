@@ -611,3 +611,15 @@ the phone; ink on the phone, see it on the iPad.
 Not planned: rendering PDFs through the book's web page, or turning a PDF
 into a smart book in one tap. The capture tool at the book scale already
 covers the second from any passage.
+
+### 13.6 An agent sends work to Chiron (done 2026-09-05)
+
+"Create a primer from first principles about FOO and send it to Chiron"
+is a shell away: `chiron` (`server-go/cmd/chiron`, the same config as
+`chiron-dev`) lists the shelf, captures at any scale, runs or skips the
+planning turns (`build -brief-file`, which the server now accepts), waits
+for the write, and prints the text. `skills/chiron/SKILL.md` is the
+skill: the agent writes the notes and the brief, captures, builds, waits,
+reads, and reports the title. A title given at capture now stays through
+the plan and the writing (`Meta.Named`). Deploy needed for the brief on
+build and the kept title; the rest works against the live server today.

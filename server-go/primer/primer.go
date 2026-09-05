@@ -69,6 +69,9 @@ type Meta struct {
 	Plan  []Turn `json:"plan,omitempty"`
 	Brief string `json:"brief,omitempty"`
 	Done  bool   `json:"done,omitempty"`
+	// Named: the title was given at capture, and stays through the plan
+	// and the writing; otherwise the writer titles it.
+	Named bool   `json:"named,omitempty"`
 	Book  string `json:"book,omitempty"`
 }
 

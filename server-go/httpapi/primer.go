@@ -159,6 +159,7 @@ func (s *Server) handlePrimerCapture(w http.ResponseWriter, r *http.Request) {
 		Scale:      req.Scale,
 		CapturedAt: time.Now().UTC(),
 	}
+	m.Named = m.Title != ""
 	if m.Title == "" {
 		m.Title = workingTitle(req.Prompt)
 	}
@@ -225,7 +226,7 @@ func (s *Server) planTurn(m *primer.Meta, learner string) (roles.Elicitation, er
 	m.Plan = append(m.Plan, primer.Turn{Role: "tutor", Text: turn.ReplyMD})
 	if turn.Done {
 		m.Done, m.Brief = true, strings.TrimSpace(turn.Brief)
-		if t := strings.TrimSpace(turn.Title); t != "" {
+		if t := strings.TrimSpace(turn.Title); t != "" && !m.Named {
 			m.Title = t
 		}
 	}
@@ -342,9 +343,23 @@ func (s *Server) handlePrimerBuild(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "%q is already being built", m.ID)
 		return
 	}
+	// A build may bring its brief, in place of the planning turns: the
+	// reader (or an agent acting for them) already knows what they want.
+	var req struct {
+		Brief string `json:"brief"`
+	}
+	if r.Body != nil && r.ContentLength != 0 {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "malformed request: %v", err)
+			return
+		}
+	}
 	primersMu.Lock()
 	defer primersMu.Unlock()
 	root := s.primersRoot()
+	if b := strings.TrimSpace(req.Brief); b != "" {
+		m.Brief, m.Done = b, true
+	}
 	brief := briefFor(m)
 	switch m.Scale {
 	case roles.ScaleBook:
@@ -550,7 +565,9 @@ func (s *Server) authorPrimer(m *primer.Meta, brief string) {
 		fail(err)
 		return
 	}
-	m.Title = title
+	if !m.Named {
+		m.Title = title
+	}
 	if err := primer.WriteDoc(root, m.ID, m.Title, doc); err != nil {
 		fail(err)
 		return

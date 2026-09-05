@@ -43,3 +43,7 @@ You are on the machine that serves the book. Facts that matter:
 - App tests and Simulator walks need the Mac: `scripts/sim-run.sh test`,
   `scripts/sim-verify.sh`.
 - Plans and status: `IPAD-PLAN.md`, `SPRITE-DEV-PLAN.md`.
+- `chiron` (`go install ./cmd/chiron` from `server-go`) drives the live
+  server from a shell: shelf, captures at every scale, plan, build, wait,
+  read. `skills/chiron/SKILL.md` is the agent skill that uses it; link it
+  with `ln -sfn $PWD/skills/chiron ~/.claude/skills/chiron`.

@@ -95,6 +95,14 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
 - **A test that gates every model call deadlocks a new call in front of
   it (2026-09-04).** `gatedChain` now gates the author only.
 
+- **A primer has no chapter until something opens it (2026-09-05).**
+  `GET /chapter/{id}` is nil for a ready primer nobody has read; the app
+  opens it with `POST /exchange {phase: start}`, which makes the first
+  unit current. `chiron read` does the same when it finds nothing.
+- **A dev server needs the corpus's `authoring-spec.md` to build a book
+  (2026-09-05).** A config with made-up corpus paths captures and writes
+  primers, and fails a book draft at planning with that file's name.
+
 ## Mac side
 
 - **ssh tries IdentityFiles in config order, `Host *` included
