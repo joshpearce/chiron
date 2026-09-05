@@ -109,6 +109,13 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
 
 ## Mac side
 
+- **xcodebuild will not register a new device (2026-09-05).** With a
+  phone plugged in for the first time it fails with "No Accounts: Add a
+  new account in Accounts settings" and "provisioning profile doesn't
+  include the currently selected device", even with both Apple IDs signed
+  into Xcode and outside the sandbox. Open the project in Xcode, pick the
+  device as the run destination, and Run once: that registers it and
+  refreshes the profiles; `xcodebuild` works from then on.
 - **ssh tries IdentityFiles in config order, `Host *` included
   (2026-09-04).** A catch-all with the YubiKey identities above the sprite
   stanza prompted for the YubiKey first. Put specific hosts above `Host *`.
