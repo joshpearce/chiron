@@ -563,6 +563,10 @@ from the sources' exercises. The brief can name the sources itself
 ("starting from Think Bayes and interleaving 18.05's readings"), and the
 finder only runs when it does not.
 
+Decisions (Matt, 2026-09-05): OpenStax prose is allowed as material, and
+the planner chooses whichever spine it judges best; the survey's voice
+notes inform that choice rather than rule it.
+
 ### 6.1 The source index
 
 Section 2 becomes `corpus/sources/index.yaml`, shipped with the server:
