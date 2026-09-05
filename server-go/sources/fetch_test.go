@@ -88,6 +88,9 @@ func TestGitHubReadsMarkdownAndNotebooks(t *testing.T) {
 	if len(secs) != 2 || secs[0].Locator != "chap01.ipynb" || secs[1].Locator != "chap02.ipynb" {
 		t.Fatalf("contents = %+v", secs)
 	}
+	if secs[1].Title != "Chapter 2" || secs[0].Title != "chap01" {
+		t.Fatalf("titles should come from the files' first headings where there is one: %+v", secs)
+	}
 	ch, err = c.Fetch(context.Background(), think, "chap02.ipynb")
 	if err != nil {
 		t.Fatal(err)

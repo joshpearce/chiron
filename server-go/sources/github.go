@@ -49,6 +49,18 @@ func (githubFetcher) contents(ctx context.Context, c *Client, s *Source) ([]Sect
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Locator < out[j].Locator })
+	// A filename is a poor title for a planner to choose by; the file's
+	// first heading is the real one. The fetches are cached, so the
+	// author's later reads cost nothing more.
+	for i := range out {
+		if i >= 80 {
+			break
+		}
+		got, err := (githubFetcher{}).fetch(ctx, c, s, out[i].Locator)
+		if err == nil && got.title != "" && firstHeading(got.markdown) != "" {
+			out[i].Title = got.title
+		}
+	}
 	return out, nil
 }
 

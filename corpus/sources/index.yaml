@@ -85,7 +85,47 @@ sources:
     repo: AllenDowney/ThinkBayes2
     ref: master
     path: notebooks/{locator}
-    dir: notebooks
+  contents:
+  - locator: chap01.ipynb
+    title: 'Chapter 1: Probability'
+  - locator: chap02.ipynb
+    title: 'Chapter 2: Bayes''s Theorem'
+  - locator: chap03.ipynb
+    title: 'Chapter 3: Distributions'
+  - locator: chap04.ipynb
+    title: 'Chapter 4: Estimating Proportions'
+  - locator: chap05.ipynb
+    title: 'Chapter 5: Estimating Counts'
+  - locator: chap06.ipynb
+    title: 'Chapter 6: Odds and Addends'
+  - locator: chap07.ipynb
+    title: 'Chapter 7: Minimum, Maximum, and Mixture'
+  - locator: chap08.ipynb
+    title: 'Chapter 8: Poisson Processes'
+  - locator: chap09.ipynb
+    title: 'Chapter 9: Decision Analysis'
+  - locator: chap10.ipynb
+    title: 'Chapter 10: Testing'
+  - locator: chap11.ipynb
+    title: 'Chapter 11: Comparison'
+  - locator: chap12.ipynb
+    title: 'Chapter 12: Classification'
+  - locator: chap13.ipynb
+    title: 'Chapter 13: Inference'
+  - locator: chap14.ipynb
+    title: 'Chapter 14: Survival Analysis'
+  - locator: chap15.ipynb
+    title: 'Chapter 15: Mark and Recapture'
+  - locator: chap16.ipynb
+    title: 'Chapter 16: Logistic Regression'
+  - locator: chap17.ipynb
+    title: 'Chapter 17: Regression'
+  - locator: chap18.ipynb
+    title: 'Chapter 18: Conjugate Priors'
+  - locator: chap19.ipynb
+    title: 'Chapter 19: MCMC'
+  - locator: chap20.ipynb
+    title: 'Chapter 20: Approximate Bayesian Computation'
 - id: quantecon-intro
   title: A First Course in Quantitative Economics with Python
   authors:
