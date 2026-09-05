@@ -138,6 +138,23 @@ final class LibraryTests: XCTestCase {
         XCTAssertNil(library.planning)
     }
 
+    /// The capture tool inside a book: the passage lands in the capture
+    /// card, credited to the book, and the tool goes down.
+    func testAPassageOfTheOpenBookBecomesACapture() async throws {
+        let fake = FakeService()
+        fake.onSubjects = { [unowned self] in self.subjects("ready") }
+        let library = library(fake)
+        await library.refresh()
+        await library.open("ai")
+        let s = try XCTUnwrap(library.session)
+        s.tool = .capture
+        s.capturePassage("a model trained to do nothing but predict the next token")
+        XCTAssertEqual(library.pendingCapture?.text, "a model trained to do nothing but predict the next token")
+        XCTAssertEqual(library.pendingCapture?.sourceApp, "How AI Works")
+        XCTAssertEqual(s.tool, .none, "the tool went down")
+        XCTAssertEqual(library.session?.subjectID, "ai", "the book stays open under the card")
+    }
+
     /// A primer that failed stays on the shelf with its error; nothing opens.
     func testAFailedPrimerStaysOnTheShelf() async throws {
         let fake = FakeService()

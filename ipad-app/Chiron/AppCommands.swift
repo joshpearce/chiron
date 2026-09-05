@@ -126,7 +126,7 @@ enum AppCommands {
             session.toggleChrome()
         case "tool":
             guard let name = args["tool"] as? String, let t = BookSession.Tool(rawValue: name) else {
-                throw Failure.badArguments("tool must be none | pen | highlighter | ask | eraser")
+                throw Failure.badArguments("tool must be none | pen | highlighter | ask | note | capture | eraser")
             }
             session.tool = t
         case "pen":
@@ -134,6 +134,10 @@ enum AppCommands {
                 throw Failure.badArguments("pen color must be red | blue | green | black")
             }
             session.penColor = c
+        case "passage":
+            // The capture tool's drag, without the drag.
+            guard let text = args["text"] as? String else { throw Failure.badArguments("passage needs text") }
+            session.capturePassage(text)
         case "mark":
             guard let text = args["text"] as? String else { throw Failure.badArguments("mark needs text") }
             let kind: Mark.Kind = (args["kind"] as? String) == "question" ? .question : .highlight

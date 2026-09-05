@@ -96,6 +96,19 @@ final class BookSession: ObservableObject {
         case none, pen, highlighter, ask, eraser
         /// Primers only: a margin note that extends the document.
         case note
+        /// A passage of this book into a capture: a summary, a primer or a
+        /// book of its own.
+        case capture
+    }
+
+    /// Where a captured passage goes: the shelf's capture card.
+    var onCapture: ((String) -> Void)?
+
+    /// The capture tool's drag ended on a passage; the tool goes down and
+    /// the card opens with the words.
+    func capturePassage(_ text: String) {
+        tool = .none
+        onCapture?(text)
     }
     @Published var tool: Tool = .none {
         didSet { if oldValue != tool && oldValue != .none { lastTool = oldValue } }
@@ -116,7 +129,7 @@ final class BookSession: ObservableObject {
     /// Squeeze on a Pencil: the next tool on the palette, round and round;
     /// with nothing up, the pen. Putting a tool down is a tap on it.
     func cycleTool() {
-        let order: [Tool] = isPrimer ? [.pen, .highlighter, .ask, .note, .eraser] : [.pen, .highlighter, .ask, .eraser]
+        let order: [Tool] = isPrimer ? [.pen, .highlighter, .ask, .note, .capture, .eraser] : [.pen, .highlighter, .ask, .capture, .eraser]
         guard let i = order.firstIndex(of: tool) else { tool = .pen; return }
         tool = order[(i + 1) % order.count]
     }

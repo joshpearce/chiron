@@ -207,6 +207,12 @@ final class Library: ObservableObject {
             title: info?.title ?? id,
             service: service, storage: storage)
         if let k = info?.kind { s.kind = k }
+        // A passage sent on from inside the book: the card opens over it,
+        // naming the book as where the words came from.
+        s.onCapture = { [weak self] text in
+            self?.captureAnswer = nil
+            self?.pendingCapture = Capture(text: text, sourceApp: s.title)
+        }
         sessions[id] = s
         session = s
         activeSubjectID = id

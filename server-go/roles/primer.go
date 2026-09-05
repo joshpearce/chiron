@@ -38,7 +38,7 @@ const primerSystem = `You write a primer: a short, self-contained document that 
 - Answer the reader's question first, then give what they need to understand the answer, then what is worth knowing next. Three to six sections headed with "## ". Between 400 and 1200 words.
 - Audience: expert software engineer, fast reader, allergic to filler. Direct tone, no exclamation marks. Hyphens only, no em dashes. Real numbers and real names where the captured material has them.
 - Prose must chain: each sentence opens on something the previous one put on the table and ends on the new thing. Never refer to a thing before the text has introduced it by that name.
-- Markdown only: paragraphs, "## " headings, lists where a list is the right shape, fenced code for code. No front matter, no title line: the title is a separate field.`
+- Markdown only: paragraphs, "## " headings, lists where a list is the right shape, fenced code for code. No front matter, no title line: the title is a separate field.` + acronymRule
 
 // AuthorPrimer writes the document for a capture.
 func AuthorPrimer(chain llm.Chain, cap Capture) (title, markdown string, err error) {
@@ -69,7 +69,7 @@ const extendSystem = `You extend an existing primer with one new section in resp
 
 - The section must stand on its own at the end of the document and answer the note directly, starting from the passage it was left on. Do not restate the rest of the primer.
 - 100 to 400 words. Same rules as the primer: expert reader, direct, chained prose, hyphens only, markdown only.
-- The heading names what the section adds, not the note.`
+- The heading names what the section adds, not the note.` + acronymRule
 
 // ExtendPrimer writes the section a margin note asks for.
 func ExtendPrimer(chain llm.Chain, doc, quote, note string) (heading, markdown string, err error) {

@@ -313,3 +313,15 @@ func TestAFollowUpCarriesTheThread(t *testing.T) {
 		}
 	}
 }
+
+// Every prompt that writes for the reader carries the acronym rule.
+func TestPromptsThatWriteForTheReaderExpandAcronyms(t *testing.T) {
+	for name, system := range map[string]string{
+		"author": authorSystem, "answer": answerSystem, "primer": primerSystem,
+		"extend": extendSystem, "capture": captureAnswerSystem,
+	} {
+		if !strings.Contains(system, "acronym") {
+			t.Errorf("%s prompt says nothing about acronyms", name)
+		}
+	}
+}

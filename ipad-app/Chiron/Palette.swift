@@ -17,6 +17,7 @@ struct Palette: View {
         if session.isPrimer {
             list.append((.note, "note.text.badge.plus", "Margin note: extend the primer"))
         }
+        list.append((.capture, "square.and.arrow.up", "Send to Chiron: a passage into a capture"))
         list.append((.eraser, "eraser", "Eraser"))
         return list
     }

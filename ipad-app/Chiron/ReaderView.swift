@@ -243,7 +243,7 @@ struct ReaderView: UIViewRepresentable {
                 canvas.isScrollEnabled = true
                 selector.isEnabled = false
                 web?.scrollView.isScrollEnabled = true
-            case .highlighter, .ask, .note:
+            case .highlighter, .ask, .note, .capture:
                 canvas.isUserInteractionEnabled = false
                 canvas.isScrollEnabled = false
                 selector.isEnabled = true
@@ -333,6 +333,9 @@ struct ReaderView: UIViewRepresentable {
                 Task { @MainActor in
                     let kind: Mark.Kind
                     switch self.session.tool {
+                    case .capture:
+                        self.session.capturePassage(text)
+                        return
                     case .ask: kind = .question
                     case .note: kind = .note
                     default: kind = .highlight

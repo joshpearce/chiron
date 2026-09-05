@@ -30,7 +30,7 @@ const captureAnswerSystem = `You answer one reader's question about material the
 - Start from what was captured; say plainly when you go beyond it.
 - Audience: expert software engineer, fast reader, allergic to filler. Direct tone, no exclamation marks. Hyphens only, no em dashes. Real numbers and real names where the captured material has them.
 - Markdown only, no headings, no title line.
-`
+` + acronymRule
 
 const summaryRule = "- Length: one paragraph, at most 120 words. The answer and nothing else.\n"
 const descriptionRule = "- Length: two or three paragraphs, 200 to 350 words: the answer, then what the reader needs to make sense of it.\n"

@@ -15,12 +15,13 @@ final class ToolTests: XCTestCase {
         s.cycleTool(); XCTAssertEqual(s.tool, .pen)
         s.cycleTool(); XCTAssertEqual(s.tool, .highlighter)
         s.cycleTool(); XCTAssertEqual(s.tool, .ask)
-        s.cycleTool(); XCTAssertEqual(s.tool, .eraser, "a book has no note tool")
+        s.cycleTool(); XCTAssertEqual(s.tool, .capture, "a book has no note tool")
+        s.cycleTool(); XCTAssertEqual(s.tool, .eraser)
         s.cycleTool(); XCTAssertEqual(s.tool, .pen, "round again, never to nothing")
         s.kind = "primer"
         s.tool = .ask
         s.cycleTool(); XCTAssertEqual(s.tool, .note)
-        s.cycleTool(); XCTAssertEqual(s.tool, .eraser)
+        s.cycleTool(); XCTAssertEqual(s.tool, .capture)
     }
 
     func testDoubleTapFlipsTheEraser() {
