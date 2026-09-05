@@ -42,7 +42,9 @@ You are on the machine that serves the book. Facts that matter:
 - Tests: `make test` (Go and the page script); corpus lint: `make lint`.
 - App tests and Simulator walks need the Mac: `scripts/sim-run.sh test`,
   `scripts/sim-verify.sh`.
-- Plans and status: `IPAD-PLAN.md`, `SPRITE-DEV-PLAN.md`.
+- Plans and status: `IPAD-PLAN.md`, `SPRITE-DEV-PLAN.md`. Open material
+  the book builder may adapt, with licences and fetch recipes, and the
+  design for building from it: `OPEN-SOURCES.md`.
 - `chiron` (`go install ./cmd/chiron` from `server-go`) drives the live
   server from a shell: shelf, captures at every scale, plan, build, wait,
   read. `skills/chiron/SKILL.md` is the agent skill that uses it; link it
