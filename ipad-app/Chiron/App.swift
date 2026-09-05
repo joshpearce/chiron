@@ -24,7 +24,7 @@ struct ChironApp: App {
                     } else if SelfTest.requested {
                         await SelfTest.run(library)
                     } else {
-                        await library.openActiveAtLaunch()
+                        await library.launch()
                     }
                 }
                 .onChange(of: scenePhase) { phase in

@@ -525,13 +525,12 @@ this: a primer is not promoted; the reader picks the scale at capture.
 Five asks, in the order to do them. Each is done when its Simulator walk
 passes and the device check named for it is done.
 
-### 13.1 The bookshelf is the first screen (half an hour)
+### 13.1 The bookshelf is the first screen (done 2026-09-05)
 
-Today the app reopens on the book last open (`openActiveAtLaunch`). It
-should open on the shelf, with that book's card saying "Open now" as it
-already does. Change: `openActiveAtLaunch` refreshes and stops; the
-self-test and `sim-verify.sh` steps that expect a book at launch open one
-first. Harness state unchanged.
+The app opens on the shelf; the book last open, on whichever client, is
+the card saying "Open now". `Library.launch()` refreshes the shelf and
+stops. The self-test opens its own book; `sim-verify.sh` expects the
+shelf at launch. Harness state unchanged.
 
 ### 13.2 Lessons learned live in the repo (now, then always)
 

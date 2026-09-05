@@ -192,12 +192,10 @@ final class Library: ObservableObject {
         pendingCapture = c
     }
 
-    /// At launch the app reopens on the book last open, on whichever client.
-    func openActiveAtLaunch() async {
+    /// At launch the app lands on the shelf; the book last open, on
+    /// whichever client, is the card marked "Open now".
+    func launch() async {
         await refresh()
-        if let id = activeSubjectID, subjects.contains(where: { $0.id == id }) {
-            await open(id)
-        }
     }
 
     func open(_ id: String) async {

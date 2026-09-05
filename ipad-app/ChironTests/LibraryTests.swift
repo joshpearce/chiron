@@ -35,6 +35,18 @@ final class LibraryTests: XCTestCase {
         }
     }
 
+    /// Launch lands on the shelf: the active book is known, and its card
+    /// says so, but the book is not opened for the reader.
+    func testLaunchStaysOnTheShelf() async throws {
+        let fake = FakeService()
+        fake.onSubjects = { [unowned self] in self.subjects("ready") }
+        let library = library(fake)
+        await library.launch()
+        XCTAssertEqual(library.activeSubjectID, "ai")
+        XCTAssertEqual(library.subjects.count, 2)
+        XCTAssertNil(library.session, "the shelf is the first screen")
+    }
+
     /// A summary comes back into the card; the shelf is untouched.
     func testASummaryIsAnsweredInTheCard() async throws {
         let fake = FakeService()

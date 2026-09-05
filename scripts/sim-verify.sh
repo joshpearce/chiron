@@ -104,8 +104,7 @@ for DEVICE in $DEVICES; do
       SIMCTL_CHILD_CHIRON_SERVER="$SERVER" SIMCTL_CHILD_CHIRON_SHELL_USER="$USER" \
         xcrun simctl launch "$UDID" "$BUNDLE" harness "harness_port=$PORT" >/dev/null
       wait_for_harness
-      # The app reopens on the active book; the shelf is the screen behind it.
-      cmd /shelf
+      # The app opens on the shelf.
       expect bookshelf
       # A capture: the card as the share sheet opens it, then a primer on
       # the shelf (a dev server writes a stub at once), read with no check,
