@@ -1,0 +1,1368 @@
+# The source index: open material the book builder may adapt, with the
+# licence each was read under and how to fetch it. Drawn from OPEN-SOURCES.md;
+# every A entry with a fetch recipe is reachable by server-go/sources.
+# Verdict: A adaptable, Q quotation only, R restricted (never fetched).
+sources:
+- id: d2l
+  title: Dive into Deep Learning
+  authors:
+  - Aston Zhang
+  - Zachary Lipton
+  - Mu Li
+  - Alexander Smola
+  subjects:
+  - deep-learning
+  - machine-learning
+  - neural-networks
+  - transformers
+  - attention
+  - optimization
+  - python
+  verdict: A
+  licence:
+    name: CC BY-SA 4.0
+    url: https://github.com/d2l-ai/d2l-en/blob/master/LICENSE
+    checked: '2026-09-05'
+  voice: Direct, code-first, every idea followed by a runnable example; a real authorial voice.
+  format: Markdown with code cells on GitHub
+  exercises: Exercises at the end of every section, no official solutions.
+  fetch:
+    kind: github
+    repo: d2l-ai/d2l-en
+    ref: master
+    path: '{locator}'
+  contents:
+  - locator: chapter_introduction/index.md
+    title: Introduction
+  - locator: chapter_preliminaries/ndarray.md
+    title: Data Manipulation
+  - locator: chapter_preliminaries/linear-algebra.md
+    title: Linear Algebra
+  - locator: chapter_preliminaries/calculus.md
+    title: Calculus
+  - locator: chapter_preliminaries/autograd.md
+    title: Automatic Differentiation
+  - locator: chapter_preliminaries/probability.md
+    title: Probability and Statistics
+  - locator: chapter_linear-regression/linear-regression.md
+    title: Linear Regression
+  - locator: chapter_linear-regression/linear-regression-scratch.md
+    title: Linear Regression Implementation from Scratch
+  - locator: chapter_linear-regression/softmax-regression.md
+    title: Softmax Regression
+  - locator: chapter_multilayer-perceptrons/mlp.md
+    title: Multilayer Perceptrons
+  - locator: chapter_multilayer-perceptrons/backprop.md
+    title: Forward and Backward Propagation
+  - locator: chapter_attention-mechanisms-and-transformers/attention-scoring-functions.md
+    title: Attention Scoring Functions
+  - locator: chapter_attention-mechanisms-and-transformers/multihead-attention.md
+    title: Multi-Head Attention
+  - locator: chapter_attention-mechanisms-and-transformers/self-attention-and-positional-encoding.md
+    title: Self-Attention and Positional Encoding
+  - locator: chapter_attention-mechanisms-and-transformers/transformer.md
+    title: The Transformer Architecture
+- id: think-bayes
+  title: Think Bayes 2e
+  authors:
+  - Allen B. Downey
+  subjects:
+  - bayesian
+  - statistics
+  - probability
+  - python
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://allendowney.github.io/ThinkBayes2/
+    checked: '2026-09-05'
+  voice: 'Conversational and computational: one idea per chapter, built up in code before any formula.'
+  format: Jupyter notebooks, one per chapter, on GitHub
+  exercises: Exercises with solutions in the same notebook; the cleanest worked constructed-response items
+    in the statistics group.
+  fetch:
+    kind: github
+    repo: AllenDowney/ThinkBayes2
+    ref: master
+    path: notebooks/{locator}
+    dir: notebooks
+- id: quantecon-intro
+  title: A First Course in Quantitative Economics with Python
+  authors:
+  - Thomas J. Sargent
+  - John Stachurski
+  subjects:
+  - economics
+  - probability
+  - statistics
+  - linear-algebra
+  - python
+  - computational-methods
+  verdict: A
+  licence:
+    name: CC BY-SA 4.0
+    url: https://github.com/QuantEcon/lecture-python-intro
+    checked: '2026-09-05'
+  voice: Lecture voice, precise and computational, economics motivated by real data.
+  format: MyST Markdown lectures on GitHub
+  exercises: Exercises with full solutions inline, marked with exercise-start and solution-start directives.
+  fetch:
+    kind: github
+    repo: QuantEcon/lecture-python-intro
+    ref: main
+    path: lectures/{locator}
+    dir: lectures
+- id: quantecon
+  title: Intermediate Quantitative Economics with Python
+  authors:
+  - Thomas J. Sargent
+  - John Stachurski
+  subjects:
+  - economics
+  - dynamic-programming
+  - probability
+  - linear-algebra
+  - python
+  - computational-methods
+  - optimization
+  verdict: A
+  licence:
+    name: CC BY-SA 4.0
+    url: https://github.com/QuantEcon/lecture-python
+    checked: '2026-09-05'
+  voice: Lecture voice, precise and computational.
+  format: MyST Markdown lectures on GitHub
+  exercises: Exercises with full solutions inline.
+  fetch:
+    kind: github
+    repo: QuantEcon/lecture-python
+    ref: main
+    path: lectures/{locator}
+    dir: lectures
+- id: rust-book
+  title: The Rust Programming Language
+  authors:
+  - Steve Klabnik
+  - Carol Nichols
+  subjects:
+  - rust
+  - programming
+  - systems
+  - memory
+  - concurrency
+  verdict: A
+  licence:
+    name: MIT or Apache 2.0
+    url: https://github.com/rust-lang/book/blob/main/LICENSE-MIT
+    checked: '2026-09-05'
+  voice: Patient tutorial voice, one concept at a time, with the compiler's errors as teaching material.
+  format: Markdown on GitHub, one file per section
+  exercises: Few; end-of-chapter projects rather than problem sets.
+  fetch:
+    kind: github
+    repo: rust-lang/book
+    ref: main
+    path: src/{locator}
+    dir: src
+- id: cs231n-notes
+  title: CS231n Convolutional Neural Networks for Visual Recognition, course notes
+  authors:
+  - Andrej Karpathy
+  - Fei-Fei Li
+  - Justin Johnson
+  subjects:
+  - deep-learning
+  - neural-networks
+  - computer-vision
+  - optimization
+  - backpropagation
+  verdict: A
+  licence:
+    name: MIT
+    url: https://github.com/cs231n/cs231n.github.io
+    checked: '2026-09-05'
+  voice: Dense, well-motivated, single element before matrix form; the reference voice for the ordering
+    rules.
+  format: Markdown on GitHub
+  exercises: None in the notes; assignments are separate.
+  fetch:
+    kind: github
+    repo: cs231n/cs231n.github.io
+    ref: master
+    path: '{locator}'
+  contents:
+  - locator: classification.md
+    title: Image Classification
+  - locator: linear-classify.md
+    title: Linear Classification
+  - locator: optimization-1.md
+    title: Optimization
+  - locator: optimization-2.md
+    title: Backpropagation
+  - locator: neural-networks-1.md
+    title: Neural Networks Part 1
+  - locator: neural-networks-2.md
+    title: Neural Networks Part 2
+  - locator: neural-networks-3.md
+    title: Neural Networks Part 3
+  - locator: convolutional-networks.md
+    title: Convolutional Networks
+- id: hf-course
+  title: The Hugging Face Course
+  authors:
+  - Hugging Face
+  subjects:
+  - transformers
+  - nlp
+  - fine-tuning
+  - machine-learning
+  - python
+  verdict: A
+  licence:
+    name: Apache 2.0
+    url: https://github.com/huggingface/course/blob/main/LICENSE
+    checked: '2026-09-05'
+  voice: Practical library tutorial; explains the library, not the math.
+  format: MDX chapters on GitHub
+  exercises: End-of-chapter quizzes in MDX.
+  fetch:
+    kind: github
+    repo: huggingface/course
+    ref: main
+    path: chapters/en/{locator}
+  contents:
+  - locator: chapter1/1.mdx
+    title: Introduction
+  - locator: chapter1/4.mdx
+    title: How do Transformers work?
+  - locator: chapter2/2.mdx
+    title: Behind the pipeline
+  - locator: chapter6/1.mdx
+    title: Tokenizers
+- id: wikibooks-haskell
+  title: Haskell (Wikibooks)
+  authors:
+  - Wikibooks contributors
+  subjects:
+  - haskell
+  - functional-programming
+  - programming
+  - type-systems
+  verdict: A
+  licence:
+    name: CC BY-SA 4.0
+    url: https://en.wikibooks.org/wiki/Wikibooks:Copyrights
+    checked: '2026-09-05'
+  voice: Uneven community prose; the core chapters are careful.
+  format: MediaWiki pages
+  exercises: Exercises with collapsible solutions in some chapters.
+  fetch:
+    kind: mediawiki
+    site: https://en.wikibooks.org
+    prefix: Haskell
+- id: ocw-18-05
+  title: MIT 18.05 Introduction to Probability and Statistics (Spring 2022)
+  authors:
+  - Jeremy Orloff
+  - Jonathan Bloom
+  subjects:
+  - probability
+  - statistics
+  - bayesian
+  - frequentist
+  - mathematics
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://ocw.mit.edu/pages/privacy-and-terms-of-use/
+    checked: '2026-09-05'
+  voice: Short, precise class readings with examples; the Bayesian and frequentist readings side by side.
+  format: HTML pages and PDF readings (PDFs need pdftotext)
+  exercises: Problem sets, in-class problems and exams, all with solutions, as paired PDFs.
+  fetch:
+    kind: ocw
+    course: 18-05-introduction-to-probability-and-statistics-spring-2022
+- id: lt-intro-stats-1e
+  title: Introductory Statistics 1e (OpenStax, LibreTexts copy)
+  authors:
+  - Barbara Illowsky
+  - Susan Dean
+  subjects:
+  - statistics
+  - probability
+  - hypothesis-testing
+  - regression
+  verdict: A
+  licence:
+    name: CC BY 4.0
+    url: https://stats.libretexts.org/Bookshelves/Introductory_Statistics/Introductory_Statistics_1e_(OpenStax)
+    checked: '2026-09-05'
+  voice: Textbook plain; the most permissive copy of this text.
+  format: HTML per page
+  exercises: Per-chapter exercise pages with inline answers.
+  fetch:
+    kind: libretexts
+    url: https://stats.libretexts.org/Bookshelves/Introductory_Statistics/Introductory_Statistics_1e_(OpenStax)
+- id: pg-origin
+  title: On the Origin of Species
+  authors:
+  - Charles Darwin
+  subjects:
+  - biology
+  - evolution
+  - natural-history
+  - science-history
+  verdict: A
+  licence:
+    name: Public domain
+    url: https://www.gutenberg.org/ebooks/2009
+    checked: '2026-09-05'
+  voice: 'Darwin''s own: patient, evidence-heavy, one long argument.'
+  format: Plain text
+  exercises: None.
+  fetch:
+    kind: gutenberg
+    id: 2009
+- id: pg-candle
+  title: The Chemical History of a Candle
+  authors:
+  - Michael Faraday
+  subjects:
+  - chemistry
+  - physics
+  - science-history
+  - combustion
+  verdict: A
+  licence:
+    name: Public domain
+    url: https://www.gutenberg.org/ebooks/14474
+    checked: '2026-09-05'
+  voice: Faraday lecturing to children at the Royal Institution; demonstrations first, names last.
+  format: Plain text
+  exercises: None.
+  fetch:
+    kind: gutenberg
+    id: 14474
+- id: pg-on-liberty
+  title: On Liberty
+  authors:
+  - John Stuart Mill
+  subjects:
+  - philosophy
+  - political-philosophy
+  - ethics
+  verdict: A
+  licence:
+    name: Public domain
+    url: https://www.gutenberg.org/ebooks/34901
+    checked: '2026-09-05'
+  voice: Mill's essay voice.
+  format: Plain text
+  exercises: None.
+  fetch:
+    kind: gutenberg
+    id: 34901
+- id: rebus-phil-logic
+  title: 'Introduction to Philosophy: Logic'
+  authors:
+  - Benjamin Martin (ed.)
+  subjects:
+  - logic
+  - philosophy
+  - argument
+  verdict: A
+  licence:
+    name: CC BY 4.0
+    url: https://press.rebus.community/intro-to-phil-logic/
+    checked: '2026-09-05'
+  voice: Undergraduate philosophy, plain and careful.
+  format: Pressbooks HTML
+  exercises: Few.
+  fetch:
+    kind: pressbooks
+    url: https://press.rebus.community/intro-to-phil-logic
+- id: openstax-calculus-1
+  title: Calculus Volume 1
+  authors:
+  - OpenStax
+  subjects:
+  - calculus
+  - limits
+  - derivatives
+  - integrals
+  - mathematics
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 8b89d172-2927-466f-8661-01abc7ccdba4
+- id: openstax-calculus-2
+  title: Calculus Volume 2
+  authors:
+  - OpenStax
+  subjects:
+  - calculus
+  - integrals
+  - series
+  - differential-equations
+  - mathematics
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 1d39a348-071f-4537-85b6-c98912458c3c
+- id: openstax-calculus-3
+  title: Calculus Volume 3
+  authors:
+  - OpenStax
+  subjects:
+  - calculus
+  - multivariable-calculus
+  - vectors
+  - mathematics
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: a31cd793-2162-4e9e-acb5-6e6bbd76a5fa
+- id: openstax-intro-stats
+  title: Introductory Statistics 2e
+  authors:
+  - OpenStax
+  subjects:
+  - statistics
+  - probability
+  - hypothesis-testing
+  - regression
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: c4b474e4-4e3b-4232-b35c-2c3535bfae73
+- id: openstax-statistics
+  title: Statistics
+  authors:
+  - OpenStax
+  subjects:
+  - statistics
+  - probability
+  - ap-statistics
+  verdict: A
+  licence:
+    name: CC BY 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 394a1101-fd8f-4875-84fa-55f15b06ba66
+- id: openstax-data-science
+  title: Principles of Data Science
+  authors:
+  - OpenStax
+  subjects:
+  - data-science
+  - statistics
+  - machine-learning
+  - python
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 54ef6090-af3e-47f9-8277-4a312aff4b2c
+- id: openstax-python
+  title: Introduction to Python Programming
+  authors:
+  - OpenStax
+  subjects:
+  - python
+  - programming
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 8d08a72f-5463-4856-b05c-58b0d65f5e61
+- id: openstax-cs
+  title: Introduction to Computer Science
+  authors:
+  - OpenStax
+  subjects:
+  - computer-science
+  - programming
+  - algorithms
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 4f06ce31-1d04-410f-8328-ac4e02c4f217
+- id: openstax-univ-physics-1
+  title: University Physics Volume 1
+  authors:
+  - OpenStax
+  subjects:
+  - physics
+  - mechanics
+  - thermodynamics
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: d50f6e32-0fda-46ef-a362-9bd36ca7c97d
+- id: openstax-univ-physics-2
+  title: University Physics Volume 2
+  authors:
+  - OpenStax
+  subjects:
+  - physics
+  - electromagnetism
+  - thermodynamics
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 7a0f9770-1c44-4acd-9920-1cd9a99f2a1e
+- id: openstax-univ-physics-3
+  title: University Physics Volume 3
+  authors:
+  - OpenStax
+  subjects:
+  - physics
+  - optics
+  - relativity
+  - quantum
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: af275420-6050-4707-995c-57b9cc13c358
+- id: openstax-college-physics
+  title: College Physics 2e
+  authors:
+  - OpenStax
+  subjects:
+  - physics
+  - mechanics
+  - electromagnetism
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: a31df062-930a-4f46-8953-605711e6d204
+- id: openstax-astronomy
+  title: Astronomy 2e
+  authors:
+  - OpenStax
+  subjects:
+  - astronomy
+  - physics
+  - cosmology
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 4c29f9e5-a53d-42c0-bdb5-091990527d79
+- id: openstax-chemistry
+  title: Chemistry 2e
+  authors:
+  - OpenStax
+  subjects:
+  - chemistry
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 7fccc9cf-9b71-44f6-800b-f9457fd64335
+- id: openstax-biology
+  title: Biology 2e
+  authors:
+  - OpenStax
+  subjects:
+  - biology
+  - genetics
+  - evolution
+  - ecology
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 8d50a0af-948b-4204-a71d-4826cba765b8
+- id: openstax-economics
+  title: Principles of Economics 3e
+  authors:
+  - OpenStax
+  subjects:
+  - economics
+  - microeconomics
+  - macroeconomics
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 4c34671f-b057-4918-8796-38ca1b2f4151
+- id: openstax-microeconomics
+  title: Principles of Microeconomics 3e
+  authors:
+  - OpenStax
+  subjects:
+  - economics
+  - microeconomics
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 759181db-a886-4a98-8f5c-770a83a78832
+- id: openstax-macroeconomics
+  title: Principles of Macroeconomics 3e
+  authors:
+  - OpenStax
+  subjects:
+  - economics
+  - macroeconomics
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: aff0c733-b223-4dfb-aad6-297bd361bdcf
+- id: openstax-philosophy
+  title: Introduction to Philosophy
+  authors:
+  - OpenStax
+  subjects:
+  - philosophy
+  - logic
+  - ethics
+  - epistemology
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: fe58be6f-3b61-4e16-b3b6-db6924f0b2f2
+- id: openstax-psychology
+  title: Psychology 2e
+  authors:
+  - OpenStax
+  subjects:
+  - psychology
+  - neuroscience
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 06aba565-9432-40f6-97ee-b8a361f118a8
+- id: openstax-sociology
+  title: Introduction to Sociology 3e
+  authors:
+  - OpenStax
+  subjects:
+  - sociology
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 746f171e-0d6a-4ef2-b69d-367880872f4a
+- id: openstax-political-science
+  title: Introduction to Political Science
+  authors:
+  - OpenStax
+  subjects:
+  - political-science
+  - government
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 89060098-2918-4037-8ebe-d90622d7a6bf
+- id: openstax-anthropology
+  title: Introduction to Anthropology
+  authors:
+  - OpenStax
+  subjects:
+  - anthropology
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: cf0085c6-528c-4101-ad26-19c612c5a2fa
+- id: openstax-us-history
+  title: U.S. History
+  authors:
+  - OpenStax
+  subjects:
+  - history
+  - us-history
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: a7ba2fb8-8925-4987-b182-5f4429d48daa
+- id: openstax-world-history-1
+  title: 'World History, Volume 1: to 1500'
+  authors:
+  - OpenStax
+  subjects:
+  - history
+  - world-history
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 685e3163-1032-4529-bb3a-f97a54407214
+- id: openstax-world-history-2
+  title: 'World History, Volume 2: from 1400'
+  authors:
+  - OpenStax
+  subjects:
+  - history
+  - world-history
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 685e3163-1032-4529-bb3a-f97a54412704
+- id: openstax-precalculus
+  title: Precalculus 2e
+  authors:
+  - OpenStax
+  subjects:
+  - precalculus
+  - algebra
+  - trigonometry
+  - mathematics
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: f021395f-fd63-46cd-ab95-037c6f051730
+- id: openstax-algebra-trig
+  title: Algebra and Trigonometry 2e
+  authors:
+  - OpenStax
+  subjects:
+  - algebra
+  - trigonometry
+  - mathematics
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: eaefdaf1-bda0-4ada-a9fe-f1c065bfcc4e
+- id: openstax-contemporary-math
+  title: Contemporary Mathematics
+  authors:
+  - OpenStax
+  subjects:
+  - mathematics
+  - logic
+  - probability
+  - finance
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 7193a423-3ad7-4ac6-98dd-90c70e4724b7
+- id: openstax-organic-chemistry
+  title: 'Organic Chemistry: A Tenth Edition'
+  authors:
+  - OpenStax
+  subjects:
+  - chemistry
+  - organic-chemistry
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: 6c2f7d1d-fbad-42e8-b977-9b903e6cb83b
+- id: openstax-microbiology
+  title: Microbiology
+  authors:
+  - OpenStax
+  subjects:
+  - biology
+  - microbiology
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://openstax.org/blog/openstax-licensing
+    checked: '2026-09-05'
+  voice: Committee-written, uniform, strong on learning objectives, worked examples and end-of-chapter
+    problems.
+  format: HTML per page (REX archive JSON); CNXML on GitHub
+  exercises: End-of-section exercises with inline solutions in the CNXML; review questions in some titles.
+  fetch:
+    kind: openstax
+    book: e42bd376-624b-4c0f-972f-e0c57998e765
+- id: sicp
+  title: Structure and Interpretation of Computer Programs
+  authors:
+  - Harold Abelson
+  - Gerald Jay Sussman
+  - Julie Sussman
+  subjects:
+  - programming
+  - computer-science
+  - scheme
+  - interpreters
+  - abstraction
+  verdict: A
+  licence:
+    name: CC BY-SA 4.0
+    url: https://mitpress.mit.edu/9780262510875/structure-and-interpretation-of-computer-programs/
+    checked: '2026-09-05'
+  voice: 'The wizard book: long, exact, playful; procedures before data.'
+  format: HTML (sarabander/sicp), Texinfo
+  exercises: Exercises throughout, no official solutions.
+- id: erickson-algorithms
+  title: Algorithms
+  authors:
+  - Jeff Erickson
+  subjects:
+  - algorithms
+  - computer-science
+  - complexity
+  - graphs
+  - dynamic-programming
+  verdict: A
+  licence:
+    name: CC BY 4.0
+    url: https://jeffe.cs.illinois.edu/teaching/algorithms/
+    checked: '2026-09-05'
+  voice: Sharp, funny, proof-driven; Erickson's own voice.
+  format: PDF per chapter
+  exercises: Rich exercises, deliberately no solutions; the homework archive is CC BY-NC-SA.
+- id: bayes-rules
+  title: Bayes Rules! An Introduction to Applied Bayesian Modeling
+  authors:
+  - Alicia A. Johnson
+  - Miles Q. Ott
+  - Mine Dogucu
+  subjects:
+  - bayesian
+  - statistics
+  - regression
+  - mcmc
+  - r
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://www.bayesrulesbook.com/preface
+    checked: '2026-09-05'
+  voice: Conversational, quiz-driven, applied.
+  format: bookdown HTML; R Markdown source
+  exercises: Quizzes in the text and end-of-chapter exercises.
+- id: software-foundations
+  title: 'Software Foundations, Volume 1: Logical Foundations'
+  authors:
+  - Benjamin C. Pierce et al.
+  subjects:
+  - logic
+  - type-systems
+  - coq
+  - proof
+  - programming-languages
+  verdict: A
+  licence:
+    name: MIT
+    url: https://softwarefoundations.cis.upenn.edu/lf-current/index.html
+    checked: '2026-09-05'
+  voice: Precise, exercise-driven, every claim machine-checked.
+  format: Literate Coq .v files in a tarball
+  exercises: Exercises on every page; solutions withheld.
+- id: open-logic
+  title: The Open Logic Text
+  authors:
+  - Open Logic Project
+  subjects:
+  - logic
+  - mathematical-logic
+  - set-theory
+  - computability
+  - incompleteness
+  verdict: A
+  licence:
+    name: CC BY 4.0
+    url: https://github.com/OpenLogicProject/OpenLogic
+    checked: '2026-09-05'
+  voice: Textbook-formal, modular by design.
+  format: LaTeX modules on GitHub
+  exercises: Problems per chapter, no solutions.
+- id: cs50
+  title: Harvard CS50x lecture notes
+  authors:
+  - David J. Malan
+  subjects:
+  - computer-science
+  - programming
+  - c
+  - python
+  - sql
+  - web
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 4.0
+    url: https://cs50.harvard.edu/x/license/
+    checked: '2026-09-05'
+  voice: 'Malan''s lecture voice, lightly edited: demonstrations and questions to the room.'
+  format: HTML notes per week
+  exercises: Problem sets with specifications; no solutions published.
+- id: open-yale
+  title: Open Yale Courses lecture transcripts
+  authors:
+  - Yale University
+  subjects:
+  - philosophy
+  - history
+  - literature
+  - economics
+  - physics
+  - psychology
+  verdict: A
+  licence:
+    name: CC BY-NC-SA 3.0
+    url: https://oyc.yale.edu/terms
+    checked: '2026-09-05'
+  voice: 'Full lecture transcripts: the spoken voice of a professor teaching a room.'
+  format: HTML per lecture
+  exercises: Exam prompts on some courses, no answers.
+- id: nielsen-nndl
+  title: Neural Networks and Deep Learning
+  authors:
+  - Michael Nielsen
+  subjects:
+  - neural-networks
+  - deep-learning
+  - backpropagation
+  - machine-learning
+  verdict: A
+  licence:
+    name: CC BY-NC 3.0
+    url: http://neuralnetworksanddeeplearning.com/
+    checked: '2026-09-05'
+  voice: Patient, first-principles, one network built by hand; a voice many learners remember.
+  format: HTML chapters
+  exercises: Exercises and problems inline, no solutions.
+- id: light-and-matter
+  title: Light and Matter
+  authors:
+  - Benjamin Crowell
+  subjects:
+  - physics
+  - mechanics
+  - electromagnetism
+  - optics
+  - relativity
+  verdict: A
+  licence:
+    name: CC BY-SA 3.0
+    url: https://www.lightandmatter.com/
+    checked: '2026-09-05'
+  voice: Idiosyncratic and conceptual; physics for people who want to understand, not memorise.
+  format: HTML and PDF; LaTeX source
+  exercises: Problems per chapter with some solutions.
+- id: goodfellow-dl
+  title: Deep Learning
+  authors:
+  - Ian Goodfellow
+  - Yoshua Bengio
+  - Aaron Courville
+  subjects:
+  - deep-learning
+  - machine-learning
+  - optimization
+  - probability
+  verdict: Q
+  licence:
+    name: Free to read online, all rights reserved
+    url: https://www.deeplearningbook.org/
+    checked: '2026-09-05'
+  voice: Reference textbook voice.
+  format: HTML
+- id: sutton-barto
+  title: 'Reinforcement Learning: An Introduction'
+  authors:
+  - Richard S. Sutton
+  - Andrew G. Barto
+  subjects:
+  - reinforcement-learning
+  - machine-learning
+  - dynamic-programming
+  verdict: Q
+  licence:
+    name: Free PDF, all rights reserved
+    url: http://incompleteideas.net/book/the-book-2nd.html
+    checked: '2026-09-05'
+  voice: The canonical text; clear and deliberate.
+  format: PDF
+- id: jurafsky-martin
+  title: Speech and Language Processing
+  authors:
+  - Daniel Jurafsky
+  - James H. Martin
+  subjects:
+  - nlp
+  - language-models
+  - transformers
+  - speech
+  verdict: Q
+  licence:
+    name: Draft free to read, all rights reserved
+    url: https://web.stanford.edu/~jurafsky/slp3/
+    checked: '2026-09-05'
+  voice: Encyclopedic, current, readable.
+  format: PDF per chapter
+- id: boyd-convex
+  title: Convex Optimization
+  authors:
+  - Stephen Boyd
+  - Lieven Vandenberghe
+  subjects:
+  - optimization
+  - convex-optimization
+  - linear-algebra
+  verdict: Q
+  licence:
+    name: Free PDF, all rights reserved
+    url: https://web.stanford.edu/~boyd/cvxbook/
+    checked: '2026-09-05'
+  voice: Rigorous and complete.
+  format: PDF
+- id: mml
+  title: Mathematics for Machine Learning
+  authors:
+  - Marc Peter Deisenroth
+  - A. Aldo Faisal
+  - Cheng Soon Ong
+  subjects:
+  - linear-algebra
+  - calculus
+  - probability
+  - machine-learning
+  - mathematics
+  verdict: Q
+  licence:
+    name: Free PDF, all rights reserved
+    url: https://mml-book.github.io/
+    checked: '2026-09-05'
+  voice: Concise mathematical build-up for ML.
+  format: PDF
+- id: mackay-itila
+  title: Information Theory, Inference, and Learning Algorithms
+  authors:
+  - David J. C. MacKay
+  subjects:
+  - information-theory
+  - bayesian
+  - inference
+  - neural-networks
+  - coding-theory
+  verdict: Q
+  licence:
+    name: Copyright Cambridge University Press; on-screen viewing permitted
+    url: https://www.inference.org.uk/mackay/itila/book.html
+    checked: '2026-09-05'
+  voice: Idiosyncratic, brilliant, exercises first.
+  format: PDF
+- id: murphy-pml
+  title: 'Probabilistic Machine Learning: An Introduction'
+  authors:
+  - Kevin P. Murphy
+  subjects:
+  - machine-learning
+  - probability
+  - bayesian
+  - deep-learning
+  verdict: Q
+  licence:
+    name: CC BY-NC-ND 4.0
+    url: https://probml.github.io/pml-book/book1.html
+    checked: '2026-09-05'
+  voice: Thorough reference.
+  format: PDF
+- id: ostep
+  title: 'Operating Systems: Three Easy Pieces'
+  authors:
+  - Remzi H. Arpaci-Dusseau
+  - Andrea C. Arpaci-Dusseau
+  subjects:
+  - operating-systems
+  - systems
+  - concurrency
+  - virtual-memory
+  - file-systems
+  verdict: Q
+  licence:
+    name: Free PDF chapters, all rights reserved
+    url: https://pages.cs.wisc.edu/~remzi/OSTEP/
+    checked: '2026-09-05'
+  voice: Warm, funny, dialogue-driven; the voice Matt would want.
+  format: PDF per chapter
+- id: crafting-interpreters
+  title: Crafting Interpreters
+  authors:
+  - Robert Nystrom
+  subjects:
+  - interpreters
+  - compilers
+  - programming-languages
+  verdict: Q
+  licence:
+    name: CC BY-NC-ND 4.0 (prose)
+    url: https://craftinginterpreters.com/
+    checked: '2026-09-05'
+  voice: Conversational and exact.
+  format: HTML
+- id: feynman-lectures
+  title: The Feynman Lectures on Physics
+  authors:
+  - Richard P. Feynman
+  - Robert B. Leighton
+  - Matthew Sands
+  subjects:
+  - physics
+  - mechanics
+  - electromagnetism
+  - quantum
+  verdict: R
+  licence:
+    name: All rights reserved; no download or reuse
+    url: https://www.feynmanlectures.caltech.edu/
+    checked: '2026-09-05'
+  voice: Feynman; cite by chapter, imitate the ordering.
+  format: HTML
+- id: 3blue1brown
+  title: 3Blue1Brown
+  authors:
+  - Grant Sanderson
+  subjects:
+  - linear-algebra
+  - calculus
+  - neural-networks
+  - probability
+  verdict: R
+  licence:
+    name: All rights reserved; no download or reuse
+    url: https://www.3blue1brown.com/about/
+    checked: '2026-09-05'
+  voice: Intuition-first animation; imitate the ordering, never the words.
+  format: HTML
+- id: fastai
+  title: Practical Deep Learning for Coders (fastbook)
+  authors:
+  - Jeremy Howard
+  - Sylvain Gugger
+  subjects:
+  - deep-learning
+  - machine-learning
+  - python
+  verdict: R
+  licence:
+    name: All rights reserved; no download or reuse
+    url: https://github.com/fastai/fastbook
+    checked: '2026-09-05'
+  voice: Strong top-down voice; prose not licensed for reuse.
+  format: HTML

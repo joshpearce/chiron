@@ -579,6 +579,17 @@ cards overflowed, on the iPad too). `chiron-iphone` is the Simulator
 The share extension is the phone's main way in: "Create me a primer from
 this text" from Safari, put the phone down, pick up the iPad.
 
+**Offline, and what happens when both sides changed** (Matt, 2026-09-05).
+Each device keeps a cache of the library: the shelf, every chapter it has
+opened, and its annotations, so a book reads on a plane. Changes made
+offline are journaled and pushed when the server is back. The sync
+compares versions per document (a unit's annotations, a shelf, a primer's
+notes); when the server's copy and the device's copy have both changed
+since they last agreed, the app does not guess: it shows the two and asks
+the reader to keep this device's copy, keep the server's, or hand both to
+the agent on the sprite to reconcile into one, which the reader then sees
+before it is written. This goes with the annotation sync below.
+
 The **shared state**. The server already holds the learner record (units
 cleared, current unit, debt, the active book), so progress is shared
 today. What is not: highlights, questions and their answers, margin
