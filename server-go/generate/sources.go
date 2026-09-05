@@ -307,9 +307,31 @@ func withSources(canon string, provs []sources.Provenance) string {
 	text := strings.TrimRight(string(block), "\n") + "\n"
 	if strings.HasPrefix(canon, "---\n") {
 		if end := strings.Index(canon[4:], "\n---\n"); end >= 0 {
-			at := 4 + end + 1
-			return canon[:at] + text + canon[at:]
+			front := canon[4 : 4+end+1]
+			// The author sometimes writes a sources list of its own; one key
+			// is the pipeline's, so the author's goes.
+			front = dropTopLevelKey(front, "sources")
+			return "---\n" + front + text + canon[4+end+1:]
 		}
 	}
 	return "---\n" + text + "---\n" + canon
+}
+
+// dropTopLevelKey removes a top-level YAML key and its indented block.
+func dropTopLevelKey(front, key string) string {
+	lines := strings.Split(front, "\n")
+	var out []string
+	skipping := false
+	for _, l := range lines {
+		if strings.HasPrefix(l, key+":") {
+			skipping = true
+			continue
+		}
+		if skipping && (l == "" || strings.HasPrefix(l, " ") || strings.HasPrefix(l, "-")) {
+			continue
+		}
+		skipping = false
+		out = append(out, l)
+	}
+	return strings.Join(out, "\n")
 }

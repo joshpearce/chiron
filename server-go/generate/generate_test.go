@@ -61,6 +61,11 @@ func TestFrontMatterGainsTheSources(t *testing.T) {
 	if !strings.HasPrefix(got, "---\nunit: u1\ntitle: Priors\nsources:\n") || !strings.Contains(got, "  title: Think Bayes 2e\n") || !strings.HasSuffix(got, "---\n\nProse.\n") {
 		t.Fatalf("got:\n%s", got)
 	}
+	// The author's own sources list gives way to the pipeline's.
+	doubled := withSources("---\nunit: u1\nsources:\n  - title: The author's guess\n    licence: none\ntitle: Priors\n---\n\nProse.\n", provs)
+	if strings.Count(doubled, "\nsources:\n") != 1 || strings.Contains(doubled, "author's guess") || !strings.Contains(doubled, "title: Priors\n") {
+		t.Fatalf("doubled:\n%s", doubled)
+	}
 	bare := withSources("Prose only.\n", provs)
 	if !strings.HasPrefix(bare, "---\nsources:\n") || !strings.HasSuffix(bare, "---\nProse only.\n") {
 		t.Fatalf("bare:\n%s", bare)
