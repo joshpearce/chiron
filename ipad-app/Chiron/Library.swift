@@ -8,6 +8,12 @@ final class Library: ObservableObject {
     /// One shell for the app, kept across books; the sheet shows it.
     let shell = ShellSession()
     @Published var shellShown = false
+    /// The "set up another device" code, on screen.
+    @Published var deviceSetupShown = false
+    #if DEBUG
+    /// The last URL the app was opened with, for the harness.
+    var lastOpenedURL: String?
+    #endif
     /// The sprite agent's line in, off unless the reader turns it on.
     let agent = AgentLink()
     /// A capture waiting for its question; the capture card shows it.
@@ -183,6 +189,19 @@ final class Library: ObservableObject {
             await refresh()
         } catch {
             planError = "The server could not discard it. Try again."
+        }
+    }
+
+    /// A server from another device's code: saved, selected, probed, and
+    /// this device's ssh key enrolled when the link carries the shared key,
+    /// as the settings sheet does on save.
+    func adopt(_ link: ServerLink) async {
+        let server = sync.servers.adopt(link)
+        sync.baseURL = server.url
+        await sync.probe()
+        await refresh()
+        if link.key != nil {
+            _ = try? await sync.enrolDeviceKey(name: DeviceKeySection.deviceName)
         }
     }
 

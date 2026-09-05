@@ -37,13 +37,14 @@ final class ServerStore: ObservableObject {
 
     private let listKey = "savedServers"
     private let selectedKey = "selectedServerID"
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
 
     var selected: SavedServer? {
         servers.first { $0.id == selectedID }
     }
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         load()
     }
 
@@ -119,5 +120,19 @@ final class ServerStore: ObservableObject {
     func select(_ server: SavedServer) {
         selectedID = server.id
         save()
+    }
+
+    /// A server set up from another device's code: added and selected, or,
+    /// when its address is already here, brought up to date and selected.
+    @discardableResult
+    func adopt(_ link: ServerLink) -> SavedServer {
+        let url = link.url.trimmingCharacters(in: .whitespaces)
+        if let existing = servers.first(where: { $0.url == url }) {
+            let name = link.name.trimmingCharacters(in: .whitespaces)
+            update(existing, name: name.isEmpty ? existing.name : name, url: url, key: link.key)
+            select(existing)
+            return existing
+        }
+        return add(name: link.name, url: url, key: link.key)
     }
 }

@@ -33,9 +33,17 @@ struct ChironApp: App {
                     }
                 }
                 // The share extension and the capture intent hand over
-                // through a URL naming a capture in the shared inbox.
+                // through a URL naming a capture in the shared inbox; the
+                // Camera app hands over another device's server setup.
                 .onOpenURL { url in
-                    if let id = CaptureInbox.captureID(in: url) { library.receiveCapture(id: id) }
+                    #if DEBUG
+                    library.lastOpenedURL = url.absoluteString
+                    #endif
+                    if let id = CaptureInbox.captureID(in: url) {
+                        library.receiveCapture(id: id)
+                    } else if let link = ServerLink(url) {
+                        Task { await library.adopt(link) }
+                    }
                 }
                 .onReceive(CaptureRouter.arrivals) { id in library.receiveCapture(id: id) }
         }
@@ -75,6 +83,10 @@ struct ContentView: View {
         }
         .sheet(item: $library.planning) { _ in
             PlanCard()
+                .environmentObject(library)
+        }
+        .sheet(isPresented: $library.deviceSetupShown) {
+            DeviceSetupView()
                 .environmentObject(library)
         }
     }
@@ -322,6 +334,7 @@ struct ConnectionSettings: View {
     @ObservedObject private var store: ServerStore
     @State private var editing: SavedServer?
     @State private var addingNew = false
+    @State private var settingUp = false
 
     init(store: ServerStore) { self.store = store }
 
@@ -375,6 +388,12 @@ struct ConnectionSettings: View {
                     } label: {
                         Label("Add a server", systemImage: "plus")
                     }
+                    Button {
+                        settingUp = true
+                    } label: {
+                        Label("Set up another device", systemImage: "qrcode")
+                    }
+                    .disabled(store.selected == nil)
                 }
 
                 DeviceKeySection(sync: library.sync)
@@ -395,6 +414,9 @@ struct ConnectionSettings: View {
         }
         .sheet(item: $editing) { server in
             ServerEditor(store: store, server: server) { Task { await refresh() } }
+        }
+        .sheet(isPresented: $settingUp) {
+            DeviceSetupView()
         }
     }
 
@@ -544,10 +566,22 @@ struct ServerEditor: View {
     /// Typing a shared key on a tablet keyboard without being able to see it is
     /// how you end up debugging a 401 that was a transposed character.
     @State private var revealKey = false
+    @State private var scanning = false
 
     var body: some View {
         NavigationStack {
             Form {
+                if server == nil {
+                    Section {
+                        Button {
+                            scanning = true
+                        } label: {
+                            Label("Scan a code", systemImage: "qrcode.viewfinder")
+                        }
+                    } footer: {
+                        Text("The code from \"Set up another device\" on a device that already has the server.")
+                    }
+                }
                 Section("Name") {
                     TextField("Mac, sprite, ...", text: $name)
                         .autocorrectionDisabled()
@@ -606,6 +640,14 @@ struct ServerEditor: View {
                     name = s.name
                     url = s.url
                     key = Credentials.token(for: s.id) ?? ""
+                }
+            }
+            .sheet(isPresented: $scanning) {
+                CodeScanner { link in
+                    name = link.name
+                    url = link.url
+                    key = link.key ?? ""
+                    scanning = false
                 }
             }
         }

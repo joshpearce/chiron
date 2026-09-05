@@ -1,10 +1,11 @@
 .venv/
 __pycache__/
 /state/
-*.xcuserdata
+xcuserdata/
 build/
 DynamicBook.xcodeproj/
 build-sim/
+build-phone/
 server-go/chiron-server
 server-go/dist/
 bin/

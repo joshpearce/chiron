@@ -35,13 +35,15 @@ enum AppCommands {
             return ["png_b64": try screenshot().base64EncodedString()]
         case "server":
             guard let url = args["url"] as? String else { throw Failure.badArguments("server needs url") }
-            library.sync.servers.add(name: args["name"] as? String ?? "", url: url, key: args["key"] as? String)
-            library.sync.baseURL = url
-            await library.sync.probe()
-            // As the settings sheet does on save: a key means enrol.
-            if let key = args["key"] as? String, !key.isEmpty {
-                _ = try? await library.sync.enrolDeviceKey(name: DeviceKeySection.deviceName)
+            await library.adopt(ServerLink(name: args["name"] as? String ?? "", url: url, key: args["key"] as? String))
+        case "server/url":
+            // What the Camera app hands over: a chiron://server link.
+            guard let raw = args["url"] as? String, let url = URL(string: raw), let link = ServerLink(url) else {
+                throw Failure.badArguments("server/url needs a chiron://server?url=... link")
             }
+            await library.adopt(link)
+        case "server/setup":
+            library.deviceSetupShown = args["shown"] as? Bool ?? true
         case "agent":
             let on = args["on"] as? Bool ?? true
             library.agent.enabled = on
@@ -217,6 +219,10 @@ enum AppCommands {
             "shelf": library.subjects.map(\.id),
             "active": library.activeSubjectID ?? "",
             "connected": library.sync.connected,
+            "server_url": library.sync.baseURL,
+            "servers": library.sync.servers.servers.map(\.name),
+            "device_setup": library.deviceSetupShown,
+            "last_url": library.lastOpenedURL ?? "",
             "agent": library.agent.connected,
             "capture_card": library.pendingCapture != nil,
             "capture_answer": library.captureAnswer ?? "",

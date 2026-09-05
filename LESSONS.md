@@ -103,6 +103,11 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   (2026-09-05).** A config with made-up corpus paths captures and writes
   primers, and fails a book draft at planning with that file's name.
 
+- **`simctl openurl` for a custom scheme waits behind an "Open in
+  Chiron?" alert (2026-09-05).** The app's `onOpenURL` never fires until
+  it is tapped, which looks like a dead handler. `idb ui describe-all`
+  shows the alert; `idb ui tap` on its Open button delivers the URL.
+  Several opens stack several alerts.
 - **A VStack with `maxHeight: .infinity` centres its overflow
   (2026-09-05).** The shelf lost its header at the top once the cards
   outgrew the screen; a ScrollView is what a growing list needs.

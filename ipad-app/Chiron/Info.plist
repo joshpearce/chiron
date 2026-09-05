@@ -34,6 +34,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Chiron reads the setup code shown on your other device, so you do not have to type the server's address and key.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Chiron connects to the tutor server running on your Mac to grade answers and generate chapters.</string>
 	<key>UIAppFonts</key>

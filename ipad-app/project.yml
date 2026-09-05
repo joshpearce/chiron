@@ -64,6 +64,7 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: "Chiron connects to the tutor server running on your Mac to grade answers and generate chapters."
+        NSCameraUsageDescription: "Chiron reads the setup code shown on your other device, so you do not have to type the server's address and key."
         UIRequiresFullScreen: false
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false

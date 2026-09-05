@@ -544,23 +544,27 @@ only the last `--env`, `claude --update` hangs on the sprite, a shell
 without a locale draws ASCII, ssh config order decides which key goes
 first, and the rest).
 
-### 13.3 Set up another device from a QR code (half a day)
+### 13.3 Set up another device from a QR code (done 2026-09-05)
 
-Server settings gets "Set up another device": a QR code encoding
-`chiron://server?name=...&url=...&key=...` for the selected server, with
-a line saying the code carries the shared key and is for your own devices.
-The way in on the other device is two-fold, so it works with or without
-the app open:
+Server settings has "Set up another device": a QR code of
+`chiron://server?name=...&url=...&key=...` for the selected server
+(`ServerLink`, `QRCode`, `DeviceSetupView`), with the line that the code
+carries the shared key and is for your own devices. Two ways in on the
+other device:
 
-- The Camera app reads the code and offers "Open in Chiron"; the app's
-  `onOpenURL` (already there for captures) adds the server, selects it,
-  probes, and enrols the device key as the settings sheet does on save.
-- "Add a server" gets a "Scan a code" button: a `DataScannerViewController`
-  (VisionKit) sheet that reads the same URL; the same handler takes it.
+- The Camera app reads the code and offers "Open in Chiron"; `onOpenURL`
+  hands the link to `Library.adopt`, which saves and selects the server
+  (updating one with the same address rather than duplicating it), probes,
+  refreshes the shelf, and enrols the device key when the link has one.
+- "Add a server" has "Scan a code": VisionKit's `DataScannerViewController`
+  reads the same URL into the form; the Simulator, with no camera, says so.
 
-Tests: URL parse and round trip (unit), the handler through the harness
-(`server/url` verb), and a Simulator screenshot of the code. Device check:
-scan the iPad's code with the phone.
+Tests: `ServerLinkTests` (round trip, rejects, adopt, render); harness
+verbs `server/url` (the link), `server/setup` (the code on screen), state
+`server_url`, `servers`, `device_setup`, `last_url`; the code decoded from
+an iPad screenshot with CIDetector gave the link back, and the phone
+Simulator adopted it through `simctl openurl`. Device check pending: scan
+the iPad's code with the phone.
 
 ### 13.4 Chiron on the phone, with the shelf and progress shared (two days)
 
