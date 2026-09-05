@@ -115,7 +115,7 @@ func TestABookIsPlannedAndAuthoredFromANamedSource(t *testing.T) {
 		t.Fatalf("total = %d", total)
 	}
 	planPrompt := chain.asked["planner"][0]
-	if !strings.Contains(planPrompt, "[spine] think-bayes") || !strings.Contains(planPrompt, "chap02.ipynb | chap02") {
+	if !strings.Contains(planPrompt, "[spine] think-bayes") || !strings.Contains(planPrompt, "chap02.ipynb | Bayes's Theorem") {
 		t.Fatalf("the planner did not see the spine's sections:\n%s", planPrompt)
 	}
 	if !strings.Contains(chain.systems["planner"][0], "follow the spine's order") {
