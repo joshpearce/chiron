@@ -18,9 +18,13 @@ type ClaudeCLI struct {
 	Model string
 }
 
+// The planner writes a whole syllabus in one call (every unit's concepts,
+// prereqs, notes and sources, plus the misconception bank), so it gets the
+// author's budget: at five minutes a reference-depth book timed out at that
+// step three times running.
 var roleTimeouts = map[string]time.Duration{
 	"grader":  5 * time.Minute,
-	"planner": 5 * time.Minute,
+	"planner": 15 * time.Minute,
 	"author":  15 * time.Minute,
 }
 

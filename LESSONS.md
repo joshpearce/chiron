@@ -108,6 +108,15 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
 - **A dev server needs the corpus's `authoring-spec.md` to build a book
   (2026-09-05).** A config with made-up corpus paths captures and writes
   primers, and fails a book draft at planning with that file's name.
+- **A book draft fails with "claude-cli: timed out (planner)" (2026-09-05).**
+  The planner is one `claude -p` call that emits the whole syllabus and
+  the misconception bank as JSON; under the claude-cli provider its
+  deadline was 5 minutes and a reference-depth brief blew through it
+  three builds in a row, after 2-3 minutes of source resolution. Passage
+  size is not the lever: a half-size passage failed at the same step. The
+  planner now has the author's 15 minutes (`llm/claudecli.go`,
+  `roleTimeouts`). The log line is the only symptom; nothing under the
+  corpus dir is written before planning succeeds except `sources.yaml`.
 
 - **`simctl openurl` for a custom scheme waits behind an "Open in
   Chiron?" alert (2026-09-05).** The app's `onOpenURL` never fires until

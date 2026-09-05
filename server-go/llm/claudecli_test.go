@@ -84,3 +84,15 @@ func TestUnmarshalLooseHandlesFencedJSON(t *testing.T) {
 		t.Error("prose with no object must error rather than silently succeed")
 	}
 }
+
+// The planner emits the whole syllabus in one call: every unit with its
+// concepts, prereqs, notes and sources, plus the misconception bank. On
+// 2026-09-05 three book builds in a row hit the 5-minute deadline at exactly
+// that step, and the CLI reports nothing but "timed out (planner)". The
+// planner's budget has to match the author's, which also writes a chapter's
+// worth of output in one call.
+func TestPlannerTimeoutCoversASyllabus(t *testing.T) {
+	if got, want := roleTimeouts["planner"], roleTimeouts["author"]; got < want {
+		t.Errorf("planner timeout %v is shorter than the author's %v; a syllabus is one call and needs the same room", got, want)
+	}
+}
