@@ -378,29 +378,33 @@ func (c *client) discard(args []string) (string, error) {
 	return pretty(out), nil
 }
 
-// status: the plan of a draft, else the job of a book being generated,
-// else the shelf row.
+// status: the shelf decides what the id is. A draft shows its plan, a
+// book being generated its job, anything else its row; the shelf is asked
+// first so a wrong guess does not log a miss on the server.
 func (c *client) status(args []string) (string, error) {
 	fs := flags("status", args)
 	id, err := idOf(fs, args)
 	if err != nil {
 		return "", err
 	}
-	var out map[string]any
-	if err := c.call("GET", "/primer/"+id+"/plan", nil, &out); err == nil {
-		return pretty(out), nil
-	}
-	if err := c.call("GET", "/teach/jobs?slug="+id, nil, &out); err == nil {
-		return pretty(out), nil
-	}
 	s, err := c.rows()
 	if err != nil {
 		return "", err
 	}
+	var out map[string]any
 	for _, r := range s.Subjects {
-		if r.ID == id {
-			return pretty(r), nil
+		if r.ID != id {
+			continue
 		}
+		if r.Status != "" && r.Status != "ready" {
+			if err := c.call("GET", "/primer/"+id+"/plan", nil, &out); err == nil {
+				return pretty(out), nil
+			}
+		}
+		return pretty(r), nil
+	}
+	if err := c.call("GET", "/teach/jobs?slug="+id, nil, &out); err == nil {
+		return pretty(out), nil
 	}
 	return "", fmt.Errorf("no subject %q", id)
 }
