@@ -182,7 +182,7 @@ func sourcesBlock(chosen []chosen) string {
 
 const sourcesPlanRule = `
 
-With sources given: follow the spine's order of chapters unless the brief or the authoring contract's ordering rules say otherwise, and for every unit list under ` + "`sources`" + ` the spine sections it covers and the interleave sections to weave in, each by its locator exactly as listed and with its role. A unit the sources do not cover gets an empty list. Never list a section of a quotation-only or restricted source.`
+With sources given: follow the spine's order of chapters unless the brief or the authoring contract's ordering rules say otherwise, and for every unit list under ` + "`sources`" + ` the spine sections it covers and the interleave sections to weave in, each by its locator exactly as listed and with its role. A unit the sources do not cover gets an empty list. Never list a section of a quotation-only or restricted source. A unit's title and notes must describe the sections it lists, because the author writes from those sections: when the brief names an idea that lives in another section (a worked problem, an example), list that section too rather than titling the unit after material it will not have.`
 
 func (g *Generator) writeSources(chosen []chosen, unknown []string) error {
 	if len(chosen) == 0 && len(unknown) == 0 {
