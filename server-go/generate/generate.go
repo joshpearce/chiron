@@ -12,6 +12,7 @@
 package generate
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,6 +22,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/mjbraun/chiron/server/llm"
+	"github.com/mjbraun/chiron/server/sources"
 )
 
 // Progress is called after each unit finishes so a caller can report it.
@@ -37,6 +39,8 @@ type unitPlan struct {
 		Name string `json:"name" yaml:"name"`
 	} `json:"concepts" yaml:"concepts"`
 	Notes string `json:"notes" yaml:"notes"`
+	// Sources are the sections of the chosen sources this unit adapts.
+	Sources []UnitSource `json:"sources,omitempty" yaml:"sources,omitempty"`
 }
 
 type misconceptionPlan struct {
@@ -100,8 +104,21 @@ func planSchema() map[string]any {
 						"prereqs":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 						"concepts": map[string]any{"type": "array", "items": conceptItem},
 						"notes":    map[string]any{"type": "string"},
+						"sources": map[string]any{
+							"type":        "array",
+							"description": "sections of the given sources this unit adapts; empty when none apply",
+							"items": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"source":  map[string]any{"type": "string", "description": "the source id in brackets"},
+									"locator": map[string]any{"type": "string", "description": "the section locator exactly as listed"},
+									"role":    map[string]any{"type": "string", "description": "spine or interleave"},
+								},
+								"required": []string{"source", "locator", "role"},
+							},
+						},
 					},
-					"required": []string{"id", "slug", "title", "minutes", "prereqs", "concepts", "notes"},
+					"required": []string{"id", "slug", "title", "minutes", "prereqs", "concepts", "notes", "sources"},
 				},
 			},
 			"misconceptions": map[string]any{
@@ -143,6 +160,10 @@ type Generator struct {
 	Chain    llm.Chain
 	SpecPath string
 	OutDir   string
+	// Index and Fetch are the open sources the book may be built from; with
+	// either nil the book is written from the brief alone.
+	Index *sources.Index
+	Fetch *sources.Client
 	// Workers bounds concurrent unit authoring. Units are independent and the
 	// wall clock is dominated by generation, but each unit is six sequential
 	// calls, so this is what decides whether a subject takes 30 minutes or two
@@ -150,8 +171,11 @@ type Generator struct {
 	Workers int
 }
 
-// Plan writes syllabus.yaml and misconception-bank.yaml, returning the unit count.
-func (g *Generator) Plan(brief, title string) (int, error) {
+// Plan writes syllabus.yaml and misconception-bank.yaml, returning the
+// unit count. Named sources (or the ones the brief states) are resolved
+// first; the planner then follows the spine's chapters and says which
+// sections each unit adapts.
+func (g *Generator) Plan(brief, title string, named []string) (int, error) {
 	spec, err := os.ReadFile(g.SpecPath)
 	if err != nil {
 		return 0, fmt.Errorf("authoring spec: %w", err)
@@ -160,12 +184,23 @@ func (g *Generator) Plan(brief, title string) (int, error) {
 	if len(contract) > 6000 {
 		contract = contract[:6000]
 	}
-	user := fmt.Sprintf("BRIEF:\n%s\n\nDesign the syllabus and misconception bank. "+
+	if err := os.MkdirAll(g.OutDir, 0o755); err != nil {
+		return 0, err
+	}
+	chosen, unknown := g.resolveSources(context.Background(), named, brief)
+	if err := g.writeSources(chosen, unknown); err != nil {
+		return 0, err
+	}
+	system := planSystem
+	if len(chosen) > 0 {
+		system += sourcesPlanRule
+	}
+	user := fmt.Sprintf("BRIEF:\n%s\n\n%sDesign the syllabus and misconception bank. "+
 		"The authoring contract the units will follow is below, for context on what "+
-		"each unit must eventually contain.\n\n%s", brief, contract)
+		"each unit must eventually contain.\n\n%s", brief, sourcesBlock(chosen), contract)
 
 	var p plan
-	if err := g.Chain.Structured("planner", planSystem, user, planSchema(), "plan", &p); err != nil {
+	if err := g.Chain.Structured("planner", system, user, planSchema(), "plan", &p); err != nil {
 		return 0, err
 	}
 	if len(p.Units) == 0 {
@@ -174,8 +209,26 @@ func (g *Generator) Plan(brief, title string) (int, error) {
 	if title == "" {
 		title = p.Title
 	}
-	if err := os.MkdirAll(g.OutDir, 0o755); err != nil {
-		return 0, err
+	// Keep only sections the sources really have, with the role they were given.
+	known := map[string]map[string]bool{}
+	for _, c := range chosen {
+		m := map[string]bool{}
+		for _, sec := range c.Sections {
+			m[sec.Locator] = true
+		}
+		known[c.ID] = m
+	}
+	for i := range p.Units {
+		var kept []UnitSource
+		for _, us := range p.Units[i].Sources {
+			if known[us.Source][us.Locator] {
+				if us.Role != "interleave" {
+					us.Role = "spine"
+				}
+				kept = append(kept, us)
+			}
+		}
+		p.Units[i].Sources = kept
 	}
 
 	syllabus := map[string]any{
@@ -291,9 +344,16 @@ func (g *Generator) authorUnit(u unitPlan, learner, bank, spec string) error {
 	if err != nil {
 		return err
 	}
+	material, provs, err := g.material(context.Background(), dir, u)
+	if err != nil {
+		return err
+	}
 	context := fmt.Sprintf("AUTHORING CONTRACT:\n%s\n\nLEARNER:\n%s\n\n"+
 		"MISCONCEPTION BANK (cite these ids):\n%s\n\nUNIT TO AUTHOR:\n%s",
 		spec, learner, bank, unitYAML)
+	if material != "" {
+		context += "\n\n" + material
+	}
 
 	// Files already on disk are kept, so re-running after a failure resumes
 	// instead of re-paying for what worked.
@@ -314,11 +374,24 @@ func (g *Generator) authorUnit(u unitPlan, learner, bank, spec string) error {
 		return body, os.WriteFile(path, []byte(body), 0o644)
 	}
 
-	canon, err := write(filepath.Join(dir, "canon.md"), "canon_md",
+	canonPath := filepath.Join(dir, "canon.md")
+	fresh := true
+	if info, err := os.Stat(canonPath); err == nil && info.Size() > 0 {
+		fresh = false
+	}
+	canon, err := write(canonPath, "canon_md",
 		"full canon.md: front matter, prose, and ```beat blocks",
 		"Write canon.md for this unit, and nothing else.")
 	if err != nil {
 		return err
+	}
+	// Attribution is the pipeline's job, not the model's: the chunks that
+	// were adapted go into the front matter as they were fetched.
+	if fresh && len(provs) > 0 {
+		canon = withSources(canon, provs)
+		if err := os.WriteFile(canonPath, []byte(canon), 0o644); err != nil {
+			return err
+		}
 	}
 	var headings []string
 	for _, line := range strings.Split(canon, "\n") {

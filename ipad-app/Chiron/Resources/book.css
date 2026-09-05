@@ -53,6 +53,10 @@ pre { background: var(--beat-bg); padding: 1em; border-radius: 8px; overflow-x: 
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   border-radius: 0 10px 10px 0;
 }
+/* Where an adapted chapter came from: a quiet footer, not a banner. */
+.sources { margin-top: 3em; padding-top: 1em; border-top: 1px solid var(--separator); color: var(--ink-secondary); font-size: 0.85em; }
+.sources h2 { font-size: 0.85em; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 0.4em; }
+.sources ul { margin: 0; padding-left: 1.2em; }
 .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.2em 0; }
 table { border-collapse: collapse; margin: 1em 0; }
 th, td { border: 1px solid var(--separator); padding: 0.4em 0.8em; }

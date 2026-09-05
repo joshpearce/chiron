@@ -143,6 +143,8 @@ type Chapter struct {
 	Check       []ClientItem  `json:"check"`
 	Calibration bool          `json:"calibration,omitempty"`
 	NextAction  string        `json:"next_action"`
+	// Sources are the attribution lines for the open texts the unit adapts.
+	Sources []string `json:"sources,omitempty"`
 }
 
 func RenderChapter(u *corpus.Unit, sections []AssembledSection, d Directives,
@@ -180,14 +182,65 @@ func RenderChapter(u *corpus.Unit, sections []AssembledSection, d Directives,
 		}
 	}
 
+	attributions := Attributions(u.Front)
+	if len(attributions) > 0 {
+		var b strings.Builder
+		b.WriteString(`<section class="sources"><h2>Sources</h2><ul>`)
+		for _, a := range attributions {
+			b.WriteString("<li>" + htmlEscape(a) + "</li>")
+		}
+		b.WriteString("</ul></section>")
+		parts = append(parts, b.String())
+	}
+
 	ch := &Chapter{
 		Unit: u.ID, Title: u.Title, Minutes: u.Minutes,
 		HTML: strings.Join(parts, "\n"), Beats: beats,
 		Pretest: clientItems(pretest), Check: clientItems(check),
 		Calibration: u.IsCalibration(),
 		NextAction:  d.NextAction,
+		Sources:     attributions,
 	}
 	return ch, nil
+}
+
+// Attributions reads the `sources:` list a unit's front matter carries
+// and gives one line per source, in order of first use: "Adapted from
+// <title> by <authors> (<licence>)".
+func Attributions(front map[string]any) []string {
+	raw, _ := front["sources"].([]any)
+	var out []string
+	seen := map[string]bool{}
+	for _, item := range raw {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		title, _ := m["title"].(string)
+		if title == "" {
+			continue
+		}
+		authors, _ := m["authors"].(string)
+		licence, _ := m["licence"].(string)
+		line := "Adapted from " + title
+		if authors != "" {
+			line += " by " + authors
+		}
+		if licence != "" {
+			line += " (" + licence + ")"
+		}
+		if seen[line] {
+			continue
+		}
+		seen[line] = true
+		out = append(out, line)
+	}
+	return out
+}
+
+func htmlEscape(s string) string {
+	r := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;")
+	return r.Replace(s)
 }
 
 func clientItems(qs []corpus.Question) []ClientItem {

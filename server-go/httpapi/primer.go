@@ -377,7 +377,7 @@ func (s *Server) handlePrimerBuild(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "save draft: %v", err)
 			return
 		}
-		s.startGenerate(slug, m.Title, full)
+		s.startGenerate(slug, m.Title, full, nil)
 		writeJSON(w, http.StatusOK, map[string]any{"subject": m.ID, "status": m.Status, "book": slug})
 	default:
 		m.Status, m.Error = primer.StatusAuthoring, ""

@@ -39,8 +39,9 @@ const usage = `usage:
   chiron status ID                     a draft's plan, a book job, or the shelf row
   chiron wait ID [-timeout D]          until ID is ready or failed; prints the row
   chiron read ID [-unit U]             the text of a primer, or of a book's unit
-  chiron teach -title T (-brief B | -brief-file F) [-slug S]
-                                       a book from a brief alone
+  chiron teach -title T (-brief B | -brief-file F) [-slug S] [-source NAME ...]
+                                       a book from a brief; -source names the open
+                                       text to start from (first) and to interleave
 
 Replies are JSON except shelf (a table) and read (text). Exit 1 on failure.
 `
@@ -528,6 +529,8 @@ func (c *client) teach(args []string) (string, error) {
 	slug := fs.String("slug", "", "its id on the shelf; from the title when empty")
 	brief := fs.String("brief", "", "what the book should teach, and to whom")
 	briefFile := fs.String("brief-file", "", "a file holding the brief")
+	var srcs multi
+	fs.Var(&srcs, "source", "an open text to build from; repeat for interleaves")
 	if err := fs.Parse(args); err != nil {
 		return "", fmt.Errorf("%w: %v", errUsage, err)
 	}
@@ -541,9 +544,19 @@ func (c *client) teach(args []string) (string, error) {
 	if *slug == "" {
 		*slug = *title
 	}
+	body := map[string]any{"slug": *slug, "title": *title, "brief": b}
+	if len(srcs) > 0 {
+		body["sources"] = []string(srcs)
+	}
 	var out map[string]any
-	if err := c.call("POST", "/teach/create", map[string]string{"slug": *slug, "title": *title, "brief": b}, &out); err != nil {
+	if err := c.call("POST", "/teach/create", body, &out); err != nil {
 		return "", err
 	}
 	return pretty(out), nil
 }
+
+// multi is a repeatable string flag.
+type multi []string
+
+func (m *multi) String() string     { return strings.Join(*m, ", ") }
+func (m *multi) Set(v string) error { *m = append(*m, v); return nil }

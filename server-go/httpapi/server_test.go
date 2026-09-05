@@ -335,6 +335,21 @@ func TestTeachEndpointGuards(t *testing.T) {
 	}
 }
 
+// A book made from named sources: the names reach the generator with the
+// brief, first the spine, then what interleaves.
+func TestTeachCreatePassesTheSourcesOn(t *testing.T) {
+	s := newServer(t, "")
+	var got []string
+	s.startGenerate = func(slug, title, brief string, named []string) { got = append([]string{slug, title, brief}, named...) }
+	w := do(t, s, "POST", "/teach/create", `{"slug":"bayes","title":"Bayes for Engineers","brief":"short","sources":["Think Bayes","MIT 18.05"]}`, "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("create -> %d: %s", w.Code, w.Body.String())
+	}
+	if strings.Join(got, "|") != "bayes|Bayes for Engineers|short|Think Bayes|MIT 18.05" {
+		t.Fatalf("generator got %v", got)
+	}
+}
+
 // A model-proposed slug names a directory, so it must be constrained - but
 // failing the request over underscores or capitals refuses something with an
 // obvious right answer.

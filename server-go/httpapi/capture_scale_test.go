@@ -214,7 +214,7 @@ func TestABookCaptureBecomesAGenerationJob(t *testing.T) {
 		"brief": "I want a short book on crawler directives.", "title": "Crawler Directives", "slug": "crawler-directives"}}
 	s.chain = chain
 	var started []string
-	s.startGenerate = func(slug, title, brief string) { started = append(started, slug+"|"+title+"|"+brief) }
+	s.startGenerate = func(slug, title, brief string, _ []string) { started = append(started, slug+"|"+title+"|"+brief) }
 
 	rep := captureScaled(t, s, `{"text":"Content-Signal: search=yes","prompt":"teach me crawler directives","scale":"book","source_app":"Safari"}`)
 	if rep.Status != "planning" || !rep.Done || rep.Scale != "book" {

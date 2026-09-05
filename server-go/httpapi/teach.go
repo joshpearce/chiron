@@ -52,6 +52,9 @@ type teachCreateRequest struct {
 	Slug  string `json:"slug"`
 	Title string `json:"title"`
 	Brief string `json:"brief"`
+	// Sources the book is built from, by index id or title; the first is
+	// the spine. Without them the brief's own "starting from X" counts.
+	Sources []string `json:"sources,omitempty"`
 }
 
 // slugify normalises a model-proposed slug into a directory-safe id.
@@ -106,7 +109,7 @@ func (s *Server) handleTeachCreate(w http.ResponseWriter, r *http.Request) {
 	s.jobs[slug] = job
 	s.jobsMu.Unlock()
 
-	s.startGenerate(slug, req.Title, req.Brief)
+	s.startGenerate(slug, req.Title, req.Brief, req.Sources)
 	writeJSON(w, http.StatusOK, job)
 }
 
