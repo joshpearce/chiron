@@ -27,7 +27,7 @@ type ClaudeCLI struct {
 // times on the first sourced book.
 var roleTimeouts = map[string]time.Duration{
 	"grader":  5 * time.Minute,
-	"planner": 15 * time.Minute,
+	"planner": 30 * time.Minute,
 	"author":  30 * time.Minute,
 }
 
