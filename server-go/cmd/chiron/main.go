@@ -443,7 +443,36 @@ func (c *client) wait(args []string) (string, error) {
 			}
 		}
 		if found == nil {
-			return "", fmt.Errorf("no subject %q on the shelf", id)
+			// Not a shelf row: a book being generated from a brief has only
+			// its job until it registers.
+			var job struct {
+				Slug  string `json:"slug"`
+				Stage string `json:"stage"`
+				Done  int    `json:"units_done"`
+				Total int    `json:"units_total"`
+				Error string `json:"error"`
+			}
+			if err := c.call("GET", "/teach/jobs?slug="+id, nil, &job); err != nil {
+				return "", fmt.Errorf("no subject %q on the shelf and no job for it", id)
+			}
+			switch job.Stage {
+			case "failed":
+				return pretty(job), fmt.Errorf("%s failed: %s", id, job.Error)
+			case "ready":
+				found = &row{ID: id, Kind: "book"}
+			default:
+				line := fmt.Sprintf("%s, %d/%d units", job.Stage, job.Done, job.Total)
+				if line != last {
+					fmt.Fprintf(os.Stderr, "chiron: %s is %s\n", id, line)
+					last = line
+				}
+				select {
+				case <-ctx.Done():
+					return pretty(job), fmt.Errorf("still %s after %v", job.Stage, *timeout)
+				case <-time.After(*every):
+				}
+				continue
+			}
 		}
 		if found.Book != "" {
 			book = found.Book

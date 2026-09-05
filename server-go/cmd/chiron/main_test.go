@@ -55,9 +55,27 @@ func (f *fake) serve(w http.ResponseWriter, r *http.Request) {
 			"unit": "u1", "title": "Why?",
 			"html": "<h2>Why</h2><p>Because <em>tokens</em> &amp; weights.</p><ul><li>one</li><li>two</li></ul>",
 		}})
+	case r.URL.Path == "/teach/jobs" && r.URL.Query().Get("slug") == "building":
+		f.polls++
+		stage := "authoring"
+		if f.polls >= 2 {
+			stage = "ready"
+		}
+		json.NewEncoder(w).Encode(map[string]any{"slug": "building", "stage": stage, "units_done": 3, "units_total": 7})
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte(`{"detail":"no such thing"}`))
+	}
+}
+
+func TestWaitFollowsABookJobThatIsNotOnTheShelfYet(t *testing.T) {
+	_, c := newFake(t)
+	out, err := run(c, "wait", []string{"building", "-every", "10ms"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `"id": "building"`) {
+		t.Fatalf("out:\n%s", out)
 	}
 }
 
