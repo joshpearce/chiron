@@ -142,6 +142,11 @@ func TestABookIsPlannedAndAuthoredFromANamedSource(t *testing.T) {
 	if !strings.Contains(authorPrompt, "MATERIAL TO ADAPT") || !strings.Contains(authorPrompt, "The cookie problem, in Downey's words.") || !strings.Contains(authorPrompt, "=== spine: Think Bayes 2e") {
 		t.Fatalf("the author did not get the material:\n%s", authorPrompt)
 	}
+	for _, later := range chain.asked["author"][1:] {
+		if strings.Contains(later, "MATERIAL TO ADAPT") {
+			t.Fatal("only the canon call carries the material")
+		}
+	}
 	unitDir := filepath.Join(g.OutDir, "units", "u0-bayes-theorem")
 	canon, _ := os.ReadFile(filepath.Join(unitDir, "canon.md"))
 	if !strings.Contains(string(canon), "sources:\n") || !strings.Contains(string(canon), "title: Think Bayes 2e") || !strings.Contains(string(canon), "licence: CC BY-NC-SA 4.0") {

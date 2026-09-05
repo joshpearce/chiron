@@ -363,8 +363,12 @@ func (g *Generator) authorUnit(u unitPlan, learner, bank, spec string) error {
 	context := fmt.Sprintf("AUTHORING CONTRACT:\n%s\n\nLEARNER:\n%s\n\n"+
 		"MISCONCEPTION BANK (cite these ids):\n%s\n\nUNIT TO AUTHOR:\n%s",
 		spec, learner, bank, unitYAML)
+	// The material is for writing canon.md; every later file is written
+	// from canon.md itself, and carrying the sources again only makes those
+	// calls slower (three units timed out on it).
+	withMaterial := context
 	if material != "" {
-		context += "\n\n" + material
+		withMaterial += "\n\n" + material
 	}
 
 	// Files already on disk are kept, so re-running after a failure resumes
@@ -374,8 +378,12 @@ func (g *Generator) authorUnit(u unitPlan, learner, bank, spec string) error {
 			existing, err := os.ReadFile(path)
 			return string(existing), err
 		}
+		prompt := context
+		if key == "canon_md" {
+			prompt = withMaterial
+		}
 		var out map[string]string
-		if err := g.Chain.Structured("author", unitSystem, context+"\n\n"+extra,
+		if err := g.Chain.Structured("author", unitSystem, prompt+"\n\n"+extra,
 			fileSchema(key, description), key, &out); err != nil {
 			return "", err
 		}
