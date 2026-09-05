@@ -189,15 +189,18 @@ struct SubjectInfo: Codable, Identifiable {
     let scale: String?
     let book: String?
     let progress: String?
+    /// The shelf it is filed on; none means the top of the library.
+    let shelf: String?
 
     init(id: String, title: String, unitsTotal: Int? = nil, unitsCleared: Int? = nil, currentUnit: String? = nil,
          debt: Int? = nil, kind: String? = nil, status: String? = nil, error: String? = nil,
          source: PrimerSource? = nil, capturedAt: String? = nil, scale: String? = nil, book: String? = nil,
-         progress: String? = nil) {
+         progress: String? = nil, shelf: String? = nil) {
         self.id = id; self.title = title; self.unitsTotal = unitsTotal; self.unitsCleared = unitsCleared
         self.currentUnit = currentUnit; self.debt = debt; self.kind = kind; self.status = status
         self.error = error; self.source = source; self.capturedAt = capturedAt
         self.scale = scale; self.book = book; self.progress = progress
+        self.shelf = shelf.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     var isPrimer: Bool { kind == "primer" }
@@ -237,7 +240,7 @@ struct SubjectInfo: Codable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, debt, kind, status, error, source, scale, book, progress
+        case id, title, debt, kind, status, error, source, scale, book, progress, shelf
         case unitsTotal = "units_total"
         case unitsCleared = "units_cleared"
         case currentUnit = "current_unit"
@@ -355,9 +358,22 @@ struct ExtendResponse: Codable {
 }
 
 /// GET /subjects: the shelf, and which book the reader last had open.
+/// A shelf: a named folder in the library, and what is on it.
+struct ShelfInfo: Codable, Identifiable, Hashable {
+    let id: String
+    var name: String
+    var subjects: [String]
+
+    init(id: String, name: String, subjects: [String] = []) {
+        self.id = id; self.name = name; self.subjects = subjects
+    }
+}
+
 struct SubjectsResponse: Codable {
     let subjects: [SubjectInfo]
     let active: String?
+    /// A server before shelves sends none.
+    var shelves: [ShelfInfo]? = nil
 
     /// The server sends "" before any book has been opened.
     var activeID: String? { (active?.isEmpty ?? true) ? nil : active }

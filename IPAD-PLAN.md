@@ -563,8 +563,8 @@ Tests: `ServerLinkTests` (round trip, rejects, adopt, render); harness
 verbs `server/url` (the link), `server/setup` (the code on screen), state
 `server_url`, `servers`, `device_setup`, `last_url`; the code decoded from
 an iPad screenshot with CIDetector gave the link back, and the phone
-Simulator adopted it through `simctl openurl`. Device check pending: scan
-the iPad's code with the phone.
+Simulator adopted it through `simctl openurl`. Device check done the same
+day: the phone took the iPad's code with the Camera.
 
 ### 13.4 Chiron on the phone, with the shelf and progress shared (two days)
 
@@ -616,6 +616,23 @@ the phone; ink on the phone, see it on the iPad.
 Not planned: rendering PDFs through the book's web page, or turning a PDF
 into a smart book in one tap. The capture tool at the book scale already
 covers the second from any passage.
+
+### 13.7 The library and its shelves (done 2026-09-05)
+
+The first screen is the Library: the shelves the reader has made, then
+everything on no shelf. A shelf is a named folder the server keeps
+(`state/shelves.json` beside `active-subject`; `GET/POST /shelves`,
+`PUT/DELETE /shelves/{id}`, `PUT /subjects/{id}/shelf`; the subjects reply
+carries `shelves` and each row its `shelf`), so both devices see the
+same ones. In the app: "New shelf" in the bar; a folder card opens the
+shelf; a card dragged onto a folder is filed there and, on the shelf's
+screen, dragged onto the library row comes back; "Move to" in a card's
+long-press menu does the same without dragging; the shelf's menu renames
+or deletes it, and deleting returns its contents to the library. Harness:
+`shelf/create`, `shelf/rename`, `shelf/delete`, `shelf/open`,
+`shelf/close`, `move`; state `shelves`, `open_shelf`, `shelf_rows[].shelf`.
+Tests: server (`shelves_test.go`), app (`ShelvesTests`), and a UI test
+that drags a card onto a shelf and back (`ShelvesUITests`).
 
 ### 13.6 An agent sends work to Chiron (done 2026-09-05)
 

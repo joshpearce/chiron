@@ -161,6 +161,7 @@ type Server struct {
 	activeMu   sync.Mutex
 	active     string
 	activePath string
+	shelves    *shelves
 
 	jobsMu sync.Mutex
 	jobs   map[string]*Job
@@ -216,6 +217,7 @@ func New(cfg *Config, root string) (*Server, error) {
 			}
 		}
 	}
+	s.shelves = loadShelves(shelvesPath(s.activePath))
 	return s, nil
 }
 
@@ -362,6 +364,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /ping", s.handlePing)
 	mux.HandleFunc("GET /health", s.handleHealth)
 	mux.HandleFunc("GET /subjects", s.handleSubjects)
+	mux.HandleFunc("PUT /subjects/{subject}/shelf", s.handleSubjectShelf)
+	mux.HandleFunc("GET /shelves", s.handleShelves)
+	mux.HandleFunc("POST /shelves", s.handleShelfCreate)
+	mux.HandleFunc("PUT /shelves/{shelf}", s.handleShelfRename)
+	mux.HandleFunc("DELETE /shelves/{shelf}", s.handleShelfDelete)
 	mux.HandleFunc("GET /state", s.handleState)
 	mux.HandleFunc("GET /review-schedule", s.handleReviewSchedule)
 	mux.HandleFunc("GET /chapter/{subject}", s.handleChapter)
@@ -481,6 +488,8 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 		Scale    string `json:"scale,omitempty"`
 		Book     string `json:"book,omitempty"`
 		Progress string `json:"progress,omitempty"`
+		// The shelf it is on, if any.
+		Shelf string `json:"shelf,omitempty"`
 	}
 	out := []row{}
 	for _, sub := range s.allSubjects() {
@@ -490,6 +499,7 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 			UnitsCleared: len(sub.Learner.ClearedUnits()),
 			CurrentUnit:  sub.Learner.Snapshot().CurrentUnit,
 			Debt:         len(sub.Learner.OpenDebt()),
+			Shelf:        s.shelves.shelfOf(sub.ID),
 		}
 		if sub.Kind == KindPrimer && sub.Primer != nil {
 			r.Kind, r.Status = KindPrimer, sub.Primer.Status
@@ -507,10 +517,12 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 			ID: m.ID, Title: m.Title, Kind: KindPrimer, Status: m.Status, Error: m.Error,
 			Source: &src, CapturedAt: m.CapturedAt.Format(time.RFC3339),
 			Scale: m.Scale, Book: m.Book, Progress: s.progressOf(m),
+			Shelf: s.shelves.shelfOf(m.ID),
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"subjects": out,
+		"shelves":  s.shelves.view(s.subjectExists),
 		"active":   s.activeSubject(),
 	})
 }

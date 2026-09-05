@@ -108,6 +108,12 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   it is tapped, which looks like a dead handler. `idb ui describe-all`
   shows the alert; `idb ui tap` on its Open button delivers the URL.
   Several opens stack several alerts.
+- **XCUITest drags a `.draggable` card only if the press is short
+  (2026-09-05).** A card with both `.contextMenu` and `.draggable` opens
+  its menu at about a second; `press(forDuration: 0.6, thenDragTo:,
+  withVelocity: .slow, thenHoldForDuration: 0.8)` lifts the drag first.
+  And a failed assertion with `continueAfterFailure = false` skips Swift
+  `defer`: clean up in `tearDown`, and at the start of the test.
 - **A VStack with `maxHeight: .infinity` centres its overflow
   (2026-09-05).** The shelf lost its header at the top once the cards
   outgrew the screen; a ScrollView is what a growing list needs.

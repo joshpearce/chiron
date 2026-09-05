@@ -16,6 +16,11 @@ final class FakeService: ChironService {
     var onPlanTurn: (String, String) throws -> CaptureResponse = { _, _ in throw URLError(.cannotConnectToHost) }
     var onBuild: (String) throws -> BuildResponse = { _ in throw URLError(.cannotConnectToHost) }
     var onExtend: (String, String, String) throws -> ExtendResponse = { _, _, _ in throw URLError(.cannotConnectToHost) }
+    var onCreateShelf: (String) throws -> ShelfInfo = { ShelfInfo(id: "s-\($0)", name: $0) }
+    var shelvesMade: [String] = []
+    var renames: [(id: String, name: String)] = []
+    var shelvesDeleted: [String] = []
+    var moves: [(subject: String, shelf: String?)] = []
     var captures: [CaptureRequest] = []
     var planTurns: [(subject: String, text: String)] = []
     var builds: [String] = []
@@ -61,6 +66,16 @@ final class FakeService: ChironService {
         return try onBuild(subject)
     }
     func discard(subject: String) async throws { discards.append(subject) }
+    func createShelf(name: String) async throws -> ShelfInfo {
+        shelvesMade.append(name)
+        return try onCreateShelf(name)
+    }
+    func renameShelf(_ id: String, name: String) async throws -> ShelfInfo {
+        renames.append((id, name))
+        return ShelfInfo(id: id, name: name)
+    }
+    func deleteShelf(_ id: String) async throws { shelvesDeleted.append(id) }
+    func move(subject: String, toShelf shelf: String?) async throws { moves.append((subject, shelf)) }
     func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse {
         extends.append((subject, quote, note))
         return try onExtend(subject, quote, note)

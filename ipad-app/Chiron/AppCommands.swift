@@ -44,6 +44,27 @@ enum AppCommands {
             await library.adopt(link)
         case "server/setup":
             library.deviceSetupShown = args["shown"] as? Bool ?? true
+        case "shelf/create":
+            guard let name = args["name"] as? String else { throw Failure.badArguments("shelf/create needs name") }
+            await library.createShelf(named: name)
+        case "shelf/rename":
+            guard let id = args["id"] as? String, let name = args["name"] as? String else {
+                throw Failure.badArguments("shelf/rename needs id and name")
+            }
+            await library.renameShelf(id, to: name)
+        case "shelf/delete":
+            guard let id = args["id"] as? String else { throw Failure.badArguments("shelf/delete needs id") }
+            await library.deleteShelf(id)
+        case "shelf/open":
+            guard let id = args["id"] as? String, library.shelf(id) != nil else { throw Failure.badArguments("shelf/open needs the id of a shelf") }
+            library.closeBook()
+            library.shelfPath = [id]
+        case "shelf/close":
+            library.shelfPath = []
+        case "move":
+            guard let subject = args["subject"] as? String else { throw Failure.badArguments("move needs subject") }
+            let shelf = (args["shelf"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            await library.move(subject, to: shelf)
         case "agent":
             let on = args["on"] as? Bool ?? true
             library.agent.enabled = on
@@ -226,7 +247,9 @@ enum AppCommands {
             "agent": library.agent.connected,
             "capture_card": library.pendingCapture != nil,
             "capture_answer": library.captureAnswer ?? "",
-            "shelf_rows": library.subjects.map { ["id": $0.id, "kind": $0.kind ?? "book", "status": $0.status ?? "", "scale": $0.scale ?? "", "progress": $0.progress ?? ""] },
+            "shelf_rows": library.subjects.map { ["id": $0.id, "kind": $0.kind ?? "book", "status": $0.status ?? "", "scale": $0.scale ?? "", "progress": $0.progress ?? "", "shelf": $0.shelf ?? ""] },
+            "shelves": library.shelves.map { ["id": $0.id, "name": $0.name, "subjects": $0.subjects] },
+            "open_shelf": library.shelfPath.last ?? "",
         ]
         if let p = library.planning {
             out["plan_card"] = ["id": p.id, "title": p.title, "scale": p.scale, "done": p.done, "turns": p.plan.count,

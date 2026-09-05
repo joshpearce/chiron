@@ -16,6 +16,10 @@ protocol ChironService: AnyObject {
     func discard(subject: String) async throws
     func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse
     func reset(subject: String) async throws -> BookState
+    func createShelf(name: String) async throws -> ShelfInfo
+    func renameShelf(_ id: String, name: String) async throws -> ShelfInfo
+    func deleteShelf(_ id: String) async throws
+    func move(subject: String, toShelf shelf: String?) async throws
 }
 
 enum ServiceError: Error {
@@ -151,6 +155,25 @@ final class Sync: ObservableObject, ChironService {
         let _: Reply = try await post("/primer/\(subject)/discard", body: Data("{}".utf8), timeout: 30)
     }
 
+    func createShelf(name: String) async throws -> ShelfInfo {
+        try await send("POST", "/shelves", body: try JSONEncoder().encode(["name": name]), timeout: 15)
+    }
+
+    func renameShelf(_ id: String, name: String) async throws -> ShelfInfo {
+        try await send("PUT", "/shelves/\(id)", body: try JSONEncoder().encode(["name": name]), timeout: 15)
+    }
+
+    func deleteShelf(_ id: String) async throws {
+        struct Reply: Decodable { let deleted: Bool }
+        let _: Reply = try await send("DELETE", "/shelves/\(id)", body: nil, timeout: 15)
+    }
+
+    func move(subject: String, toShelf shelf: String?) async throws {
+        struct Reply: Decodable { let subject: String }
+        let _: Reply = try await send("PUT", "/subjects/\(subject)/shelf",
+                                      body: try JSONEncoder().encode(["shelf": shelf ?? ""]), timeout: 15)
+    }
+
     /// A margin note extends the primer; the whole document comes back.
     func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse {
         struct Body: Encodable { let quote, note: String }
@@ -189,10 +212,16 @@ final class Sync: ObservableObject, ChironService {
     }
 
     private func post<T: Decodable>(_ path: String, body: Data, timeout: TimeInterval) async throws -> T {
+        try await send("POST", path, body: body, timeout: timeout)
+    }
+
+    private func send<T: Decodable>(_ method: String, _ path: String, body: Data?, timeout: TimeInterval) async throws -> T {
         var req = try request(path, timeout: timeout)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = body
+        req.httpMethod = method
+        if let body {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = body
+        }
         return try await perform(req)
     }
 }

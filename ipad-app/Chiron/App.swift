@@ -249,13 +249,17 @@ struct BookView: View {
     }
 }
 
-/// The shelf: one card per book the server offers, the open one marked.
+/// The library: the shelves the reader has made, then every book and
+/// primer on no shelf, the open one marked. A shelf opens on its own
+/// screen; a card dragged onto a shelf is filed there.
 struct BookshelfView: View {
     @EnvironmentObject var library: Library
     @State private var showSettings = false
+    @State private var namingShelf = false
+    @State private var newShelfName = ""
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $library.shelfPath) {
             shelf
                 .toolbarTitleDisplayMode(.inline)
                 .toolbar {
@@ -269,11 +273,18 @@ struct BookshelfView: View {
                             Label("Capture", systemImage: "text.badge.plus")
                         }
                         .disabled(!library.sync.connected)
-                        .accessibilityHint("Paste something and ask about it; a primer appears on the shelf")
+                        .accessibilityHint("Paste something and ask about it; a primer appears in the library")
                         Button {
                             library.teaching = true
                         } label: {
                             Label("Teach me something else", systemImage: "sparkles")
+                        }
+                        .disabled(!library.sync.connected)
+                        Button {
+                            newShelfName = ""
+                            namingShelf = true
+                        } label: {
+                            Label("New shelf", systemImage: "folder.badge.plus")
                         }
                         .disabled(!library.sync.connected)
                     }
@@ -281,16 +292,26 @@ struct BookshelfView: View {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button {
                             Task { await library.refresh() }
-                        } label: { Label("Refresh the shelf", systemImage: "arrow.clockwise") }
+                        } label: { Label("Refresh the library", systemImage: "arrow.clockwise") }
                         Button {
                             showSettings = true
                         } label: { Label("Server", systemImage: "gearshape") }
                         ShellButton()
                     }
                 }
+                .navigationDestination(for: String.self) { id in
+                    ShelfContentsView(shelfID: id)
+                }
         }
         .task { await library.refresh() }
         .sheet(isPresented: $showSettings) { ConnectionSettings(store: library.sync.servers) }
+        .alert("New shelf", isPresented: $namingShelf) {
+            TextField("Name", text: $newShelfName)
+            Button("Make it") { Task { await library.createShelf(named: newShelfName) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("A shelf holds the books and primers you keep together.")
+        }
     }
 
     private var shelf: some View {
@@ -303,16 +324,19 @@ struct BookshelfView: View {
                         .frame(height: 160)
                         .accessibilityHidden(true)
                     Text("Chiron").font(Typography.display(52))
-                    Text("The bookshelf")
+                    Text("Library")
                         .font(Typography.serifItalic(20))
                         .foregroundStyle(.secondary)
                 }
                 VStack(spacing: 12) {
-                    ForEach(library.subjects) { s in
+                    ForEach(library.shelves) { shelf in
+                        ShelfFolderCard(shelf: shelf)
+                    }
+                    ForEach(library.unfiled) { s in
                         ShelfCard(subject: s)
                     }
                     if library.subjects.isEmpty && !library.loadingShelf {
-                        Text(library.shelfError ?? "No books on the shelf.")
+                        Text(library.shelfError ?? "Nothing in the library yet.")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -764,5 +788,26 @@ struct ShelfCard: View {
         .disabled(!openable)
         .accessibilityLabel(subject.title)
         .accessibilityHint(subject.authoring ? "Still being written" : (subject.id == library.activeSubjectID ? "Open now" : subject.progressLine))
+        // Filed by dragging onto a shelf, or by the menu for a hand that
+        // would rather not drag.
+        .draggable(subject.id)
+        .contextMenu {
+            Menu("Move to") {
+                Button {
+                    Task { await library.move(subject.id, to: nil) }
+                } label: {
+                    Label("Library", systemImage: "books.vertical")
+                }
+                .disabled(subject.shelf == nil)
+                ForEach(library.shelves) { shelf in
+                    Button {
+                        Task { await library.move(subject.id, to: shelf.id) }
+                    } label: {
+                        Label(shelf.name, systemImage: "folder")
+                    }
+                    .disabled(subject.shelf == shelf.id)
+                }
+            }
+        }
     }
 }

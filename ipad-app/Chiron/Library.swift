@@ -10,6 +10,9 @@ final class Library: ObservableObject {
     @Published var shellShown = false
     /// The "set up another device" code, on screen.
     @Published var deviceSetupShown = false
+    /// The shelves of the library, and the one open (a path of one id).
+    @Published var shelves: [ShelfInfo] = []
+    @Published var shelfPath: [String] = []
     #if DEBUG
     /// The last URL the app was opened with, for the harness.
     var lastOpenedURL: String?
@@ -70,8 +73,11 @@ final class Library: ObservableObject {
         do {
             let shelf = try await service.subjects()
             subjects = shelf.subjects
+            shelves = shelf.shelves ?? []
             activeSubjectID = shelf.activeID
             shelfError = nil
+            // A shelf deleted elsewhere closes here.
+            shelfPath.removeAll { id in !shelves.contains { $0.id == id } }
         } catch {
             shelfError = BookSession.unreachable
         }
@@ -190,6 +196,60 @@ final class Library: ObservableObject {
         } catch {
             planError = "The server could not discard it. Try again."
         }
+    }
+
+    // The library's shape: what is on no shelf, and what is on one.
+
+    var unfiled: [SubjectInfo] { subjects.filter { $0.shelf == nil } }
+
+    func subjects(on shelf: String) -> [SubjectInfo] { subjects.filter { $0.shelf == shelf } }
+
+    func shelf(_ id: String) -> ShelfInfo? { shelves.first { $0.id == id } }
+
+    func createShelf(named name: String) async {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        do {
+            _ = try await service.createShelf(name: trimmed)
+            shelfError = nil
+        } catch {
+            shelfError = "The server could not make the shelf."
+        }
+        await refresh()
+    }
+
+    func renameShelf(_ id: String, to name: String) async {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        do {
+            _ = try await service.renameShelf(id, name: trimmed)
+            shelfError = nil
+        } catch {
+            shelfError = "The server could not rename the shelf."
+        }
+        await refresh()
+    }
+
+    /// Deleting a shelf returns what it held to the library.
+    func deleteShelf(_ id: String) async {
+        do {
+            try await service.deleteShelf(id)
+            shelfError = nil
+        } catch {
+            shelfError = "The server could not delete the shelf."
+        }
+        await refresh()
+    }
+
+    /// File a subject on a shelf, or, with nil, back in the library.
+    func move(_ subject: String, to shelf: String?) async {
+        do {
+            try await service.move(subject: subject, toShelf: shelf)
+            shelfError = nil
+        } catch {
+            shelfError = "The server could not move it."
+        }
+        await refresh()
     }
 
     /// A server from another device's code: saved, selected, probed, and
