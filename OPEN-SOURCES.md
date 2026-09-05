@@ -672,7 +672,17 @@ Status 2026-09-05: steps 1 and 2 are built (commits f750d68, e15ff07,
 fetched sections and writes attribution into the unit; the chapter shows
 its sources; `chiron teach -source` and the `sources` field on
 `/teach/create`. The first sourced book, "Bayes for an Engineer" from
-Think Bayes, was started on chiron2 the same day. Steps 3 to 5 are open.
+Think Bayes, is on the shelf the same evening: seven units, each adapted
+from the chapter the planner assigned. It took four runs, each resuming
+from the files on disk: units timed out at fifteen minutes on their depth
+variants (the author's limit is now thirty, and only the chapter call
+carries the material), the author wrote its own `sources:` key beside the
+pipeline's (the pipeline's now replaces it), and eight multiple-choice
+items lacked `check: choice` (the pipeline now adds it). Read of unit 0:
+Chiron's chapter shape with Downey's cookie problem, though the planner
+had assigned chapter 1, whose material (Linda, the survey data) went
+unused; the planner is now told to title units after the sections it
+assigns. Steps 3 to 5 are open.
 
 
 1. The index and the fetchers for the formats that cover most of section

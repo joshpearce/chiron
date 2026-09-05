@@ -208,3 +208,14 @@ func TestAnUnknownNameIsRecordedNotFatal(t *testing.T) {
 		t.Fatalf("sources.yaml:\n%s", raw)
 	}
 }
+
+func TestBareMCQsGetTheirCheck(t *testing.T) {
+	in := "items:\n  - id: q1\n    kind: mcq\n    prompt: a\n    options:\n      - text: x\n        correct: true\n\n  - id: q2\n    kind: mcq\n    check: choice\n    prompt: b\n\n  - id: q3\n    kind: constructed\n    check: llm\n"
+	got := withChoiceChecks(in)
+	if strings.Count(got, "check: choice") != 2 || !strings.Contains(got, "kind: mcq\n    check: choice\n    prompt: a") {
+		t.Fatalf("got:\n%s", got)
+	}
+	if withChoiceChecks(got) != got {
+		t.Fatal("not idempotent")
+	}
+}

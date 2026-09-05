@@ -421,11 +421,20 @@ func (g *Generator) authorUnit(u unitPlan, learner, bank, spec string) error {
 	}
 	headingList := strings.Join(headings, "\n")
 
-	if _, err := write(filepath.Join(dir, "questions.yaml"), "questions_yaml",
+	questionsPath := filepath.Join(dir, "questions.yaml")
+	questions, err := write(questionsPath, "questions_yaml",
 		"full questions.yaml content",
 		"Here is the canon.md you just wrote:\n\n"+canon+
-			"\n\nNow write questions.yaml for it, and nothing else."); err != nil {
+			"\n\nNow write questions.yaml for it, and nothing else.")
+	if err != nil {
 		return err
+	}
+	// An MCQ without `check: choice` is not graded as one; the model
+	// forgets it often enough that the pipeline adds it.
+	if fixed := withChoiceChecks(questions); fixed != questions {
+		if err := os.WriteFile(questionsPath, []byte(fixed), 0o644); err != nil {
+			return err
+		}
 	}
 	if _, err := write(filepath.Join(dir, "misconceptions.yaml"), "misconceptions_yaml",
 		"unit-local misconceptions.yaml content",
@@ -445,4 +454,34 @@ func (g *Generator) authorUnit(u unitPlan, learner, bank, spec string) error {
 		}
 	}
 	return nil
+}
+
+// withChoiceChecks adds `check: choice` to every `kind: mcq` item that has
+// no check line of its own.
+func withChoiceChecks(questions string) string {
+	lines := strings.Split(questions, "\n")
+	var out []string
+	for i, l := range lines {
+		out = append(out, l)
+		trimmed := strings.TrimSpace(l)
+		if trimmed != "kind: mcq" {
+			continue
+		}
+		indent := l[:len(l)-len(strings.TrimLeft(l, " "))]
+		has := false
+		for j := i + 1; j < len(lines); j++ {
+			next := lines[j]
+			if strings.TrimSpace(next) == "" || strings.HasPrefix(strings.TrimSpace(next), "- id:") {
+				break
+			}
+			if strings.HasPrefix(next, indent+"check:") {
+				has = true
+				break
+			}
+		}
+		if !has {
+			out = append(out, indent+"check: choice")
+		}
+	}
+	return strings.Join(out, "\n")
 }
