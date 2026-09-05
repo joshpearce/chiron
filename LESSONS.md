@@ -108,6 +108,13 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   it is tapped, which looks like a dead handler. `idb ui describe-all`
   shows the alert; `idb ui tap` on its Open button delivers the URL.
   Several opens stack several alerts.
+- **A `.confirmationDialog` or `.alert` on a button inside a `Menu` or
+  `.contextMenu` never shows (2026-09-05).** The menu's content is torn
+  down as it closes, and the state that would present the dialog goes
+  with it: "Delete shelf" did nothing on the iPad. Keep the presenting
+  state and the modifier on the view that stays on screen; the menu item
+  only flips the binding. The harness verb had bypassed the menu, so a UI
+  test now goes through it.
 - **XCUITest drags a `.draggable` card only if the press is short
   (2026-09-05).** A card with both `.contextMenu` and `.draggable` opens
   its menu at about a second; `press(forDuration: 0.6, thenDragTo:,

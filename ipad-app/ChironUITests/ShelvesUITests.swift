@@ -75,4 +75,57 @@ final class ShelvesUITests: XCTestCase {
         XCTAssertEqual(try shelfOf("data"), "", "the book is back in the library")
         try post("shelf/close", [:])
     }
+
+    /// The shelf's own menu renames it and deletes it, through the real
+    /// menu, alert and confirmation, which a dialog inside a menu never
+    /// reached.
+    func testTheShelfMenuRenamesAndDeletes() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["harness"]
+        app.launchEnvironment["CHIRON_SERVER"] = ProcessInfo.processInfo.environment["CHIRON_SERVER"] ?? "http://localhost:8084"
+        app.launch()
+        let deadline = Date().addingTimeInterval(20)
+        while Date() < deadline, (try? state()) == nil { Thread.sleep(forTimeInterval: 0.5) }
+        try post("shelf", [:])
+        for old in try XCTUnwrap(try state()["shelves"] as? [[String: Any]]) where (old["name"] as? String)?.hasPrefix("Menu") == true {
+            try post("shelf/delete", ["id": old["id"] as? String ?? ""])
+        }
+        try post("shelf/create", ["name": "Menu test"])
+        let shelves = try XCTUnwrap(try state()["shelves"] as? [[String: Any]])
+        let id = try XCTUnwrap(shelves.first { $0["name"] as? String == "Menu test" }?["id"] as? String)
+        made = id
+        try post("shelf/open", ["id": id])
+
+        let menu = app.buttons["Shelf menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 10), "the shelf screen's menu")
+        menu.tap()
+        let rename = app.buttons["Rename"]
+        XCTAssertTrue(rename.waitForExistence(timeout: 5))
+        rename.tap()
+        let field = app.textFields["Name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "the rename alert's field")
+        field.tap()
+        field.typeText(" renamed")
+        app.buttons["Save"].tap()
+        let renamed = Date().addingTimeInterval(10)
+        func name() throws -> String {
+            let list = try XCTUnwrap(try state()["shelves"] as? [[String: Any]])
+            return list.first { $0["id"] as? String == id }?["name"] as? String ?? ""
+        }
+        while Date() < renamed, (try name()) != "Menu test renamed" { Thread.sleep(forTimeInterval: 0.5) }
+        XCTAssertEqual(try name(), "Menu test renamed")
+
+        menu.tap()
+        let delete = app.buttons["Delete shelf"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        delete.tap()
+        let confirm = app.buttons["Delete the shelf"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "the confirmation")
+        confirm.tap()
+        let gone = Date().addingTimeInterval(10)
+        while Date() < gone, (try name()) != "" { Thread.sleep(forTimeInterval: 0.5) }
+        XCTAssertEqual(try name(), "", "the shelf is deleted")
+        XCTAssertEqual(try state()["open_shelf"] as? String, "", "and no longer open")
+        made = nil
+    }
 }

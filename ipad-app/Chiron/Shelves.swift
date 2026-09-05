@@ -6,6 +6,8 @@ struct ShelfFolderCard: View {
     @EnvironmentObject var library: Library
     let shelf: ShelfInfo
     @State private var over = false
+    @State private var renaming = false
+    @State private var deleting = false
 
     var body: some View {
         NavigationLink(value: shelf.id) {
@@ -36,22 +38,21 @@ struct ShelfFolderCard: View {
             Task { await library.move(id, to: shelf.id) }
             return true
         } isTargeted: { over = $0 }
-        .contextMenu { ShelfMenu(shelf: shelf) }
+        .contextMenu { ShelfMenu(renaming: $renaming, deleting: $deleting) }
+        .modifier(ShelfPrompts(shelf: shelf, renaming: $renaming, deleting: $deleting))
     }
 }
 
-/// Rename or delete a shelf; the same menu on the card and on the shelf's
-/// screen. Deleting returns what it held to the library.
+/// Rename or delete a shelf: the same two items on the card's menu and
+/// on the shelf's screen. The prompts they raise live on the view that
+/// stays on screen (`ShelfPrompts`); a dialog attached inside a menu is
+/// gone with the menu before it can show.
 struct ShelfMenu: View {
-    @EnvironmentObject var library: Library
-    let shelf: ShelfInfo
-    @State private var renaming = false
-    @State private var name = ""
-    @State private var deleting = false
+    @Binding var renaming: Bool
+    @Binding var deleting: Bool
 
     var body: some View {
         Button {
-            name = shelf.name
             renaming = true
         } label: {
             Label("Rename", systemImage: "pencil")
@@ -61,21 +62,38 @@ struct ShelfMenu: View {
         } label: {
             Label("Delete shelf", systemImage: "trash")
         }
-        .alert("Rename shelf", isPresented: $renaming) {
-            TextField("Name", text: $name)
-            Button("Save") { Task { await library.renameShelf(shelf.id, to: name) } }
-            Button("Cancel", role: .cancel) {}
-        }
-        .confirmationDialog("Delete \"\(shelf.name)\"?", isPresented: $deleting, titleVisibility: .visible) {
-            Button("Delete the shelf", role: .destructive) {
-                Task { await library.deleteShelf(shelf.id) }
+    }
+}
+
+/// The rename alert and the delete confirmation for one shelf. Deleting
+/// returns what it held to the library.
+struct ShelfPrompts: ViewModifier {
+    @EnvironmentObject var library: Library
+    let shelf: ShelfInfo
+    @Binding var renaming: Bool
+    @Binding var deleting: Bool
+    @State private var name = ""
+
+    func body(content: Content) -> some View {
+        content
+            .alert("Rename shelf", isPresented: $renaming) {
+                TextField("Name", text: $name)
+                Button("Save") { Task { await library.renameShelf(shelf.id, to: name) } }
+                Button("Cancel", role: .cancel) {}
             }
-            Button("Keep it", role: .cancel) {}
-        } message: {
-            Text(shelf.subjects.isEmpty
-                 ? "The shelf is empty."
-                 : "What is on it goes back to the library; nothing is lost.")
-        }
+            .onChange(of: renaming) { _, on in
+                if on { name = shelf.name }
+            }
+            .confirmationDialog("Delete \"\(shelf.name)\"?", isPresented: $deleting, titleVisibility: .visible) {
+                Button("Delete the shelf", role: .destructive) {
+                    Task { await library.deleteShelf(shelf.id) }
+                }
+                Button("Keep it", role: .cancel) {}
+            } message: {
+                Text(shelf.subjects.isEmpty
+                     ? "The shelf is empty."
+                     : "What is on it goes back to the library; nothing is lost.")
+            }
     }
 }
 
@@ -85,6 +103,8 @@ struct ShelfContentsView: View {
     @EnvironmentObject var library: Library
     let shelfID: String
     @State private var over = false
+    @State private var renaming = false
+    @State private var deleting = false
 
     private var shelf: ShelfInfo? { library.shelf(shelfID) }
     private var contents: [SubjectInfo] { library.subjects(on: shelfID) }
@@ -142,10 +162,10 @@ struct ShelfContentsView: View {
         .navigationTitle(shelf?.name ?? "Shelf")
         .toolbarTitleDisplayMode(.inline)
         .toolbar {
-            if let shelf {
+            if shelf != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        ShelfMenu(shelf: shelf)
+                        ShelfMenu(renaming: $renaming, deleting: $deleting)
                     } label: {
                         Label("Shelf", systemImage: "ellipsis.circle")
                     }
@@ -153,5 +173,6 @@ struct ShelfContentsView: View {
                 }
             }
         }
+        .modifier(ShelfPrompts(shelf: shelf ?? ShelfInfo(id: shelfID, name: ""), renaming: $renaming, deleting: $deleting))
     }
 }
