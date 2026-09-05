@@ -37,6 +37,8 @@ You are on the machine that serves the book. Facts that matter:
 
 ## Everywhere
 
+- `LESSONS.md` holds what cost more than ten minutes to learn. Read it
+  before debugging; add to it in the same commit as the fix.
 - Tests: `make test` (Go and the page script); corpus lint: `make lint`.
 - App tests and Simulator walks need the Mac: `scripts/sim-run.sh test`,
   `scripts/sim-verify.sh`.

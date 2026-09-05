@@ -519,3 +519,96 @@ leaves the shelf when its book registers. Harness verbs: `capture` takes
 `scale`; `draft/open`, `plan`, `build`, `discard`; state carries
 `capture_answer` and `plan_card`. The open decision above is settled by
 this: a primer is not promoted; the reader picks the scale at capture.
+
+## 13. Phone, other devices, PDFs, and the shelf first (plan, 2026-09-05)
+
+Five asks, in the order to do them. Each is done when its Simulator walk
+passes and the device check named for it is done.
+
+### 13.1 The bookshelf is the first screen (half an hour)
+
+Today the app reopens on the book last open (`openActiveAtLaunch`). It
+should open on the shelf, with that book's card saying "Open now" as it
+already does. Change: `openActiveAtLaunch` refreshes and stops; the
+self-test and `sim-verify.sh` steps that expect a book at launch open one
+first. Harness state unchanged.
+
+### 13.2 Lessons learned live in the repo (now, then always)
+
+`LESSONS.md` at the root: one entry per thing that cost more than ten
+minutes to learn, dated, with the symptom, the cause and what to do. The
+rule in `CLAUDE.md`: add to it in the same commit as the fix. Seeded from
+this week (glass swallows taps, invalid SF Symbol names render as text,
+XCUI typing waits on a blinking caret, `hitTest` never sees the touch on
+the device, page rects are offset by the bar inset, `sprite-env` keeps
+only the last `--env`, `claude --update` hangs on the sprite, a shell
+without a locale draws ASCII, ssh config order decides which key goes
+first, and the rest).
+
+### 13.3 Set up another device from a QR code (half a day)
+
+Server settings gets "Set up another device": a QR code encoding
+`chiron://server?name=...&url=...&key=...` for the selected server, with
+a line saying the code carries the shared key and is for your own devices.
+The way in on the other device is two-fold, so it works with or without
+the app open:
+
+- The Camera app reads the code and offers "Open in Chiron"; the app's
+  `onOpenURL` (already there for captures) adds the server, selects it,
+  probes, and enrols the device key as the settings sheet does on save.
+- "Add a server" gets a "Scan a code" button: a `DataScannerViewController`
+  (VisionKit) sheet that reads the same URL; the same handler takes it.
+
+Tests: URL parse and round trip (unit), the handler through the harness
+(`server/url` verb), and a Simulator screenshot of the code. Device check:
+scan the iPad's code with the phone.
+
+### 13.4 Chiron on the phone, with the shelf and progress shared (two days)
+
+Two halves. The **app on the phone**: add iPhone to the target
+(`TARGETED_DEVICE_FAMILY` 1,2 in `project.yml`), and walk every screen at
+compact width: the shelf (already a stack), the reader (contents is a
+sheet in compact width already; the palette shrinks to symbols along the
+bottom edge; the ask card becomes a bottom sheet), the capture and
+planning cards (full sheets on the phone), Teach me, settings. Pencil-only
+paths stay guarded. The share extension is the phone's main way in:
+"Create me a primer from this text" from Safari, put the phone down, pick
+up the iPad.
+
+The **shared state**. The server already holds the learner record (units
+cleared, current unit, debt, the active book), so progress is shared
+today. What is not: highlights, questions and their answers, margin
+notes, ink and the reading position, which live in each device's
+Application Support. Move them to the server as annotations:
+`GET /annotations/{subject}/{unit}` and `PUT` of the same, one document
+per unit with `marks`, `ink` (PencilKit data, base64) and `position`,
+each carrying `updated_at`; the app pulls on opening a unit, pushes on
+`persist()` and after every mark or ink change (debounced as ink already
+is), last writer wins per field, and keeps working offline from its
+cache. `BookSession` gains a sync step; `Sync` gains two calls; the
+FakeService records them. Device check: highlight on the iPad, see it on
+the phone; ink on the phone, see it on the iPad.
+
+### 13.5 PDFs on the shelf (two to three days, in three steps)
+
+1. **Import and read.** A PDF arrives by the share sheet (the extension
+   already takes PDFs, today as text for a primer) or from Files
+   (`.fileImporter` behind an "Import a PDF" item in the shelf's bar).
+   The app uploads it: `POST /documents` (multipart: the file, its name),
+   the server keeps it under `state/documents/<id>/` with a `document.json`
+   (title, pages, size, imported_at) and lists it on the shelf as
+   kind `pdf` with a page count and the last page read. The reader shows
+   it in `PDFView` (PDFKit) with the same chrome and the reading position
+   (page and scroll) as an annotation per 13.4. Harness: `import` with a
+   file path, `pdf/page`.
+2. **Ink.** Pencil strokes as PDFKit ink annotations, saved into the
+   document and pushed as annotations per page rather than re-uploading
+   the file, so the phone and the iPad see the same marks.
+3. **Ask and capture.** A selection in `PDFView` feeds the ask card and
+   the capture tool the way a page selection does (text, page number),
+   so a passage of a paper becomes a primer or a book; the primer's
+   source names the document and page.
+
+Not planned: rendering PDFs through the book's web page, or turning a PDF
+into a smart book in one tap. The capture tool at the book scale already
+covers the second from any passage.
