@@ -11,6 +11,8 @@ struct ReaderContainer: View {
     /// book nils the chapter and switches screen, and SwiftUI re-evaluated
     /// this body against the nil chapter before the screen change took effect.
     let chapter: ChapterPayload
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var compact: Bool { sizeClass == .compact }
 
     var body: some View {
         // The page runs under the bars, as the system's bars expect; the
@@ -18,18 +20,29 @@ struct ReaderContainer: View {
         // the card stay within the safe area.
         ReaderView(chapter: chapter)
             .ignoresSafeArea()
-            .overlay(alignment: .trailing) {
+            .overlay(alignment: compact ? .bottomTrailing : .trailing) {
                 Palette()
                     .padding(.trailing, 10)
+                    .padding(.bottom, compact ? 10 : 0)
             }
             .overlay(alignment: .bottomTrailing) {
-                if session.asking != nil {
+                if !compact, session.asking != nil {
                     AskCard()
                         .padding(16)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
         .animation(.easeInOut(duration: 0.2), value: session.asking != nil)
+        // In compact width the card is a bottom sheet: half the page stays
+        // in view above it, with the passage it is about.
+        .sheet(isPresented: Binding(
+            get: { compact && session.asking != nil },
+            set: { if !$0 { session.closeAsking() } })) {
+            AskCard(sheet: true)
+                .environmentObject(session)
+                .presentationDetents([.medium, .large])
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+        }
         // The Pencil Pro's gestures do what the reader chose for them in
         // Settings, as the Pencil settings promise; "show the palette" is
         // read as "next tool", since the palette is already on the page.

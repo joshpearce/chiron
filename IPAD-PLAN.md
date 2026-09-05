@@ -564,15 +564,16 @@ scan the iPad's code with the phone.
 
 ### 13.4 Chiron on the phone, with the shelf and progress shared (two days)
 
-Two halves. The **app on the phone**: add iPhone to the target
-(`TARGETED_DEVICE_FAMILY` 1,2 in `project.yml`), and walk every screen at
-compact width: the shelf (already a stack), the reader (contents is a
-sheet in compact width already; the palette shrinks to symbols along the
-bottom edge; the ask card becomes a bottom sheet), the capture and
-planning cards (full sheets on the phone), Teach me, settings. Pencil-only
-paths stay guarded. The share extension is the phone's main way in:
-"Create me a primer from this text" from Safari, put the phone down, pick
-up the iPad.
+Two halves. The **app on the phone** (done 2026-09-05, Simulator; device
+check pending): iPhone is in the target, portrait only. At compact width
+the palette lies along the bottom edge and a phone's palette has no pen
+or eraser (ink needs a Pencil); the ask card is a bottom sheet with the
+page above it; contents, capture and planning were sheets already; the
+shelf scrolls (it was a stack that centred and lost its header once the
+cards overflowed, on the iPad too). `chiron-iphone` is the Simulator
+(iPhone 17, iOS 26.5); `DEVICE=chiron-iphone scripts/sim-run.sh ...`.
+The share extension is the phone's main way in: "Create me a primer from
+this text" from Safari, put the phone down, pick up the iPad.
 
 The **shared state**. The server already holds the learner record (units
 cleared, current unit, debt, the active book), so progress is shared

@@ -8,6 +8,9 @@ import SwiftUI
 /// card carries a margin note, whose answer is a new section on the page.
 struct AskCard: View {
     @EnvironmentObject var session: BookSession
+    /// In a sheet (compact width) the card fills it and the sheet is the
+    /// surface; on the page it is a card of its own width.
+    var sheet = false
     @State private var question = ""
     @State private var confirmingDelete = false
     @FocusState private var typing: Bool
@@ -94,16 +97,28 @@ struct AskCard: View {
             }
         }
         .padding(18)
-        .frame(width: 400)
-        // Material, not glass: a glass surface takes the taps meant for the
-        // buttons on it (the UI test proves it), and the card carries text
-        // to read, which the guidance keeps off glass anyway.
-        .background(.regularMaterial, in: .rect(cornerRadius: 26))
-        .shadow(color: .black.opacity(0.1), radius: 16, y: 4)
+        .modifier(Surface(sheet: sheet))
         .onAppear { typing = asking?.mark.question == nil }
         .onChange(of: asking?.mark.id) { _, _ in
             question = ""
             typing = asking?.mark.question == nil
+        }
+    }
+
+    private struct Surface: ViewModifier {
+        let sheet: Bool
+        func body(content: Content) -> some View {
+            if sheet {
+                content.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            } else {
+                // Material, not glass: a glass surface takes the taps meant
+                // for the buttons on it (the UI test proves it), and the card
+                // carries text to read, which the guidance keeps off glass.
+                content
+                    .frame(width: 400)
+                    .background(.regularMaterial, in: .rect(cornerRadius: 26))
+                    .shadow(color: .black.opacity(0.1), radius: 16, y: 4)
+            }
         }
     }
 

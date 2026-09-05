@@ -44,4 +44,12 @@ final class ToolTests: XCTestCase {
         s.tool = .none
         s.switchPrevious(); XCTAssertEqual(s.tool, .highlighter, "putting a tool down and switching back picks it up again")
     }
+
+    /// Ink needs a Pencil: a phone's palette has no pen and no eraser; the
+    /// iPad's keeps the pen first and the eraser last.
+    func testAPhoneHasNoInkTools() {
+        XCTAssertEqual(Palette.tools(primer: false, inkable: false).map(\.0), [.highlighter, .ask, .capture])
+        XCTAssertEqual(Palette.tools(primer: true, inkable: false).map(\.0), [.highlighter, .ask, .note, .capture])
+        XCTAssertEqual(Palette.tools(primer: false, inkable: true).map(\.0), [.pen, .highlighter, .ask, .capture, .eraser])
+    }
 }

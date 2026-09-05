@@ -282,32 +282,36 @@ struct BookshelfView: View {
     }
 
     private var shelf: some View {
-        VStack(spacing: 28) {
-            VStack(spacing: 10) {
-                Image("Logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 160)
-                    .accessibilityHidden(true)
-                Text("Chiron").font(Typography.display(52))
-                Text("The bookshelf")
-                    .font(Typography.serifItalic(20))
-                    .foregroundStyle(.secondary)
-            }
-            VStack(spacing: 12) {
-                ForEach(library.subjects) { s in
-                    ShelfCard(subject: s)
-                }
-                if library.subjects.isEmpty && !library.loadingShelf {
-                    Text(library.shelfError ?? "No books on the shelf.")
+        ScrollView {
+            VStack(spacing: 28) {
+                VStack(spacing: 10) {
+                    Image("Logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 160)
+                        .accessibilityHidden(true)
+                    Text("Chiron").font(Typography.display(52))
+                    Text("The bookshelf")
+                        .font(Typography.serifItalic(20))
                         .foregroundStyle(.secondary)
                 }
+                VStack(spacing: 12) {
+                    ForEach(library.subjects) { s in
+                        ShelfCard(subject: s)
+                    }
+                    if library.subjects.isEmpty && !library.loadingShelf {
+                        Text(library.shelfError ?? "No books on the shelf.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let err = library.shelfError, !library.subjects.isEmpty {
+                    Text(err).foregroundStyle(.red).font(.callout)
+                }
             }
-            if let err = library.shelfError, !library.subjects.isEmpty {
-                Text(err).foregroundStyle(.red).font(.callout)
-            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 24)
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

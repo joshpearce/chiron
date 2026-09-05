@@ -41,8 +41,9 @@ targets:
         type: folder
     settings:
       base:
-        TARGETED_DEVICE_FAMILY: "2"          # iPad only
+        TARGETED_DEVICE_FAMILY: "1,2"        # the iPad reads; the phone captures and reads along
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait"
         CODE_SIGN_STYLE: Automatic
         # Fly.io, Inc - a paid team, so provisioning profiles last a year
         # rather than the seven days a personal team gets. The free-team profile
@@ -94,7 +95,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Chiron
-        TARGETED_DEVICE_FAMILY: "2"
+        TARGETED_DEVICE_FAMILY: "1,2"
         CURRENT_PROJECT_VERSION: 1
         MARKETING_VERSION: 1.0
     info:
