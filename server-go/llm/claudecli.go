@@ -19,13 +19,16 @@ type ClaudeCLI struct {
 }
 
 // The planner writes a whole syllabus in one call (every unit's concepts,
-// prereqs, notes and sources, plus the misconception bank), so it gets the
-// author's budget: at five minutes a reference-depth book timed out at that
-// step three times running.
+// prereqs, notes and sources, plus the misconception bank), so it gets a
+// long budget: at five minutes a reference-depth book timed out at that
+// step three times running. The author's depth variants are longer still:
+// a deeper-math file for a 35 KB chapter, written at the CLI's ~33 tokens
+// a second with three units in flight, ran past fifteen minutes three
+// times on the first sourced book.
 var roleTimeouts = map[string]time.Duration{
 	"grader":  5 * time.Minute,
 	"planner": 15 * time.Minute,
-	"author":  15 * time.Minute,
+	"author":  30 * time.Minute,
 }
 
 // Per-role model tiers. Grading is a bounded judgement against an explicit
