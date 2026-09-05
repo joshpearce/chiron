@@ -95,6 +95,12 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
 - **A test that gates every model call deadlocks a new call in front of
   it (2026-09-04).** `gatedChain` now gates the author only.
 
+- **The served corpus on the sprite is a copy, not the checkout
+  (2026-09-05).** `/home/sprite/chiron/corpus` was copied once in August;
+  `make deploy` swapped only the binary, so the new source index was not
+  there and the first sourced book planned from the brief alone. Deploy
+  now copies the files the server reads at build time (the authoring
+  contract, `corpus/sources/index.yaml`); unit files stay as they are.
 - **A primer has no chapter until something opens it (2026-09-05).**
   `GET /chapter/{id}` is nil for a ready primer nobody has read; the app
   opens it with `POST /exchange {phase: start}`, which makes the first

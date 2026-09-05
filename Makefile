@@ -28,6 +28,12 @@ deploy: test
 	$(GO) build -ldflags="-s -w" -o $(BIN).new ./cmd/chiron-server
 	[ -f $(BIN) ] && cp $(BIN) $(BIN).$$(date +%b%d | tr A-Z a-z) || true
 	mv $(BIN).new $(BIN)
+	# The served corpus is a copy, not the checkout: the files the server
+	# reads at build time (the authoring contract, the source index) go
+	# with the binary. Unit files stay: they are the live book.
+	mkdir -p $(SERVED)/corpus/sources
+	cp corpus/authoring-spec.md $(SERVED)/corpus/authoring-spec.md
+	cp corpus/sources/index.yaml $(SERVED)/corpus/sources/index.yaml
 	sprite-env services restart chiron-server
 	sleep 3
 	@printf 'server /ping  %s\n' "$$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/ping)"
