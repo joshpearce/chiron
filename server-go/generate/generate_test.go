@@ -161,6 +161,25 @@ func TestABookIsPlannedAndAuthoredFromANamedSource(t *testing.T) {
 	}
 }
 
+// A rerun keeps the syllabus it has and only writes what is missing.
+func TestARerunKeepsTheSyllabus(t *testing.T) {
+	dir := t.TempDir()
+	spec := filepath.Join(dir, "spec.md")
+	os.WriteFile(spec, []byte("contract"), 0o644)
+	out := filepath.Join(dir, "out")
+	os.MkdirAll(out, 0o755)
+	os.WriteFile(filepath.Join(out, "syllabus.yaml"), []byte("units:\n  - id: u0\n    slug: a\n    title: A\n  - id: u1\n    slug: b\n    title: B\n"), 0o644)
+	chain := &stubChain{payloads: map[string]map[string]any{}}
+	g := &Generator{Chain: chain, SpecPath: spec, OutDir: out}
+	total, err := g.Plan("anything", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(chain.asked["planner"]) != 0 {
+		t.Fatalf("total=%d planner calls=%d", total, len(chain.asked["planner"]))
+	}
+}
+
 func TestAnUnknownNameIsRecordedNotFatal(t *testing.T) {
 	dir := t.TempDir()
 	spec := filepath.Join(dir, "spec.md")

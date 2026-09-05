@@ -14,6 +14,7 @@ package generate
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -187,6 +188,16 @@ func (g *Generator) Plan(brief, title string, named []string) (int, error) {
 	if err := os.MkdirAll(g.OutDir, 0o755); err != nil {
 		return 0, err
 	}
+	// A syllabus already on disk is kept: a rerun after a failed unit
+	// finishes the book rather than planning a different one.
+	if raw, err := os.ReadFile(filepath.Join(g.OutDir, "syllabus.yaml")); err == nil {
+		var existing struct {
+			Units []unitPlan `yaml:"units"`
+		}
+		if yaml.Unmarshal(raw, &existing) == nil && len(existing.Units) > 0 {
+			return len(existing.Units), nil
+		}
+	}
 	chosen, unknown := g.resolveSources(context.Background(), named, brief)
 	if err := g.writeSources(chosen, unknown); err != nil {
 		return 0, err
@@ -323,6 +334,7 @@ func (g *Generator) Units(only []string, progress Progress) (int, error) {
 			done++
 			if err != nil {
 				failures++
+				log.Printf("generate %s: unit %s: %v", filepath.Base(g.OutDir), u.ID, err)
 			}
 			d := done
 			mu.Unlock()
