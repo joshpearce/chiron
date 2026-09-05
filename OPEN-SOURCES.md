@@ -665,6 +665,16 @@ agent can say "starting from X" without writing it into the brief, and
 
 ### 6.8 Order of work and cost
 
+Status 2026-09-05: steps 1 and 2 are built (commits f750d68, e15ff07,
+0835d43): `server-go/sources` with the index at `corpus/sources/index.yaml`
+(66 entries, 45 with recipes) and seven fetchers, all checked live;
+`generate` resolves named sources, plans from the spine, authors from the
+fetched sections and writes attribution into the unit; the chapter shows
+its sources; `chiron teach -source` and the `sources` field on
+`/teach/create`. The first sourced book, "Bayes for an Engineer" from
+Think Bayes, was started on chiron2 the same day. Steps 3 to 5 are open.
+
+
 1. The index and the fetchers for the formats that cover most of section
    2: GitHub raw, OpenStax REX, LibreTexts HTML, MediaWiki, OCW, Gutenberg,
    Pressbooks. About a day and a half, fixtures included.
