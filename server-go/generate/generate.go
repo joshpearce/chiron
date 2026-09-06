@@ -359,7 +359,8 @@ func (g *Generator) authorUnit(u unitPlan, learner, bank, spec string) error {
 	if err != nil {
 		return err
 	}
-	material, provs, err := g.material(context.Background(), dir, u)
+	ctx := context.Background()
+	material, provs, err := g.material(ctx, dir, u)
 	if err != nil {
 		return err
 	}
@@ -424,10 +425,22 @@ func (g *Generator) authorUnit(u unitPlan, learner, bank, spec string) error {
 	}
 	headingList := strings.Join(headings, "\n")
 
+	// The sources' own exercises become items before the author writes the
+	// bank, so a source's worked problems are the check rather than a
+	// paraphrase of them. A failed import costs the unit those items, not
+	// the unit.
+	imported, err := g.importItems(ctx, dir, u, unitYAML, spec, bank)
+	if err != nil {
+		log.Printf("generate: %s: importing exercises: %v", u.ID, err)
+	}
+	withImported := ""
+	if imported != "" {
+		withImported = "\n\nITEMS IMPORTED FROM THE SOURCES' EXERCISES (already in the schema; every one stays in the check list with only its concept and difficulty adjusted; write the rest of the bank around them):\n\n" + imported
+	}
 	questionsPath := filepath.Join(dir, "questions.yaml")
 	questions, err := write(questionsPath, "questions_yaml",
 		"full questions.yaml content",
-		"Here is the canon.md you just wrote:\n\n"+canon+
+		"Here is the canon.md you just wrote:\n\n"+canon+withImported+
 			"\n\nNow write questions.yaml for it, and nothing else.")
 	if err != nil {
 		return err

@@ -213,6 +213,7 @@ func Rewrite(chain llm.Chain, dir, bankPath, specPath string, batch int) ([]stri
 			return nil, err
 		}
 		for _, r := range out.Items {
+			r.YAML = withChoiceCheck(r.YAML)
 			if err := validate(r.ID, r.YAML); err != nil {
 				return nil, err
 			}
@@ -260,6 +261,17 @@ func schema() map[string]any {
 		},
 		"required": []string{"items"},
 	}
+}
+
+var optionsLine = regexp.MustCompile(`(?m)^  options:`)
+
+// withChoiceCheck adds `check: choice` to an item that has options and no
+// check line; the model forgets it often enough to add it here.
+func withChoiceCheck(block string) string {
+	if checkLine.MatchString(block) || !optionsLine.MatchString(block) {
+		return block
+	}
+	return strings.TrimRight(block, "\n") + "\n  check: choice\n"
 }
 
 // validate: the block parses as one item with that id, answered by a tap.

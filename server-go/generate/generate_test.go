@@ -37,6 +37,9 @@ func (c *stubChain) Structured(role, system, user string, schema map[string]any,
 			payload = map[string]any{key: c.payloads["author"]["body"]}
 		}
 	}
+	if name == "imported_items" {
+		payload = c.payloads["import"]
+	}
 	data, _ := json.Marshal(payload)
 	return json.Unmarshal(data, out)
 }
@@ -81,7 +84,7 @@ func TestABookIsPlannedAndAuthoredFromANamedSource(t *testing.T) {
 		case "/api/repos/AllenDowney/ThinkBayes2/contents/notebooks":
 			w.Write([]byte(`[{"name":"chap01.ipynb","type":"file"},{"name":"chap02.ipynb","type":"file"}]`))
 		case "/AllenDowney/ThinkBayes2/master/notebooks/chap02.ipynb":
-			w.Write([]byte(`{"cells":[{"cell_type":"markdown","source":"# Bayes's Theorem\n\nThe cookie problem, in Downey's words.\n"}]}`))
+			w.Write([]byte(`{"cells":[{"cell_type":"markdown","source":"# Bayes's Theorem\n\nThe cookie problem, in Downey's words.\n\n## Exercises\n\n**Exercise:** Two coins, one fair. P(heads)?\n"},{"cell_type":"code","source":"# Solution\n\np = 0.75\n"}]}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -109,6 +112,7 @@ func TestABookIsPlannedAndAuthoredFromANamedSource(t *testing.T) {
 			"misconceptions": []map[string]any{},
 		},
 		"author": {"body": "---\nunit: u0\ntitle: Bayes's Theorem\n---\n\n## The cookie problem\n\nIn Downey's words, adapted.\n"},
+		"import": {"items": []map[string]any{{"source": "think-bayes chap02.ipynb exercise 1", "yaml": "- id: u0-e1\n  concept: c-bayes\n  kind: constructed\n  prompt: Two coins, one fair. P(heads)?\n  answer: '0.75'\n  check: numeric(0.01)\n  difficulty: core\n"}}},
 	}}
 	g := &Generator{Chain: chain, SpecPath: spec, OutDir: filepath.Join(dir, "corpus-bayes"), Index: idx, Fetch: client, Workers: 1}
 
@@ -152,6 +156,16 @@ func TestABookIsPlannedAndAuthoredFromANamedSource(t *testing.T) {
 			t.Fatal("only the canon call carries the material")
 		}
 	}
+	// The source's exercises were imported before the bank was written,
+	// and the author wrote the bank around them.
+	importPrompt := chain.asked["author"][1]
+	if !strings.Contains(importPrompt, "think-bayes chap02.ipynb exercise 1") || !strings.Contains(importPrompt, "SOLUTION:\n```python\n# Solution\n\np = 0.75") {
+		t.Fatalf("the importer did not see the exercise and its solution:\n%s", importPrompt)
+	}
+	questionsPrompt := chain.asked["author"][2]
+	if !strings.Contains(questionsPrompt, "ITEMS IMPORTED") || !strings.Contains(questionsPrompt, "- id: u0-e1\n") || !strings.Contains(questionsPrompt, "source: think-bayes chap02.ipynb exercise 1") {
+		t.Fatalf("the bank was not written around the imported items:\n%s", questionsPrompt)
+	}
 	unitDir := filepath.Join(g.OutDir, "units", "u0-bayes-theorem")
 	canon, _ := os.ReadFile(filepath.Join(unitDir, "canon.md"))
 	if !strings.Contains(string(canon), "sources:\n") || !strings.Contains(string(canon), "title: Think Bayes 2e") || !strings.Contains(string(canon), "licence: CC BY-NC-SA 4.0") {
@@ -159,6 +173,9 @@ func TestABookIsPlannedAndAuthoredFromANamedSource(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(unitDir, "sources", "01-think-bayes-chap02-ipynb.provenance.yaml")); err != nil {
 		t.Fatal("the chunk's provenance was not written beside the unit")
+	}
+	if imported, err := os.ReadFile(filepath.Join(unitDir, "imported.yaml")); err != nil || !strings.Contains(string(imported), "u0-e1") {
+		t.Fatalf("imported.yaml: %v %q", err, imported)
 	}
 
 	// A unit with no sources is authored from the brief, with no material block.

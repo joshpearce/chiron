@@ -10,6 +10,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/mjbraun/chiron/server/roles"
 	"github.com/mjbraun/chiron/server/sources"
 )
 
@@ -334,4 +335,36 @@ func dropTopLevelKey(front, key string) string {
 		out = append(out, l)
 	}
 	return strings.Join(out, "\n")
+}
+
+// importItems turns the exercises of the unit's adaptable sources into
+// bank items, kept in imported.yaml beside the unit so a rerun reuses them.
+func (g *Generator) importItems(ctx context.Context, dir string, u unitPlan, unitYAML []byte, spec, bank string) (string, error) {
+	if len(u.Sources) == 0 || g.Index == nil || g.Fetch == nil {
+		return "", nil
+	}
+	path := filepath.Join(dir, "imported.yaml")
+	if existing, err := os.ReadFile(path); err == nil && len(existing) > 0 {
+		return string(existing), nil
+	}
+	var imported []roles.Imported
+	for _, us := range u.Sources {
+		s := g.Index.Get(us.Source)
+		if s == nil || s.Verdict != sources.Adaptable || s.Fetch.Kind == "" {
+			continue
+		}
+		ex, err := g.Fetch.Exercises(ctx, s, us.Locator)
+		if err != nil || len(ex) == 0 {
+			continue
+		}
+		imported = append(imported, roles.Imported{Source: s.ID, Locator: us.Locator, Title: s.Title, Exercises: ex})
+	}
+	if len(imported) == 0 {
+		return "", nil
+	}
+	items, err := roles.ImportItems(g.Chain, u.ID, string(unitYAML), spec, bank, imported)
+	if err != nil || items == "" {
+		return "", err
+	}
+	return items, os.WriteFile(path, []byte(items), 0o644)
 }

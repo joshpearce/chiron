@@ -108,3 +108,18 @@ func TestValidateAcceptsAPretestChoiceWithoutAKind(t *testing.T) {
 		t.Fatal("prose item accepted")
 	}
 }
+
+func TestAnOptionsItemWithoutACheckLineBecomesAChoice(t *testing.T) {
+	block := "- id: u1-q1\n  kind: mcq\n  prompt: which?\n  options:\n    - text: a\n      correct: true\n      explain: yes\n"
+	got := withChoiceCheck(block)
+	if !strings.HasSuffix(got, "  check: choice\n") {
+		t.Fatalf("got %q", got)
+	}
+	if withChoiceCheck(got) != got {
+		t.Fatal("a second pass changed it")
+	}
+	numeric := "- id: u1-q2\n  kind: constructed\n  prompt: how many?\n  answer: 3\n"
+	if withChoiceCheck(numeric) != numeric {
+		t.Fatal("a constructed item gained a choice check")
+	}
+}

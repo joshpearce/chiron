@@ -184,6 +184,13 @@ Rules:
   explaining or deriving is the skill being checked. A reader on a phone
   answers by tapping; prose is the exception that has to earn its place.
 - Anything a program can check (`numeric`, `exact`, `choice`) must NOT use `check: llm`.
+- **Imported items (2026-09-06):** when a unit adapts a source whose
+  exercises come with answers, the pipeline imports them first as items in
+  this schema, each carrying `source: "<source id> <locator> exercise <n>"`.
+  The author writes the rest of the bank around them: every imported item
+  stays, with only its `concept` and `difficulty` adjusted, and the author
+  adds what the mix, the pretest and the callback and stretch rules still
+  need.
 - At least 2 items per unit marked `callback_eligible` and at least 1 `stretch`
   item that the >90% path can use.
 

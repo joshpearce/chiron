@@ -40,6 +40,9 @@ type Recipe struct {
 	Ref  string `yaml:"ref,omitempty" json:"ref,omitempty"`
 	Path string `yaml:"path,omitempty" json:"path,omitempty"`
 	Dir  string `yaml:"dir,omitempty" json:"dir,omitempty"`
+	// Solutions is a second Path template for a companion that holds the
+	// answers to a locator's exercises (Downey keeps them under soln/).
+	Solutions string `yaml:"solutions,omitempty" json:"solutions,omitempty"`
 	// openstax: Book uuid, Version when not the default.
 	Book    string `yaml:"book,omitempty" json:"book,omitempty"`
 	Version string `yaml:"version,omitempty" json:"version,omitempty"`

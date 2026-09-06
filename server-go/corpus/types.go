@@ -97,6 +97,9 @@ type Question struct {
 	Congruent        bool              `yaml:"congruent" json:"-"`
 	CallbackEligible bool              `yaml:"callback_eligible" json:"-"`
 	Options          []checkers.Option `yaml:"options" json:"-"`
+	// Source names the open text an imported item came from: the source
+	// id, the locator and the exercise number.
+	Source string `yaml:"source,omitempty" json:"-"`
 }
 
 // Beat is one in-chapter interaction. Step-based interaction is where the

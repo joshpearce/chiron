@@ -85,6 +85,7 @@ sources:
     repo: AllenDowney/ThinkBayes2
     ref: master
     path: notebooks/{locator}
+    solutions: soln/{locator}
   contents:
   - locator: chap01.ipynb
     title: 'Chapter 1: Probability'
