@@ -191,19 +191,24 @@ struct SubjectInfo: Codable, Identifiable {
     let progress: String?
     /// The shelf it is filed on; none means the top of the library.
     let shelf: String?
+    /// Documents only: pages in the PDF and the page last read.
+    let pages: Int?
+    let page: Int?
 
     init(id: String, title: String, unitsTotal: Int? = nil, unitsCleared: Int? = nil, currentUnit: String? = nil,
          debt: Int? = nil, kind: String? = nil, status: String? = nil, error: String? = nil,
          source: PrimerSource? = nil, capturedAt: String? = nil, scale: String? = nil, book: String? = nil,
-         progress: String? = nil, shelf: String? = nil) {
+         progress: String? = nil, shelf: String? = nil, pages: Int? = nil, page: Int? = nil) {
         self.id = id; self.title = title; self.unitsTotal = unitsTotal; self.unitsCleared = unitsCleared
         self.currentUnit = currentUnit; self.debt = debt; self.kind = kind; self.status = status
         self.error = error; self.source = source; self.capturedAt = capturedAt
         self.scale = scale; self.book = book; self.progress = progress
         self.shelf = shelf.flatMap { $0.isEmpty ? nil : $0 }
+        self.pages = pages; self.page = page
     }
 
     var isPrimer: Bool { kind == "primer" }
+    var isPDF: Bool { kind == "pdf" }
     /// The server is writing it: a primer being authored, a book being built.
     var authoring: Bool { isPrimer && (status == "authoring" || status == "building") }
     var failed: Bool { isPrimer && status == "failed" }
@@ -213,6 +218,11 @@ struct SubjectInfo: Codable, Identifiable {
     var building: Bool { isPrimer && status == "building" }
 
     var progressLine: String {
+        if isPDF {
+            guard let n = pages, n > 0 else { return "PDF" }
+            if let p = page, p > 0 { return "page \(p + 1) of \(n)" }
+            return "\(n) pages"
+        }
         if drafting { return "Planning the \(scale == "book" ? "book" : "primer") · \(sourceLine)" }
         if building { return progress.map { "Building the book · \($0)" } ?? "Building the book" }
         if isPrimer { return sourceLine }
@@ -240,7 +250,7 @@ struct SubjectInfo: Codable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, debt, kind, status, error, source, scale, book, progress, shelf
+        case id, title, debt, kind, status, error, source, scale, book, progress, shelf, pages, page
         case unitsTotal = "units_total"
         case unitsCleared = "units_cleared"
         case currentUnit = "current_unit"
@@ -697,5 +707,18 @@ struct ReconciledAnnotations: Codable, Equatable {
         case version, marks, position
         case inkB64 = "ink_b64"
         case inkOtherB64 = "ink_other_b64"
+    }
+}
+
+/// A PDF the server keeps for the shelf, with where the reader is in it.
+struct Document: Codable, Equatable {
+    let id: String
+    let title: String
+    let pages: Int
+    var page: Int
+    var position: Double
+
+    init(id: String, title: String, pages: Int, page: Int = 0, position: Double = 0) {
+        self.id = id; self.title = title; self.pages = pages; self.page = page; self.position = position
     }
 }

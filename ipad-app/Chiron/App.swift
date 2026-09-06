@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 @main
 struct ChironApp: App {
@@ -63,6 +64,9 @@ struct ContentView: View {
                 BookView()
                     .environmentObject(session)
                     .id(session.subjectID)
+            } else if let doc = library.document {
+                DocumentReaderView(doc: doc)
+                    .id(doc.id)
             } else {
                 BookshelfView()
             }
@@ -261,6 +265,7 @@ struct BookshelfView: View {
     @EnvironmentObject var library: Library
     @State private var showSettings = false
     @State private var namingShelf = false
+    @State private var importingPDF = false
     @State private var newShelfName = ""
 
     var body: some View {
@@ -292,6 +297,13 @@ struct BookshelfView: View {
                             Label("New shelf", systemImage: "folder.badge.plus")
                         }
                         .disabled(!library.sync.connected)
+                        Button {
+                            importingPDF = true
+                        } label: {
+                            Label("Import a PDF", systemImage: "doc.badge.plus")
+                        }
+                        .disabled(!library.sync.connected)
+                        .accessibilityHint("A PDF from Files goes on the shelf")
                     }
                     ToolbarSpacer(.fixed, placement: .topBarTrailing)
                     ToolbarItemGroup(placement: .topBarTrailing) {
@@ -310,6 +322,9 @@ struct BookshelfView: View {
         }
         .task { await library.refresh() }
         .sheet(isPresented: $showSettings) { ConnectionSettings(store: library.sync.servers) }
+        .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf]) { result in
+            if case .success(let url) = result { Task { await library.importPDF(at: url) } }
+        }
         .alert("New shelf", isPresented: $namingShelf) {
             TextField("Name", text: $newShelfName)
             Button("Make it") { Task { await library.createShelf(named: newShelfName) } }
@@ -779,12 +794,12 @@ struct ShelfCard: View {
                 // progress the reader can pick up again.
                 HStack(spacing: 4) {
                     if subject.drafting || subject.building { Text("🔨").font(.footnote) }
-                    Image(systemName: subject.scale == "book" || !subject.isPrimer ? "brain" : "doc.text")
+                    Image(systemName: subject.isPDF ? "doc.richtext" : (subject.scale == "book" || !subject.isPrimer ? "brain" : "doc.text"))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
                 .padding(10)
-                .accessibilityLabel(subject.drafting || subject.building ? "Draft" : (subject.isPrimer ? "Primer" : "Smart book"))
+                .accessibilityLabel(subject.drafting || subject.building ? "Draft" : (subject.isPDF ? "PDF" : (subject.isPrimer ? "Primer" : "Smart book")))
             }
             .opacity(openable ? 1 : 0.55)
         }

@@ -1,4 +1,3 @@
-import PDFKit
 import UIKit
 import UniformTypeIdentifiers
 
@@ -34,14 +33,18 @@ final class ShareViewController: UIViewController {
                 } else if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
                           let url = try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier) as? URL {
                     if url.isFileURL {
-                        if let text = fileText(url) { capture.text += (capture.text.isEmpty ? "" : "\n\n") + text }
+                        if url.pathExtension.lowercased() == "pdf", let data = try? Data(contentsOf: url) {
+                            keepPDF(data, in: &capture)
+                        } else if let text = fileText(url) {
+                            capture.text += (capture.text.isEmpty ? "" : "\n\n") + text
+                        }
                     } else {
                         capture.sourceURL = url.absoluteString
                     }
                 } else if provider.hasItemConformingToTypeIdentifier(UTType.pdf.identifier),
-                          let data = try? await provider.loadItem(forTypeIdentifier: UTType.pdf.identifier),
-                          let text = pdfText(data) {
-                    capture.text += (capture.text.isEmpty ? "" : "\n\n") + text
+                          let loaded = try? await provider.loadItem(forTypeIdentifier: UTType.pdf.identifier),
+                          let data = pdfData(loaded) {
+                    keepPDF(data, in: &capture)
                 } else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier),
                           let loaded = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier),
                           let png = pngData(loaded) {
@@ -69,19 +72,24 @@ final class ShareViewController: UIViewController {
     }
 
     private func fileText(_ url: URL) -> String? {
-        if url.pathExtension.lowercased() == "pdf", let data = try? Data(contentsOf: url) { return pdfText(data) }
-        return try? String(contentsOf: url, encoding: .utf8)
+        try? String(contentsOf: url, encoding: .utf8)
     }
 
-    private func pdfText(_ any: Any) -> String? {
-        let data: Data?
+    private func pdfData(_ any: Any) -> Data? {
         switch any {
-        case let d as Data: data = d
-        case let u as URL: data = try? Data(contentsOf: u)
-        default: data = nil
+        case let d as Data: return d
+        case let u as URL: return try? Data(contentsOf: u)
+        default: return nil
         }
-        guard let data, let doc = PDFDocument(data: data) else { return nil }
-        return doc.string
+    }
+
+    /// The PDF itself goes into the inbox; the app puts it on the shelf.
+    private func keepPDF(_ data: Data, in capture: inout Capture) {
+        let name = "\(capture.id).pdf"
+        let url = CaptureInbox.directory.appendingPathComponent(name)
+        if (try? data.write(to: url, options: .atomic)) != nil {
+            capture.pdfFile = name
+        }
     }
 
     private func pngData(_ any: Any) -> Data? {

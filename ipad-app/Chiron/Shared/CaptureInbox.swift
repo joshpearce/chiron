@@ -8,8 +8,11 @@ struct Capture: Codable, Identifiable, Equatable {
     var imagePNG: Data?
     var sourceURL: String?
     var sourceApp: String?
+    /// A PDF shared in, written beside the capture in the inbox: it goes
+    /// on the shelf as a document rather than becoming text.
+    var pdfFile: String?
 
-    var isEmpty: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imagePNG == nil }
+    var isEmpty: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imagePNG == nil && pdfFile == nil }
 }
 
 /// The hand-off between the share extension and the app. Extensions run in

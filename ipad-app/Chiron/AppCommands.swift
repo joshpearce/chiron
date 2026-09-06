@@ -61,6 +61,13 @@ enum AppCommands {
             library.shelfPath = [id]
         case "shelf/close":
             library.shelfPath = []
+        case "import":
+            guard let path = args["path"] as? String else { throw Failure.badArguments("import needs path") }
+            await library.importPDF(at: URL(fileURLWithPath: path))
+        case "pdf/page":
+            guard let d = library.document else { throw Failure.noBook }
+            guard let page = args["page"] as? Int else { throw Failure.badArguments("pdf/page needs page") }
+            d.go(to: page)
         case "move":
             guard let subject = args["subject"] as? String else { throw Failure.badArguments("move needs subject") }
             let shelf = (args["shelf"] as? String).flatMap { $0.isEmpty ? nil : $0 }
@@ -259,7 +266,11 @@ enum AppCommands {
             "shelf_rows": library.subjects.map { ["id": $0.id, "kind": $0.kind ?? "book", "status": $0.status ?? "", "scale": $0.scale ?? "", "progress": $0.progress ?? "", "shelf": $0.shelf ?? ""] },
             "shelves": library.shelves.map { ["id": $0.id, "name": $0.name, "subjects": $0.subjects] },
             "open_shelf": library.shelfPath.last ?? "",
+            "shelf_error": library.shelfError ?? "",
         ]
+        if let d = library.document {
+            out["document"] = ["id": d.id, "title": d.title, "page": d.page, "pages": d.pages]
+        }
         if let p = library.planning {
             out["plan_card"] = ["id": p.id, "title": p.title, "scale": p.scale, "done": p.done, "turns": p.plan.count,
                                 "last": p.plan.last?.text ?? "", "busy": library.planBusy, "error": library.planError ?? ""]

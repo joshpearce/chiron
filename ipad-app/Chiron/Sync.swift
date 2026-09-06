@@ -23,6 +23,10 @@ protocol ChironService: AnyObject {
     func annotations(subject: String, unit: String) async throws -> Annotations?
     func putAnnotations(subject: String, unit: String, _ a: Annotations, baseVersion: Int) async throws -> AnnotationsPut
     func reconcileAnnotations(subject: String, unit: String, mine: Annotations, theirs: Annotations) async throws -> ReconciledAnnotations
+    func uploadDocument(title: String, pages: Int, data: Data) async throws -> Document
+    func documentData(id: String) async throws -> Data
+    func documentPosition(id: String, page: Int, position: Double) async throws
+    func deleteDocument(id: String) async throws
 }
 
 enum ServiceError: Error {
@@ -228,6 +232,36 @@ final class Sync: ObservableObject, ChironService {
     }
 
     // MARK: - transport
+
+    // MARK: - Documents
+
+    func uploadDocument(title: String, pages: Int, data: Data) async throws -> Document {
+        var parts = URLComponents()
+        parts.queryItems = [URLQueryItem(name: "title", value: title), URLQueryItem(name: "pages", value: String(pages))]
+        var req = try request("/documents" + (parts.string ?? ""), timeout: 300)
+        req.httpMethod = "POST"
+        req.setValue("application/pdf", forHTTPHeaderField: "Content-Type")
+        req.httpBody = data
+        return try await perform(req)
+    }
+
+    func documentData(id: String) async throws -> Data {
+        let (data, resp) = try await URLSession.shared.data(for: try request("/documents/\(id)/file", timeout: 300))
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        guard code == 200 else { throw ServiceError.status(code) }
+        return data
+    }
+
+    func documentPosition(id: String, page: Int, position: Double) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["page": page, "position": position])
+        let (code, _) = try await sendRaw("PUT", "/documents/\(id)/position", body: body, timeout: 15)
+        guard code == 200 else { throw ServiceError.status(code) }
+    }
+
+    func deleteDocument(id: String) async throws {
+        let (code, _) = try await sendRaw("DELETE", "/documents/\(id)", body: nil, timeout: 15)
+        guard code == 200 else { throw ServiceError.status(code) }
+    }
 
     private func request(_ path: String, timeout: TimeInterval) throws -> URLRequest {
         guard let url = URL(string: "\(baseURL)\(path)") else { throw ServiceError.badURL }

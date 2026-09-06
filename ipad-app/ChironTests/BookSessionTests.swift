@@ -42,6 +42,12 @@ final class FakeService: ChironService {
     var asks: [(unit: String, quote: String, question: String)] = []
     var histories: [[QA]] = []
     var chapterPolls = 0
+    var onUploadDocument: (String, Int, Data) throws -> Document = { title, pages, _ in Document(id: "doc-\(title)", title: title, pages: pages) }
+    var onDocumentData: (String) throws -> Data = { _ in throw URLError(.cannotConnectToHost) }
+    var uploads: [(title: String, pages: Int, data: Data)] = []
+    var documentFetches: [String] = []
+    var positions: [(id: String, page: Int, position: Double)] = []
+    var documentsDeleted: [String] = []
 
     func subjects() async throws -> SubjectsResponse { try onSubjects() }
     func state(subject: String) async throws -> BookState { try onState(subject) }
@@ -99,6 +105,12 @@ final class FakeService: ChironService {
         reconciles.append((mine, theirs))
         return try onReconcile(mine, theirs)
     }
+    func uploadDocument(title: String, pages: Int, data: Data) async throws -> Document {
+        uploads.append((title, pages, data)); return try onUploadDocument(title, pages, data)
+    }
+    func documentData(id: String) async throws -> Data { documentFetches.append(id); return try onDocumentData(id) }
+    func documentPosition(id: String, page: Int, position: Double) async throws { positions.append((id, page, position)) }
+    func deleteDocument(id: String) async throws { documentsDeleted.append(id) }
     func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse {
         extends.append((subject, quote, note))
         return try onExtend(subject, quote, note)

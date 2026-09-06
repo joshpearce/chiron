@@ -1,4 +1,5 @@
 import Foundation
+import PDFKit
 
 /// The bookshelf: every subject the server offers, which one is open, and
 /// the connection they share. One `BookSession` per subject is kept alive
@@ -38,6 +39,12 @@ final class Library: ObservableObject {
     @Published var activeSubjectID: String?
     /// The open book, or nil for the shelf.
     @Published var session: BookSession?
+    /// A PDF open in the reader; a book and a document are never open together.
+    @Published var document: DocumentSession?
+    /// How long after a page turn the position goes to the server.
+    var documentPositionDelay: TimeInterval = 2
+    private var documentPush: Task<Void, Never>?
+    private var documentDirty = false
     @Published var teaching = false
     @Published var shelfError: String?
     @Published var loadingShelf = false
@@ -291,6 +298,15 @@ final class Library: ObservableObject {
     /// A chiron://capture/<id> URL, from the share extension or an intent.
     func receiveCapture(id: String) {
         guard let c = CaptureInbox.take(id) else { return }
+        if let name = c.pdfFile {
+            // A PDF shared in goes on the shelf as itself, not as text.
+            let url = CaptureInbox.directory.appendingPathComponent(name)
+            Task {
+                await importPDF(at: url, title: c.sourceApp)
+                try? FileManager.default.removeItem(at: url)
+            }
+            return
+        }
         pendingCapture = c
     }
 
@@ -302,6 +318,10 @@ final class Library: ObservableObject {
 
     func open(_ id: String) async {
         let info = subjects.first(where: { $0.id == id })
+        if let info, info.isPDF {
+            await openDocument(info)
+            return
+        }
         let s = sessions[id] ?? BookSession(
             subjectID: id,
             title: info?.title ?? id,
@@ -322,6 +342,74 @@ final class Library: ObservableObject {
     func closeBook() {
         session?.persist()
         session = nil
+        if let d = document {
+            documentPush?.cancel()
+            document = nil
+            Task { await pushDocumentPosition(d) }
+        }
         Task { await refresh() }
+    }
+
+    // MARK: - Documents
+
+    private var documentsDir: URL {
+        let dir = storage.appendingPathComponent("documents", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// The file is fetched once and kept, so the document opens offline.
+    private func openDocument(_ info: SubjectInfo) async {
+        let file = documentsDir.appendingPathComponent("\(info.id).pdf")
+        if !FileManager.default.fileExists(atPath: file.path) {
+            do {
+                let data = try await service.documentData(id: info.id)
+                try data.write(to: file, options: .atomic)
+            } catch {
+                shelfError = "The PDF could not be fetched: \(error.localizedDescription)"
+                return
+            }
+        }
+        let d = DocumentSession(id: info.id, title: info.title, pages: info.pages ?? 0,
+                                page: info.page ?? 0, position: 0, fileURL: file)
+        d.onTurn = { [weak self, weak d] _, _ in
+            guard let self, let d else { return }
+            self.documentDirty = true
+            self.documentPush?.cancel()
+            self.documentPush = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64((self?.documentPositionDelay ?? 2) * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                await self?.pushDocumentPosition(d)
+            }
+        }
+        document = d
+        shelfError = nil
+    }
+
+    private func pushDocumentPosition(_ d: DocumentSession) async {
+        guard documentDirty else { return }
+        documentDirty = false
+        try? await service.documentPosition(id: d.id, page: d.page, position: d.position)
+    }
+
+    /// A PDF from Files or the share sheet goes to the server and onto the
+    /// shelf; the title is the file's name unless the sender knew better.
+    func importPDF(at url: URL, title: String? = nil) async {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url), data.starts(with: Array("%PDF".utf8)) else {
+            shelfError = "\(url.lastPathComponent) is not a PDF."
+            return
+        }
+        let name = title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let pages = PDFDocument(data: data)?.pageCount ?? 0
+        do {
+            _ = try await service.uploadDocument(title: (name?.isEmpty == false ? name! : url.deletingPathExtension().lastPathComponent),
+                                                 pages: pages, data: data)
+            shelfError = nil
+            await refresh()
+        } catch {
+            shelfError = "The PDF could not be sent: \(error.localizedDescription)"
+        }
     }
 }
