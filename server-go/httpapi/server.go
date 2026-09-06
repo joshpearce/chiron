@@ -368,6 +368,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /annotations/{subject}/{unit}", s.handleAnnotationsGet)
 	mux.HandleFunc("PUT /annotations/{subject}/{unit}", s.handleAnnotationsPut)
 	mux.HandleFunc("POST /annotations/{subject}/{unit}/reconcile", s.handleAnnotationsReconcile)
+	mux.HandleFunc("POST /documents", s.handleDocumentUpload)
+	mux.HandleFunc("GET /documents/{doc}", s.handleDocumentGet)
+	mux.HandleFunc("GET /documents/{doc}/file", s.handleDocumentFile)
+	mux.HandleFunc("PUT /documents/{doc}/position", s.handleDocumentPosition)
+	mux.HandleFunc("DELETE /documents/{doc}", s.handleDocumentDelete)
 	mux.HandleFunc("GET /shelves", s.handleShelves)
 	mux.HandleFunc("POST /shelves", s.handleShelfCreate)
 	mux.HandleFunc("PUT /shelves/{shelf}", s.handleShelfRename)
@@ -491,6 +496,9 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 		Scale    string `json:"scale,omitempty"`
 		Book     string `json:"book,omitempty"`
 		Progress string `json:"progress,omitempty"`
+		// Documents only: pages in the PDF and the page last read.
+		Pages int `json:"pages,omitempty"`
+		Page  int `json:"page,omitempty"`
 		// The shelf it is on, if any.
 		Shelf string `json:"shelf,omitempty"`
 	}
@@ -522,6 +530,9 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 			Scale: m.Scale, Book: m.Book, Progress: s.progressOf(m),
 			Shelf: s.shelves.shelfOf(m.ID),
 		})
+	}
+	for _, d := range s.documents() {
+		out = append(out, row{ID: d.ID, Title: d.Title, Kind: "pdf", Pages: d.Pages, Page: d.Page, Shelf: s.shelves.shelfOf(d.ID)})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"subjects": out,

@@ -170,9 +170,13 @@ func shelvesPath(activePath string) string {
 	return filepath.Join(filepath.Dir(activePath), "shelves.json")
 }
 
-// subjectExists: a registered subject, or a primer still on its way.
+// subjectExists: a registered subject, a primer still on its way, or a
+// document.
 func (s *Server) subjectExists(id string) bool {
 	if _, ok := s.subject(id); ok {
+		return true
+	}
+	if s.documentExists(id) {
 		return true
 	}
 	s.primersMu.Lock()
