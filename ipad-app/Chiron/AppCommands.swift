@@ -68,6 +68,9 @@ enum AppCommands {
             guard let d = library.document else { throw Failure.noBook }
             guard let page = args["page"] as? Int else { throw Failure.badArguments("pdf/page needs page") }
             d.go(to: page)
+        case "pdf/capture":
+            guard let d = library.document else { throw Failure.noBook }
+            d.captureRequested = (args["text"] as? String) ?? ""
         case "pdf/tool":
             guard let d = library.document else { throw Failure.noBook }
             guard let tool = (args["tool"] as? String).flatMap(DocumentSession.Tool.init(rawValue:)) else { throw Failure.badArguments("pdf/tool needs pen or eraser") }

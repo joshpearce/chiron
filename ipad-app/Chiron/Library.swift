@@ -388,6 +388,13 @@ final class Library: ObservableObject {
             guard let self, let d else { return }
             self.scheduleDocumentPush(d)
         }
+        // A passage of the PDF sent on: the card opens over the page,
+        // naming the document and the page as where the words came from.
+        d.onCapture = { [weak self, weak d] text, page in
+            guard let self, let d else { return }
+            self.captureAnswer = nil
+            self.pendingCapture = Capture(text: text, sourceApp: "\(d.title), page \(page + 1)")
+        }
         document = d
         shelfError = nil
     }

@@ -75,6 +75,21 @@ final class DocumentTests: XCTestCase {
         XCTAssertEqual(fake.positions.count, 1, "closing without a change sends nothing more")
     }
 
+    func testAPassageOfThePDFOpensTheCaptureCardNamingThePage() async {
+        let fake = FakeService()
+        fake.onSubjects = { [unowned self] in self.shelf() }
+        fake.onDocumentData = { [unowned self] _ in self.pdf }
+        let library = library(fake)
+        await library.refresh()
+        await library.open("doc-1")
+        library.document?.captured("  Two coins in a box.  ", page: 1)
+        XCTAssertEqual(library.pendingCapture?.text, "Two coins in a box.")
+        XCTAssertEqual(library.pendingCapture?.sourceApp, "A paper, page 2")
+        library.pendingCapture = nil
+        library.document?.captured("   ", page: 0)
+        XCTAssertNil(library.pendingCapture, "nothing selected, no card")
+    }
+
     func testImportingAPDFUploadsItWithItsPageCountAndRefreshes() async throws {
         let fake = FakeService()
         var rows = shelf()

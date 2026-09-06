@@ -14,6 +14,7 @@ final class DocumentSession: ObservableObject, Identifiable {
     private(set) var position: Double
     /// A page the app asked the view to show (the harness, a link).
     @Published var requestedPage: Int?
+    @Published var captureRequested: String?
     var onTurn: ((Int, Double) -> Void)?
     /// Ink per page, in the page's own points, with the version the server
     /// last gave for each and the pages drawn on since.
@@ -26,6 +27,15 @@ final class DocumentSession: ObservableObject, Identifiable {
     /// Pages with a canvas laid over them, for the harness to see the
     /// overlays came up.
     var overlaidPages: Set<Int> = []
+    /// A passage selected on a page, sent on: a summary, a primer or a
+    /// book of its own, with the document and page as where it came from.
+    var onCapture: ((String, Int) -> Void)?
+
+    func captured(_ text: String, page: Int) {
+        let passage = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !passage.isEmpty else { return }
+        onCapture?(passage, page)
+    }
 
     init(id: String, title: String, pages: Int, page: Int, position: Double, fileURL: URL) {
         self.id = id; self.title = title; self.pages = pages; self.fileURL = fileURL
@@ -121,7 +131,8 @@ struct PDFKitView: UIViewRepresentable {
     @ObservedObject var doc: DocumentSession
 
     func makeUIView(context: Context) -> PDFView {
-        let view = PDFView()
+        let view = DocumentPDFView()
+        view.onCapture = { [weak doc] text, page in doc?.captured(text, page: page) }
         view.autoScales = true
         view.displayMode = .singlePageContinuous
         view.displayDirection = .vertical
@@ -142,6 +153,16 @@ struct PDFKitView: UIViewRepresentable {
     }
 
     func updateUIView(_ view: PDFView, context: Context) {
+        if let text = doc.captureRequested {
+            // The harness's way of choosing the menu item: the selection
+            // when there is one, else the text it gave.
+            let selected = view.currentSelection?.string ?? text
+            let page = view.currentSelection?.pages.first.flatMap { view.document?.index(for: $0) } ?? doc.page
+            DispatchQueue.main.async {
+                doc.captureRequested = nil
+                doc.captured(selected, page: page)
+            }
+        }
         for (index, overlay) in context.coordinator.overlays {
             overlay.apply(tool: doc.tool)
             // Ink that changed in the model (the other device's, or a merge)
@@ -158,7 +179,7 @@ struct PDFKitView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(doc: doc) }
 
-    @MainActor final class Coordinator: NSObject, PDFPageOverlayViewProvider {
+    @MainActor final class Coordinator: NSObject, @preconcurrency PDFPageOverlayViewProvider {
         let doc: DocumentSession
         weak var view: PDFView?
         var overlays: [Int: InkOverlay] = [:]
@@ -247,5 +268,23 @@ final class InkOverlay: UIView, PKCanvasViewDelegate {
         guard !applying, scale > 0 else { return }
         canonical = canvasView.drawing.transformed(using: CGAffineTransform(scaleX: 1 / scale, y: 1 / scale))
         onChange?(canonical)
+    }
+}
+
+/// PDFKit's view with one more item in the selection menu: the selected
+/// passage goes to Chiron, the way a page selection in a book does.
+final class DocumentPDFView: PDFView {
+    var onCapture: ((String, Int) -> Void)?
+
+    override func buildMenu(with builder: any UIMenuBuilder) {
+        super.buildMenu(with: builder)
+        guard let selection = currentSelection, let text = selection.string,
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let page = selection.pages.first.flatMap { document?.index(for: $0) } ?? 0
+        let send = UIAction(title: "Send to Chiron", image: UIImage(systemName: "text.badge.plus")) { [weak self] _ in
+            self?.onCapture?(text, page)
+            self?.clearSelection()
+        }
+        builder.insertChild(UIMenu(options: .displayInline, children: [send]), atStartOfMenu: .standardEdit)
     }
 }

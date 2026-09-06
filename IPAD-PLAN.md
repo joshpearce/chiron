@@ -381,9 +381,9 @@ from the sprite's checkout. What each later section records:
   shell; `OPEN-SOURCES.md`: books built from open texts, with the
   exercise import and the finder.
 
-Still open: the Pencil Pro double-tap on a device; PDF ink and capture
-(13.5 steps 2 and 3); measurements on the A8 iPad mini, which is no
-longer the target device.
+Still open: the Pencil Pro double-tap on a device; the PDF selection
+menu on a device; measurements on the A8 iPad mini, which is no longer
+the target device.
 
 ## 11. iOS 26 and the Pencil Pro (2026-09-02)
 
@@ -643,7 +643,17 @@ on close, and a page both devices drew on while apart ends with both
 drawings laid together, put back on the server's version, so no stroke
 is lost and no card is needed. Harness: `pdf/tool`, `pdf/stroke {page,
 points}`; state `document.ink_pages`, `ink_strokes`, `overlaid_pages`.
-Tests: `TestInkOnAPDFIsKeptPerPage`, `DocumentInkTests`. Step 3 is open.
+Tests: `TestInkOnAPDFIsKeptPerPage`, `DocumentInkTests`.
+
+Step 3 is built the same evening: a selection on a page has "Send to
+Chiron" in its menu (`DocumentPDFView.buildMenu`), which opens the
+capture card over the page with the passage and "from <title>, page N"
+as its source, so a summary, a primer or a book comes from a paper the
+way it does from a book's passage. Harness: `pdf/capture {text}` (the
+selection when there is one). Test: the capture path in
+`DocumentTests`. The menu item itself has only been exercised through
+the harness; select a passage on the iPad to see it. 13.5 is done; a
+PDF is not yet a smart book in one tap, as planned.
 
 1. **Import and read.** A PDF arrives by the share sheet (the extension
    already takes PDFs, today as text for a primer) or from Files
