@@ -32,6 +32,7 @@ func main() {
 	chain := llm.New(llm.FactoryConfig{Provider: "claude-cli", ClaudeCLIModel: *model})
 	failed := 0
 	for _, dir := range flag.Args() {
+		dir = filepath.Clean(dir)
 		root := filepath.Dir(filepath.Dir(dir))
 		b, s := *bank, *spec
 		if b == "" {
