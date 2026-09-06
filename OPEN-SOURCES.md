@@ -682,7 +682,23 @@ items lacked `check: choice` (the pipeline now adds it). Read of unit 0:
 Chiron's chapter shape with Downey's cookie problem, though the planner
 had assigned chapter 1, whose material (Linda, the survey data) went
 unused; the planner is now told to title units after the sections it
-assigns. Steps 3 to 5 are open.
+assigns.
+
+Status 2026-09-06: step 3 is built. `sources.Exercises` reads three
+shapes of exercise from fetched Markdown: MyST exercise and solution
+directives (QuantEcon), bold "**Exercise:**" markers with the answer in
+the cells that follow (Downey), and "Exercise N" or "Problem N" headings
+with a Solution or Answer heading under them. A recipe's `solutions:`
+names a companion path for answers kept apart from the questions (Think
+Bayes keeps them under `soln/`), and the client pairs the two by order or
+number. Checked live: Think Bayes chapters 2 and 4 give four exercises
+each with solutions; QuantEcon's `prob_dist.md` and `lln_clt.md` give two
+each. `roles.ImportItems` turns them into items in the schema, taps
+first, each with a `source:` line; the generator writes them to
+`imported.yaml` beside the unit before the bank is written and the author
+writes the rest of the bank around them. OCW problem sets flow through
+the same path once the planner assigns a PDF locator (the sprite now has
+`pdftotext`), but no OCW book has been built yet. Steps 4 and 5 are open.
 
 
 1. The index and the fetchers for the formats that cover most of section
