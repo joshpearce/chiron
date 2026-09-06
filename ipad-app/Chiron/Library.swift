@@ -1,5 +1,6 @@
 import Foundation
 import PDFKit
+import PencilKit
 
 /// The bookshelf: every subject the server offers, which one is open, and
 /// the connection they share. One `BookSession` per subject is kept alive
@@ -372,24 +373,64 @@ final class Library: ObservableObject {
         }
         let d = DocumentSession(id: info.id, title: info.title, pages: info.pages ?? 0,
                                 page: info.page ?? 0, position: 0, fileURL: file)
+        // The ink drawn on the other device comes down with the document;
+        // when the server is away the page opens clean and any ink drawn
+        // now goes up on the next open.
+        if let ink = try? await service.documentInk(id: info.id) {
+            d.adopt(ink: ink)
+        }
         d.onTurn = { [weak self, weak d] _, _ in
             guard let self, let d else { return }
             self.documentDirty = true
-            self.documentPush?.cancel()
-            self.documentPush = Task { [weak self] in
-                try? await Task.sleep(nanoseconds: UInt64((self?.documentPositionDelay ?? 2) * 1_000_000_000))
-                guard !Task.isCancelled else { return }
-                await self?.pushDocumentPosition(d)
-            }
+            self.scheduleDocumentPush(d)
+        }
+        d.onInk = { [weak self, weak d] _ in
+            guard let self, let d else { return }
+            self.scheduleDocumentPush(d)
         }
         document = d
         shelfError = nil
     }
 
+    private func scheduleDocumentPush(_ d: DocumentSession) {
+        documentPush?.cancel()
+        documentPush = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64((self?.documentPositionDelay ?? 2) * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            await self?.pushDocumentPosition(d)
+        }
+    }
+
+    /// Whatever changed goes up: the page, and every page drawn on. A page
+    /// the other device also drew on while apart comes back as a conflict
+    /// with its ink, which lies over this one; nothing drawn is lost.
     private func pushDocumentPosition(_ d: DocumentSession) async {
-        guard documentDirty else { return }
-        documentDirty = false
-        try? await service.documentPosition(id: d.id, page: d.page, position: d.position)
+        if documentDirty {
+            documentDirty = false
+            try? await service.documentPosition(id: d.id, page: d.page, position: d.position)
+        }
+        for page in d.takeDirtyInk() {
+            guard let ink = d.ink[page] else { continue }
+            let b64 = ink.dataRepresentation().base64EncodedString()
+            do {
+                switch try await service.putDocumentInk(id: d.id, page: page, inkB64: b64, baseVersion: d.inkVersions[page] ?? 0) {
+                case .stored(let stored):
+                    d.inkVersions[page] = stored.version
+                case .conflict(let server):
+                    if let theirs = Data(base64Encoded: server.inkB64).flatMap({ try? PKDrawing(data: $0) }) {
+                        d.merge(theirs, on: page)
+                    }
+                    let merged = d.ink[page]?.dataRepresentation().base64EncodedString() ?? b64
+                    if case .stored(let stored) = try await service.putDocumentInk(id: d.id, page: page, inkB64: merged, baseVersion: server.version) {
+                        d.inkVersions[page] = stored.version
+                    } else {
+                        d.markInkDirty(page)
+                    }
+                }
+            } catch {
+                d.markInkDirty(page)
+            }
+        }
     }
 
     /// A PDF from Files or the share sheet goes to the server and onto the

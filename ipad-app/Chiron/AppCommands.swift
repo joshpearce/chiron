@@ -68,6 +68,21 @@ enum AppCommands {
             guard let d = library.document else { throw Failure.noBook }
             guard let page = args["page"] as? Int else { throw Failure.badArguments("pdf/page needs page") }
             d.go(to: page)
+        case "pdf/tool":
+            guard let d = library.document else { throw Failure.noBook }
+            guard let tool = (args["tool"] as? String).flatMap(DocumentSession.Tool.init(rawValue:)) else { throw Failure.badArguments("pdf/tool needs pen or eraser") }
+            d.tool = tool
+        case "pdf/stroke":
+            // A stroke in page points, as a Pencil would leave it.
+            guard let d = library.document else { throw Failure.noBook }
+            guard let page = args["page"] as? Int, let points = args["points"] as? [[Double]], points.count >= 2 else {
+                throw Failure.badArguments("pdf/stroke needs page and points [[x,y],...]")
+            }
+            let path = PKStrokePath(controlPoints: points.map {
+                PKStrokePoint(location: CGPoint(x: $0[0], y: $0[1]), timeOffset: 0, size: CGSize(width: 3, height: 3), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
+            }, creationDate: Date())
+            let stroke = PKStroke(ink: PKInk(.pen, color: .label), path: path)
+            d.drew(on: page, (d.ink[page] ?? PKDrawing()).appending(PKDrawing(strokes: [stroke])))
         case "move":
             guard let subject = args["subject"] as? String else { throw Failure.badArguments("move needs subject") }
             let shelf = (args["shelf"] as? String).flatMap { $0.isEmpty ? nil : $0 }
@@ -269,7 +284,10 @@ enum AppCommands {
             "shelf_error": library.shelfError ?? "",
         ]
         if let d = library.document {
-            out["document"] = ["id": d.id, "title": d.title, "page": d.page, "pages": d.pages]
+            out["document"] = ["id": d.id, "title": d.title, "page": d.page, "pages": d.pages, "tool": d.tool.rawValue,
+                               "ink_pages": d.ink.filter { !$0.value.strokes.isEmpty }.keys.sorted(),
+                               "ink_strokes": d.ink.values.reduce(0) { $0 + $1.strokes.count },
+                               "overlaid_pages": d.overlaidPages.sorted()]
         }
         if let p = library.planning {
             out["plan_card"] = ["id": p.id, "title": p.title, "scale": p.scale, "done": p.done, "turns": p.plan.count,

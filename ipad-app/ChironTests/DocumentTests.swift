@@ -1,3 +1,4 @@
+import PencilKit
 import XCTest
 @testable import Chiron
 
@@ -95,5 +96,84 @@ final class DocumentTests: XCTestCase {
         await library.importPDF(at: text)
         XCTAssertEqual(fake.uploads.count, 1, "not a PDF, not sent")
         XCTAssertNotNil(library.shelfError)
+    }
+}
+
+/// Ink on a PDF: what the other device drew comes down with the document,
+/// a stroke here goes up with the page's version, and a page both drew on
+/// while apart ends with both drawings.
+@MainActor
+final class DocumentInkTests: XCTestCase {
+    private var pdf: Data {
+        let dir = Bundle(for: DocumentInkTests.self).url(forResource: "fixtures", withExtension: nil)!
+        return try! Data(contentsOf: dir.appendingPathComponent("sample.pdf"))
+    }
+
+    private func stroke(at x: Double) -> PKDrawing {
+        let path = PKStrokePath(controlPoints: [x, x + 40].map {
+            PKStrokePoint(location: CGPoint(x: $0, y: 100), timeOffset: 0, size: CGSize(width: 3, height: 3), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
+        }, creationDate: Date())
+        return PKDrawing(strokes: [PKStroke(ink: PKInk(.pen, color: .black), path: path)])
+    }
+
+    private func library(_ fake: FakeService) -> Library {
+        let storage = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let l = Library(storage: storage, service: fake)
+        l.documentPositionDelay = 0
+        return l
+    }
+
+    private func open(_ fake: FakeService) async -> (Library, DocumentSession) {
+        fake.onSubjects = { SubjectsResponse(subjects: [SubjectInfo(id: "doc-1", title: "A paper", kind: "pdf", pages: 2)], active: nil, shelves: []) }
+        fake.onDocumentData = { [unowned self] _ in self.pdf }
+        let library = library(fake)
+        await library.refresh()
+        await library.open("doc-1")
+        return (library, library.document!)
+    }
+
+    func testTheServersInkComesDownWithTheDocument() async {
+        let fake = FakeService()
+        let theirs = stroke(at: 10)
+        fake.onDocumentInk = { _ in [1: PageInk(version: 3, inkB64: theirs.dataRepresentation().base64EncodedString())] }
+        let (_, doc) = await open(fake)
+        XCTAssertEqual(doc.ink[1]?.strokes.count, 1)
+        XCTAssertEqual(doc.inkVersions[1], 3)
+        XCTAssertNil(doc.ink[0])
+    }
+
+    func testAStrokeGoesUpWithThePagesVersion() async {
+        let fake = FakeService()
+        fake.onDocumentInk = { _ in [0: PageInk(version: 2, inkB64: PKDrawing().dataRepresentation().base64EncodedString())] }
+        let (library, doc) = await open(fake)
+        doc.drew(on: 0, stroke(at: 10))
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(fake.inkPuts.map(\.page), [0])
+        XCTAssertEqual(fake.inkPuts.first?.base, 2)
+        XCTAssertEqual(doc.inkVersions[0], 3, "the stored version is kept for the next put")
+        let sent = fake.inkPuts.first.flatMap { Data(base64Encoded: $0.inkB64) }.flatMap { try? PKDrawing(data: $0) }
+        XCTAssertEqual(sent?.strokes.count, 1)
+        XCTAssertNotNil(library.document, "the library lives as long as the reader")
+    }
+
+    func testAPageBothDrewOnKeepsBothDrawings() async {
+        let fake = FakeService()
+        let theirs = stroke(at: 200)
+        var conflicted = false
+        fake.onPutDocumentInk = { _, ink, base in
+            if !conflicted {
+                conflicted = true
+                return .conflict(server: PageInk(version: 5, inkB64: theirs.dataRepresentation().base64EncodedString()))
+            }
+            return .stored(PageInk(version: base + 1, inkB64: ink))
+        }
+        let (library, doc) = await open(fake)
+        doc.drew(on: 1, stroke(at: 10))
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(fake.inkPuts.count, 2, "the merge is put back on top of the server's version")
+        XCTAssertEqual(fake.inkPuts.last?.base, 5)
+        XCTAssertEqual(doc.ink[1]?.strokes.count, 2)
+        XCTAssertEqual(doc.inkVersions[1], 6)
+        XCTAssertNotNil(library.document)
     }
 }

@@ -48,6 +48,9 @@ final class FakeService: ChironService {
     var documentFetches: [String] = []
     var positions: [(id: String, page: Int, position: Double)] = []
     var documentsDeleted: [String] = []
+    var onDocumentInk: (String) throws -> [Int: PageInk] = { _ in [:] }
+    var onPutDocumentInk: (Int, String, Int) throws -> PageInkPut = { _, ink, base in .stored(PageInk(version: base + 1, inkB64: ink)) }
+    var inkPuts: [(page: Int, inkB64: String, base: Int)] = []
 
     func subjects() async throws -> SubjectsResponse { try onSubjects() }
     func state(subject: String) async throws -> BookState { try onState(subject) }
@@ -111,6 +114,10 @@ final class FakeService: ChironService {
     func documentData(id: String) async throws -> Data { documentFetches.append(id); return try onDocumentData(id) }
     func documentPosition(id: String, page: Int, position: Double) async throws { positions.append((id, page, position)) }
     func deleteDocument(id: String) async throws { documentsDeleted.append(id) }
+    func documentInk(id: String) async throws -> [Int: PageInk] { try onDocumentInk(id) }
+    func putDocumentInk(id: String, page: Int, inkB64: String, baseVersion: Int) async throws -> PageInkPut {
+        inkPuts.append((page, inkB64, baseVersion)); return try onPutDocumentInk(page, inkB64, baseVersion)
+    }
     func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse {
         extends.append((subject, quote, note))
         return try onExtend(subject, quote, note)

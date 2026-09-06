@@ -722,3 +722,19 @@ struct Document: Codable, Equatable {
         self.id = id; self.title = title; self.pages = pages; self.page = page; self.position = position
     }
 }
+
+/// The ink on one page of a document, versioned like a unit's annotations.
+struct PageInk: Codable, Equatable {
+    let version: Int
+    let inkB64: String
+
+    enum CodingKeys: String, CodingKey {
+        case version
+        case inkB64 = "ink_b64"
+    }
+}
+
+enum PageInkPut: Equatable {
+    case stored(PageInk)
+    case conflict(server: PageInk)
+}

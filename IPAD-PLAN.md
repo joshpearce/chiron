@@ -630,8 +630,20 @@ page count and title; the card wears a `doc.richtext` badge and says
 (`documents/<id>.pdf`) and shows it in PDFKit with the bookshelf button
 and "x of n"; a page turn goes to the server two seconds later, and on
 close. Harness: `import {path}`, `pdf/page {page}`; state `document`,
-`shelf_error`. Tests: `documents_test.go`, `DocumentTests`. Steps 2 and
-3 are open.
+`shelf_error`. Tests: `documents_test.go`, `DocumentTests`.
+
+Step 2 is built the same day: a PencilKit canvas lies over every page
+(`PDFPageOverlayViewProvider`, pencil only, so a finger scrolls), the
+strokes are kept in the page's own points so they fit at any zoom and on
+either device, and the reader's toolbar has a pen and an eraser. Each
+page's ink is versioned on the server (`GET /documents/{id}/ink`, `PUT
+/documents/{id}/ink/{page}` with `base_version`, 409 with the server's
+copy); the app pushes a drawn page two seconds after the last stroke and
+on close, and a page both devices drew on while apart ends with both
+drawings laid together, put back on the server's version, so no stroke
+is lost and no card is needed. Harness: `pdf/tool`, `pdf/stroke {page,
+points}`; state `document.ink_pages`, `ink_strokes`, `overlaid_pages`.
+Tests: `TestInkOnAPDFIsKeptPerPage`, `DocumentInkTests`. Step 3 is open.
 
 1. **Import and read.** A PDF arrives by the share sheet (the extension
    already takes PDFs, today as text for a primer) or from Files

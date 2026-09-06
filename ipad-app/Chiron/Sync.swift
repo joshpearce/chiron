@@ -27,6 +27,8 @@ protocol ChironService: AnyObject {
     func documentData(id: String) async throws -> Data
     func documentPosition(id: String, page: Int, position: Double) async throws
     func deleteDocument(id: String) async throws
+    func documentInk(id: String) async throws -> [Int: PageInk]
+    func putDocumentInk(id: String, page: Int, inkB64: String, baseVersion: Int) async throws -> PageInkPut
 }
 
 enum ServiceError: Error {
@@ -261,6 +263,28 @@ final class Sync: ObservableObject, ChironService {
     func deleteDocument(id: String) async throws {
         let (code, _) = try await sendRaw("DELETE", "/documents/\(id)", body: nil, timeout: 15)
         guard code == 200 else { throw ServiceError.status(code) }
+    }
+
+    func documentInk(id: String) async throws -> [Int: PageInk] {
+        struct Reply: Decodable { let pages: [String: PageInk] }
+        let reply: Reply = try await get("/documents/\(id)/ink", timeout: 30)
+        var out: [Int: PageInk] = [:]
+        for (k, v) in reply.pages { if let n = Int(k) { out[n] = v } }
+        return out
+    }
+
+    func putDocumentInk(id: String, page: Int, inkB64: String, baseVersion: Int) async throws -> PageInkPut {
+        let body = try JSONSerialization.data(withJSONObject: ["ink_b64": inkB64, "base_version": baseVersion])
+        let (code, data) = try await sendRaw("PUT", "/documents/\(id)/ink/\(page)", body: body, timeout: 30)
+        switch code {
+        case 200:
+            return .stored(try JSONDecoder().decode(PageInk.self, from: data))
+        case 409:
+            struct Reply: Decodable { let server: PageInk }
+            return .conflict(server: try JSONDecoder().decode(Reply.self, from: data).server)
+        default:
+            throw ServiceError.status(code)
+        }
     }
 
     private func request(_ path: String, timeout: TimeInterval) throws -> URLRequest {

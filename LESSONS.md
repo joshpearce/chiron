@@ -207,3 +207,10 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   the book on the screener and three tests fail on the pen button. Run
   the dev server on `ipadbase/config.yaml`, whose state is past
   placement, and use a copy of the config only for throwaway walks.
+
+- **PDFKit asks for a page's overlay only if the provider is set before
+  the document (2026-09-06).** With `pageOverlayViewProvider` assigned
+  after `document`, `overlayViewFor` is never called and nothing shows,
+  with no error. Set the provider first. And a test that returns a
+  `Library` from a helper and drops it (`let (_, doc) = ...`) silently
+  loses every `[weak self]` push: keep the library bound until the end.
