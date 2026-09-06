@@ -181,3 +181,13 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   stanza prompted for the YubiKey first. Put specific hosts above `Host *`.
 - **The 1Password prompt on `ssh chiron` is the tunnel reading the key
   (2026-09-04).** Expected; the YubiKey prompt was not.
+
+- **A rewritten unit file does not reach the sprite by deploying
+  (2026-09-06).** `make deploy` carries the binary, the spec and the source
+  index; unit files stay because the served corpus is the live book. After
+  editing a bank in the checkout (`corpus-taps` on the calibration units),
+  check the served copy still matches the version you started from, back it
+  up under `~/backups/<date>/`, copy the file over, and restart
+  `chiron-server` - it reads units at start. Generated books live only on
+  the sprite: copy the unit down, run the tool with
+  `-spec corpus/authoring-spec.md`, copy it back.
