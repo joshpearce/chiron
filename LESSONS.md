@@ -191,3 +191,19 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   `chiron-server` - it reads units at start. Generated books live only on
   the sprite: copy the unit down, run the tool with
   `-spec corpus/authoring-spec.md`, copy it back.
+
+- **A new Swift file needs `xcodegen generate` before it builds
+  (2026-09-06).** `Chiron.xcodeproj` is generated from `project.yml`; a
+  file added on disk is not in the project until then, and the error
+  reads as "cannot find type in scope" from the first file that uses it.
+  Test fixtures live under `fixtures/` as a folder reference: load them
+  with `url(forResource: "fixtures", withExtension: nil)` and append the
+  name, not `forResource: "name"`. A crash in a test class's stored
+  property initialiser takes the whole runner down ("early unexpected
+  exit ... at DocumentTests.init").
+- **The palette UI tests need the dev server's placed learner
+  (2026-09-06).** `PaletteUITests` open `ai` on `:8084` and expect a
+  chapter with the palette; a server started on a fresh state dir puts
+  the book on the screener and three tests fail on the pen button. Run
+  the dev server on `ipadbase/config.yaml`, whose state is past
+  placement, and use a copy of the config only for throwaway walks.

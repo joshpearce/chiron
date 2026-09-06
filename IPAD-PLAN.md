@@ -618,6 +618,22 @@ the phone; ink on the phone, see it on the iPad.
 
 ### 13.5 PDFs on the shelf (two to three days, in three steps)
 
+Status 2026-09-06: step 1 is built and walked in the Simulator. The
+server keeps a PDF under `state/documents/<id>/` with its `document.json`
+(`POST /documents?title=&pages=` with the file as the body, `GET
+/documents/{id}`, `/file`, `PUT /documents/{id}/position`, `DELETE`) and
+lists it on the shelf as kind `pdf` with `pages` and `page`; a document
+goes on a shelf like anything else. In the app: "Import a PDF" in the
+library bar (`.fileImporter`), or a PDF shared in (the extension now
+writes the file into the inbox instead of its text) goes up with its
+page count and title; the card wears a `doc.richtext` badge and says
+"page x of n"; opening fetches the file once into Application Support
+(`documents/<id>.pdf`) and shows it in PDFKit with the bookshelf button
+and "x of n"; a page turn goes to the server two seconds later, and on
+close. Harness: `import {path}`, `pdf/page {page}`; state `document`,
+`shelf_error`. Tests: `documents_test.go`, `DocumentTests`. Steps 2 and
+3 are open.
+
 1. **Import and read.** A PDF arrives by the share sheet (the extension
    already takes PDFs, today as text for a primer) or from Files
    (`.fileImporter` behind an "Import a PDF" item in the shelf's bar).
