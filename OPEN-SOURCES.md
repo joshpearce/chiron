@@ -698,7 +698,26 @@ first, each with a `source:` line; the generator writes them to
 `imported.yaml` beside the unit before the bank is written and the author
 writes the rest of the bank around them. OCW problem sets flow through
 the same path once the planner assigns a PDF locator (the sprite now has
-`pdftotext`), but no OCW book has been built yet. Steps 4 and 5 are open.
+`pdftotext`), but no OCW book has been built yet.
+
+Status 2026-09-06, later: step 4 is built. When a brief names nothing the
+index has, `Plan` runs the finder: the planner extracts search phrases
+and subject tags from the brief (`roles.SearchTerms`, tags held to the
+index's vocabulary); candidates are the index by tag and by title, then
+the Open Textbook Library, MIT Learn (courses, with their problem-set
+features) and the LibreTexts catalogue (`sources.Client.Search`, each hit
+a provisional `Source` with a verdict read from the licence field and a
+recipe where a fetcher exists for the host); the tables of contents of
+the best eight are fetched; and `roles.PickSources` chooses a spine and
+up to two interleaves with a sentence of reason each, plus references.
+The picks go to `sources.yaml` with their recipes, so a rerun and the
+unit authoring can fetch a found source the index never listed. Live on
+"a short book on Bayesian statistics for a software engineer who has
+never taken a statistics course": spine Think Bayes 2e, interleaves MIT
+18.05 and QuantEcon's intro lectures, references Bayes Rules!, MacKay and
+Murphy, in seventy seconds. OpenStax's list, DOAB and Gutendex are not
+asked yet; the index covers OpenStax, and the other two wait for a
+humanities brief. Step 5 is open.
 
 
 1. The index and the fetchers for the formats that cover most of section
