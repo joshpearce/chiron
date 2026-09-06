@@ -361,30 +361,29 @@ remains is UI and policy, in this order when the time comes:
 - `TeachView` and the bundled book are carried, not improved; if they rot,
   they are removed rather than repaired.
 
-## 10. Status (2026-09-01)
+## 10. Status (2026-09-06)
 
-Phases 0 through 4 are built and verified in the Simulator on both
-`chiron-ipad-15` (iOS 15.5, iPad mini 4 shape) and `chiron-ipad` (iOS 26.5):
-unit tests green on both, `scripts/sim-verify.sh` walks every screen on
-both in light and dark at the default and accessibility-extra-large text
-sizes, and the self-test completes placement, series, results, and the next
-chapter on both books. Server changes A, B, C are in (commits 1be81ca,
-00332a6) plus the ink check-in marking the book active and a drive-mode stub
-transcriber (43aceb8). None of it is on the sprite yet.
+Phases 0 through 5 are built. The app runs on the iPad Air 13" (M4) and
+the iPhone 16 against the sprite (`https://chiron.example`,
+Anthropic-backed), set up from a QR code; every change is tested in the
+Simulator (`scripts/sim-run.sh test`, 80 tests, plus the harness walks)
+before it goes on a device, and the server deploys with `make deploy`
+from the sprite's checkout. What each later section records:
 
-Still open:
-- Phase 5 device milestone: install on the mini 4, one chapter and one check
-  on the device, Wi-Fi to the sprite. Needs the iPad and Matt.
-- Deploy the server (commits since e24f73e) to the sprite: the iPad needs
-  `async` exchanges, `GET /chapter`, `results_doc`, and the reveal `correct`
-  fix. Needs Matt's go-ahead.
-- Phase 4 measurements on the A8 (chapter load, results render) and the
-  KaTeX font subsetting, if the numbers call for it.
-- Split View and rotation checked by hand in the Simulator (no simctl for
-  either); the layout is size-class driven and all four orientations are on.
-- The pretest still reveals the reference answer per item after commit, as
-  the flight-era app did; the plan's "reveal only on teaching-unit checks"
-  is read as "never on the calibration series", which holds.
+- Section 11: iOS 26 and the Pencil Pro (the double-tap is still
+  unverified on the device).
+- Section 12: the reader's chrome and the palette.
+- Section 13: the library first, shelves, the phone, another device from
+  a QR code, an agent sending work (`chiron` and its skill), annotation
+  sync with an offline shelf cache and a three-way conflict card, and
+  PDFs on the shelf (step 1 of three).
+- `SPRITE-DEV-PLAN.md`: development from the sprite with the in-app
+  shell; `OPEN-SOURCES.md`: books built from open texts, with the
+  exercise import and the finder.
+
+Still open: the Pencil Pro double-tap on a device; PDF ink and capture
+(13.5 steps 2 and 3); measurements on the A8 iPad mini, which is no
+longer the target device.
 
 ## 11. iOS 26 and the Pencil Pro (2026-09-02)
 
