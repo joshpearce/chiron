@@ -53,6 +53,7 @@ final class Library: ObservableObject {
         self.storage = storage ?? Library.defaultStorage()
         self.service = service ?? sync
         agent.attach(self)
+        loadShelfCache()
     }
 
     /// Per-subject caches live in Application Support, not Documents: they
@@ -78,8 +79,11 @@ final class Library: ObservableObject {
             shelfError = nil
             // A shelf deleted elsewhere closes here.
             shelfPath.removeAll { id in !shelves.contains { $0.id == id } }
+            saveShelfCache(shelf)
+            // The server is back: whatever was marked up while it was away goes up.
+            await session?.pushAnnotations()
         } catch {
-            shelfError = BookSession.unreachable
+            shelfError = subjects.isEmpty ? BookSession.unreachable : Library.offline
         }
         if let id = awaitedPrimer, let primer = subjects.first(where: { $0.id == id }), !primer.authoring {
             awaitedPrimer = nil
@@ -196,6 +200,25 @@ final class Library: ObservableObject {
         } catch {
             planError = "The server could not discard it. Try again."
         }
+    }
+
+    static let offline = "The server is out of reach; this is the library as it was last seen."
+
+    // The library as last seen, kept on disk so it shows without the server.
+
+    private var shelfCacheURL: URL { storage.appendingPathComponent("library.json") }
+
+    private func saveShelfCache(_ shelf: SubjectsResponse) {
+        try? FileManager.default.createDirectory(at: storage, withIntermediateDirectories: true)
+        if let d = try? JSONEncoder().encode(shelf) { try? d.write(to: shelfCacheURL) }
+    }
+
+    private func loadShelfCache() {
+        guard let d = try? Data(contentsOf: shelfCacheURL),
+              let shelf = try? JSONDecoder().decode(SubjectsResponse.self, from: d) else { return }
+        subjects = shelf.subjects
+        shelves = shelf.shelves ?? []
+        activeSubjectID = shelf.activeID
     }
 
     // The library's shape: what is on no shelf, and what is on one.

@@ -47,6 +47,28 @@ final class LibraryTests: XCTestCase {
         XCTAssertNil(library.session, "the shelf is the first screen")
     }
 
+    /// The library as last seen shows without the server, and says so.
+    func testTheLibraryShowsFromItsCacheWhenTheServerIsAway() async throws {
+        let fake = FakeService()
+        fake.onSubjects = { [unowned self] in self.subjects("ready") }
+        let storage = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let first = Library(storage: storage, service: fake)
+        await first.refresh()
+        XCTAssertEqual(first.subjects.count, 2)
+
+        let away = FakeService()  // every call fails
+        let second = Library(storage: storage, service: away)
+        XCTAssertEqual(second.subjects.map(\.id), ["ai", "primer-why"], "loaded from disk before any call")
+        XCTAssertEqual(second.activeSubjectID, "ai")
+        await second.refresh()
+        XCTAssertEqual(second.subjects.count, 2, "a failed refresh keeps what was seen")
+        XCTAssertEqual(second.shelfError, Library.offline)
+
+        let empty = Library(storage: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString), service: away)
+        await empty.refresh()
+        XCTAssertEqual(empty.shelfError, BookSession.unreachable, "nothing cached reads as unreachable")
+    }
+
     /// A summary comes back into the card; the shelf is untouched.
     func testASummaryIsAnsweredInTheCard() async throws {
         let fake = FakeService()
