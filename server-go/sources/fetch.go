@@ -87,6 +87,8 @@ type Client struct {
 	Pause time.Duration
 	// Now is the clock for provenance; tests pin it.
 	Now func() time.Time
+	// Catalogues are the keyless search endpoints the finder asks.
+	Catalogues Catalogues
 
 	mu    sync.Mutex
 	hosts map[string]*hostState
@@ -103,9 +105,10 @@ func NewClient(cache string) *Client {
 		Cache: cache,
 		// A plain browser string: some hosts (Pressbooks behind CloudFront)
 		// answer 403 to anything that names a tool.
-		UserAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-		Pause:     700 * time.Millisecond,
-		Now:       time.Now,
+		UserAgent:  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+		Pause:      700 * time.Millisecond,
+		Now:        time.Now,
+		Catalogues: DefaultCatalogues,
 	}
 }
 

@@ -37,8 +37,9 @@ func (c *stubChain) Structured(role, system, user string, schema map[string]any,
 			payload = map[string]any{key: c.payloads["author"]["body"]}
 		}
 	}
-	if name == "imported_items" {
-		payload = c.payloads["import"]
+	// Roles that share a chain role are told apart by their schema name.
+	if p, ok := c.payloads[name]; ok {
+		payload = p
 	}
 	data, _ := json.Marshal(payload)
 	return json.Unmarshal(data, out)
@@ -111,8 +112,8 @@ func TestABookIsPlannedAndAuthoredFromANamedSource(t *testing.T) {
 			},
 			"misconceptions": []map[string]any{},
 		},
-		"author": {"body": "---\nunit: u0\ntitle: Bayes's Theorem\n---\n\n## The cookie problem\n\nIn Downey's words, adapted.\n"},
-		"import": {"items": []map[string]any{{"source": "think-bayes chap02.ipynb exercise 1", "yaml": "- id: u0-e1\n  concept: c-bayes\n  kind: constructed\n  prompt: Two coins, one fair. P(heads)?\n  answer: '0.75'\n  check: numeric(0.01)\n  difficulty: core\n"}}},
+		"author":         {"body": "---\nunit: u0\ntitle: Bayes's Theorem\n---\n\n## The cookie problem\n\nIn Downey's words, adapted.\n"},
+		"imported_items": {"items": []map[string]any{{"source": "think-bayes chap02.ipynb exercise 1", "yaml": "- id: u0-e1\n  concept: c-bayes\n  kind: constructed\n  prompt: Two coins, one fair. P(heads)?\n  answer: '0.75'\n  check: numeric(0.01)\n  difficulty: core\n"}}},
 	}}
 	g := &Generator{Chain: chain, SpecPath: spec, OutDir: filepath.Join(dir, "corpus-bayes"), Index: idx, Fetch: client, Workers: 1}
 
@@ -247,5 +248,82 @@ func TestAnMCQWithAParagraphBreakKeepsItsOneCheck(t *testing.T) {
 	got := withChoiceChecks(in)
 	if got != in {
 		t.Fatalf("an MCQ that already has its check must be left alone, got:\n%s", got)
+	}
+}
+
+// A brief that names nothing: the planner says what to search for, the
+// index and the catalogues offer candidates with their contents, the
+// planner picks, and the book is planned from the picks as if they had
+// been named. A found source is fetchable on a rerun from sources.yaml.
+func TestSourcesAreFoundWhenTheBriefNamesNone(t *testing.T) {
+	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/repos/AllenDowney/ThinkBayes2/contents/notebooks":
+			w.Write([]byte(`[{"name":"chap02.ipynb","type":"file"}]`))
+		case "/AllenDowney/ThinkBayes2/master/notebooks/chap02.ipynb":
+			w.Write([]byte(`{"cells":[{"cell_type":"markdown","source":"# Bayes's Theorem\n\nCookies.\n"}]}`))
+		case "/otl/textbooks.json":
+			w.Write([]byte(`{"data":[]}`))
+		case "/learn/":
+			w.Write([]byte(`{"results":[{"readable_id":"18.05+spring_2022","title":"Introduction to Probability and Statistics","url":"https://ocw.mit.edu/courses/18-05-introduction-to-probability-and-statistics-spring-2022/","description":"Probability.","course_feature":["Problem Sets","Problem Set Solutions"]}]}`))
+		case "/lt/catalog":
+			w.Write([]byte(`{"books":[]}`))
+		case "/courses/18-05-introduction-to-probability-and-statistics-spring-2022/":
+			w.Write([]byte(`<html><body><nav><a href="/courses/18-05-introduction-to-probability-and-statistics-spring-2022/pages/syllabus/">Syllabus</a><a href="/courses/18-05-introduction-to-probability-and-statistics-spring-2022/pages/readings/">Readings</a></nav></body></html>`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer host.Close()
+	dir := t.TempDir()
+	spec := filepath.Join(dir, "authoring-spec.md")
+	os.WriteFile(spec, []byte("# Contract\n"), 0o644)
+	idx := &sources.Index{Sources: []sources.Source{{
+		ID: "think-bayes", Title: "Think Bayes 2e", Authors: []string{"Allen B. Downey"}, Subjects: []string{"bayesian", "probability"},
+		Verdict: sources.Adaptable, Licence: sources.Licence{Name: "CC BY-NC-SA 4.0", URL: "lic"}, Voice: "Computation first.",
+		Fetch: sources.Recipe{Kind: "github", Base: host.URL, Repo: "AllenDowney/ThinkBayes2", Ref: "master", Path: "notebooks/{locator}", Dir: "notebooks"},
+	}, {
+		ID: "organic-chem", Title: "Organic Chemistry", Subjects: []string{"chemistry"}, Verdict: sources.Adaptable,
+	}}}
+	client := sources.NewClient(filepath.Join(dir, "cache"))
+	client.Pause = 0
+	client.Catalogues = sources.Catalogues{OpenTextbookLibrary: host.URL + "/otl/textbooks.json", MITLearn: host.URL + "/learn/", LibreTexts: host.URL + "/lt/catalog"}
+	chain := &stubChain{payloads: map[string]map[string]any{
+		"search_terms": {"terms": []string{"bayesian statistics"}, "tags": []string{"bayesian", "not-a-tag"}},
+		"source_picks": {"picks": []map[string]any{
+			{"id": "ocw-18-05", "role": "interleave", "reason": "Problem sets with solutions."},
+			{"id": "think-bayes", "role": "spine", "reason": "Computation first, fits an engineer."},
+			{"id": "nope", "role": "interleave", "reason": "made up"},
+		}, "references": []string{"Bayesian Data Analysis, 3rd edition"}},
+		"planner": {"title": "Bayes", "learner_profile": "an engineer", "units": []map[string]any{
+			{"id": "u0", "slug": "bayes", "title": "Bayes", "minutes": 20, "prereqs": []string{}, "concepts": []map[string]any{{"id": "c-b", "name": "b"}}, "notes": "",
+				"sources": []map[string]any{{"source": "think-bayes", "locator": "chap02.ipynb", "role": "spine"}, {"source": "ocw-18-05", "locator": "readings", "role": "interleave"}}}},
+			"misconceptions": []map[string]any{}},
+	}}
+	g := &Generator{Chain: chain, SpecPath: spec, OutDir: filepath.Join(dir, "out"), Index: idx, Fetch: client, Workers: 1}
+	if _, err := g.Plan("A short book on Bayesian statistics for an engineer.", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	pickPrompt := chain.asked["planner"][1]
+	if !strings.Contains(pickPrompt, "[index] think-bayes") || !strings.Contains(pickPrompt, "[MIT Learn] ocw-18-05") || strings.Contains(pickPrompt, "organic-chem") {
+		t.Fatalf("the picker saw the wrong candidates:\n%s", pickPrompt)
+	}
+	if !strings.Contains(pickPrompt, "syllabus | Syllabus") || !strings.Contains(pickPrompt, "chap02.ipynb | Bayes's Theorem") {
+		t.Fatalf("the picker did not see the tables of contents:\n%s", pickPrompt)
+	}
+	planPrompt := chain.asked["planner"][2]
+	if !strings.Contains(planPrompt, "[spine] ocw-18-05") || !strings.Contains(planPrompt, "[interleave] think-bayes") {
+		t.Fatalf("the planner did not get the picks in the picked order:\n%s", planPrompt)
+	}
+	raw, _ := os.ReadFile(filepath.Join(g.OutDir, "sources.yaml"))
+	doc := string(raw)
+	if !strings.Contains(doc, "id: ocw-18-05") || !strings.Contains(doc, "course: 18-05-introduction-to-probability-and-statistics-spring-2022") || !strings.Contains(doc, "Bayesian Data Analysis") || strings.Contains(doc, "nope") {
+		t.Fatalf("sources.yaml:\n%s", doc)
+	}
+	// A fresh generator on the same directory can fetch the found source.
+	again := &Generator{Chain: chain, SpecPath: spec, OutDir: g.OutDir, Index: idx, Fetch: client}
+	again.loadFound()
+	if s := again.source("ocw-18-05"); s == nil || s.Fetch.Course == "" {
+		t.Fatalf("the found source was not read back: %+v", s)
 	}
 }

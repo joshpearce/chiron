@@ -168,6 +168,9 @@ type Generator struct {
 	// either nil the book is written from the brief alone.
 	Index *sources.Index
 	Fetch *sources.Client
+	// found are the sources the finder chose for this book, read back from
+	// sources.yaml; the index never listed them.
+	found []sources.Source
 	// Workers bounds concurrent unit authoring. Units are independent and the
 	// wall clock is dominated by generation, but each unit is six sequential
 	// calls, so this is what decides whether a subject takes 30 minutes or two
@@ -202,9 +205,19 @@ func (g *Generator) Plan(brief, title string, named []string) (int, error) {
 		}
 	}
 	chosen, unknown := g.resolveSources(context.Background(), named, brief)
-	if err := g.writeSources(chosen, unknown); err != nil {
+	var references []string
+	if len(chosen) == 0 {
+		// Nothing named that the index has: find the sources for the brief.
+		found, refs, err := g.findSources(context.Background(), brief, unknown)
+		if err != nil {
+			return 0, fmt.Errorf("finding sources: %w", err)
+		}
+		chosen, references = found, refs
+	}
+	if err := g.writeSources(chosen, unknown, references); err != nil {
 		return 0, err
 	}
+	g.loadFound()
 	system := planSystem
 	if len(chosen) > 0 {
 		system += sourcesPlanRule
@@ -304,6 +317,7 @@ func (g *Generator) Units(only []string, progress Progress) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	g.loadFound()
 
 	wanted := map[string]bool{}
 	for _, id := range only {

@@ -34,7 +34,12 @@ type chosen struct {
 	Voice      string            `yaml:"voice,omitempty"`
 	Sections   []sources.Section `yaml:"sections,omitempty"`
 	Note       string            `yaml:"note,omitempty"`
-	src        *sources.Source
+	// Fetch, Exercises and Origin let a source the finder chose be fetched
+	// on a rerun, when the index never listed it.
+	Fetch     sources.Recipe `yaml:"fetch,omitempty"`
+	Exercises string         `yaml:"exercises,omitempty"`
+	Origin    string         `yaml:"origin,omitempty"`
+	src       *sources.Source
 }
 
 // Phrases a brief uses to name its sources: "starting from X", "based on
@@ -129,7 +134,7 @@ func (g *Generator) resolveSources(ctx context.Context, named []string, brief st
 			role = "spine"
 		}
 		c := chosen{ID: s.ID, Title: s.Title, Authors: s.Authors, Licence: s.Licence.Name, LicenceURL: s.Licence.URL,
-			Verdict: s.Verdict, Role: role, Voice: s.Voice, src: s}
+			Verdict: s.Verdict, Role: role, Voice: s.Voice, Fetch: s.Fetch, Exercises: s.Exercises, Origin: "index", src: s}
 		switch {
 		case s.Verdict == sources.Restricted:
 			c.Note = "restricted: cited by title only, never fetched"
@@ -185,13 +190,16 @@ const sourcesPlanRule = `
 
 With sources given: follow the spine's order of chapters unless the brief or the authoring contract's ordering rules say otherwise, and for every unit list under ` + "`sources`" + ` the spine sections it covers and the interleave sections to weave in, each by its locator exactly as listed and with its role. A unit the sources do not cover gets an empty list. Never list a section of a quotation-only or restricted source. A unit's title and notes must describe the sections it lists, because the author writes from those sections: when the brief names an idea that lives in another section (a worked problem, an example), list that section too rather than titling the unit after material it will not have.`
 
-func (g *Generator) writeSources(chosen []chosen, unknown []string) error {
-	if len(chosen) == 0 && len(unknown) == 0 {
+func (g *Generator) writeSources(chosen []chosen, unknown, references []string) error {
+	if len(chosen) == 0 && len(unknown) == 0 && len(references) == 0 {
 		return nil
 	}
 	doc := map[string]any{"sources": chosen}
 	if len(unknown) > 0 {
 		doc["unresolved"] = unknown
+	}
+	if len(references) > 0 {
+		doc["references"] = references
 	}
 	return writeYAML(filepath.Join(g.OutDir, "sources.yaml"), doc)
 }
@@ -201,7 +209,7 @@ func (g *Generator) writeSources(chosen []chosen, unknown []string) error {
 // list for the unit's front matter. Quotation-only chunks are not
 // material; they are named for the author to restate.
 func (g *Generator) material(ctx context.Context, dir string, u unitPlan) (string, []sources.Provenance, error) {
-	if len(u.Sources) == 0 || g.Index == nil || g.Fetch == nil {
+	if len(u.Sources) == 0 || g.Fetch == nil {
 		return "", nil, nil
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "sources"), 0o755); err != nil {
@@ -210,7 +218,7 @@ func (g *Generator) material(ctx context.Context, dir string, u unitPlan) (strin
 	var chunks []*sources.Chunk
 	var refs []string
 	for _, us := range u.Sources {
-		s := g.Index.Get(us.Source)
+		s := g.source(us.Source)
 		if s == nil {
 			continue
 		}
@@ -340,7 +348,7 @@ func dropTopLevelKey(front, key string) string {
 // importItems turns the exercises of the unit's adaptable sources into
 // bank items, kept in imported.yaml beside the unit so a rerun reuses them.
 func (g *Generator) importItems(ctx context.Context, dir string, u unitPlan, unitYAML []byte, spec, bank string) (string, error) {
-	if len(u.Sources) == 0 || g.Index == nil || g.Fetch == nil {
+	if len(u.Sources) == 0 || g.Fetch == nil {
 		return "", nil
 	}
 	path := filepath.Join(dir, "imported.yaml")
@@ -349,7 +357,7 @@ func (g *Generator) importItems(ctx context.Context, dir string, u unitPlan, uni
 	}
 	var imported []roles.Imported
 	for _, us := range u.Sources {
-		s := g.Index.Get(us.Source)
+		s := g.source(us.Source)
 		if s == nil || s.Verdict != sources.Adaptable || s.Fetch.Kind == "" {
 			continue
 		}
