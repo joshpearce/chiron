@@ -20,7 +20,10 @@ chiron discard ID                     drop a draft (only drafts)
 chiron status ID                      plan, job, or shelf row as JSON
 chiron wait ID [-timeout D]           until ready or failed; prints the row
 chiron read ID [-unit U]              the text of a primer or a book unit
-chiron teach -title T -brief-file F [-slug S]   a book from a brief alone
+chiron teach -title T -brief-file F [-slug S] [-source NAME ...]
+                                      a book from a brief; -source names an
+                                      open text to build from (repeat for
+                                      interleaves), else the builder finds them
 ```
 
 `chiron` with no arguments prints this usage. Replies are JSON except
@@ -82,7 +85,13 @@ You write the material and the brief; Chiron writes the primer.
 The same recipe with `-scale book` makes a smart book; `wait` follows
 the draft to the book it builds and returns when the book is on the
 shelf. `chiron teach -title T -brief-file brief.md` makes a book from a
-brief with no passage at all.
+brief with no passage at all. A book is built from open texts: name them
+with `-source "Think Bayes" -source "MIT 18.05"` (the first is the spine
+whose order the syllabus follows, the rest interleave), or write
+"starting from X, interleaving Y" in the brief, or name nothing and the
+builder searches its index and the open catalogues and picks a spine
+itself. The picks and their reasons are in the book's `sources.yaml`,
+and each chapter ends with what it was adapted from.
 
 ## Planning instead of a brief
 
