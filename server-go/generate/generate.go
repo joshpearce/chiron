@@ -471,7 +471,14 @@ func withChoiceChecks(questions string) string {
 		has := false
 		for j := i + 1; j < len(lines); j++ {
 			next := lines[j]
-			if strings.TrimSpace(next) == "" || strings.HasPrefix(strings.TrimSpace(next), "- id:") {
+			// A blank line is not the end of the item: a prompt written as
+			// a block scalar has one between paragraphs.
+			if strings.TrimSpace(next) == "" {
+				continue
+			}
+			// The item ends where the indent drops back: the next item's
+			// "- id:" line, or the parent key.
+			if len(next)-len(strings.TrimLeft(next, " ")) < len(indent) {
 				break
 			}
 			if strings.HasPrefix(next, indent+"check:") {

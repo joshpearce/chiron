@@ -219,3 +219,16 @@ func TestBareMCQsGetTheirCheck(t *testing.T) {
 		t.Fatal("not idempotent")
 	}
 }
+
+// A prompt written as a block scalar can hold a blank line between
+// paragraphs. The scan for an existing check line must not mistake that
+// blank line for the end of the item, or the author's own `check: choice`
+// after the prompt gets a duplicate above it and the file no longer parses
+// (u14-q8 of the first agent-auth build).
+func TestAnMCQWithAParagraphBreakKeepsItsOneCheck(t *testing.T) {
+	in := "items:\n  - id: q1\n    kind: mcq\n    prompt: |\n      First paragraph.\n\n      Second paragraph?\n    check: choice\n    options:\n      - text: x\n        correct: true\n"
+	got := withChoiceChecks(in)
+	if got != in {
+		t.Fatalf("an MCQ that already has its check must be left alone, got:\n%s", got)
+	}
+}

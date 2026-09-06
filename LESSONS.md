@@ -128,6 +128,17 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   planner now has the author's 15 minutes (`llm/claudecli.go`,
   `roleTimeouts`). The log line is the only symptom; nothing under the
   corpus dir is written before planning succeeds except `sources.yaml`.
+- **A finished book fails with "generated corpus did not load" and the
+  corpus lints with a duplicate `check` key (2026-09-06).** The pass that
+  adds `check: choice` to bare MCQs looked for an existing check line only
+  up to the first blank line, and a prompt written as a block scalar has
+  one between paragraphs, so an author-supplied check below the prompt was
+  missed and a second one inserted above it. The scan now ends where the
+  indent drops back (`generate.go`, `withChoiceChecks`). To find the file:
+  `go run ./cmd/corpus-lint <corpus dir>` on the sprite. A rebuild after
+  this failure does not reuse the corpus (the failed job holds the slug, so
+  the next build takes `-2` and re-plans); repair the file, lint, and
+  `sprite-env services restart chiron-server` so discovery registers it.
 
 - **`simctl openurl` for a custom scheme waits behind an "Open in
   Chiron?" alert (2026-09-05).** The app's `onOpenURL` never fires until
