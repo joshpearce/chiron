@@ -97,53 +97,51 @@ check:
   band: 3
 - id: u0-q12
   concept: c-matmul
-  kind: constructed
+  kind: mcq
   congruent: true
   callback_eligible: true
   prompt: |
-    $X$ has shape $(n, d)$ and $W$ has shape $(d, m)$. Describe entry $(i,j)$
-    of $XW$ as a dot product: which vector is dotted with which?
-  answer: |
-    Entry $(i,j)$ is the dot product of row $i$ of $X$ - the $i$-th token's
-    $d$-dimensional vector - with column $j$ of $W$, which is also
-    $d$-dimensional. Both operands have length $d$, the shared inner
-    dimension, which is why they can be dotted at all. The full product is an
-    $n \times m$ grid of such dot products.
-  check: llm
-  rubric: |
-    Must contain: (1) row $i$ of $X$ dotted with column $j$ of $W$ - the
-    row/column pairing must be correct and in the right order; (2) both
-    operands have length $d$, the contracted inner dimension.
-    Pass = both. Partial = (1) only.
-    Fail and what it diagnoses: "row $i$ of $X$ with row $j$ of $W$" or any
-    pairing that ignores which axis contracts = the shape rule is being
-    applied as memorized bookkeeping rather than understood, U0-M1. Answering
-    with elementwise multiplication of $X_{ij}$ and $W_{ij}$ = U0-M1 in its
-    strongest form; deliver the matmul section before any later unit.
+    $X$ has shape $(n, d)$ and $W$ has shape $(d, m)$. Entry $(i,j)$ of $XW$
+    is the dot product of which two vectors?
+  check: choice
+  options:
+    - text: "Row $i$ of $X$ with column $j$ of $W$; both have length $d$."
+      correct: true
+      explain: "Right. The contracted axis is the shared inner dimension $d$: row $i$ of $X$ is a $d$-vector, column $j$ of $W$ is a $d$-vector, and the product is an $n \\times m$ grid of such dot products."
+    - text: "Row $i$ of $X$ with row $j$ of $W$; both have length $m$."
+      misconception: U0-M1
+      explain: "Attractive because 'row with row' matches the way a nested loop is often sketched, but row $j$ of $W$ has length $m$, not $d$, so there is nothing to contract. Which axis contracts is the meaning of the shape rule, not bookkeeping."
+    - text: "Column $i$ of $X$ with row $j$ of $W$; both have length $n$."
+      misconception: U0-M4
+      explain: "This is the pairing you would write under the column-vector convention with the operands swapped. Orientation is not cosmetic: under $XW$ with data on the left, it is row $i$ of $X$ that indexes the output row."
+    - text: "Entry $X_{ij}$ multiplied by entry $W_{ij}$, elementwise."
+      misconception: U0-M1
+      explain: "This is the strongest form of reading a matrix as storage rather than a linear map. Elementwise multiplication would require $X$ and $W$ to have the same shape and would compute no composition at all."
   difficulty: core
   band: 4
 - id: u0-p7
   concept: c-dotprod
+  kind: mcq
   prompt: |
-    $q$ and $k$ are both row vectors of shape $(1, d)$. Write the dot product
-    $q \cdot k$ as a matrix product of $q$ and $k$, and state the shape of
-    the result.
-  answer: |
-    $q k^T$, of shape $(1, 1)$ - a scalar. The transpose turns $k$ into a
-    $(d, 1)$ column so the inner dimensions $d$ match and contract away.
-  check: llm
-  rubric: |
-    Pass requires the expression $q k^T$ (or an equivalent explicitly showing
-    one factor transposed) AND the result being a scalar / shape $(1,1)$.
-    Partial: correct shape reasoning but writes $q^T k$, which yields a
-    $(d,d)$ outer product - note the error, it is a real orientation slip.
-    Fail and what it diagnoses: writing $qk$ with no transpose and calling it
-    valid = U0-M4 (orientation treated as cosmetic). Answering that the
-    result is a vector of length $d$ = confusing the dot product with
-    elementwise multiplication, U0-M1.
+    $q$ and $k$ are both row vectors of shape $(1, d)$. Which matrix product
+    of $q$ and $k$ equals the dot product $q \cdot k$, and what shape is the
+    result?
+  check: choice
+  options:
+    - text: "$q k^T$, shape $(1, 1)$."
+      correct: true
+      explain: "Right. The transpose turns $k$ into a $(d, 1)$ column, so the inner dimensions $d$ match and contract away, leaving a $(1,1)$ scalar."
+    - text: "$q^T k$, shape $(d, d)$."
+      misconception: U0-M4
+      explain: "A real orientation slip: this is a valid product, but it contracts the length-1 axis and gives the outer product, a $(d,d)$ matrix. Which factor carries the transpose decides whether you get a scalar or a matrix."
+    - text: "$qk$, shape $(1, 1)$ - no transpose is needed."
+      misconception: U0-M4
+      explain: "Treats the transpose as tidying you add when the shapes complain. $(1,d)$ times $(1,d)$ has inner dimensions $d$ and $1$, which do not match, so the product is undefined."
+    - text: "$qk$, shape $(1, d)$ - the entries multiply position by position."
+      misconception: U0-M1
+      explain: "This is elementwise multiplication, not a matrix product. The dot product sums those products into a single number; keeping $d$ separate numbers means nothing has contracted."
   difficulty: core
   band: 4
-  kind: constructed
 - id: u0-q7
   concept: c-matmul
   kind: mcq
@@ -185,30 +183,26 @@ check:
   band: 4
 - id: u0-p3
   concept: c-notation
+  kind: mcq
   prompt: |
-    Softmax turns a vector of scores into a set of positive numbers summing
-    to 1. Compare $\text{softmax}([2, 1])$ with $\text{softmax}([12, 11])$.
-    Are the two outputs the same or different? One sentence on why.
-  answer: |
-    Identical. Softmax depends only on differences between scores: adding the
-    same constant to every entry multiplies every exponential by the same
-    factor, which cancels in the normalization. Both inputs have a gap of 1,
-    so both give the same distribution, roughly $[0.73, 0.27]$.
-  check: llm
-  rubric: |
-    Pass requires the verdict "same/identical" AND a reason resting on
-    shift-invariance (only differences between scores matter, or the common
-    factor cancels in the denominator).
-    Partial: correct verdict with a vague reason ("the gap is the same")
-    that does not mention cancellation or differences.
-    Fail: says "different" - diagnoses treating softmax outputs as absolute
-    magnitudes rather than a normalized comparison (see M2 in the global
-    bank); route through u2's softmax section at full depth.
-    A learner who computes the actual numbers and gets ~[0.73, 0.27] for both
-    passes regardless of how the reason is phrased.
+    Softmax turns a vector of scores into positive numbers summing to 1.
+    Compare $\text{softmax}([2, 1])$ with $\text{softmax}([12, 11])$.
+  check: choice
+  options:
+    - text: "Identical - softmax depends only on the differences between scores, so adding 10 to both entries cancels in the normalization. Both give roughly $[0.73, 0.27]$."
+      correct: true
+      explain: "Right. Adding a constant $c$ to every entry multiplies every exponential by $e^{c}$, and that common factor cancels between numerator and denominator. Both inputs have a gap of 1, so both give the same distribution."
+    - text: "Different - $[12, 11]$ are much larger scores, so the first entry gets a probability much closer to 1."
+      misconception: M2
+      explain: "Attractive if the outputs are read as absolute confidence in each option, so bigger scores must mean more certainty. But softmax normalizes: only the gap of 1 survives, and the same gap gives the same distribution wherever it sits."
+    - text: "Different - both are shifted toward $[0.5, 0.5]$, because the ratio $12/11$ is closer to 1 than $2/1$ is."
+      misconception: M2
+      explain: "Softmax exponentiates differences, it does not compare ratios. $e^{12}/e^{11} = e^{1} = e^{2}/e^{1}$, so the ratio of the two outputs is identical in both cases."
+    - text: "Different - $[12, 11]$ overflows in floating point, so its output is not well defined."
+      misconception: M7
+      explain: "This reads a normalization step as a numerics safeguard. $e^{12}$ is about $1.6 \\times 10^{5}$, nowhere near overflow, and shift-invariance is exactly why implementations may subtract the max first - the mathematical answer is unchanged."
   difficulty: core
   band: 4
-  kind: constructed
 - id: u0-p4
   concept: c-notation
   prompt: |
@@ -221,156 +215,129 @@ check:
   kind: constructed
 - id: u0-p6
   concept: c-notation
+  kind: mcq
   prompt: |
-    What does $\mathbb{E}_{x \sim \mathcal{D}}[f(x)]$ denote, and how is it
-    actually computed during training? Two sentences.
-  answer: |
-    It denotes the expected value of $f(x)$ when $x$ is drawn from the
-    distribution $\mathcal{D}$ - the average of $f$ over all possible inputs,
-    weighted by their probability under $\mathcal{D}$. It cannot be computed
-    exactly because $\mathcal{D}$ is not enumerable, so training estimates it
-    by the mean of $f(x_i)$ over the examples in a batch.
-  check: llm
-  rubric: |
-    Pass requires both: (1) an average/expected value of $f$ under the
-    distribution $\mathcal{D}$, not over a fixed finite set; (2) that it is
-    estimated in practice by a sample mean over a batch.
-    Partial: (1) only, or (2) stated as if the batch mean were the definition.
-    Fail and what it diagnoses: "the average over the training set" with no
-    distribution involved = U0-M5. "The most likely / typical value of f" =
-    U0-M7. Either answer means the notation section should be delivered.
+    Which statement best describes what $\mathbb{E}_{x \sim \mathcal{D}}[f(x)]$
+    denotes and how it is actually computed during training?
+  check: choice
+  options:
+    - text: "The average of $f$ over all possible inputs, weighted by their probability under $\\mathcal{D}$; since $\\mathcal{D}$ cannot be enumerated, training estimates it by the mean of $f(x_i)$ over a batch."
+      correct: true
+      explain: "Right. The objective is defined over a distribution nobody can write down; the batch mean is an unbiased but noisy estimate of it, which is why gradient noise falls as $1/\\sqrt{b}$."
+    - text: "The average of $f(x_i)$ over the training set - the distribution notation is formality for the mean of the data you have."
+      misconception: U0-M5
+      explain: "The batch mean is what the loop computes, so it is natural to take it as the definition. But if the objective were the dataset average, a model that memorized the dataset would have solved the stated problem exactly, and held-out loss would not be a meaningful number."
+    - text: "The value of $f(x)$ you should expect to see - the typical or most likely outcome when $x$ is drawn from $\\mathcal{D}$; training reads it off the most common example."
+      misconception: U0-M7
+      explain: "'Expected' in English does mean 'what you would predict', and on symmetric distributions the mean is near the typical value. But $\\mathbb{E}$ is the probability-weighted mean, not the mode: the expected roll of a fair die is 3.5, a value the die cannot produce."
+    - text: "The largest value $f$ can take over the support of $\\mathcal{D}$; training computes it as the worst-case loss in the batch."
+      misconception: U0-M7
+      explain: "This confuses a weighted average with an extremum. A maximum ignores probability entirely, and optimizing it would be a different objective (worst case) from the one the notation states."
   difficulty: core
   band: 4
-  kind: constructed
 - id: u0-q2
   concept: c-dotprod
-  kind: constructed
+  kind: mcq
   congruent: true
   callback_eligible: false
   prompt: |
-    A query vector $q$ is compared against two key vectors that point in
-    exactly the same direction as each other, but $k_2$ is five times as long
-    as $k_1$. Compare $q \cdot k_1$ with $q \cdot k_2$, and compare the
-    cosine similarity of $q$ with each. Explain the difference in one or two
-    sentences.
-  answer: |
-    $q \cdot k_2 = 5 \, (q \cdot k_1)$: the dot product scales linearly with
-    the length of either input. The cosine similarities are identical, because
-    cosine divides out both magnitudes and depends only on the angle, which is
-    unchanged. The dot product measures alignment scaled by both magnitudes;
-    the cosine measures alignment alone.
-  check: llm
-  rubric: |
-    Must contain: (1) the dot product is 5x larger for $k_2$ (any statement
-    that it scales with magnitude, with the correct direction of the effect);
-    (2) the cosines are equal because the angle is unchanged.
-    Pass = both. Partial = (1) with no cosine comparison, or (2) with the dot
-    products called equal in direction-terms but scaled correctly.
-    Fail and what it diagnoses: saying both dot products are equal because the
-    direction is the same = U0-M2. Saying $k_1$ scores higher because it is
-    nearer to $q$ = U0-M6. Either failure means the dot-product section is
-    required at full depth before u3.
+    A query $q$ is compared against two keys pointing in exactly the same
+    direction as each other, where $k_2 = 5 k_1$. Which is true of the dot
+    products and the cosine similarities?
+  check: choice
+  options:
+    - text: "$q \\cdot k_2 = 5 \\, (q \\cdot k_1)$, and the two cosine similarities are equal."
+      correct: true
+      explain: "Right. The dot product is linear in either argument, so it scales with magnitude; cosine divides out both magnitudes and depends only on the angle, which is unchanged."
+    - text: "$q \\cdot k_2 = q \\cdot k_1$, and the cosines are equal - both keys point the same way, so both score the same."
+      misconception: U0-M2
+      explain: "True in the only place most engineers meet the dot product: on unit-normalized embeddings it is the cosine. Nothing normalizes $k$ here, and $u \\cdot v = \\lVert u \\rVert \\lVert v \\rVert \\cos\\theta$ carries both magnitudes."
+    - text: "$q \\cdot k_1 > q \\cdot k_2$, because $k_1$ is nearer to $q$ in space."
+      misconception: U0-M6
+      explain: "Reads the dot product as a proximity measure, the way nearest-neighbor search is usually sold. It is a projection, not a distance, and is not monotone in distance: the farther key here scores five times higher."
+    - text: "$q \\cdot k_2 = 5 \\, (q \\cdot k_1)$, and the cosine for $k_2$ is 5 times the cosine for $k_1$."
+      misconception: U0-M2
+      explain: "Gets the dot product right but treats cosine as carrying magnitude too. Cosine is bounded in $[-1,1]$ and divides by $\\lVert k \\rVert$, so the factor of 5 cancels exactly."
   difficulty: core
   band: 4
 - id: u0-p8
   concept: c-matmul
+  kind: mcq
   prompt: |
     $X$ has shape $(n, 512)$, $W_1$ has shape $(512, 2048)$, $W_2$ has shape
-    $(2048, 512)$. (a) What is the shape of $X W_1 W_2$? (b) Is $X W_2 W_1$ a
-    valid product? One line each.
-  answer: |
-    (a) $(n, 512)$: $XW_1$ is $(n, 2048)$, and multiplying by $W_2$ contracts
-    the 2048 to give $(n, 512)$.
-    (b) No. $X$ is $(n, 512)$ and $W_2$ is $(2048, 512)$; the inner
-    dimensions 512 and 2048 do not match, so the product is undefined.
-  check: llm
-  rubric: |
-    Pass requires both parts: (a) $(n, 512)$, and (b) not valid, because the
-    inner dimensions do not match.
-    Partial: (a) correct, (b) wrong or unjustified.
-    Fail and what it diagnoses: answering (b) "yes, matrix multiplication is
-    commutative" or "yes, you would loop in the other order" = U0-M1.
-    Answering (b) "yes, transpose it and it works" without noticing that this
-    computes a different function = U0-M4.
+    $(2048, 512)$. Which statement about $X W_1 W_2$ and $X W_2 W_1$ is correct?
+  check: choice
+  options:
+    - text: "$X W_1 W_2$ has shape $(n, 512)$; $X W_2 W_1$ is undefined."
+      correct: true
+      explain: "Right. $XW_1$ is $(n, 2048)$ and $W_2$ contracts the 2048 back to $(n, 512)$. For $X W_2$ the inner dimensions are 512 and 2048, which do not match, so the product does not exist."
+    - text: "$X W_1 W_2$ has shape $(n, 512)$; $X W_2 W_1$ is also valid and has shape $(n, 512)$, since matrix multiplication reorders freely."
+      misconception: U0-M1
+      explain: "Treats the ordering as bookkeeping you can reshuffle. Matrix multiplication is composition of maps and does not commute: $W_2$ takes a 2048-dimensional input, and $X$'s rows are 512-dimensional, so nothing can be fed in."
+    - text: "Both are valid: $X W_2 W_1$ works once $W_2$ is transposed, and gives the same $(n, 512)$ result."
+      misconception: U0-M4
+      explain: "Adding a transpose to make the shapes agree is orientation treated as cosmetic. $X W_2^T W_1^T$ is defined, but it composes different maps in a different order and computes a different function."
+    - text: "$X W_1 W_2$ has shape $(n, 2048)$; $X W_2 W_1$ is undefined."
+      misconception: U0-M1
+      explain: "The second part is right, but the first stops after $XW_1$. The final $W_2$ contracts the 2048 axis, and the output width is always the last factor's second dimension - 512."
   difficulty: core
   band: 4
-  kind: constructed
 - id: u0-q8
   concept: c-notation
-  kind: constructed
+  kind: mcq
   congruent: true
   callback_eligible: false
   prompt: |
     A batch of token embeddings entering a transformer has shape
-    $(b, n, d_{\text{model}})$. Say what each of the three symbols denotes,
-    and give the shape of the weight matrix $W$ that would project each token
-    vector to width $d_{\text{ff}}$.
-  answer: |
-    $b$ is the batch size (independent sequences processed together), $n$ is
-    the sequence length in tokens, $d_{\text{model}}$ is the width of each
-    token's vector - the residual stream width. $W$ has shape
-    $(d_{\text{model}}, d_{\text{ff}})$: input dimension first under the
-    row-vector convention, so the $d_{\text{model}}$ axis contracts and the
-    output is $(b, n, d_{\text{ff}})$.
-  check: llm
-  rubric: |
-    Must contain: (1) all three symbols correctly identified - batch size,
-    sequence length, per-token vector width; (2) the weight shape
-    $(d_{\text{model}}, d_{\text{ff}})$ in that order.
-    Pass = both. Partial = (1) correct with the weight shape transposed.
-    Fail and what it diagnoses: giving $(d_{\text{ff}}, d_{\text{model}})$
-    while also describing $Wx$ rather than $xW$ is internally consistent
-    column-convention reasoning - not a failure of understanding, but flag
-    U0-M4 and confirm the learner knows which convention this book uses.
-    Confusing $n$ with $d_{\text{model}}$, or treating $b$ as anything other
-    than independent parallel sequences, is a genuine miss.
+    $(b, n, d_{\text{model}})$, and a linear layer projects each token vector
+    to width $d_{\text{ff}}$ as $XW$. Which reading of the symbols and shape
+    of $W$ is correct?
+  options:
+    - text: "$b$ = independent sequences in the batch, $n$ = sequence length in tokens, $d_{\\text{model}}$ = per-token vector width; $W$ is $(d_{\\text{model}}, d_{\\text{ff}})$"
+      correct: true
+      explain: "Right. Under the row-vector convention data sits on the left, so the $d_{\\text{model}}$ axis contracts at the join and the output is $(b, n, d_{\\text{ff}})$."
+    - text: "$b$ = independent sequences in the batch, $n$ = sequence length in tokens, $d_{\\text{model}}$ = per-token vector width; $W$ is $(d_{\\text{ff}}, d_{\\text{model}})$"
+      misconception: U0-M4
+      explain: "Everything but the shape is right, and this shape is the correct one under $Wx$ with column vectors. This book writes $xW$, so the same weights are stored transposed - orientation is a global choice, not a transpose you patch in later."
+    - text: "$b$ = batch size, $n$ = per-token vector width, $d_{\\text{model}}$ = number of layers; $W$ is $(n, d_{\\text{ff}})$"
+      misconception: U0-M1
+      explain: "Attractive if the shape tuple is read as storage bookkeeping - three loop bounds in some order. But the axes are typed: $n$ indexes positions in the sequence, $d_{\\text{model}}$ is the residual stream width, and the projection must contract the width axis, not the position axis."
+    - text: "$b$ = batch size, $n$ = sequence length, $d_{\\text{model}}$ = per-token vector width; $W$ is $(d_{\\text{model}}, d_{\\text{model}})$ and $d_{\\text{ff}}$ is set by a later reshape"
+      misconception: U0-M1
+      explain: "This treats the width change as a rearrangement of stored numbers. A reshape moves entries around and preserves their count; $W$ is a linear map from a $d_{\\text{model}}$-dimensional space to a $d_{\\text{ff}}$-dimensional one, and the output width is fixed by the map, not by layout."
+  check: choice
   difficulty: core
   band: 4
 - id: u0-q11
   concept: c-notation
-  kind: constructed
+  kind: mcq
   congruent: true
   callback_eligible: true
   prompt: |
     A paper writes attention as
     $\text{softmax}\!\left(\frac{QK^T}{\sqrt{d_k}}\right)V$ with $Q$, $K$, $V$
-    each of shape $(n, d_k)$. Using only shape reasoning: (a) why is $K$
-    transposed, (b) what is the shape of $QK^T$ and what does one entry of it
-    mean, (c) what is the shape of the final output?
-  answer: |
-    (a) $Q$ is $(n, d_k)$ and $K$ is $(n, d_k)$; their inner dimensions do not
-    match ($d_k$ against $n$), so the product is undefined. Transposing $K$
-    gives $(d_k, n)$, and the $d_k$ axes contract.
-    (b) $QK^T$ is $(n, n)$. Entry $(i,j)$ is the dot product of query row $i$
-    with key row $j$ - one alignment score per (query position, key position)
-    pair.
-    (c) Softmax does not change shape, so $(n,n)$ times $V$ of shape
-    $(n, d_k)$ contracts the second $n$ and gives $(n, d_k)$ - the same shape
-    as the input, one output vector per position.
-  check: llm
-  rubric: |
-    Must contain: (1) the transpose exists to make the inner dimensions
-    match, so the $d_k$ axes contract; (2) $QK^T$ has shape $(n,n)$ and one
-    entry is a dot product between one query and one key; (3) the output is
-    $(n, d_k)$.
-    Pass = all three. Partial = any two, with (2) counting only if both the
-    shape and the dot-product reading are present.
-    Fail and what it diagnoses: giving $(d_k, d_k)$ for $QK^T$ = contracting
-    the wrong axis, re-teach the shape contract. Describing an entry of
-    $QK^T$ as a similarity between two tokens' meanings rather than a dot
-    product of two projected vectors = premature semantics, harmless here but
-    flag it before u3. Claiming the transpose is a storage or layout detail
-    = U0-M4.
-    This item is stretch: a learner who has never read an attention equation
-    can still derive all three answers from shapes alone, which is the point.
+    each of shape $(n, d_k)$. Using only shape reasoning, which statement is
+    correct about the transpose, the shape and meaning of $QK^T$, and the
+    shape of the final output?
+  options:
+    - text: "$K$ is transposed so the $d_k$ axes contract; $QK^T$ is $(n, n)$ and entry $(i,j)$ is the dot product of query row $i$ with key row $j$; the output is $(n, d_k)$"
+      correct: true
+      explain: "Right, and derivable from shapes alone. $(n,d_k)$ against $(n,d_k)$ has mismatched inner dimensions; $K^T$ is $(d_k,n)$, the $d_k$ axes contract to give $(n,n)$, softmax preserves shape, and $(n,n)$ times $(n,d_k)$ contracts the second $n$ back to $(n, d_k)$ - one output vector per position."
+    - text: "$K$ is transposed so the $n$ axes contract; $QK^T$ is $(d_k, d_k)$, one entry per pair of feature dimensions; the output is $(n, d_k)$"
+      misconception: U0-M1
+      explain: "This contracts the wrong axis. $Q^T K$ would be $(d_k, d_k)$, but $QK^T$ puts $d_k$ at the join. The shape rule is a type check on which space is being summed over, not a loop you can run in either order."
+    - text: "The transpose is a storage-layout detail so the numbers are read in the right order; $QK^T$ is $(n, n)$ and entry $(i,j)$ is how close token $i$ and token $j$ are in the sequence; the output is $(n, n)$"
+      misconception: U0-M4
+      explain: "The $(n,n)$ shape is right and the rest is not. A transpose in a real equation is load-bearing - it decides which axis contracts - and entry $(i,j)$ is a dot product of two projected vectors, not a proximity. The final product with $V$ contracts one $n$, so the output is $(n, d_k)$."
+    - text: "$K$ is transposed so the $d_k$ axes contract; $QK^T$ is $(n, n)$ and entry $(i,j)$ is smaller when rows $i$ and $j$ are farther apart in space; the output is $(n, d_k)$"
+      misconception: U0-M6
+      explain: "The shapes are all correct, which is what makes this tempting, but the reading of an entry is not. A dot product is a projection scaled by both magnitudes, not a distance: a far-away key with a large norm outscores a nearby one with a small norm."
+    - text: "$K$ is transposed so the $d_k$ axes contract; $QK^T$ is $(n, n)$ and entry $(i,j)$ is the cosine of the angle between query $i$ and key $j$; the output is $(n, d_k)$"
+      misconception: U0-M2
+      explain: "Shapes right, entry wrong. The cosine equals the dot product only on unit vectors, and nothing normalizes $Q$ or $K$ before the score. That is exactly why the score grows with $d_k$ and needs the $1/\\sqrt{d_k}$ factor sitting in this equation."
+  check: choice
   difficulty: stretch
   band: 5
-
-# Bands 1 and 2: the floor the original bank never had. Band 1 is the
-# arithmetic everything else is built from; band 2 is recognising the
-# objects - a vector, a shape, what a dot product produces - or following a
-# recipe that is spelled out. A learner who rates "absolute novice" is sized
-# here, not thrown at matrix products.
 - id: u0-n1
   concept: c-dotprod
   kind: constructed
@@ -500,31 +467,32 @@ check:
   band: 5
 - id: u0-n10
   concept: c-notation
-  kind: constructed
+  kind: mcq
   congruent: true
   callback_eligible: true
   prompt: |
     $Y = XW$, with $X$ of shape $(n, d)$ and $W$ of shape $(d, m)$. You are
-    handed $G = \partial L / \partial Y$, of shape $(n, m)$. Write
-    $\partial L / \partial W$ in terms of $X$ and $G$, and give its shape.
-  answer: |
-    $\partial L / \partial W = X^T G$, of shape $(d, m)$ - the shape of $W$
-    itself. $X^T$ is $(d, n)$, $G$ is $(n, m)$, and the $n$ axis contracts.
-  check: llm
-  rubric: |
-    Pass requires both: (1) the expression $X^T G$ - $X$ transposed, on the
-    left; (2) the shape $(d, m)$, the same as $W$.
-    Partial: the shape right with the expression wrong ($X G^T$, $G X$, or
-    $G^T X$), or the expression right with no shape.
-    Fail and what it diagnoses: a gradient whose shape is not $W$'s (a scalar,
-    or $(n, m)$) = U0-M3, the gradient treated as a slope rather than one
-    number per weight. Writing $XG$ with no transpose and calling it valid =
-    U0-M4.
+    handed $G = \partial L / \partial Y$, of shape $(n, m)$. Which expression
+    for $\partial L / \partial W$, with which shape, is correct?
+  options:
+    - text: "$X^T G$, of shape $(d, m)$"
+      correct: true
+      explain: "Right. $X^T$ is $(d, n)$ and $G$ is $(n, m)$, so the $n$ axis contracts and the result is $(d, m)$ - the shape of $W$ itself, one number per weight."
+    - text: "$X G$, of shape $(d, m)$"
+      misconception: U0-M4
+      explain: "The shape is right and the expression cannot produce it: $X$ is $(n,d)$ and $G$ is $(n,m)$, so the inner dimensions $d$ and $n$ do not meet. The transpose here is load-bearing, not tidying done after the fact."
+    - text: "$G X^T$, of shape $(n, d)$"
+      misconception: U0-M4
+      explain: "Operand order is not free. This is the shape of $\\partial L / \\partial X$, the other gradient of the same layer; the gradient with respect to $W$ must come out shaped like $W$."
+    - text: "A single scalar, the slope of $L$ along the direction training is moving"
+      misconception: U0-M3
+      explain: "That is the one-variable derivative carried one domain over. If it were a scalar, $W \\leftarrow W - \\eta \\, \\partial L / \\partial W$ would shift every weight by the same amount forever. The gradient is shaped like $W$: entry $(i,j)$ is the sensitivity of $L$ to $W_{ij}$ alone."
+    - text: "$G$ itself, of shape $(n, m)$ - the gradient passes through the layer unchanged"
+      misconception: U0-M3
+      explain: "Appealing because $G$ is the only gradient in hand, but $(n, m)$ is the shape of the layer's output, not of its weights. There is no entrywise update this could define, since $W$ has $d \\times m$ entries."
+  check: choice
   difficulty: stretch
   band: 5
-
-# Self-placement, asked before the series. The answer selects a
-# calibration_sets entry; it is never graded for correctness.
 screener:
   id: u0-s1
   concept: c-notation

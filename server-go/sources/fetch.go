@@ -99,8 +99,8 @@ type hostState struct {
 
 func NewClient(cache string) *Client {
 	return &Client{
-		HTTP:      &http.Client{Timeout: 60 * time.Second},
-		Cache:     cache,
+		HTTP:  &http.Client{Timeout: 60 * time.Second},
+		Cache: cache,
 		// A plain browser string: some hosts (Pressbooks behind CloudFront)
 		// answer 403 to anything that names a tool.
 		UserAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",

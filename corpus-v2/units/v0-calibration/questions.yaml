@@ -140,59 +140,54 @@ check:
   band: 4
 - id: v0-q12
   concept: d-prob-basics
-  kind: constructed
+  kind: mcq
   congruent: true
   callback_eligible: true
   prompt: |
-    In two or three sentences: a detection method reports z = -5 relative
-    to a null distribution. What is the null distribution here, and what
-    does the z = -5 roughly claim?
-  answer: |
-    The null distribution is the spread of the test statistic in the world
-    where the effect is absent (here: the model was NOT trained on the
-    marked data) - what values you would see from chance alone. z = -5
-    says the observed statistic sits five standard deviations below the
-    null's mean, i.e. an outcome so unlikely under chance (p on the order
-    of 1 in a few million, one-sided) that the null is rejected.
-  rubric: |
-    Must contain: (1) the null = distribution of the statistic when the
-    effect/membership is absent, chance alone; (2) z = -5 means five
-    standard deviations from the null mean, extremely unlikely under the
-    null (any reasonable magnitude language passes; the exact p-value is
-    not required).
-    Pass = both. Partial = (2) only, or (1) phrased as "the baseline"
-    with no absence-of-effect content.
-    Fail and diagnose: saying z = -5 is "the probability the data was
-    used" or "95%+ confidence the hypothesis is true" = V0-M1, the
-    p-value-as-truth-probability confusion - deliver v6 slowly.
-  check: llm
+    A detection method reports z = -5 for a model against a null
+    distribution. Which statement describes what the null distribution is
+    and what z = -5 claims?
+  options:
+    - text: "The null is the spread of the test statistic in the world where the marked data was NOT trained on; z = -5 puts the observed statistic five standard deviations below that distribution's mean, an outcome chance alone almost never produces."
+      correct: true
+      explain: "Right on both halves: the null is the statistic's distribution under absence of the effect, and z counts standard deviations from the null mean. Five of them is roughly one in a few million one-sided - small enough to reject the null."
+    - text: "The null is the spread of the statistic under absence of the effect; z = -5 means there is about a 1-in-a-few-million chance that the model was NOT trained on the marked data."
+      misconception: V0-M1
+      explain: "The first half is right, which is what makes this the tempting wrong answer. The second half flips the conditioning: the tail probability is P(data this extreme | null true), not P(null true | data). Turning it into a probability about the hypothesis would need a prior the test never asked for."
+    - text: "The null is the distribution of the statistic over models that WERE trained on the marked data; z = -5 measures how far the observed model falls from that trained population."
+      misconception: D2
+      explain: "This inverts the null. Sampling 'models trained on my data' is exactly the distribution you cannot construct without retraining, and a test built against it has no false-positive rate. The null must be the absence case - which is why keyed canaries, whose null is constructible by design, are the sound route."
+    - text: "The null is the model's average loss on the marked data; z = -5 says the loss sits five units below that average, so the text was memorized verbatim."
+      misconception: D3
+      explain: "Two errors: a null is a distribution of a statistic, not a single average, and z counts standard deviations rather than raw units. It also smuggles in verbatim memorization, which is a lower bound on influence and not what a z-score against a null reports."
+  check: choice
   difficulty: stretch
   band: 5
 - id: v0-q13
   concept: d-prob-basics
-  kind: constructed
+  kind: mcq
   congruent: true
   callback_eligible: true
   prompt: |
     Two training runs of the same model differ only in random seed and
     score 3.41 and 3.44 on the same held-out metric. Across many seeds,
     the seed-to-seed standard deviation of this metric is 0.03. A
-    colleague says the first configuration is better. In one or two
-    sentences: is that established, and why?
-  answer: |
-    Not established. The observed gap (0.03) is the same size as one
-    standard deviation of pure seed noise, so a difference this large
-    happens routinely between identical configurations; you would need
-    more seeds per configuration (and a gap comfortably larger than the
-    noise) before calling either one better.
-  rubric: |
-    Must contain: (1) no - not established; (2) the reason: the gap is
-    within (about the same size as) seed noise, so chance alone produces
-    it. Mentioning a remedy (more seeds, averaging) is a bonus, not
-    required.
-    Fail: any answer that accepts the difference as real, or that argues
-    from the direction of the gap rather than its size vs noise.
-  check: llm
+    colleague says the first configuration is better. Which response is
+    correct?
+  options:
+    - text: "Not established: the 0.03 gap is about one standard deviation of pure seed noise, so identical configurations routinely differ this much. More seeds per configuration, and a gap comfortably larger than 0.03, are needed first."
+      correct: true
+      explain: "Correct. The comparison that matters is gap versus noise, and here they are the same size. Two runs of the SAME configuration would produce a gap like this all the time."
+    - text: "Established: 3.41 < 3.44, and the two runs differ only in seed, so the difference is attributable to the configuration."
+      misconception: D16
+      explain: "This treats a run's score as a stable property of the configuration. It is a draw from a distribution: with sigma = 0.03 seed-to-seed, the direction of a 0.03 gap is close to a coin flip, and holding everything but the seed fixed is precisely the condition under which the noise shows up."
+    - text: "Established, but only weakly: 0.03 is exactly one standard deviation, which corresponds to about 68% confidence that the first configuration is better."
+      misconception: V0-M1
+      explain: "The 68% figure is a statement about how often chance stays within one sigma, not a probability that a hypothesis is true - and it is attached to the wrong quantity here besides. A tail area under the null never converts into confidence about which configuration is better."
+    - text: "Not established, because 3.41 and 3.44 are both far from the expected value of the metric, so neither run is a typical outcome for its configuration."
+      misconception: V0-M2
+      explain: "The conclusion is right by accident and the reasoning is wrong. Both scores sit within a standard deviation of the mean, and an expectation is a probability-weighted mean rather than the outcome a run is supposed to land on. The real reason is that the gap is the size of the noise."
+  check: choice
   difficulty: stretch
   band: 5
 - id: v0-q14

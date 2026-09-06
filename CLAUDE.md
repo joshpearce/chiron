@@ -40,6 +40,9 @@ You are on the machine that serves the book. Facts that matter:
 - `LESSONS.md` holds what cost more than ten minutes to learn. Read it
   before debugging; add to it in the same commit as the fix.
 - Tests: `make test` (Go and the page script); corpus lint: `make lint`.
+- `corpus-taps <unit dir>` (from `server-go`, `go run ./cmd/corpus-taps`)
+  rewrites a bank's prose items as tap-answered ones; `corpus-v2` and
+  generated books have no spec copy, so pass `-spec corpus/authoring-spec.md`.
 - App tests and Simulator walks need the Mac: `scripts/sim-run.sh test`,
   `scripts/sim-verify.sh`.
 - Plans and status: `IPAD-PLAN.md`, `SPRITE-DEV-PLAN.md`. Open material
