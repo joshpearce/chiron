@@ -202,3 +202,106 @@ func (s *Server) handleDocumentDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": d.ID})
 }
+
+// PageInk is the drawing on one page of a document, versioned so two
+// devices that both drew on it while apart are caught.
+type PageInk struct {
+	Version   int    `json:"version"`
+	UpdatedAt string `json:"updated_at"`
+	InkB64    string `json:"ink_b64"`
+}
+
+func (s *Server) inkPath(id string, page int) string {
+	return filepath.Join(s.documentsDir(), id, "ink", strconv.Itoa(page)+".json")
+}
+
+func (s *Server) readPageInk(id string, page int) (*PageInk, error) {
+	data, err := os.ReadFile(s.inkPath(id, page))
+	if err != nil {
+		return nil, err
+	}
+	var ink PageInk
+	if err := json.Unmarshal(data, &ink); err != nil {
+		return nil, err
+	}
+	return &ink, nil
+}
+
+func (s *Server) handleDocumentInkAll(w http.ResponseWriter, r *http.Request) {
+	d, ok := s.document(w, r)
+	if !ok {
+		return
+	}
+	pages := map[string]*PageInk{}
+	entries, _ := os.ReadDir(filepath.Join(s.documentsDir(), d.ID, "ink"))
+	for _, e := range entries {
+		name := strings.TrimSuffix(e.Name(), ".json")
+		page, err := strconv.Atoi(name)
+		if err != nil || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		if ink, err := s.readPageInk(d.ID, page); err == nil {
+			pages[name] = ink
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"document": d.ID, "pages": pages})
+}
+
+func (s *Server) handleDocumentInkPut(w http.ResponseWriter, r *http.Request) {
+	d, ok := s.document(w, r)
+	if !ok {
+		return
+	}
+	page, err := strconv.Atoi(r.PathValue("page"))
+	if err != nil || page < 0 {
+		writeError(w, http.StatusUnprocessableEntity, "page %q", r.PathValue("page"))
+		return
+	}
+	var req struct {
+		InkB64      string `json:"ink_b64"`
+		BaseVersion int    `json:"base_version"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "malformed request: %v", err)
+		return
+	}
+	annotationsMu.Lock()
+	defer annotationsMu.Unlock()
+	current, err := s.readPageInk(d.ID, page)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		writeError(w, http.StatusInternalServerError, "read ink: %v", err)
+		return
+	}
+	if current != nil {
+		if current.InkB64 == req.InkB64 {
+			writeJSON(w, http.StatusOK, current)
+			return
+		}
+		if req.BaseVersion != current.Version {
+			writeJSON(w, http.StatusConflict, map[string]any{
+				"conflict": true, "server": current,
+				"detail": "both copies of this page changed since they last agreed",
+			})
+			return
+		}
+	}
+	next := &PageInk{Version: 1, UpdatedAt: time.Now().UTC().Format(time.RFC3339), InkB64: req.InkB64}
+	if current != nil {
+		next.Version = current.Version + 1
+	}
+	path := s.inkPath(d.ID, page)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		writeError(w, http.StatusInternalServerError, "keep ink: %v", err)
+		return
+	}
+	data, _ := json.Marshal(next)
+	werr := os.WriteFile(path+".tmp", data, 0o644)
+	if werr == nil {
+		werr = os.Rename(path+".tmp", path)
+	}
+	if werr != nil {
+		writeError(w, http.StatusInternalServerError, "keep ink: %v", werr)
+		return
+	}
+	writeJSON(w, http.StatusOK, next)
+}

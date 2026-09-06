@@ -117,3 +117,50 @@ func TestOnlyAPDFIsAccepted(t *testing.T) {
 		t.Fatalf("no title: got %d", w.Code)
 	}
 }
+
+// Ink on a PDF is kept per page and versioned like a unit's annotations:
+// a page inked on both devices while apart is a conflict the device
+// resolves by laying one drawing over the other.
+func TestInkOnAPDFIsKeptPerPage(t *testing.T) {
+	s := newServer(t, "")
+	w := upload(t, s, "Inked", "%PDF-1.4\n%%EOF\n")
+	var doc Document
+	json.Unmarshal(w.Body.Bytes(), &doc)
+
+	w = do(t, s, "GET", "/documents/"+doc.ID+"/ink", "", "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"pages":{}`) {
+		t.Fatalf("empty ink: %d %s", w.Code, w.Body)
+	}
+	w = do(t, s, "PUT", "/documents/"+doc.ID+"/ink/2", `{"ink_b64":"AAA=","base_version":0}`, "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"version":1`) {
+		t.Fatalf("first put: %d %s", w.Code, w.Body)
+	}
+	// The same ink again changes nothing and bumps nothing.
+	w = do(t, s, "PUT", "/documents/"+doc.ID+"/ink/2", `{"ink_b64":"AAA=","base_version":1}`, "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"version":1`) {
+		t.Fatalf("same put: %d %s", w.Code, w.Body)
+	}
+	// A put on a stale base is a conflict carrying the server's copy.
+	w = do(t, s, "PUT", "/documents/"+doc.ID+"/ink/2", `{"ink_b64":"BBB=","base_version":0}`, "")
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), `"ink_b64":"AAA="`) {
+		t.Fatalf("stale put: %d %s", w.Code, w.Body)
+	}
+	w = do(t, s, "PUT", "/documents/"+doc.ID+"/ink/2", `{"ink_b64":"BBB=","base_version":1}`, "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"version":2`) {
+		t.Fatalf("second put: %d %s", w.Code, w.Body)
+	}
+	w = do(t, s, "GET", "/documents/"+doc.ID+"/ink", "", "")
+	var all struct {
+		Pages map[string]struct {
+			Version int    `json:"version"`
+			Ink     string `json:"ink_b64"`
+		} `json:"pages"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &all)
+	if len(all.Pages) != 1 || all.Pages["2"].Version != 2 || all.Pages["2"].Ink != "BBB=" {
+		t.Fatalf("all ink: %s", w.Body)
+	}
+	if w := do(t, s, "PUT", "/documents/"+doc.ID+"/ink/x", `{"ink_b64":"AAA="}`, ""); w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("bad page: %d", w.Code)
+	}
+}

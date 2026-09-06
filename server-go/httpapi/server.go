@@ -373,6 +373,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /documents/{doc}/file", s.handleDocumentFile)
 	mux.HandleFunc("PUT /documents/{doc}/position", s.handleDocumentPosition)
 	mux.HandleFunc("DELETE /documents/{doc}", s.handleDocumentDelete)
+	mux.HandleFunc("GET /documents/{doc}/ink", s.handleDocumentInkAll)
+	mux.HandleFunc("PUT /documents/{doc}/ink/{page}", s.handleDocumentInkPut)
 	mux.HandleFunc("GET /shelves", s.handleShelves)
 	mux.HandleFunc("POST /shelves", s.handleShelfCreate)
 	mux.HandleFunc("PUT /shelves/{shelf}", s.handleShelfRename)
