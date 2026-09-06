@@ -95,6 +95,11 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
 - **A test that gates every model call deadlocks a new call in front of
   it (2026-09-04).** `gatedChain` now gates the author only.
 
+- **A debounce that resets on every change can wait forever
+  (2026-09-06).** The annotation push was rescheduled by each position
+  report as the page settled, so the phone never pushed its highlight;
+  the iPad, which had not scrolled, did. A push is now due once per pause
+  and sends whatever is current.
 - **The CLI model writes about 33 tokens a second, and a depth variant
   of a long chapter is a 10k-token reply (2026-09-05).** Three units of
   the first sourced book timed out at fifteen minutes on deeper-math.md,

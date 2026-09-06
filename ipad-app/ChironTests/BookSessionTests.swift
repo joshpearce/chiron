@@ -16,6 +16,17 @@ final class FakeService: ChironService {
     var onPlanTurn: (String, String) throws -> CaptureResponse = { _, _ in throw URLError(.cannotConnectToHost) }
     var onBuild: (String) throws -> BuildResponse = { _ in throw URLError(.cannotConnectToHost) }
     var onExtend: (String, String, String) throws -> ExtendResponse = { _, _, _ in throw URLError(.cannotConnectToHost) }
+    var onAnnotations: (String, String) throws -> Annotations? = { _, _ in nil }
+    var onPutAnnotations: (String, String, Annotations, Int) throws -> AnnotationsPut = { _, _, a, base in
+        var stored = a; stored.version = base + 1; return .stored(stored)
+    }
+    var onReconcile: (Annotations, Annotations) throws -> ReconciledAnnotations = { mine, theirs in
+        ReconciledAnnotations(version: max(mine.version, theirs.version), marks: mine.marks + theirs.marks.filter { t in !mine.marks.contains { $0.id == t.id } },
+                              position: max(mine.position, theirs.position), inkB64: mine.inkB64 ?? theirs.inkB64, inkOtherB64: nil)
+    }
+    var annotationPuts: [(unit: String, annotations: Annotations, base: Int)] = []
+    var annotationPulls: [String] = []
+    var reconciles: [(mine: Annotations, theirs: Annotations)] = []
     var onCreateShelf: (String) throws -> ShelfInfo = { ShelfInfo(id: "s-\($0)", name: $0) }
     var shelvesMade: [String] = []
     var renames: [(id: String, name: String)] = []
@@ -76,6 +87,18 @@ final class FakeService: ChironService {
     }
     func deleteShelf(_ id: String) async throws { shelvesDeleted.append(id) }
     func move(subject: String, toShelf shelf: String?) async throws { moves.append((subject, shelf)) }
+    func annotations(subject: String, unit: String) async throws -> Annotations? {
+        annotationPulls.append(unit)
+        return try onAnnotations(subject, unit)
+    }
+    func putAnnotations(subject: String, unit: String, _ a: Annotations, baseVersion: Int) async throws -> AnnotationsPut {
+        annotationPuts.append((unit, a, baseVersion))
+        return try onPutAnnotations(subject, unit, a, baseVersion)
+    }
+    func reconcileAnnotations(subject: String, unit: String, mine: Annotations, theirs: Annotations) async throws -> ReconciledAnnotations {
+        reconciles.append((mine, theirs))
+        return try onReconcile(mine, theirs)
+    }
     func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse {
         extends.append((subject, quote, note))
         return try onExtend(subject, quote, note)

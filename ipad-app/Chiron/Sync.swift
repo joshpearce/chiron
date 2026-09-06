@@ -20,6 +20,9 @@ protocol ChironService: AnyObject {
     func renameShelf(_ id: String, name: String) async throws -> ShelfInfo
     func deleteShelf(_ id: String) async throws
     func move(subject: String, toShelf shelf: String?) async throws
+    func annotations(subject: String, unit: String) async throws -> Annotations?
+    func putAnnotations(subject: String, unit: String, _ a: Annotations, baseVersion: Int) async throws -> AnnotationsPut
+    func reconcileAnnotations(subject: String, unit: String, mine: Annotations, theirs: Annotations) async throws -> ReconciledAnnotations
 }
 
 enum ServiceError: Error {
@@ -174,6 +177,43 @@ final class Sync: ObservableObject, ChironService {
                                       body: try JSONEncoder().encode(["shelf": shelf ?? ""]), timeout: 15)
     }
 
+    func annotations(subject: String, unit: String) async throws -> Annotations? {
+        do {
+            return try await get("/annotations/\(subject)/\(unit)", timeout: 15)
+        } catch ServiceError.status(404) {
+            return nil
+        }
+    }
+
+    func putAnnotations(subject: String, unit: String, _ a: Annotations, baseVersion: Int) async throws -> AnnotationsPut {
+        struct Body: Encodable {
+            let version: Int
+            let device: String?
+            let marks: [Mark]
+            let ink_b64: String?
+            let position: Double
+            let base_version: Int
+        }
+        let body = try JSONEncoder().encode(Body(version: a.version, device: a.device, marks: a.marks, ink_b64: a.inkB64,
+                                                 position: a.position, base_version: baseVersion))
+        let (code, data) = try await sendRaw("PUT", "/annotations/\(subject)/\(unit)", body: body, timeout: 30)
+        switch code {
+        case 200:
+            return .stored(try JSONDecoder().decode(Annotations.self, from: data))
+        case 409:
+            struct Reply: Decodable { let server: Annotations }
+            return .conflict(server: try JSONDecoder().decode(Reply.self, from: data).server)
+        default:
+            throw ServiceError.status(code)
+        }
+    }
+
+    func reconcileAnnotations(subject: String, unit: String, mine: Annotations, theirs: Annotations) async throws -> ReconciledAnnotations {
+        struct Body: Encodable { let mine, theirs: Annotations }
+        return try await send("POST", "/annotations/\(subject)/\(unit)/reconcile",
+                              body: try JSONEncoder().encode(Body(mine: mine, theirs: theirs)), timeout: 120)
+    }
+
     /// A margin note extends the primer; the whole document comes back.
     func extend(subject: String, quote: String, note: String) async throws -> ExtendResponse {
         struct Body: Encodable { let quote, note: String }
@@ -213,6 +253,18 @@ final class Sync: ObservableObject, ChironService {
 
     private func post<T: Decodable>(_ path: String, body: Data, timeout: TimeInterval) async throws -> T {
         try await send("POST", path, body: body, timeout: timeout)
+    }
+
+    /// A request whose status the caller reads itself (a 409 carries a body).
+    private func sendRaw(_ method: String, _ path: String, body: Data?, timeout: TimeInterval) async throws -> (Int, Data) {
+        var req = try request(path, timeout: timeout)
+        req.httpMethod = method
+        if let body {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = body
+        }
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        return ((resp as? HTTPURLResponse)?.statusCode ?? 0, data)
     }
 
     private func send<T: Decodable>(_ method: String, _ path: String, body: Data?, timeout: TimeInterval) async throws -> T {

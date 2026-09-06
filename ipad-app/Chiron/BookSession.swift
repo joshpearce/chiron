@@ -1,4 +1,5 @@
 import Foundation
+import PencilKit
 import UIKit
 
 /// One book, open: its chapter, the learner's position in it, and the state
@@ -489,6 +490,7 @@ final class BookSession: ObservableObject {
         pretestDone = false
         chapterOpenedAt = nil
         loadMarks()
+        Task { await pullAnnotations() }
     }
 
     private func chunkMinutes() -> Double? {
@@ -507,7 +509,9 @@ final class BookSession: ObservableObject {
     /// The reader reports where it is as the page scrolls; the position is
     /// kept per chapter so a book reopens where it was left.
     func recordPosition(unit: String, offset: Double) {
+        guard positions[unit] != offset else { return }
         positions[unit] = offset
+        annotationsChanged()
     }
 
     func position(for unit: String) -> Double {
@@ -637,6 +641,7 @@ final class BookSession: ObservableObject {
     func saveInk(_ data: Data?) {
         inkData = data
         inkDirty = true
+        annotationsChanged()
         inkSave?.cancel()
         inkSave = Task {
             try? await Task.sleep(nanoseconds: 400_000_000)
@@ -646,6 +651,181 @@ final class BookSession: ObservableObject {
     }
 
     private var inkDirty = false
+
+    // MARK: - annotations shared with the other devices
+
+    /// The version of each unit's annotations this device last agreed
+    /// with the server on, and the units changed here since.
+    private var annotationVersions: [String: Int] = [:]
+    private var annotationDirty: Set<String> = []
+    private var annotationPush: Task<Void, Never>?
+    /// How long a change waits before it is pushed; tests shorten it.
+    var annotationPushDelay: TimeInterval = 2
+
+    /// Two copies of a unit's annotations that both changed while apart:
+    /// this device's and the server's, for the reader to choose between
+    /// or to have reconciled.
+    struct Conflict: Identifiable, Equatable {
+        let unit: String
+        let mine: Annotations
+        let theirs: Annotations
+        var id: String { unit }
+    }
+    @Published var conflict: Conflict?
+    /// Set while a choice on a conflict is being carried out.
+    @Published private(set) var resolving = false
+
+    private var deviceName: String {
+        #if os(iOS)
+        UIDevice.current.name
+        #else
+        "device"
+        #endif
+    }
+
+    /// What this device holds for the current unit, as the server keeps it.
+    private func localAnnotations(_ unit: String) -> Annotations {
+        Annotations(version: annotationVersions[unit] ?? 0, updatedAt: nil, device: deviceName,
+                    marks: marks, inkB64: inkData?.base64EncodedString(), position: positions[unit] ?? 0)
+    }
+
+    /// Take a copy of the annotations as this device's own.
+    private func adopt(_ a: Annotations, unit: String) {
+        marks = a.marks
+        inkData = a.ink
+        inkDirty = true
+        positions[unit] = a.position
+        annotationVersions[unit] = a.version
+        annotationDirty.remove(unit)
+        persistMarks(changed: false)
+        flushInk()
+        persistAnnotationMeta()
+        if let asking, !marks.contains(where: { $0.id == asking.mark.id }) { self.asking = nil }
+    }
+
+    /// On opening a unit: the server's copy is taken when it is newer and
+    /// nothing changed here since the last agreement; when both changed,
+    /// the reader is asked.
+    func pullAnnotations() async {
+        guard let unit = chapter?.unit else { return }
+        guard let server = try? await service.annotations(subject: subjectID, unit: unit) else { return }
+        guard chapter?.unit == unit else { return }
+        let known = annotationVersions[unit] ?? 0
+        if server.version <= known { return }
+        if annotationDirty.contains(unit) || (known == 0 && (!marks.isEmpty || inkData != nil)) {
+            let mine = localAnnotations(unit)
+            if sameContent(mine, server) {
+                annotationVersions[unit] = server.version
+                annotationDirty.remove(unit)
+                persistAnnotationMeta()
+                return
+            }
+            conflict = Conflict(unit: unit, mine: mine, theirs: server)
+            return
+        }
+        adopt(server, unit: unit)
+    }
+
+    private func sameContent(_ a: Annotations, _ b: Annotations) -> Bool {
+        a.marks == b.marks && (a.inkB64 ?? "") == (b.inkB64 ?? "") && a.position == b.position
+    }
+
+    /// A change here: pushed after a pause, so a burst of strokes or a
+    /// scroll is one put. The pause is not reset by each change (a page
+    /// that reports its position as it settles would postpone the push
+    /// forever); one push is due per pause, and it sends what is current.
+    func annotationsChanged() {
+        guard let unit = chapter?.unit else { return }
+        annotationDirty.insert(unit)
+        persistAnnotationMeta()
+        guard annotationPush == nil else { return }
+        annotationPush = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: UInt64(self.annotationPushDelay * 1_000_000_000))
+            self.annotationPush = nil
+            guard !Task.isCancelled else { return }
+            await self.pushAnnotations()
+        }
+    }
+
+    /// Push the current unit's annotations on top of the version last
+    /// agreed. The server's answer is either the stored version or a
+    /// conflict for the reader to settle.
+    func pushAnnotations() async {
+        guard let unit = chapter?.unit, annotationDirty.contains(unit), conflict == nil else { return }
+        let mine = localAnnotations(unit)
+        let base = annotationVersions[unit] ?? 0
+        guard let reply = try? await service.putAnnotations(subject: subjectID, unit: unit, mine, baseVersion: base) else { return }
+        switch reply {
+        case .stored(let stored):
+            annotationVersions[unit] = stored.version
+            // Changes made while the put was in flight stay dirty.
+            if sameContent(localAnnotations(unit), mine) { annotationDirty.remove(unit) }
+            persistAnnotationMeta()
+        case .conflict(let server):
+            conflict = Conflict(unit: unit, mine: mine, theirs: server)
+        }
+    }
+
+    /// The reader's three answers to a conflict.
+    enum Resolution: String { case mine, theirs, agent }
+
+    func resolveConflict(_ choice: Resolution) async {
+        guard let c = conflict else { return }
+        resolving = true
+        defer { resolving = false }
+        switch choice {
+        case .theirs:
+            if chapter?.unit == c.unit { adopt(c.theirs, unit: c.unit) }
+            conflict = nil
+        case .mine:
+            annotationVersions[c.unit] = c.theirs.version
+            annotationDirty.insert(c.unit)
+            conflict = nil
+            await pushAnnotations()
+        case .agent:
+            guard let merged = try? await service.reconcileAnnotations(subject: subjectID, unit: c.unit, mine: c.mine, theirs: c.theirs) else { return }
+            var ink = merged.inkB64.flatMap { Data(base64Encoded: $0) }
+            if let other = merged.inkOtherB64.flatMap({ Data(base64Encoded: $0) }) {
+                ink = Self.overlay(ink, other)
+            }
+            let a = Annotations(version: c.theirs.version, updatedAt: nil, device: deviceName,
+                                marks: merged.marks, inkB64: ink?.base64EncodedString(), position: merged.position)
+            if chapter?.unit == c.unit { adopt(a, unit: c.unit) }
+            annotationVersions[c.unit] = c.theirs.version
+            annotationDirty.insert(c.unit)
+            conflict = nil
+            await pushAnnotations()
+        }
+    }
+
+    /// Two drawings become one: the other's strokes over this one's.
+    static func overlay(_ base: Data?, _ other: Data) -> Data? {
+        guard let base else { return other }
+        if let a = try? PKDrawing(data: base), let b = try? PKDrawing(data: other) {
+            return a.appending(b).dataRepresentation()
+        }
+        return base
+    }
+
+    private struct AnnotationMeta: Codable {
+        var versions: [String: Int]
+        var dirty: [String]
+    }
+
+    private func persistAnnotationMeta() {
+        if let d = try? JSONEncoder().encode(AnnotationMeta(versions: annotationVersions, dirty: Array(annotationDirty).sorted())) {
+            try? d.write(to: file("annotations"))
+        }
+    }
+
+    private func restoreAnnotationMeta() {
+        if let d = try? Data(contentsOf: file("annotations")),
+           let m = try? JSONDecoder().decode(AnnotationMeta.self, from: d) {
+            annotationVersions = m.versions
+            annotationDirty = Set(m.dirty)
+        }
+    }
 
     /// Write the ink now: the debounce's turn, and every persist (closing
     /// the book, backgrounding), so nothing is lost to a quick exit.
@@ -669,11 +849,14 @@ final class BookSession: ObservableObject {
         inkData = try? Data(contentsOf: dir.appendingPathComponent("ink-\(unit).pkdrawing"))
     }
 
-    private func persistMarks() {
+    /// Write the marks file. A change made here is also a change to push;
+    /// a copy taken from the server is not.
+    private func persistMarks(changed: Bool = true) {
         guard let unit = chapter?.unit else { return }
         if let d = try? JSONEncoder().encode(marks) {
             try? d.write(to: dir.appendingPathComponent("marks-\(unit).json"))
         }
+        if changed { annotationsChanged() }
     }
 
     // MARK: - persistence
@@ -692,6 +875,7 @@ final class BookSession: ObservableObject {
         chapter = nil
         bookState = nil
         beatResponses = []
+        restoreAnnotationMeta()
         if let d = try? Data(contentsOf: file("chapter")),
            let ch = try? JSONDecoder().decode(ChapterPayload.self, from: d) {
             chapter = ch
@@ -715,6 +899,9 @@ final class BookSession: ObservableObject {
 
     func persist() {
         flushInk()
+        if let unit = chapter?.unit, annotationDirty.contains(unit) {
+            Task { await pushAnnotations() }
+        }
         if let ch = chapter, let d = try? JSONEncoder().encode(ch) {
             try? d.write(to: file("chapter"))
         } else {

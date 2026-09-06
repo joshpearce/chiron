@@ -590,6 +590,18 @@ the reader to keep this device's copy, keep the server's, or hand both to
 the agent on the sprite to reconcile into one, which the reader then sees
 before it is written. This goes with the annotation sync below.
 
+Status 2026-09-06: the annotation sync is built. The server keeps one
+versioned document per unit (`GET/PUT /annotations/{subject}/{unit}`, a
+409 with the server's copy when both changed, `POST .../reconcile` that
+merges two copies: every mark, the richer copy of a shared one, threads
+joined by the tutor, the further position, both inks). The app pulls on
+opening a unit, pushes changes after a two-second pause (throttled, not
+reset by each scroll), and on a conflict shows the two copies with the
+three choices; the agent's merge lays one ink over the other with
+PencilKit. Harness: `sync`, `conflict/resolve {choice}`, state
+`conflict`. Walked on two Simulators against one dev server. The offline
+library cache is the next piece.
+
 The **shared state**. The server already holds the learner record (units
 cleared, current unit, debt, the active book), so progress is shared
 today. What is not: highlights, questions and their answers, margin

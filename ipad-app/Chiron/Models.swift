@@ -656,3 +656,46 @@ struct EnrolResponse: Codable {
     let name: String
     let installed: Bool
 }
+
+/// One unit's marks, ink and reading position as the server keeps them,
+/// versioned so two devices that both changed it are caught.
+struct Annotations: Codable, Equatable {
+    var version: Int
+    var updatedAt: String?
+    var device: String?
+    var marks: [Mark]
+    var inkB64: String?
+    var position: Double
+
+    enum CodingKeys: String, CodingKey {
+        case version, device, marks, position
+        case updatedAt = "updated_at"
+        case inkB64 = "ink_b64"
+    }
+
+    var ink: Data? { inkB64.flatMap { Data(base64Encoded: $0) } }
+}
+
+/// What a put comes back with: stored at a version, or the server's copy
+/// because both changed.
+enum AnnotationsPut: Equatable {
+    case stored(Annotations)
+    case conflict(server: Annotations)
+}
+
+/// The merge the server proposes for two copies: every mark, the further
+/// position, and both inks when they differ, for the device to lay one
+/// over the other.
+struct ReconciledAnnotations: Codable, Equatable {
+    var version: Int
+    var marks: [Mark]
+    var position: Double
+    var inkB64: String?
+    var inkOtherB64: String?
+
+    enum CodingKeys: String, CodingKey {
+        case version, marks, position
+        case inkB64 = "ink_b64"
+        case inkOtherB64 = "ink_other_b64"
+    }
+}

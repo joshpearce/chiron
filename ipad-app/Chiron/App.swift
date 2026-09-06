@@ -123,6 +123,11 @@ struct BookView: View {
             set: { session.contentsShown = $0 })) {
             ContentsView()
         }
+        .sheet(item: $session.conflict) { c in
+            ConflictCard(conflict: c)
+                .environmentObject(session)
+                .presentationDetents([.medium, .large])
+        }
     }
 
     /// The page's chrome is the navigation bar and, while reading a book,

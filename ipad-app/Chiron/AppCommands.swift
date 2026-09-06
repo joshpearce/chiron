@@ -172,6 +172,15 @@ enum AppCommands {
             if await session.mark(text: text, kind: .question) != nil {
                 await session.ask(q)
             }
+        case "sync":
+            // Push what changed here, or pull when nothing did.
+            await session.pushAnnotations()
+            await session.pullAnnotations()
+        case "conflict/resolve":
+            guard let raw = args["choice"] as? String, let choice = BookSession.Resolution(rawValue: raw) else {
+                throw Failure.badArguments("conflict/resolve needs choice: mine, theirs or agent")
+            }
+            await session.resolveConflict(choice)
         case "close":
             session.closeAsking()
         case "delete":
@@ -256,6 +265,10 @@ enum AppCommands {
                                 "last": p.plan.last?.text ?? "", "busy": library.planBusy, "error": library.planError ?? ""]
         }
         if let s = library.session {
+            if let c = s.conflict {
+                out["conflict"] = ["unit": c.unit, "mine_marks": c.mine.marks.count, "theirs_marks": c.theirs.marks.count,
+                                   "theirs_version": c.theirs.version]
+            }
             out["subject"] = s.subjectID
             out["kind"] = s.kind
             out["screen"] = screenName(s.screen)
