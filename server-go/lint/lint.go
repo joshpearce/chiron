@@ -187,16 +187,26 @@ func checkSpecConformance(u *corpus.Unit, r *Report) {
 		r.errorf(where, "%d check items, spec requires >= 8 (fewer is statistical "+
 			"noise for an 80%% gate)", len(checks))
 	}
-	constructed := 0
+	// The mix: about half MCQ, most constructed items answered with a
+	// number or a term, prose at most a fifth. A reader on a phone taps.
+	constructed, prose := 0, 0
 	for _, q := range checks {
 		if q.Kind == "constructed" {
 			constructed++
+			if q.Check == "" || q.Check == "llm" {
+				prose++
+			}
 		}
 	}
-	if len(checks) > 0 && float64(constructed)/float64(len(checks)) < 0.6 {
-		r.errorf(where, "%d/%d constructed (spec requires >= 60%% for response congruency)",
+	if len(checks) > 0 && float64(constructed)/float64(len(checks)) < 0.4 {
+		r.warnf(where, "%d/%d constructed; the spec wants about half, for response congruency",
 			constructed, len(checks))
 	}
+	if len(checks) > 0 && float64(prose)/float64(len(checks)) > 0.2 {
+		r.warnf(where, "%d/%d check items are answered in prose (check: llm); the spec allows a fifth, "+
+			"the rest should be mcq, numeric or exact so the reader taps", prose, len(checks))
+	}
+	checkTapOnly(u, r)
 	eligible := 0
 	for _, q := range checks {
 		if q.CallbackEligible {
@@ -358,6 +368,31 @@ func first(xs []string, n int) []string {
 }
 
 // Run lints a corpus and returns the report.
+// checkTapOnly: placement and pretests are answered by tapping. A prose
+// item there is what makes the intake feel like an exam.
+func checkTapOnly(u *corpus.Unit, r *Report) {
+	prose := func(q corpus.Question) bool {
+		return q.Kind != "mcq" && (q.Check == "" || q.Check == "llm")
+	}
+	for _, q := range u.Questions.Pretest {
+		if prose(q) {
+			r.warnf(u.ID+"/"+q.ID, "pretest item answered in prose; pretests are taps (choice, numeric or exact)")
+		}
+	}
+	if u.IsCalibration() {
+		n := 0
+		for _, q := range u.Questions.Check {
+			if prose(q) {
+				n++
+			}
+		}
+		if n > 0 {
+			r.warnf(u.ID, "%d prose items in a calibration unit; placement is answered by taps, "+
+				"so every item should be mcq, numeric or exact", n)
+		}
+	}
+}
+
 func Run(c *corpus.Corpus) *Report {
 	r := &Report{}
 	for _, uid := range c.UnitOrder() {

@@ -112,9 +112,38 @@ func TestRealCorpusLintsClean(t *testing.T) {
 	for _, e := range r.Errors {
 		t.Errorf("corpus error: %s", e)
 	}
-	if len(r.Warnings) != 2 {
-		t.Errorf("%d warnings, expected the 2 known large-integer ones: %v",
-			len(r.Warnings), r.Warnings)
+	// The tap-only rules (2026-09-06) warn on this book's own calibration
+	// bank and prose-heavy checks until those are reworked; the other
+	// warnings are the 2 known large-integer ones.
+	other := 0
+	for _, w := range r.Warnings {
+		if !strings.Contains(w, "prose") && !strings.Contains(w, "taps") {
+			other++
+		}
+	}
+	if other != 2 {
+		t.Errorf("%d warnings beyond the tap-only ones, expected the 2 known large-integer ones: %v",
+			other, r.Warnings)
+	}
+}
+
+// Placement and pretests are answered by taps; prose there is flagged.
+func TestProseInPlacementIsFlagged(t *testing.T) {
+	u := &corpus.Unit{ID: "u0", Front: map[string]any{"calibration": true}, Questions: corpus.QuestionFile{
+		Pretest: []corpus.Question{{ID: "p1", Kind: "constructed", Check: "llm"}, {ID: "p2", Kind: "constructed", Check: "numeric(0.1)"}},
+		Check: []corpus.Question{
+			{ID: "q1", Kind: "constructed", Check: "llm"},
+			{ID: "q2", Kind: "mcq", Check: "choice"},
+			{ID: "q3", Kind: "constructed", Check: "exact"},
+		}}}
+	r := &Report{}
+	checkTapOnly(u, r)
+	joined := strings.Join(r.Warnings, "\n")
+	if !strings.Contains(joined, "u0/p1") || strings.Contains(joined, "u0/p2") {
+		t.Errorf("pretest findings wrong:\n%s", joined)
+	}
+	if !strings.Contains(joined, "1 prose items in a calibration unit") {
+		t.Errorf("calibration finding missing:\n%s", joined)
 	}
 }
 

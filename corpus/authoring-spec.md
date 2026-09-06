@@ -131,7 +131,8 @@ sections wholesale). Content rules:
 ## questions.yaml schema
 
 ```yaml
-pretest:            # 2-3 items, EXPECTED to fail, calibration + pretesting effect
+pretest:            # 2-3 items, EXPECTED to fail, calibration + pretesting effect;
+                    # answered by a tap: check is choice, numeric or exact, never llm
                     # (exception: a unit with `calibration: true` in canon front
                     # matter has NO pretest and no body sections - its whole
                     # check bank is one progressive series, delivered complete
@@ -146,7 +147,7 @@ pretest:            # 2-3 items, EXPECTED to fail, calibration + pretesting effe
 check:              # >=10 items so the server can compose an 8+ item check
   - id: u3-q1
     concept: c-sdpa
-    kind: constructed   # constructed (>=60% of items) | mcq
+    kind: constructed   # constructed | mcq (about half the items are mcq)
     congruent: true     # true if the response form matches the goal (derive/compute/explain)
     callback_eligible: true   # may appear in later units' cumulative checks
     prompt: "..."
@@ -176,7 +177,12 @@ check:              # >=10 items so the server can compose an 8+ item check
 Rules:
 - Every distractor keyed to a misconception ID. No throwaway options. Every
   option gets an `explain` (feedback adjudicates each option, not just the right one).
-- >=60% of check items `kind: constructed` with `congruent: true`.
+- **The mix (2026-09-06):** about half the check items are `kind: mcq`; of
+  the constructed items, most are answered with a number or a term
+  (`check: numeric(tol)` or `exact`); `check: llm` items, which the reader
+  answers in prose, are at most a fifth of the bank and only where
+  explaining or deriving is the skill being checked. A reader on a phone
+  answers by tapping; prose is the exception that has to earn its place.
 - Anything a program can check (`numeric`, `exact`, `choice`) must NOT use `check: llm`.
 - At least 2 items per unit marked `callback_eligible` and at least 1 `stretch`
   item that the >90% path can use.
@@ -204,6 +210,14 @@ calibration_sets:     # one list per level, item ids from check, easy to hard
   1: [u0-n1, u0-n2, ..., u0-q1, u0-p2]
   ...
 ```
+
+**A calibration series is answered by taps.** Every item a calibration
+unit delivers is `kind: mcq`, or constructed with a `numeric` or `exact`
+check whose answer is a number or a single term. No `check: llm` item
+belongs in a calibration unit: placement is a quick sizing, not an exam,
+and typing prose before the book has started is what makes it feel like
+one. Every generated book opens with a calibration unit (`u0`,
+`calibration: true`) so the placement is the first thing the reader meets.
 
 Every item in the bank carries `band: 1..5`, the screener level at which a
 learner is expected to get it right without strain. The point of the screener

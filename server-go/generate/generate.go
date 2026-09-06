@@ -69,6 +69,8 @@ Two hard constraints shape every choice:
 
 2. **Misconceptions are the teaching material, not a footnote.** For this domain, list the wrong models a capable learner actually arrives with - especially ones that are confidently held and partially correct. Each needs a *specific prediction it makes that observably fails*; that failing prediction is what the chapter will use to break it. Vague "some people think X is hard" entries are useless. Aim for at least one per unit, more where the domain is counterintuitive.
 
+3. **The reader is placed by taps, not an exam.** Unit u0 is the calibration unit (` + "`calibration: true`" + `, no prose sections): a five-option self-rating screener and a series of multiple-choice or number-answer items across bands 1 to 5, delivered complete, so placement takes minutes. Everything the reader is taught starts at u1.
+
 Concept ids are kebab-case and prefixed ` + "`c-`" + `. Unit ids are u0, u1, ... in teaching order. Misconception ids are M1, M2, ... Write for the specific learner described in the brief: name what they already know so the chapters do not re-explain it.`
 
 const unitSystem = `You author one unit of an adaptive textbook corpus, following the authoring contract exactly. The contract is not advice - the server parses these files mechanically, and a deviation breaks the unit.
@@ -76,7 +78,8 @@ const unitSystem = `You author one unit of an adaptive textbook corpus, followin
 The two things that most often go wrong, and that you must get right:
 
 - **Mechanically-checked items need machine-comparable answers.** If ` + "`check`" + ` is ` + "`numeric(tol)`" + ` or ` + "`exact`" + `, ` + "`answer`" + ` is a bare value, never a sentence. Choose ` + "`tol`" + ` tighter than the distance to every plausible wrong answer you name in the rubric - a tolerance that accepts the error the item exists to catch makes the item worthless.
-- **Every MCQ carries ` + "`check: choice`" + `**, exactly one option marked ` + "`correct`" + `, an ` + "`explain`" + ` on every option, and a misconception id from the bank on every distractor. An MCQ without ` + "`check: choice`" + ` is not graded as an MCQ at all, and a wrong answer must be a diagnosis rather than a miss.`
+- **Every MCQ carries ` + "`check: choice`" + `**, exactly one option marked ` + "`correct`" + `, an ` + "`explain`" + ` on every option, and a misconception id from the bank on every distractor. An MCQ without ` + "`check: choice`" + ` is not graded as an MCQ at all, and a wrong answer must be a diagnosis rather than a miss.
+- **The reader answers by tapping.** About half the check items are MCQs; most constructed items take a number or a single term (` + "`numeric`" + ` or ` + "`exact`" + `); prose items (` + "`check: llm`" + `) are at most a fifth of the bank and only where explaining or deriving is the skill. Pretest items and every item of a calibration unit are never ` + "`check: llm`" + `.`
 
 func planSchema() map[string]any {
 	conceptItem := map[string]any{
@@ -247,7 +250,7 @@ func (g *Generator) Plan(brief, title string, named []string) (int, error) {
 		"learner": map[string]any{"profile": p.LearnerProfile},
 		"defaults": map[string]any{
 			"mastery_gate": 0.80, "extension_trigger": 0.90,
-			"check_min_items": 8, "check_constructed_fraction": 0.6,
+			"check_min_items": 8, "check_constructed_fraction": 0.5,
 			"check_callback_fraction": 0.4, "chunk_minutes": []int{20, 25},
 		},
 		"units": p.Units,
