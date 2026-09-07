@@ -12,37 +12,66 @@ pretest:
       A publisher asks you to prove that their catalogue contributed to a
       language model you trained, and to say by how much.
 
-      Describe the experiment that would settle it. Be specific about what you
-      would run and what you would compare.
-    answer: |
-      Train the model twice: once on the full corpus, once on the identical
-      corpus with that publisher's catalogue removed and the token budget
-      backfilled by repeating what remains. Evaluate both on the same held-out
-      text, reserved before either run. The difference in held-out bits per
-      byte is the catalogue's contribution, by definition.
-
-      Repeat both conditions with at least three different random seeds and
-      average within each condition before subtracting, because a single pair
-      of runs cannot distinguish a contribution from training randomness.
-      Report the difference alongside its standard error, sigma*sqrt(2/n),
-      where sigma is the run-to-run spread of held-out bits per byte at fixed
-      configuration.
-    check: llm
-    rubric: |
-      Pass requires: (1) two training runs differing only in the presence of
-      the catalogue, and (2) a comparison of held-out performance rather than
-      training loss or any property of the finished model's weights.
-      Multiple seeds and an error bar upgrade to full credit but are not
-      required at pretest.
-      Answering with anything computed from a single trained model - gradient
-      similarity, how well the model reproduces the catalogue's text,
-      embedding similarity, asking the model - = fail. That is the expected
-      failure and it is the whole reason the unit opens where it opens: the
-      question is causal, and no measurement on one model answers a causal
-      question.
-      Answering "retrain without it" but comparing training loss instead of
-      held-out loss = partial; a training-loss comparison across two different
-      corpora is not a comparison of anything.
+      Which experiment settles it?
+    answer: "Train with and without the catalogue, compare held-out bits per byte"
+    check: choice
+    options:
+      - text: |
+          Train the model twice - once on the full corpus, once on the
+          identical corpus with the catalogue removed and the token budget
+          backfilled by repeating what remains - evaluate both on the same
+          held-out text reserved before either run, and take the difference
+          in held-out bits per byte, averaged over several seeds per
+          condition.
+        correct: true
+        explain: |
+          This is the definition rather than a proxy for it:
+          Delta_i = v(all except i) - v(all), where v(S) is held-out bits per
+          byte for a model trained on S. The question is causal, and only two
+          worlds answer a causal question. Seeds and the error bar
+          sigma*sqrt(2/n) are what turn the pair of runs into a measurement.
+      - text: |
+          Prompt the finished model with openings from the catalogue and
+          measure what fraction of the text it reproduces verbatim; that
+          fraction is the catalogue's contribution.
+        misconception: D3
+        explain: |
+          Attractive because verbatim regurgitation is the visible,
+          screenshot-able evidence. But it is a lower bound and a measurement
+          artifact: most of what training data contributes is semantic and
+          never resurfaces verbatim, and a model that reproduces nothing can
+          still have been shaped heavily by the catalogue.
+      - text: |
+          Run a membership-inference attack on the finished model: the
+          catalogue's documents will show a suspiciously low loss compared
+          with typical text, which proves they were trained on.
+        misconception: D2
+        explain: |
+          A test statistic without a null is not a proof. To attach a
+          false-positive rate you need the distribution of that loss under
+          "the model was NOT trained on this", which you cannot sample
+          without retraining - so the second run reappears anyway, and
+          post-hoc MIA gives no magnitude at all.
+      - text: |
+          Compute gradient-based influence scores for every document in the
+          catalogue against the finished model and sum them; the total is the
+          catalogue's contribution.
+        misconception: D6
+        explain: |
+          This is the method the field builds precisely to AVOID the second
+          training run, and its worth is exactly the correlation with
+          retraining that accompanies it. Measured against actual retraining,
+          the versions that scale have come out at chance - so a sum of
+          influence scores with no counterfactual behind it settles nothing.
+      - text: |
+          Query the deployed system on topics the catalogue covers and count
+          how often it cites the catalogue's works as sources.
+        misconception: D1
+        explain: |
+          Citation is corroborative (this source supports the claim), not
+          contributive (this data caused the capability). Swap the retrieval
+          index and the citations change while the model, and everything it
+          learned in training, stays identical.
 
   - id: v4-p2
     concept: d-noise-floor
@@ -51,29 +80,61 @@ pretest:
       whether source 7 was present. Held-out bits per byte: 1.043 with source
       7, 1.061 without it.
 
-      Is 0.018 source 7's contribution? Answer yes, no, or "cannot tell", and
-      justify in two sentences.
-    answer: |
-      Cannot tell. 0.018 is the difference between two single draws from a
-      noisy process - retrain either condition with a different seed and both
-      numbers move - so without knowing the run-to-run spread at this
-      configuration there is no way to say whether 0.018 is a contribution or
-      is the ordinary variation between two training runs.
-
-      What would settle it: several seeds per condition, averaged within
-      condition, compared against sigma*sqrt(2/n).
-    check: llm
-    rubric: |
-      Pass requires "cannot tell" AND the reason being run-to-run variation
-      from training randomness rather than any property of the data or metric.
-      Answering "yes, 0.018 is the contribution" = fail, diagnosing D16. This
-      is the primary calibration item for the unit and is expected to fail;
-      the definition really does give 0.018, which is exactly what makes the
-      trap work.
-      Answering "no" because the model is small, or because bits per byte is
-      an unfamiliar metric, or because one eval set is not enough = partial;
-      all three are reasonable concerns and none is the one that makes the
-      number unreliable.
+      Is 0.018 source 7's contribution?
+    answer: "Cannot tell without the run-to-run spread sigma"
+    check: choice
+    options:
+      - text: |
+          Cannot tell - each figure is a single draw from a stochastic
+          training process, so without knowing the run-to-run spread sigma at
+          this configuration there is no way to say whether 0.018 is a
+          contribution or ordinary variation between two runs.
+        correct: true
+        explain: |
+          Right. v(S) is a random variable: retrain either condition with a
+          different seed and both numbers move. Settling it takes several
+          seeds per condition, averaged within condition, compared against
+          SE = sigma*sqrt(2/n).
+      - text: |
+          Yes - 0.018 is what contribution means: the difference in held-out
+          bits per byte between training with the source and training without
+          it.
+        misconception: D16
+        explain: |
+          The trap works because the definition really does give 0.018. The
+          definition is exact; the MEASUREMENT is an experiment with error
+          bars. Reseeded, the same pair of conditions came back at 0.012 and
+          0.015 - the largest gap is 50% bigger than the smallest, with
+          nothing changed but a random number generator's starting value.
+      - text: |
+          Yes - both runs used the same seed, so training randomness is held
+          fixed and the whole 0.018 is attributable to the corpus.
+        misconception: D16
+        explain: |
+          Fixing the seed makes the pair reproducible, not stable. A
+          different seed gives a different gap, so what you have is one draw
+          from the distribution of gaps and no idea of its width. Common
+          randomness reduces nothing you can report without repeats.
+      - text: |
+          No - at 10 million parameters the model is too small for a
+          contribution measured on it to mean anything.
+        misconception: V4-M4
+        explain: |
+          Scale is a scope statement, not a validity problem: the
+          counterfactual is exact at any scale, and the open question is what
+          it is exact ABOUT. Small scale is what makes the second run
+          affordable at all. What makes 0.018 unreliable here is seed noise,
+          which a bigger model does not remove.
+      - text: |
+          Yes, provided the corpus was deduplicated first, since dedup
+          removes the overlap that would otherwise let another source cover
+          for source 7.
+        misconception: D9
+        explain: |
+          Dedup does not neutralise the redundancy question, it decides it:
+          whichever source keeps the shared copies absorbs the contribution
+          of everything they teach. And even a perfectly deduplicated corpus
+          leaves 0.018 as a single noisy draw.
 
   - id: v4-p3
     concept: d-subset-regression
@@ -82,88 +143,122 @@ pretest:
       training a model on every possible combination is 4,096 runs, which you
       cannot afford. You can afford about 300.
 
-      Propose a way to get all 12 numbers out of 300 runs. What would you
-      train, and how would you extract the per-source values?
-    answer: |
-      Train 300 models, each on a random subset of the 12 sources, recording
-      for each run which sources were included and the held-out bits per byte
-      that resulted. Then fit a linear model predicting the score from the
-      inclusion indicators; each source's coefficient is its per-source value.
-
-      With a balanced design the fit needs no solver: for each source, average
-      the scores of the runs that included it, average the scores of the runs
-      that did not, and subtract. Everything else is present about equally
-      often in both groups, so every other source's effect cancels and what
-      remains is the one you asked about.
-    check: llm
-    rubric: |
-      Pass requires: (1) train on random subsets rather than one-source-out
-      only, and (2) recover per-source values by relating outcome to
-      membership across many runs - any wording of regression, fitting, or
-      difference-of-group-means.
-      Answering "just do the 12 leave-one-out runs" = partial; it is a correct
-      and useful design, it fits the budget, and it is not what the question
-      asked, since it does not use the 300 runs for anything.
-      Answering that 300 runs cannot give 12 values because 300 < 4,096 = fail;
-      the count needed is set by how many numbers you are estimating and how
-      noisy each run is, not by the size of the combination space. This is the
-      expected failure.
+      Which design gets all 12 numbers out of 300 runs?
+    answer: "Random-subset runs, then regress held-out bpb on the inclusion indicators"
+    check: choice
+    options:
+      - text: |
+          Train 300 models, each on a random subset of the 12 sources,
+          recording for each run which sources were in and the held-out bits
+          per byte that came out; then fit v(S) = beta_0 + sum_i beta_i x_i
+          over the inclusion indicators, and read each source's value off its
+          coefficient as c_i = -beta_i.
+        correct: true
+        explain: |
+          Every run informs every coefficient, which is why the design is
+          roughly six times more run-efficient than leave-one-out per unit of
+          precision: SE_beta = 2*sigma/sqrt(M). With a balanced design no
+          solver is needed - average the runs with source i in, average those
+          with it out, subtract, and every other source cancels.
+      - text: |
+          You cannot: 300 runs cover only 7% of the 4,096 possible
+          combinations, so nine tenths of the coalitions are unobserved and
+          the per-source values are undetermined.
+        misconception: D7
+        explain: |
+          The combinatorial count is not what sets the run budget. You are
+          estimating 12 numbers plus an intercept, and the runs needed follow
+          from that count and the seed noise, not from 2^K. This is the
+          infeasibility argument in the wrong place - it bites at per-document
+          granularity, not at 12 payable sources.
+      - text: |
+          Train 13 models: one on the full corpus and 12 each on a single
+          source alone. Each single-source model's held-out bits per byte is
+          that source's value, and the values divide the total between them.
+        misconception: V4-M1
+        explain: |
+          A source measured alone is measured in a corpus that is not the one
+          being billed for, and the resulting numbers are assumed to divide a
+          total. They do not: marginal contributions fail to sum whenever
+          sources interact - two near-duplicate sources each score near 0.002
+          while removing both costs 0.020.
+      - text: |
+          Skip the extra training entirely: train once on the full corpus and
+          compute per-source gradient influence on that single model, which
+          gives 12 numbers for the price of one run.
+        misconception: D6
+        explain: |
+          Cheap, and untested. An influence implementation yields a
+          plausible-looking ranking whether or not it is correct, and it is
+          worth the correlation with retraining that accompanies it - which
+          is a number only the subset runs can produce.
 
 check:
   - id: v4-q1
     concept: d-counterfactual
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      State the definition of a source's contribution used in this unit,
-      defining every symbol. Then explain what makes it exact and what makes
-      it, nevertheless, something you can get wrong - and name the design
-      decision that has to be recorded alongside the number for it to be
-      interpretable at all.
-    answer: |
-      Definition: Delta_i = v(all except i) - v(all), where v(S) is the
-      held-out bits per byte of a model trained on the set of sources S, "all"
-      is the full source list, and i is the source being valued. Bits per byte
-      is a cost, so lower is better; the removal goes first so that a positive
-      Delta_i means the source helped.
-
-      What makes it exact: it is a statement about two training runs that were
-      actually performed. It requires no assumption about the loss surface, no
-      differentiability, no convexity, no theory of what the network learned.
-      Whatever the two models are, the difference between their held-out
-      scores is what it is.
-
-      What makes it possible to get wrong: v(S) is a random variable, because
-      the training run depends on a seed through the weight initialization and
-      the data shuffle. One realized value of the difference can be off by
-      more than the difference itself. The remedy is n seeds per condition,
-      averaged within condition before subtracting, with the result reported
-      against SE = sigma*sqrt(2/n).
-
-      The design decision that must be recorded: the leave-one-out protocol.
-      Under "fixed corpus" the leave-one-out model trains on fewer tokens, so
-      the measured delta bundles the source's content with its volume. Under
-      "fixed token budget" the missing tokens are backfilled by repeating the
-      surviving sources, isolating content. The two do not differ by a
-      constant - fixed corpus systematically favours large sources - so the
-      protocol changes the order of the table, not just its scale.
-    check: llm
-    rubric: |
-      Must contain: (1) the formula with removal first and every symbol
-      defined, including that lower bpb is better, (2) the exactness claim
-      correctly scoped - exact for the runs performed, requiring no theory,
-      (3) the estimator-versus-estimand point: v(S) is a random variable and a
-      single realization is not a measurement, (4) the protocol as the recorded
-      design decision, with the reason that it reorders rather than rescales.
-      (1), (2), (3) = pass. All four = full credit.
-      Reversing the sign so that a helpful source gets a negative number =
-      fail; the convention is arbitrary but a table whose signs are not stated
-      cannot be read.
-      An answer that calls Delta_i exact without qualification, or that treats
-      the seed variation as an implementation defect to be eliminated = fail,
-      diagnosing D16 and V4-M4 respectively.
+      Which statement gives this unit's definition of a source's contribution
+      and a correct account of what it does and does not license?
+    check: choice
     difficulty: core
+    options:
+      - text: |
+          Delta_i = v(all except i) - v(all), where v(S) is the held-out bits
+          per byte of a model trained on the source set S and lower is
+          better, so the removal goes first and positive means helpful. It is
+          exact for the two runs performed and needs no theory of the loss
+          surface - but v(S) is a random variable across seeds, so it ships
+          with n, sigma and SE = sigma*sqrt(2/n), and with the leave-one-out
+          protocol recorded beside it.
+        correct: true
+        explain: |
+          The definition is exact and the measurement is not, and the
+          protocol - fixed corpus versus fixed token budget - has to be
+          recorded because the two do not differ by a constant: fixed corpus
+          systematically favours large sources and so reorders the table
+          rather than rescaling it.
+      - text: |
+          Delta_i = v(all except i) - v(all), with v(S) the held-out bits per
+          byte of a model trained on S. Because it is computed by doing the
+          experiment rather than estimated, it is exact full stop; the seed
+          variation is a defect in the training setup and an error bar is a
+          scientific courtesy the invoice can drop.
+        misconception: D16
+        explain: |
+          The first sentence is right and the second is the failure this unit
+          exists to prevent. Reseeded, source 7's gap ran 0.018, 0.012, 0.015
+          with nothing changed but an RNG's starting value. Contribution is a
+          random variable at every scale, and a table without its sigma
+          cannot be read.
+      - text: |
+          Delta_i = v(all except i) - v(all), with v(S) the held-out bits per
+          byte for source set S. It is a counterfactual measured by actually
+          retraining, so it is the true contribution of the source; the model
+          scale, token budget and held-out set are implementation details of
+          how the number was obtained rather than part of what it means.
+        misconception: V4-M4
+        explain: |
+          The counterfactual is exact for the configuration that produced it -
+          this architecture, parameter count, token budget, protocol,
+          held-out set and source list - and nothing more. Influence patterns
+          change with scale: a 10M-parameter result is evidence about
+          10M-parameter models and a hypothesis about anything larger.
+      - text: |
+          Delta_i = v(all except i) - v(all), with v(S) the held-out bits per
+          byte for source set S. Since the twelve Delta_i are each a source's
+          contribution to the model, they sum to the model's total value, and
+          each source's share is Delta_i divided by that sum.
+        misconception: V4-M1
+        explain: |
+          The formula is right, the ledger arithmetic is not. Delta_i is a
+          marginal contribution to the FULL corpus, and marginals do not sum
+          to the total whenever sources interact: two near-duplicate sources
+          each measure 0.002 while removing both costs 0.020, five times
+          their sum. Proportional-to-delta payout is a choice needing a
+          defence, which is what v5 is for.
 
   - id: v4-q2
     concept: d-counterfactual
@@ -172,61 +267,19 @@ check:
     callback_eligible: true
     prompt: |
       Your corpus is 200 million tokens across 12 sources. A mid-sized source
-      is about 8% of it; a single paper is about 0.004% of it. Your measured
-      seed noise is sigma = 0.003 bits per byte, and the mid-sized source's
-      contribution came in around 0.015.
+      is about 8% of it and measured Delta = 0.015 bits per byte. A single
+      paper is about 0.004% of it. Seed noise at this configuration is
+      sigma = 0.003 bpb.
 
-      Show why per-source leave-one-out is measurable and per-document
-      leave-one-out is not. Give the arithmetic, state the assumption your
-      arithmetic rests on, and then state the design principle that follows.
-    answer: |
-      Assume the effect on held-out bpb of deleting content is roughly
-      proportional to the fraction of the corpus deleted. This is crude - it
-      ignores quality, redundancy, and diminishing returns - but it is signed
-      correctly and adequate for an order-of-magnitude check, and it is the
-      load-bearing assumption so it gets stated rather than hidden.
+      Assume the effect on held-out bpb of deleting content is proportional
+      to the fraction of the corpus deleted, so one paper's contribution is
+      0.015 x (0.004 / 8). Using n >= 8 sigma^2 / Delta^2, how many seeds per
+      condition would be needed to resolve one paper's contribution at
+      z >= 2?
 
-      Token shares differ by a factor of 0.004/8 = 1/2000, so a single paper
-      should move held-out bpb by about 0.015/2000 = 7.5e-6 bpb.
-
-      Compare against the noise. Seeds needed for z >= 2 is n >= 8*sigma^2 /
-      Delta^2.
-
-      Per source: 8 * (0.003)^2 / (0.015)^2 = 7.2e-5 / 2.25e-4 = 0.32, so one
-      seed per condition would nominally clear the bar. Three are run anyway,
-      because sigma cannot be estimated without repeats and because much of
-      the table sits nearer the floor.
-
-      Per document: 8 * (0.003)^2 / (7.5e-6)^2 = 7.2e-5 / 5.6e-11 = about
-      1.3 million seeds per condition, so 2.6 million training runs, for one
-      document, out of 25,000 in the corpus.
-
-      The design principle: because n scales as 1/Delta^2 and Delta scales as
-      the unit's token share, the cost of resolving a unit scales as the
-      inverse SQUARE of its share. That is a wall rather than a slope - there
-      is no gradual path from source-level to document-level. So choose the
-      attribution unit to match the payment unit: a royalty is paid to a
-      publisher, catalogue, or feed, which is an entity large enough to move
-      the loss, and the measurement becomes affordable precisely because
-      payable entities are large.
-    check: llm
-    rubric: |
-      Must contain: (1) the proportionality assumption, stated as an
-      assumption, (2) the scaled-down per-document effect, roughly 1e-5 bpb or
-      smaller - accept any figure within an order of magnitude, (3) the seed
-      formula applied to both cases with the per-document answer in the
-      millions, (4) the principle that cost scales as the inverse square of
-      the unit's share, so the unit must be chosen to match the payment unit.
-      (2), (3), (4) = pass. Omitting (1) = pass but flag; an unstated
-      assumption in this argument is the kind of thing an opposing expert
-      opens with.
-      An answer that concludes per-document attribution needs better methods
-      or better hardware = fail; the obstacle is a ratio between an effect and
-      a variance, and neither software nor hardware appears in it.
-      An answer that proposes shrinking the corpus so documents are a larger
-      share = fail on this item, and note it is refuted in canon: the seed
-      count falls as the square of the effect gain and still lands infeasible,
-      and the resulting number describes a model nobody is billing for.
+      Give the answer in millions of seeds, to two decimal places.
+    answer: "1.28"
+    check: numeric(0.05)
     difficulty: core
 
   - id: v4-q3
@@ -277,66 +330,70 @@ check:
 
   - id: v4-q5
     concept: d-noise-floor
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      Your sweep leaves eight of twelve sources below the noise floor. Your
-      cofounder wants to present the table next week and proposes: keep the
-      same total compute, but spend it on 600 random-subset runs instead of
-      300, since more runs means more averaging and the whole table gets
-      tighter.
+      Your sweep leaves eight of twelve sources below the noise floor, at
+      K = 12, n = 3 seeds per condition, sigma = 0.003 bpb and M = 300
+      random-subset runs. Your cofounder proposes keeping the same total
+      compute but spending it on 600 subset runs instead of 300, since more
+      runs means more averaging and the whole table gets tighter.
 
-      Explain precisely what that plan does and does not accomplish, and say
-      what you would spend the compute on instead. Give the arithmetic for
-      your alternative.
-    answer: |
-      What it does accomplish: the subset regression's coefficients get
-      tighter, and by a real amount. Each coefficient is a difference between
-      two averages of about M/2 runs, so its standard error is 2*sigma/sqrt(M);
-      doubling M from 300 to 600 shrinks it by sqrt(2), from about 0.00035 to
-      0.00025 bpb. It also buys a better-conditioned design and more held-out
-      subsets for scoring methods later.
-
-      What it does not accomplish: it changes nothing about the leave-one-out
-      table, which is the artifact in question. Delta_i is a difference
-      between exactly two condition means of n seeds each, and its standard
-      error is sigma*sqrt(2/n). There is no M in that expression. Train ten
-      thousand subset models and the eight sub-floor sources are still
-      sub-floor, to the last digit.
-
-      There is a second, deeper problem with substituting one for the other:
-      the regression coefficient c_i and the leave-one-out delta Delta_i are
-      not estimates of the same quantity. c_i is an average marginal effect
-      across the subset density you sampled, typically half-size coalitions;
-      Delta_i is the marginal effect with all eleven other sources present.
-      They agree only if contributions are additive, which is false whenever
-      two sources overlap. So the plan quietly swaps the estimand as well as
-      the estimator.
-
-      What to spend it on: seeds on the conditions near the floor. To resolve
-      an effect of 0.005 bpb at sigma = 0.003 requires
-      n >= 8*sigma^2/Delta^2 = 8*(9e-6)/(2.5e-5) = 2.88, so 3 seeds. To
-      resolve 0.002 bpb requires 8*(9e-6)/(4e-6) = 18 seeds per condition. At
-      225 seconds per run, going from 3 to 18 seeds on the eight sub-floor
-      conditions plus the full-corpus condition is 9 * 15 = 135 extra runs,
-      about 8.4 GPU-hours, well under $35. Buy seeds.
-    check: llm
-    rubric: |
-      Must contain: (1) the plan does help the regression, with the
-      2*sigma/sqrt(M) reason - an answer that simply rejects it has not
-      understood why it was tempting, (2) it does nothing for the
-      leave-one-out table because SE_delta depends only on sigma and n,
-      (3) an alternative that is more seeds, with the n >= 8*sigma^2/Delta^2
-      arithmetic and a cost.
-      All three = pass. (2) alone without (1) = partial, do not pass.
-      Missing (3) = fail; the whole force of the seed formula is that the
-      remedy is purchasable, and an answer that diagnoses without pricing has
-      not used the unit's main tool.
-      Accepting the plan = fail, diagnosing V4-M2.
-      An answer that also flags the estimand mismatch between c_i and Delta_i
-      = full credit.
+      Which assessment is correct?
+    check: choice
     difficulty: core
+    options:
+      - text: |
+          It tightens the subset regression - SE_beta = 2*sigma/sqrt(M) falls
+          from about 0.00035 to 0.00025 bpb - and does nothing whatever for
+          the leave-one-out table, since SE_delta = sigma*sqrt(2/n) contains
+          no M. Spend the compute on seeds instead: resolving 0.002 bpb needs
+          n >= 8(9e-6)/(4e-6) = 18 seeds per condition, about 135 extra runs
+          and under 9 GPU-hours.
+        correct: true
+        explain: |
+          Averaging shrinks the error of the estimator that does the
+          averaging. Delta_i reads exactly two condition means, so only n
+          moves its error bar; the regression pools across all M runs, so M
+          moves its. The remedy for the floor is purchasable, and it is
+          seeds.
+      - text: |
+          It works: 600 runs is twice the averaging of 300, so every number
+          in the sweep - the regression coefficients and the leave-one-out
+          deltas alike - tightens by sqrt(2), and several of the eight
+          sub-floor sources clear z = 2.
+        misconception: V4-M2
+        explain: |
+          Write down SE_delta = sigma*sqrt(2/n) and look for M in it. There
+          is none. Delta_i is a difference between two condition means of n
+          runs each; train ten thousand subset models and the eight sub-floor
+          sources are still sub-floor, to the last digit.
+      - text: |
+          Neither plan helps, because seed noise is a small-model artifact.
+          Train at 300M parameters instead: larger models train more stably,
+          their sigma is smaller, and the sub-floor sources resolve without
+          extra runs.
+        misconception: D16
+        explain: |
+          Noise is not a defect that scale anneals away - a 300M model has
+          its own sigma. And cost is linear in N, so a 30x larger model buys
+          30x fewer seeds; since seeds are the only thing that shrinks
+          SE_delta, this is the most expensive available way to make the
+          problem worse.
+      - text: |
+          Better: drop the leave-one-out deltas and report the regression
+          coefficients c_i in their place. They estimate the same quantity
+          with a tighter error bar, so 600 subset runs resolve all eight
+          sources directly.
+        misconception: V4-M1
+        explain: |
+          c_i is an average marginal effect at the subset density you
+          sampled - mostly half-size coalitions - while Delta_i is the
+          marginal effect with all eleven other sources present. They
+          coincide only under additivity, which fails exactly where sources
+          overlap. Report both; the disagreement is an interaction
+          diagnostic, not a swap.
 
   - id: v4-q6
     concept: d-subset-regression
@@ -419,7 +476,7 @@ check:
 
   - id: v4-q9
     concept: d-counterfactual
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
@@ -429,115 +486,137 @@ check:
       more condition with BOTH removed, and get a joint effect of 0.020, far
       above the floor.
 
-      Explain why this happens, state what it means for a payout table built by
-      dividing each Delta_i by the sum of all deltas, and say what measurement
-      you can make from runs you already have that would have warned you.
-    answer: |
-      Why: the leave-one-out delta is a source's marginal contribution to the
-      FULL corpus, with everything else present. Remove A and B still teaches
-      the shared material, so the model barely notices and Delta_A is small.
-      Remove B and A covers for it, so Delta_B is small. Remove both and the
-      shared material is gone entirely, so the loss jumps. Each source is
-      individually redundant and jointly essential, which is a completely
-      ordinary situation for any corpus assembled from a preprint server and a
-      journal.
-
-      What it means for a proportional payout: the scheme is broken in this
-      case, and badly. The two sources' deltas sum to 0.004 against a joint
-      contribution of 0.020, so a table built on deltas pays them a fifth of
-      what their material was worth - and since both are below the noise floor
-      it may pay them nothing at all, while the material they jointly supply is
-      one of the largest effects in the corpus. Dividing by the sum of deltas
-      also silently assumes the deltas add up to the total, which this example
-      shows they do not. Proportional-to-delta is a choice requiring a defence,
-      not a definition.
-
-      The warning available from runs already performed: fit the subset
-      regression and compare each c_i against the corresponding Delta_i. The
-      regression coefficient is the average marginal effect across the subset
-      density sampled - typically half-size coalitions, where a source's
-      duplicate partner is often absent - while Delta_i is the effect at full
-      density where the partner is always present. For a redundant pair the
-      two disagree sharply, and the size of Delta_i - c_i is a direct readout
-      of how much that source's value depends on what else is in the corpus.
-      It costs no additional training runs, and almost nobody computes it.
-    check: llm
-    rubric: |
-      Must contain: (1) the mechanism - each source is individually redundant
-      because the other covers the shared material, so marginal contributions
-      at full density are small while the joint effect is not, (2) the
-      consequence that per-source deltas do not sum to the total, so a
-      proportional split misallocates, with the factor of five or equivalent,
-      (3) the diagnostic: compare Delta_i against the subset-regression c_i,
-      available from runs already performed.
-      (1) and (2) = pass. All three = full credit.
-      An answer that concludes one of the two sources should be dropped =
-      fail; the material is valuable and the redundancy is a credit-assignment
-      problem, not a data-quality problem. Diagnose V4-M3.
-      An answer that treats the sum-of-deltas denominator as unproblematic once
-      the numbers are more precise = fail, diagnosing V4-M1; the failure here
-      is structural and survives any amount of precision.
-      An answer that reaches for a fair-division rule and names coalitions or
-      Shapley without having been taught them = full credit; that instinct is
-      exactly what v5 formalizes.
+      Which statement accounts for the pattern, gives the right verdict on a
+      payout table built by dividing each Delta_i by the sum of all deltas, and
+      names a check available from runs you have already performed?
+    options:
+      - text: >-
+          Each source is individually redundant and jointly essential: Delta_i is
+          a marginal contribution at FULL corpus density, where the partner still
+          covers the shared material, so the two deltas sum to 0.004 against a
+          joint effect of 0.020. A proportional-to-delta table pays the pair a
+          fifth of what their material was worth, and possibly nothing at all
+          since both sit below the floor. The warning is free: fit the subset
+          regression on runs already trained and compare each c_i against
+          Delta_i, since the two disagree sharply for a redundant pair.
+        correct: true
+        explain: >-
+          Right. The leave-one-out delta answers "what if this source alone is
+          missing", so redundancy suppresses it while the joint effect exposes
+          it. Marginal contributions do not sum to the total, which is why a
+          proportional split is a choice needing a defence (v5's axioms) rather
+          than a definition, and why Delta_i - c_i is a readout of interaction at
+          zero extra training cost.
+      - text: >-
+          The joint number cannot be right: per-source contributions add up, so
+          0.002 + 0.002 must equal the joint effect. Treat 0.020 as a measurement
+          error, rerun the joint condition with more seeds until it reconciles
+          with 0.004, and keep the proportional table as it stands.
+        misconception: V4-M1
+        explain: >-
+          The pie-chart instinct - slices must sum to the pie - is exactly the
+          assumption the experiment refutes. Marginal contributions sum to the
+          total only when sources do not interact, and two overlapping sources
+          are the most common case in which they do. No quantity of seeds will
+          reconcile 0.004 with 0.020, because the gap is structural rather than
+          noise.
+      - text: >-
+          Both deltas are below the noise floor, so this is a precision problem
+          rather than a structural one: spend the budget on a few hundred
+          random-subset runs, which average across many more models than three
+          seeds can, and the deltas will resolve to roughly 0.010 each and sum to
+          the joint 0.020.
+        misconception: V4-M2
+        explain: >-
+          Averaging shrinks the error of the estimator doing the averaging.
+          SE_delta = sigma*sqrt(2/n) contains no M, so subset runs leave the
+          leave-one-out error bar untouched to the last digit. And the two
+          estimators do not target the same quantity: c_i is an average marginal
+          effect at the sampled subset density, Delta_i is the effect at full
+          density, so making them agree is not something more runs can force.
+      - text: >-
+          Two sources carrying the same material means one of them is dead weight
+          in the corpus. Drop the redundant one; the survivor's delta then rises
+          to about 0.020, the table sums correctly, and the payout goes to the
+          source that actually taught the model.
+        misconception: V4-M3
+        explain: >-
+          A small or negative delta under redundancy is a statement about the
+          marginal token in this corpus, not a quality verdict on the source -
+          which is visible in the fact that the sign and size flip depending on
+          which OTHER source is present. Dropping one source does not measure
+          anything; it decides, silently, which rightsholder receives the value of
+          material both supplied. That is a credit-assignment question, and v5
+          answers it with coalitions rather than deletion.
+    check: choice
     difficulty: stretch
 
   - id: v4-q10
     concept: d-counterfactual
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
       Your pipeline's deduplication stage found a cluster of near-identical
-      passages appearing in both source 4 and source 9, recorded the cluster
-      and its source membership in the manifest, and kept source 4's copies.
+      passages appearing in both source 4 and source 9, recorded the cluster and
+      its source membership in the manifest, and kept source 4's copies.
 
-      Your finished table reads Delta_4 = 0.028 and Delta_9 = -0.006.
+      Your finished table reads Delta_4 = 0.028 and Delta_9 = -0.006, both
+      clearing the noise floor.
 
-      Explain the causal path from the dedup decision to those two numbers,
-      state what would have happened had the pipeline kept source 9's copies,
-      and say what has to ship alongside the table as a result.
-    answer: |
-      The causal path: deduplication chose which source's tokens the model
-      would actually see for the shared passages. Source 4 kept them, so the
-      model learned that material from source 4's tokens, so removing source 4
-      loses it and Delta_4 is inflated by the whole value of the shared
-      material. Source 9's surviving tokens are its unique content only, and at
-      a fixed token budget some of them are displacing tokens that would have
-      taught something the held-out set rewards - which is how a clean,
-      perfectly good source ends up with a negative number.
-
-      Had the pipeline kept source 9's copies instead: the two numbers largely
-      swap. Source 9 becomes the carrier of the shared material and its delta
-      rises; source 4 loses it and its delta falls, plausibly below zero by the
-      same displacement argument. Nothing about the corpus, the sources, the
-      model, the eval set, or the protocol changed. A pipeline stage that every
-      engineer treats as hygiene moved a large fraction of the measured value
-      between two rightsholders.
-
-      What must ship with the table: the deduplication policy and the
-      duplicate-cluster record. The pipeline already produces both - the
-      clusters were recorded rather than silently collapsed - so this is a
-      reporting obligation rather than new work. Without them, a delta inflated
-      by having won a dedup tiebreak reads as a measured property of the
-      source, and the honest framing of Delta_4 is "source 4's contribution
-      under this dedup policy," not "source 4's contribution."
-    check: llm
-    rubric: |
-      Must contain: (1) whichever source keeps the shared copies is the source
-      the model learns the material from, so it absorbs that material's
-      contribution, (2) swapping the dedup survivor largely swaps the two
-      deltas with nothing about the underlying data having changed, (3) the
-      dedup policy and cluster record are part of the result and must be
-      reported.
-      (1) and (2) = pass. All three = full credit.
-      Reading Delta_9 < 0 as evidence that source 9 is low quality = fail,
-      diagnosing V4-M3; the sign was manufactured by a pipeline decision.
-      Proposing more aggressive deduplication as the fix = fail; more dedup
-      makes more of these decisions, not fewer.
-      Proposing that the two sources split the shared material's credit = pass
-      and note the instinct is correct - it is a coalition question and v5
-      gives it a principled answer.
+      Which statement gives the correct causal path from the dedup decision to
+      those two numbers, and the correct consequence for shipping the table?
+    options:
+      - text: >-
+          Dedup decided which source's tokens the model would actually see for
+          the shared passages, so source 4 absorbed the whole value of that
+          material while source 9 was left with unique tokens that, at a fixed
+          token budget, displaced more useful ones. Had the pipeline kept source
+          9's copies the two deltas would largely swap with nothing about the
+          corpus, sources, model, eval set or protocol having changed - so the
+          dedup policy and the cluster record must ship alongside the table.
+        correct: true
+        explain: >-
+          Right. The pipeline already records the clusters, so this is a
+          reporting obligation rather than new work, and it is what keeps Delta_4
+          readable as "source 4's contribution UNDER this dedup policy" instead
+          of as a measured property of the source.
+      - text: >-
+          Delta_9 = -0.006 clears the floor with a negative sign, which is the
+          table telling you source 9 is low-quality or corrupted content. Inspect
+          it, drop it from the corpus, and report the remaining eleven sources.
+        misconception: V4-M3
+        explain: >-
+          Source 9 here is a clean journal mirror; reading a hundred of its
+          documents will find nothing wrong. The negative sign was manufactured
+          by a pipeline decision - flip which copies dedup kept and the sign
+          flips with it - and a property of the data cannot depend on which other
+          source is present.
+      - text: >-
+          Deduplication only removes redundant copies of text the corpus already
+          contains, so it cannot move value between sources. The two deltas
+          measure the sources' own content, and keeping source 9's copies instead
+          would have produced the same table.
+        misconception: D9
+        explain: >-
+          This is the hygiene reading of dedup, and it is what makes the decision
+          invisible. Keeping one copy of a shared passage assigns credit for
+          everything that passage teaches to whichever source survived; at web
+          scale that choice is made silently millions of times, and in a royalty
+          system it moves money.
+      - text: >-
+          Delta_4 + Delta_9 = 0.022 is the pair's joint contribution, so the
+          shared material is correctly accounted for in aggregate. How the dedup
+          stage split it between the two rows is an internal accounting detail
+          that does not need to ship with the table.
+        misconception: V4-M1
+        explain: >-
+          Two errors at once. Leave-one-out deltas do not sum to a joint effect
+          whenever sources interact, so 0.022 is not the pair's joint
+          contribution; and the split between the rows is precisely what a
+          rightsholder is paid on, so calling it an internal detail is calling
+          the invoice an internal detail.
+    check: choice
     difficulty: core
 
   - id: v4-q11
@@ -567,79 +646,76 @@ check:
 
   - id: v4-q12
     concept: d-subset-regression
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: false
     prompt: |
-      An investor asks why you are training ten-million-parameter models when
-      the interesting models have three orders of magnitude more parameters,
-      and points out that influence functions have been run at 52 billion
-      parameters by a frontier lab.
+      An investor asks why you are training ten-million-parameter models when the
+      interesting models have three orders of magnitude more parameters, and
+      points out that influence functions have been run at 52 billion parameters
+      by a frontier lab.
 
-      Answer them. State what the small-scale counterfactual buys that no
-      large-scale method can supply, cite what happened when somebody measured
-      the scalable methods against retraining, and concede the limit of your
-      own position honestly.
-    answer: |
-      What the small scale buys: it is the only regime where the counterfactual
-      is affordable, and the counterfactual is the only check any attribution
-      method has. An influence implementation produces a confident, plausible,
-      well-formatted ranking whether or not it is computing anything - no
-      crash, no exception, no obviously wrong output, and a sign error in the
-      middle yields a list that looks exactly as reasonable as the correct one.
-      There is no unit test for "these influence scores are the right influence
-      scores." Against a retraining table there is: compute the method's LDS,
-      and a broken implementation scores near zero.
-
-      What happened when somebody measured: on a 2-billion-parameter model
-      evaluated against actual retraining, the methods that scale performed no
-      better than random guessing, while the near-optimal method reached a rank
-      correlation of 0.97 and cost three to five full training runs per test
-      sample, which makes it an oracle rather than a system. Separately, a 2026
-      result found the dominant error in trajectory methods was that the
-      literature assumed SGD while the models trained with AdamW; correcting
-      that one mismatch moved published results by 10 to 300%. Both are what a
-      missing calibration standard produces: years of confident numbers, none
-      of them checked. The 52B run is a demonstration that a method RUNS at
-      that size, published as a generalization study rather than as an
-      attribution product, and running is not the same as being correct.
-
-      So the central dilemma is structural rather than temporary: the methods
-      that scale do not demonstrably correlate with ground truth, and the
-      method that correlates does not scale. Any attribution claim at scale is
-      worth exactly the measured correlation that accompanies it, and that
-      correlation can only be measured where retraining is affordable.
-
-      The concession: my table is exact for a 10-million-parameter model on
-      this token budget against this held-out set, and influence patterns are
-      known to change with scale - crisp and top-heavy at small scale, a long
-      tail at frontier scale where per-document effects round to zero, and
-      more abstract as models grow. So a contribution established here is
-      evidence about small models and a hypothesis about large ones. That is a
-      scope statement rather than a defect, and it has a price attached:
-      whether it transfers is a well-defined experiment - repeat one scale up
-      and compare the rankings - rather than a matter of opinion. Nobody else
-      in this space can quote that price, because nobody else has the
-      instrument.
-    check: llm
-    rubric: |
-      Must contain: (1) the counterfactual is the only available check on an
-      attribution implementation, with some version of the "it produces a
-      plausible ranking either way" argument, (2) the measured result -
-      scalable methods at chance against retraining ground truth, the
-      correlating method too expensive to scale, (3) an honest concession that
-      small-scale results are scoped and influence changes with scale.
-      All three = pass. Missing (3) = fail, diagnosing V4-M4; the concession is
-      the part that makes the rest credible and its absence is the version of
-      this answer that loses the room.
-      Missing (2) = fail; without the measurement the argument is an assertion
-      that small is better, which the investor has no reason to accept.
-      An answer that claims the 52B influence work is worthless = fail; it is
-      careful published research presented as a generalization study, and
-      overclaiming against it is the mirror of the error being corrected.
-      Full credit for also noting that the small-scale sweep amortizes - it is
-      a one-time cost independent of query count, where the per-query oracle
-      is not.
+      Which reply is both the strongest and the most honest?
+    options:
+      - text: >-
+          The 52B result shows the method RUNS at that size, which is not the
+          same as being correct: measured against actual retraining on a
+          2B-parameter model, the methods that scale came out no better than
+          random, while the near-optimal method reached rho = 0.97 and cost three
+          to five training runs per query. Small scale is the only regime where
+          that check is affordable, so the sweep is the calibration standard, not
+          a prototype - and the resulting table is exact for 10M parameters and a
+          hypothesis about anything larger, testable by repeating one scale up.
+        correct: true
+        explain: >-
+          Right, and the concession is what makes the rest credible. It states
+          the central dilemma (what scales does not demonstrably correlate, what
+          correlates does not scale), quotes the measurement rather than
+          asserting a preference for small models, and attaches a price to the
+          open question instead of leaving it as opinion.
+      - text: >-
+          Concede the point: the 52B work shows gradient attribution is
+          essentially solved and taking it to frontier scale is engineering. The
+          small runs are a prototype whose methods get applied unchanged once
+          there is budget for real hardware.
+        misconception: D6
+        explain: >-
+          This is the headline reading of the scaling demonstrations. The
+          measurements published by the same community say otherwise: scalable
+          methods at chance against retraining ground truth, and a single
+          corrected assumption (SGD where the models trained with AdamW) moving
+          published results by 10 to 300%. Numbers that move by 300% when one
+          line is fixed were not measuring what their authors thought.
+      - text: >-
+          Answer that ground truth is ground truth: the 10M table was computed by
+          doing the experiment rather than estimated, so it is the true
+          contribution, full stop. Its ranking of sources therefore transfers to
+          any model trained on this corpus, and no scale caveat is needed.
+        misconception: V4-M4
+        explain: >-
+          The counterfactual is exact for the configuration that produced it -
+          this architecture, parameter count, token budget, protocol, held-out
+          set and source list - and nothing more. Influence is crisp and top-heavy
+          at small scale and a long tail at frontier scale, and it becomes more
+          abstract as models grow, so rankings can genuinely reorder between the
+          two. Dropping the scope statement is what loses the room to the first
+          person who has read the literature.
+      - text: >-
+          Explain that the frontier methods only look bad because they are noisy,
+          and that attribution noise is a temporary methods problem: average more
+          seeds at 52B and the scalable methods will come into agreement with
+          retraining, so small-scale work is a stopgap until the estimators
+          improve.
+        misconception: D20
+        explain: >-
+          Two problems. The scalable methods scored at chance against ground
+          truth, which is a correlation failure and not a variance one, and there
+          is no seed budget at 52B in any case. More broadly, whether
+          contribution-proportional payment beats a flat fee is decided by
+          measured signal-to-noise on your corpus at your scale - a better
+          estimator does not move the threshold, only more signal does, which is
+          why measuring your own floor IS the result.
+    check: choice
     difficulty: stretch
 
   - id: v4-q13

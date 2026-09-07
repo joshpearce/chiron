@@ -91,51 +91,62 @@ id: v2-b1
 type: predict
 concept: d-extraction-filtering
 prompt: |
-  Before reading on. Of the four injuries above, sort them into two piles:
-  those that cost the trained MODEL something (it learns worse), and those
-  that cost the ATTRIBUTION something (you can no longer say correctly which
-  source produced which text). Put each injury in one or both piles, and for
-  the attribution pile say concretely what downstream step breaks.
-answer: |
-  Model-quality pile: all four, in decreasing severity. Interleaving is worst
-  - it manufactures ungrammatical token sequences at every line boundary, and
-  a two-column paper has hundreds of them per page. Ligature loss injects
-  systematic misspellings of exactly the domain's most frequent words
-  (fine-tuned, significant, efficient, classifier), so the tokenizer will
-  learn merges for the broken forms. Math rubble teaches the model that
-  equations are noise. Footers are the mildest: repeated boilerplate that
-  quality filters largely catch.
-
-  Attribution pile: interleaving and footers, and they break different steps.
-
-  Interleaving breaks the source tag at sub-document granularity. If the
-  right column of page 4 is a block quotation from another work, or a
-  reference list entry, the spliced line now contains text from two owners
-  under one source label. There is no later stage that can separate them
-  again, because the splice happened before anything was tagged.
-
-  Footers break deduplication. Every paper from the same proceedings now
-  carries the identical footer string. That string is a near-exact duplicate
-  spanning hundreds of documents from many different author groups, so the
-  duplicate cluster it forms is enormous and spans sources - and whatever
-  credit policy you apply to duplicate clusters is now being applied to
-  typesetting furniture.
-
-  Ligature loss and math rubble are pure quality damage; they do not move
-  credit between sources.
-rubric: |
-  Pass requires: (1) recognizing that all four hurt model quality, with
-  interleaving named as the worst, (2) at least one injury correctly placed
-  in the attribution pile with a named downstream step - interleaving
-  corrupting the source tag, OR footers corrupting the dedup clusters.
-  Both halves of (2) = full credit.
-  Fail if the answer treats extraction purely as a quality problem with no
-  attribution consequence at all - that is V2-M1 (extraction-is-a-commodity)
-  in its most common form, and the rest of the unit will not land.
-  Do not fail an answer that assigns ligature loss to the attribution pile
-  with a plausible argument (broken forms change the shingles used for
-  dedup); that is a defensible read.
-check: llm
+  Before reading on, commit to one reading. Of the four injuries above -
+  interleaving, ligature loss, math rubble, inlined footers - which
+  description correctly sorts them into what costs the trained MODEL something
+  and what costs the ATTRIBUTION something, and names the downstream step that
+  breaks?
+options:
+  - text: |
+      All four hurt model quality, interleaving worst. Two of them also move
+      credit: interleaving corrupts the source tag at sub-document
+      granularity (a spliced line can carry two owners' text under one
+      source label, and nothing later can separate them), and inlined footers
+      corrupt deduplication (the identical proceedings footer forms one
+      enormous near-duplicate cluster spanning hundreds of documents from many
+      author groups, so the cluster credit policy is applied to typesetting
+      furniture).
+    correct: true
+    explain: |
+      Right, and the two piles overlap rather than partition. Ligature loss
+      and math rubble are pure quality damage; interleaving and footers reach
+      into the credit machinery, and they break different steps - the source
+      tag and the dedup clusters respectively.
+  - text: |
+      All four are quality damage and nothing more. Extraction is upstream of
+      every tagging step, so whatever text comes out is simply tagged with the
+      document's source; the attribution machinery is unaffected by how the
+      bytes were recovered.
+    misconception: V2-M1
+    explain: |
+      This is extraction-as-commodity in its most common form. Interleaving
+      happens BEFORE anything is tagged, which is exactly why it is fatal:
+      a line welding a block quotation to body text gets one source label and
+      no later stage can split it. Footers, meanwhile, manufacture
+      cross-source duplicate clusters out of nothing.
+  - text: |
+      Only ligature loss and math rubble matter, and they matter for
+      attribution: broken spellings and missing symbols change a document's
+      shingles, so it no longer matches its own duplicates. Interleaving and
+      footers are cosmetic - quality filters remove both.
+    misconception: V2-M1
+    explain: |
+      Shingle drift is a defensible secondary worry, but the ordering is
+      backwards. Interleaving is the worst injury on both axes: it fabricates
+      sentences no human wrote at tens per page, and it merges two owners'
+      text into one tagged span. And no quality filter reconstructs reading
+      order - the extractor reported no error.
+  - text: |
+      None of the four survives filtering, so the pile assignment is moot: the
+      quality classifier scores the mangled text low and drops those documents
+      before tokenization.
+    misconception: D8
+    explain: |
+      Interleaved text is fluent line by line and passes heuristics; that is
+      the whole danger. A filter selects for a distribution, it does not
+      detect that the reading order was destroyed. Extraction damage is
+      silent all the way to the trained model.
+check: choice
 ```
 
 Now the same page through a pipeline that knows what a page is. Layout is
@@ -319,51 +330,56 @@ prompt: |
   filtering is a web-crawl problem. Skip the classifier, spend the time on
   dedup."
 
-  The premise is largely true. Explain, in your own words, why the conclusion
-  is still wrong for THIS corpus specifically, and name the one thing a
-  classifier would be filtering FOR here that it would not be filtering for on
-  a web crawl.
-answer: |
-  The web-crawl classifier's job is to separate prose from garbage: SEO spam,
-  navigation chrome, autogenerated listings. peS2o has none of that, so
-  importing a web classifier wholesale buys nothing. That much of the premise
-  holds.
-
-  What it misses is that a filter's job is to select for the distribution you
-  want the model to be good at, not to remove garbage. Two things a paper
-  corpus is full of that a web classifier would never see:
-
-  First, extraction residue. Even a good PDF pipeline leaves reference lists,
-  table rubble, acknowledgement blocks, author-affiliation strings, and math
-  that half-survived. These are grammatical enough to pass every heuristic and
-  are a substantial fraction of the token count of a typical paper. A
-  classifier trained on "is this connected technical exposition or is this
-  document furniture" is the thing that removes them, and nothing else in the
-  pipeline will.
-
-  Second, the corpus is now the entire training distribution rather than a
-  slice of it. At 300M to 1B tokens there is no general-web ballast to dilute
-  a bad decision - if 15% of the corpus is reference lists, the model spends
-  15% of its capacity learning to emit citation strings.
-
-  The thing being filtered FOR: connected exposition within a paper, as
-  opposed to the structured metadata surrounding it. On the web that
-  distinction barely exists; here it is most of the signal.
-rubric: |
-  Must contain: (1) an explicit reframing of filtering as selecting for a
-  target distribution rather than removing garbage, (2) at least one concrete
-  paper-specific artifact class that survives heuristics but should be cut -
-  reference lists, table remnants, acknowledgements, affiliation blocks,
-  math residue.
-  Both = pass.
-  An answer that agrees with the colleague, or that only says "filtering is
-  always good" without naming what is being filtered for, = fail, diagnosing
-  D8: the learner still believes the filter is a size knob rather than a
-  distribution knob.
-  An answer arguing peer review is itself the quality classifier = partial;
-  true and worth saying, but it does not address extraction residue, which is
-  the concrete miss.
-check: llm
+  The premise is largely true. Which explanation best accounts for why the
+  conclusion is still wrong for THIS corpus, and names what a classifier would
+  be filtering FOR here that it would not be filtering for on a web crawl?
+options:
+  - text: |
+      A filter selects for the distribution you want the model good at; it
+      does not merely remove garbage. peS2o has no SEO spam, but it is full of
+      reference lists, table rubble, acknowledgements, affiliation blocks and
+      half-surviving math - grammatical enough to pass every heuristic, and a
+      large share of a paper's tokens. At 300M to 1B tokens there is no
+      general-web ballast to dilute that. The thing being selected for is
+      connected exposition as against the structured metadata around it.
+    correct: true
+    explain: |
+      Right. The premise (no web garbage) is true and the conclusion does not
+      follow, because the classifier's job here is a distribution choice, and
+      the artifact class it targets - document furniture inside a legitimate
+      paper - is one a web classifier never meets.
+  - text: |
+      The colleague is right for this corpus. Filtering is a size knob: it
+      buys quality by discarding tokens, and peS2o at 300M to 1B tokens is
+      already near the data floor, so any classifier can only make a
+      quality-filtered corpus smaller and therefore worse.
+    misconception: D8
+    explain: |
+      This still treats filtering as a size dial. FineWeb-Edu is a 1.3T
+      carve-out that beats its own 15T superset on knowledge benchmarks, which
+      means the discarded material carried negative value. Fewer tokens of the
+      right distribution is the whole finding.
+  - text: |
+      The conclusion is wrong because peS2o is not large enough: the right
+      move is to relax filtering and pull in more papers, since past a floor
+      corpus size is what sets model quality and a classifier only shrinks the
+      pool further.
+    misconception: D8
+    explain: |
+      Backwards. Past the floor, quality dominates size, and quality is
+      operationalized as a classifier - the single biggest factor in DCLM's
+      own ablations, larger than any architecture change they tested.
+  - text: |
+      The conclusion is wrong only because peer review is not a reliable
+      quality signal - venues differ enormously, so the classifier's job is to
+      re-rank documents by venue prestige and drop the weak papers.
+    misconception: V2-M1
+    explain: |
+      Venue quality is a different axis, and sorting by it does not touch the
+      concrete miss: extraction residue INSIDE good papers. A strong paper
+      whose reference list is 15% of its tokens still spends 15% of the
+      model's capacity teaching it to emit citation strings.
+check: choice
 ```
 
 ## Deduplication, worked by hand
@@ -445,8 +461,6 @@ $k$ in the hundreds.
 id: v2-b3
 type: completion
 concept: d-dedup-provenance
-# variants: blank h_1 and h_3 instead of h_2; or change C's last element to 20
-# so that C and A are identical and every position must agree.
 prompt: |
   A third document has shingle set $C = \{2,\ 5,\ 9,\ 20,\ 31\}$. Using the
   same three hash functions and the same table of values as above:
@@ -455,36 +469,53 @@ prompt: |
     h_2 over C: min(12, 27, 10, 28, 9)     = ____
     h_3 over C: min(17, 1, 29, ____, 35)   = ____
 
-  Fill the five blanks. Then give sig(C), the estimated Jaccard index between
-  A and C from signature agreement, and the true Jaccard index computed
-  directly from the sets.
-answer: |
-  h_1 blank: 24 (the value of h_1 at x=20), so min(7,16,28,24,20) = 7.
-  h_2:  min(12,27,10,28,9) = 9.
-  h_3 blank: 32 (the value of h_3 at x=20), so min(17,1,29,32,35) = 1.
-
-  sig(C) = [7, 9, 1].
-
-  sig(A) = [6, 10, 1]. Positions agreeing: only the third. Estimate = 1/3
-  = 0.33.
-
-  True Jaccard: A = {2,5,9,14,20}, C = {2,5,9,20,31}. Intersection =
-  {2,5,9,20}, 4 elements. Union = {2,5,9,14,20,31}, 6 elements.
-  J(A,C) = 4/6 = 0.667.
-
-  The point: the estimate (0.33) is badly wrong here, and the true value is
-  identical to J(A,B). k = 3 does not have the resolution to tell these pairs
-  apart. This is the concrete reason production configs use 100+ hashes, not
-  a theoretical nicety.
-rubric: |
-  Required, exactly: blanks 24, 7, 9, 32, 1 (in that order); sig(C) = [7, 9, 1];
-  estimate = 1/3 or 0.33; true J = 4/6 or 0.667.
-  All correct = pass.
-  Getting the estimate right but the true J wrong = fail on arithmetic.
-  Getting both right but asserting the estimator is broken or biased = flag:
-  the estimator is unbiased, it is high-variance at k=3. If the learner says
-  "MinHash does not work", correct that explicitly before moving on.
-check: llm
+  Recall sig(A) = [6, 10, 1]. Which filling of the five blanks, and which
+  reading of the result, is correct?
+options:
+  - text: |
+      Blanks 24, 7, 9, 32, 1, so sig(C) = [7, 9, 1]. Only the third position
+      agrees with sig(A) = [6, 10, 1], giving an estimate of 1/3 = 0.33, while
+      the true index is J(A,C) = |{2,5,9,20}| / |{2,5,9,14,20,31}| = 4/6 =
+      0.667. The estimator is unbiased but has standard error about
+      $1/\sqrt{k}$, and at k = 3 it cannot resolve this pair from A and B.
+    correct: true
+    explain: |
+      Right on both halves. $h_1(20) = (3 \cdot 20 + 1) \bmod 37 = 24$ and
+      $h_3(20) = (7 \cdot 20 + 3) \bmod 37 = 32$, and the true J here equals
+      J(A,B) = 0.667 exactly - the signature says 0.33 for one and 0.667 for
+      the other. That gap is why production configurations use hundreds of
+      hashes.
+  - text: |
+      Blanks 24, 7, 9, 32, 1, so sig(C) = [7, 9, 1] and the estimate is 1/3 =
+      0.33. The true index is also about 0.33, since C shares three of its
+      five shingles with A and MinHash is exact for small sets.
+    misconception: D3
+    explain: |
+      The arithmetic on the signature is right, the set arithmetic is not.
+      Intersection $\{2,5,9,20\}$ is four elements, union
+      $\{2,5,9,14,20,31\}$ is six, so J = 4/6 = 0.667. MinHash is never exact;
+      it is an unbiased estimate whose error is what this beat is about.
+  - text: |
+      Blanks 24, 7, 9, 32, 1, so sig(C) = [7, 9, 1], estimate 0.33 against a
+      true J of 0.667. The signature is therefore biased downward on
+      small sets, and the fix is to correct the estimate upward before
+      thresholding.
+    misconception: D19
+    explain: |
+      The numbers are right and the diagnosis is wrong. Each position agrees
+      with probability exactly J, so the estimator is unbiased; what fails at
+      k = 3 is variance, not centring. Raising k shrinks the error as
+      $1/\sqrt{k}$; no upward correction is warranted.
+  - text: |
+      Blanks 20, 20, 9, 35, 9, so sig(C) = [20, 9, 9]. No position agrees with
+      sig(A), giving an estimate of 0 against a true J of 4/6 = 0.667.
+    misconception: D3
+    explain: |
+      This reads the blanks as h-values of 31 rather than of 20. The set C
+      contains 20, so the missing entries are $h_1(20) = 24$ and
+      $h_3(20) = 32$; the 31 column supplies the 20 and 35 already printed in
+      the prompt. The minima are 7 and 1.
+check: choice
 ```
 
 **Bucketing: LSH.** Signatures still have to be compared pairwise unless you
@@ -636,59 +667,60 @@ prompt: |
   doc_417 and doc_890 are the v1 and v2 preprints of the same work. doc_101 is
   the camera-ready. doc_902 is a scraped mirror of the camera-ready.
 
-  Your pipeline will train on exactly one of these. Set aside which one for a
-  moment, and answer: what must the manifest record so that ANY of the three
-  credit policies above can be applied later without retraining? Then state
-  which policy each of the three sources would argue for, and why "equal split
-  across cluster members" is the wrong default here specifically.
-answer: |
-  What the manifest must record, per cluster:
-
-  - the cluster id and the full member list, with each member's doc_id AND
-    source_id - because the credit unit is the source, not the document, and
-    a source can appear more than once in one cluster;
-  - which member is the representative, i.e. whose tokens are the ones the
-    model actually saw, so an auditor can reproduce the corpus;
-  - the (shard, offset, length) span of the representative, so the cluster is
-    joinable to the training tokens;
-  - each member's publication date, since one of the three policies is a
-    function of it;
-  - the pairwise similarity of each member to the representative, so that a
-    later reader can see whether this was an exact duplicate or a 0.76-Jaccard
-    near-match, which changes how much a policy argument is worth.
-
-  Nothing here requires retraining to change the policy, which is the design
-  goal: the model is a function of the representative alone, and payout is a
-  function of the cluster table alone. They are separable.
-
-  What each source argues for: Northlake Preprints argues earliest-publication
-  (they were first by four months, and they win outright). Journal of Text
-  Systems argues either equal split, or a policy weighted by which version is
-  the one of record. OpenMirror Archive argues equal split, since it is the
-  only policy under which a mirror gets paid at all.
-
-  Why equal split is wrong as a default here: it is computed over cluster
-  MEMBERS, and Northlake appears twice with two preprint versions. A source
-  that posts n versions of the same work collects n/m of the payout for a
-  passage it contributed once. Equal split must be over distinct SOURCES in
-  the cluster, not over documents - and the moment you say that out loud you
-  have noticed that the source identity is the thing an adversary controls,
-  which is the v5 shell-company attack arriving early.
-rubric: |
-  Must contain: (1) member list carrying source_id, not just doc_id, (2) the
-  representative identified, (3) at least one of {publication date, pairwise
-  similarity} recorded because a policy is a function of it, (4) recognition
-  that equal-split-over-documents double-counts Northlake and that the split
-  must be over distinct sources.
-  (1), (2), and (4) = pass. (4) is the load-bearing one.
-  An answer that picks a policy and records only what that policy needs =
-  fail: the design requirement is that the policy be changeable without
-  retraining, and this answer has welded the policy into the corpus.
-  An answer that says "just keep all four documents in the corpus, no dedup"
-  = fail, and diagnose it explicitly: training on four copies of one passage
-  quadruples its effective weight and makes it extractable (v6), so it is a
-  worse corpus AND a worse attribution substrate.
-check: llm
+  Which account of what the manifest must record - and of why "equal split
+  across cluster members" is the wrong default here specifically - is correct?
+options:
+  - text: |
+      Record the cluster id, the full member list with each member's doc_id
+      AND source_id, which member is the representative, the representative's
+      (shard, offset, length) span, each member's publication date, and each
+      member's similarity to the representative - so any of the three policies
+      is computable later without retraining. Equal split is wrong as a
+      default because it is computed over MEMBERS and Northlake appears twice:
+      a source posting n versions collects n/m for a passage it contributed
+      once. The split must be over distinct sources.
+    correct: true
+    explain: |
+      Right, and the double-count is the load-bearing part. Dates are needed
+      because earliest-publication is a function of them; similarities because
+      an exact copy and a 0.76 near-match deserve different arguments. Noticing
+      that source identity is the adversary's knob is the v5 shell-company
+      attack arriving early.
+  - text: |
+      Pick the policy first - earliest publication, since doc_417 predates the
+      camera-ready by four months - and record only what it needs: the
+      representative and the winning member's date. Recording the rest is
+      speculative schema for policies you have decided against.
+    misconception: D9
+    explain: |
+      This welds the policy into the corpus. The design requirement is that
+      the payout rule be changeable without retraining, which is only true if
+      the model is a function of the representative alone and payout a
+      function of a cluster table that survives every policy. Discard the
+      member list and changing your mind means rerunning dedup.
+  - text: |
+      Record only the representative and its span. The cluster is resolved by
+      construction - one document's tokens enter the corpus - so the members
+      are no longer part of the corpus and have nothing to be paid for. Equal
+      split is wrong here simply because a scraped mirror should never be paid.
+    misconception: D9
+    explain: |
+      Dedup as hygiene. Whatever the model learns from that passage is
+      credited entirely to whoever holds the representative, and every later
+      measurement - leave-one-source-out, Shapley, influence - inherits that
+      accident of shard order. The member list is the entire novel
+      contribution and it costs one table.
+  - text: |
+      Sidestep the policy question by keeping all four documents in the corpus
+      and tagging each with its own source, so credit follows the tokens
+      directly and no cluster table is needed.
+    misconception: D9
+    explain: |
+      Training on four copies quadruples the passage's effective weight and
+      makes it extractable (v6), so it is a worse corpus and a worse
+      attribution substrate at once. You have not avoided the credit decision,
+      you have made it by multiplicity.
+check: choice
 ```
 
 Two structural notes for the build, both pure systems work.
@@ -876,9 +908,6 @@ packing in the next section.
 id: v2-b6
 type: completion
 concept: d-tokenizer-training
-# variants: blank the chars/token column instead, giving token counts; or add a
-# third row at 5.6 chars/token (a 65K vocabulary) and ask for the marginal gain
-# over the 4.8 row.
 prompt: |
   Your corpus is 3.6e9 characters of paper text. You measure three
   tokenizers on a held-out slice of it.
@@ -887,32 +916,53 @@ prompt: |
     B: domain-trained 16K vocabulary       4.5 chars/token -> ____ tokens
     C: domain-trained 32K vocabulary       4.8 chars/token -> ____ tokens
 
-  Fill the three blanks. Then: state the percentage reduction in token count
-  from A to C, and state in one sentence why the gain from B to C is much
-  smaller than the gain from A to B even though the vocabulary doubled.
-answer: |
-  A: 3.6e9 / 3.6 = 1,000,000,000 tokens
-  B: 3.6e9 / 4.5 =   800,000,000 tokens
-  C: 3.6e9 / 4.8 =   750,000,000 tokens
-
-  Reduction A to C: (1,000 - 750) / 1,000 = 25%.
-
-  Why B to C is small: BPE merges in frequency order, so the first few
-  thousand merges absorb the highest-frequency sequences and capture most of
-  the available compression. Everything after that is progressively rarer
-  material, and each doubling of the vocabulary buys a thinner slice of the
-  frequency tail. The gain in characters per token is roughly logarithmic in
-  vocabulary size while the embedding table cost is linear in it.
-rubric: |
-  Required, exactly: 1,000,000,000; 800,000,000; 750,000,000; 25%.
-  The one-sentence answer must contain diminishing returns tied to
-  frequency-ordered merges - accept "the common merges are found first" or
-  "the tail is rare" in any wording.
-  All numbers correct AND the diminishing-returns reason = pass.
-  Numbers correct but the explanation says the larger vocabulary is simply
-  better and the measurement is noise = fail, diagnosing V2-M3.
-  Computing 3.6e9 x 3.6 instead of dividing = fail; the units are the point.
-check: llm
+  Which filling of the three blanks, with the reduction from A to C and the
+  reason B to C gains so much less than A to B, is correct?
+options:
+  - text: |
+      1,000,000,000; 800,000,000; 750,000,000. Reduction A to C is
+      (1000 - 750)/1000 = 25%. B to C gains little because BPE merges in
+      frequency order: the first few thousand merges absorb the
+      highest-frequency sequences and capture most of the available
+      compression, so each doubling of $V$ buys a thinner slice of the
+      frequency tail - roughly logarithmic gain against a table cost linear
+      in $V$.
+    correct: true
+    explain: |
+      Right. 3.6e9 divided by chars-per-token gives tokens, and the
+      diminishing return is a property of the merge ordering, not of the
+      measurement.
+  - text: |
+      1,000,000,000; 800,000,000; 750,000,000. Reduction A to C is 25%. B to C
+      gains little only because 32K is still too small; the trend would
+      continue if you kept doubling, so the largest vocabulary you can afford
+      is the right one.
+    misconception: V2-M3
+    explain: |
+      Arithmetic right, lesson missed. The gain is logarithmic in $V$ while
+      the embedding table $V \times d_{model}$ is linear, and on a fixed small
+      corpus the extra rows see too few updates to train. Optimal vocabulary
+      shrinks when you are data-bottlenecked.
+  - text: |
+      12,960,000,000; 16,200,000,000; 17,280,000,000. The token count is
+      characters times chars-per-token, so C produces the most tokens and the
+      change from A to C is a 33% increase - which is the point, since more
+      tokens is more training signal.
+    misconception: V2-M3
+    explain: |
+      The units invert the relationship. Chars per token is a ratio you divide
+      by: better compression means FEWER tokens for the same text, which is
+      what cuts the bill, since training cost scales with token count.
+  - text: |
+      1,000,000,000; 800,000,000; 750,000,000. Reduction A to C is 6.25%,
+      measured from B to C, and the B-to-C gain is small because held-out
+      chars-per-token measurements are noisy at this corpus size.
+    misconception: V2-M3
+    explain: |
+      The reduction asked for is A to C: (1000 - 750)/1000 = 25%. And the
+      shrinking gain is structural, not noise - merges are chosen in frequency
+      order, so the tail is progressively rarer by construction.
+check: choice
 ```
 
 <!-- refutes: V2-M3 -->
@@ -1061,46 +1111,57 @@ prompt: |
   descending and use a bin-packing heuristic to minimize padding, which raises
   token utilization from 94% to 99.4%.
 
-  Before reading on: state what this costs you, in attribution terms, and what
-  one-line change to the manifest would make the cost recoverable rather than
-  fatal.
-answer: |
-  What it costs: which documents share a sequence is now determined by their
-  LENGTHS, and length correlates with source. Papers from one venue have
-  similar page limits; a source of short abstracts will have its documents
-  systematically co-packed with other short documents. Sequence composition is
-  no longer random with respect to source, so any per-sequence statistic
-  computed later - gradient norms, in-run Shapley contributions, loss by
-  sequence - carries a source-correlated confound introduced by the packer.
-
-  Masking prevents the sources from contaminating each other's attention, so
-  the input is still clean. The problem is at the batch and measurement level,
-  not the attention level.
-
-  The recoverable-vs-fatal change: the manifest must record, per training
-  sequence, the ordered list of (doc_id, source_id, start, length) spans it
-  contains. With that, any later analysis can condition on sequence
-  composition, test whether a measured effect survives it, or restrict to
-  single-source sequences. Without it, the confound is unmeasurable and you
-  have to retrain to find out whether it mattered.
-
-  Worth noticing: 94% to 99.4% utilization is a 5.7% saving on a bill this
-  unit already cut 16.7% off with a one-minute tokenizer job. The optimization
-  is real and small; the confound it introduces is unbounded.
-rubric: |
-  Must contain: (1) length-based packing correlates sequence composition with
-  source identity, (2) masking does not fix this because the problem is which
-  documents are co-batched, not what attends to what, (3) the manifest must
-  record per-sequence document/source composition so the confound is at least
-  measurable.
-  (1) and (3) = pass. (2) upgrades to full credit.
-  An answer stating that intra-document masking makes packing order irrelevant
-  = fail, diagnosing V2-M4 in its subtler form: masking fixes the input, not
-  the sampling.
-  An answer that rejects the optimization outright without naming what would
-  make it acceptable = partial; the design skill being tested is making a
-  confound recordable, not avoiding all confounds.
-check: llm
+  Before reading on, commit: which prediction about what this costs, and what
+  one-line manifest change makes the cost recoverable rather than fatal, is
+  right?
+options:
+  - text: |
+      Which documents share a sequence is now decided by LENGTH, and length
+      correlates with source (page limits by venue, a source of short
+      abstracts co-packed with other short documents), so any per-sequence
+      statistic later carries a source-correlated confound the packer
+      introduced. Masking does not help: the problem is which documents are
+      co-batched, not what attends to what. Record per training sequence the
+      ordered (doc_id, source_id, start, length) spans, and the confound
+      becomes conditionable instead of invisible.
+    correct: true
+    explain: |
+      Right, including the part that masking cleans the input and not the
+      sampling. And the trade is lopsided: 5.7% utilization against an
+      unbounded confound, on a bill this unit already cut 16.7% with a
+      one-minute tokenizer job.
+  - text: |
+      It costs nothing. Intra-document causal masking makes a packed sequence
+      behave exactly like the concatenation of independent shorter sequences,
+      so which documents land together is invisible to the model and
+      therefore to any measurement built on it; take the 99.4%.
+    misconception: V2-M4
+    explain: |
+      Masking fixes the input, not the sampling. No token attends across a
+      boundary, true - but a per-sequence gradient still sums whatever
+      documents the packer put in that sequence, and now the packer chose them
+      by a length that tracks source identity.
+  - text: |
+      The cost is that gradients will flow from one source's loss through
+      attention placed on another source's tokens, blending the attribution
+      unit; the fix is to record which sequences are mixed so those can be
+      excluded from gradient-based analysis.
+    misconception: V2-M4
+    explain: |
+      That is the unmasked failure, and masking already forbids it here. The
+      remaining damage is statistical - sequence composition correlated with
+      source - and the answer is to record composition for every sequence, not
+      just the mixed ones, so any effect can be tested against it.
+  - text: |
+      Reject the optimization: any packing order that is not uniformly random
+      destroys attribution, so 94% utilization with random packing is the only
+      defensible configuration.
+    misconception: V2-M4
+    explain: |
+      Too blunt, and it skips the design skill being tested. A confound you
+      have recorded per sequence is one a later analysis can condition on;
+      the failure is an unrecorded confound, not a nonrandom packer.
+check: choice
 ```
 
 ## The provenance manifest
@@ -1167,8 +1228,6 @@ harmless.
 id: v2-b9
 type: completion
 concept: d-mixing-packing
-# variants: blank the sequence indices and give the positions; or change L to
-# 1024 and ask for the change in the boundary-sequence fraction.
 prompt: |
   Same shard, same $L = 2048$. doc_3 sits at offset 62,000 with length 30,500.
 
@@ -1178,34 +1237,59 @@ prompt: |
     last sequence         = floor(____ / 2048)         = 45
     position within it    = ____ - (45 x 2048)         = 339
 
-  Fill the five blanks. Then state how many sequences doc_3 spans, and how
-  many of those are boundary sequences shared with another document.
-answer: |
-  last token position = 92,499
-  first sequence      = 30            (30 x 2048 = 61,440; 31 x 2048 = 63,488)
-  position within it  = 62,000 - (30 x 2048) = 560
-  last sequence       = floor(92,499 / 2048) = 45   (45 x 2048 = 92,160)
-  position within it  = 92,499 - 92,160 = 339
-
-  doc_3 spans sequences 30 through 45, which is 16 sequences.
-
-  Boundary sequences: two. Sequence 30 is shared with doc_2, whose last token
-  is at position 61,999 - sequence 30 begins at 61,440, so it holds doc_2's
-  last 560 tokens and then doc_3. Sequence 45 holds doc_3's tail and then
-  padding to the end of the shard, since doc_3 is the last document in shard
-  0. Whether you count a padding boundary as a shared sequence is a
-  convention; what matters is that the manifest records the composition either
-  way.
-rubric: |
-  Required, exactly: 92,499; 30; 30; 92,499; 92,499. Span = 16 sequences.
-  Boundary count = 2, or 1 with an explicit argument that the trailing
-  padding boundary does not share with another document. Accept either.
-  All five blanks plus the span = pass.
-  Computing the span as 45 - 30 = 15 = fail: it is an inclusive range,
-  45 - 30 + 1 = 16. This off-by-one is the most common error in the whole
-  manifest and it silently drops a sequence from every document.
-  Using ceiling instead of floor anywhere = fail.
-check: llm
+  Which filling of the five blanks is right, and what does it say about how
+  many sequences doc_3 spans and how many of those are shared with another
+  document?
+options:
+  - text: |
+      92,499; 30; 30; 92,499; 92,499. doc_3 spans sequences 30 through 45,
+      which is 16 sequences, two of which are boundary sequences shared with a
+      neighbour (sequence 30 with doc_2, sequence 45 with the shard's trailing
+      padding).
+    correct: true
+    explain: |
+      Right. $30 \times 2048 = 61{,}440$ and $31 \times 2048 = 63{,}488$, so
+      the first sequence is 30 and the position within it is
+      $62{,}000 - 61{,}440 = 560$. The last token is at $92{,}499$, and
+      $45 \times 2048 = 92{,}160$, giving position $339$. The range 30 to 45 is
+      inclusive: $45 - 30 + 1 = 16$. Sequence 30 begins at 61,440 and holds
+      doc_2's last 560 tokens before doc_3 starts.
+  - text: |
+      92,499; 30; 30; 92,499; 92,499. doc_3 spans $45 - 30 = 15$ sequences,
+      two of which are boundary sequences shared with a neighbour.
+    misconception: V2-M4
+    explain: |
+      The blanks are right and the span is not. $45 - 30$ counts the gaps
+      between sequence indices, not the sequences themselves; the range is
+      inclusive, so it is $45 - 30 + 1 = 16$. This off-by-one is the most
+      common error in the whole manifest, and because it drops one sequence
+      from every document's record it never shows up as a crash - exactly the
+      kind of silent bookkeeping damage that treating packing as plumbing
+      invites.
+  - text: |
+      92,499; 31; 31; 92,499; 92,499. doc_3 begins partway through a sequence,
+      so it is counted from sequence 31 and spans 31 through 45, which is 15
+      sequences.
+    misconception: V2-M4
+    explain: |
+      This rounds up where the arithmetic floors. $31 \times 2048 = 63{,}488$,
+      which is past offset 62,000 entirely - the given anchor
+      $62{,}000 - (\_\_ \times 2048) = 560$ can only be satisfied by 30. A
+      document's first sequence is the one its first token lands in, partway
+      through or not, and that is $\lfloor \text{offset} / L \rfloor$.
+  - text: |
+      92,499; 30; 30; 92,499; 92,499. doc_3 spans 16 sequences and none of
+      them are shared: the separator token written between documents closes
+      doc_2 out, so sequence 30 contains only doc_3.
+    misconception: V2-M4
+    explain: |
+      The blanks are right; the boundary claim is not. Sequence 30 covers
+      shard positions $[61{,}440,\ 63{,}488)$, and doc_2's last token sits at
+      61,999 - so 560 tokens of doc_2 are physically in that sequence, whatever
+      separator was written between them. A separator marks a boundary; it does
+      not split a sequence. That is why intra-document masking exists and why
+      the manifest has to record per-sequence composition.
+check: choice
 ```
 
 **Determinism.** The manifest is only useful if the training run is
@@ -1295,59 +1379,64 @@ prompt: |
   as the representative. doc_101 lands at shard 3, offset 44,100, length
   9,800.
 
-  In v4 you will retrain the model with Northlake Preprints removed and
-  measure the change in held-out loss. State exactly what the manifest and
-  cluster table must contain for that experiment to be well defined, and state
-  what goes wrong if the cluster table records only the representative.
-
-  Answer from the design alone - do not describe what your pipeline currently
-  does.
-answer: |
-  What must be recorded:
-
-  - the manifest row for doc_101: (shard 3, offset 44,100, length 9,800),
-    source_id = Journal of Text Systems, cluster_id = c;
-  - the cluster table row for c: representative = doc_101, members =
-    [(doc_417, Northlake Preprints, similarity), (doc_101, Journal of Text
-    Systems, 1.0)], and the credit policy in force;
-  - enough to reconstruct the removal set: for "remove Northlake Preprints,"
-    the set of token spans to drop must be computed as the union of (a) all
-    manifest rows with source_id = Northlake, and (b) a decision about
-    clusters where Northlake is a member but not the representative.
-
-  Why (b) is the whole question. Removing Northlake means removing what
-  Northlake contributed. doc_101's tokens ARE the content doc_417 contributed,
-  under a different owner's label. Two defensible experiments exist and they
-  answer different questions: drop only rows tagged Northlake (measuring "what
-  does this source's exclusive content add") or additionally drop
-  representatives of clusters Northlake belongs to (measuring "what does this
-  source's total content add, including what someone else also has"). They
-  give different numbers and both are legitimate; the leave-one-out delta is
-  only well defined once you say which one you ran.
-
-  What goes wrong if only the representative is recorded: option (b) is not
-  computable, because nothing anywhere says Northlake ever had that passage.
-  The measurement silently becomes option (a) while being reported as "the
-  contribution of Northlake Preprints," and the difference between those two
-  is money. Worse, it is undetectable after the fact - the corpus contains no
-  trace of the merge - so no audit of the trained model or the shards can
-  recover it. It is only recoverable by rerunning dedup, which means rerunning
-  everything downstream.
-rubric: |
-  Must contain: (1) the manifest span plus source_id plus cluster_id for the
-  representative, (2) the cluster member list carrying doc_417's source_id,
-  (3) recognition that "remove source k" is ambiguous for clusters where k is
-  a non-representative member, and that the two readings give different
-  numbers, (4) that without the member list the ambiguity is resolved silently
-  rather than deliberately.
-  (2) and (3) = pass; (3) is the load-bearing one.
-  An answer that treats leave-one-source-out as unambiguous = fail, diagnosing
-  D9: the learner still sees dedup as hygiene, so removing a source looks like
-  a simple filter on source_id.
-  An answer that proposes keeping both copies in the corpus to sidestep the
-  problem = fail; it doubles the passage's training weight and changes the
-  model being measured, which is a different experiment.
-check: llm
+  In v4 you will retrain with Northlake Preprints removed and measure the
+  change in held-out loss. Which account of what the manifest and cluster
+  table must hold for that experiment to be well defined is right?
+options:
+  - text: |
+      The manifest row for doc_101 - (shard 3, offset 44,100, length 9,800),
+      source_id = Journal of Text Systems, cluster_id = c - plus a cluster row
+      for c whose member list carries doc_417 WITH its source_id. Without that
+      member list, "remove Northlake" silently means "drop rows tagged
+      Northlake", when it could also mean "drop those rows and the
+      representatives of clusters Northlake belongs to". The two give different
+      numbers and both are legitimate; the delta is only defined once you say
+      which you ran.
+    correct: true
+    explain: |
+      Right, and (3) is the load-bearing part: doc_101's tokens ARE the content
+      doc_417 contributed, carrying a different owner's label. One reading
+      measures Northlake's exclusive content, the other its total content
+      including what someone else also holds. With only the representative
+      recorded, the second reading is not computable and the first is reported
+      as if it were the whole answer - undetectable afterwards, since the corpus
+      keeps no trace of the merge.
+  - text: |
+      Only the manifest span and source_id are needed. Removing a source is a
+      filter: drop every row whose source_id is Northlake Preprints and
+      retrain. doc_101 belongs to the Journal, so it stays, and the cluster
+      table is a maintenance record with no bearing on the experiment.
+    misconception: D9
+    explain: |
+      This is dedup-as-hygiene. The survivor of a duplicate cluster was chosen
+      by shard iteration order, and that choice moved a passage's credit from
+      Northlake to the Journal. Filtering on source_id therefore measures
+      Northlake minus whatever the pipeline happened to reassign - a quantity
+      set by iteration order, reported as the source's contribution.
+  - text: |
+      Sidestep it: keep both doc_417 and doc_101 in the corpus so each source's
+      content is present under its own label, and then removing Northlake is
+      unambiguous because nothing was ever merged away.
+    misconception: D9
+    explain: |
+      This changes the model rather than defining the measurement. Training on
+      both copies doubles that passage's effective weight and makes it far more
+      extractable (v6), so the leave-one-out delta you measure belongs to a
+      different corpus than the one you ship. Dedup still has to happen; what
+      has to change is that the cluster is recorded rather than resolved.
+  - text: |
+      Record the representative and its cluster's similarity scores. Membership
+      detail is not needed, because a merge large enough to matter would show
+      up as an anomaly in the leave-one-out delta itself - the delta is a stable
+      property of the corpus, so run it and inspect the number.
+    misconception: D16
+    explain: |
+      The delta is not stable enough to serve as its own audit. Seed and data
+      order alone can swing a source's marginal contribution by more than its
+      own magnitude, so a mis-assigned cluster is indistinguishable from run
+      noise in the output. The ambiguity has to be resolved in the schema,
+      before the run, not read back out of the result.
+check: choice
 ```
 
 ## Notation in this unit

@@ -16,81 +16,82 @@
 pretest:
   - id: u4-p1
     concept: c-mha
+    kind: mcq
     prompt: |
       A transformer block has $d = 1024$ and 16 attention heads. An engineer
       reconfigures it to 4 heads, leaving $d = 1024$ and everything else
-      unchanged. State what happens to (a) the number of parameters in the
-      attention sublayer and (b) what the model can express, and give your
-      reasoning for each.
-    answer: |
-      (a) Nothing. The attention sublayer is four $1024 \times 1024$ matrices
-      ($W^Q, W^K, W^V, W^O$) = $4d^2 = 4{,}194{,}304$ parameters at 16 heads
-      and at 4 heads. Head count only decides how those matrices' columns are
-      sliced.
-      (b) Expressiveness changes in a specific trade: 4 heads means 4
-      simultaneous attention distributions per query position instead of 16,
-      but each head's score-forming and output circuits now have rank up to
-      $d_k = 256$ instead of 64. Fewer, more expressive read patterns.
-    check: llm
-    rubric: |
-      (a) Pass requires "unchanged". Any answer that scales parameters with
-      head count is U4M1 and is the expected pretest failure - record it.
-      (b) Pass requires naming the count-versus-rank trade in some form
-      (fewer simultaneous attention patterns, each wider/higher-rank).
-      Answers that only say "fewer heads means less specialization" are
-      partial. Expect most learners to fail (a) confidently; that confidence
-      is the calibration datum.
+      unchanged. Which statement about the attention sublayer after the change
+      is correct?
+    options:
+      - text: "The parameter count is unchanged at $4d^2 = 4{,}194{,}304$; the block now forms 4 attention distributions per query position instead of 16, each with rank up to $d_k = 256$ instead of 64."
+        correct: true
+        explain: "$W^Q, W^K, W^V, W^O$ are $1024 \\times 1024$ at any head count; $h$ only sets how their columns are sliced. The trade is count of simultaneous patterns against per-head rank."
+      - text: "The parameter count drops by 4x, to $1{,}048{,}576$, because each head carries its own $W^Q, W^K, W^V$ and there are now a quarter as many heads."
+        misconception: U4M1
+        explain: "This is the replication model of heads. Heads are not copies: the four projection matrices stay $d \\times d$ and are sliced into $h$ contiguous blocks of width $d_k = d/h$, so the count is $4d^2$ either way."
+      - text: "The parameter count is unchanged, but expressiveness is unchanged too, since the same matrices with the same entries are applied to the same input."
+        misconception: U4M1
+        explain: "The count is right and the conclusion is wrong. The slicing decides how many separate softmax rows a query position gets: 4 mixing distributions rather than 16, at width 256 rather than 64. Same weights, different computation."
+      - text: "The parameter count is unchanged, but the model loses expressiveness outright, because 12 of the specialised heads (previous-token, subject-verb, and so on) no longer exist."
+        misconception: U4M1
+        explain: "Head specialisation is an emergent consequence of having several restricted read/write channels, not a fixed inventory of functions that is deleted. Fewer heads means fewer simultaneous patterns but each one higher-rank - a trade, not a pure loss."
+      - text: "The parameter count rises, because $d_k$ grows from 64 to 256 and each head's projection is $d \\times d_k$."
+        misconception: U4M1
+        explain: "Per-head projections are $d \\times d_k$, but there are $h$ of them: $h \\cdot d \\cdot d_k = h \\cdot d \\cdot d/h = d^2$ per projection regardless of $h$. Widening the heads is exactly compensated by having fewer."
+    check: choice
 
   - id: u4-p2
     concept: c-residual
+    kind: mcq
     prompt: |
-      You have a trained 24-block transformer. At inference time, you delete
-      block 12 entirely - the tensor for it is gone, the forward pass goes
-      straight from block 11 to block 13. Predict, concretely, what the model
-      outputs: fluent text, degraded text, or noise? Justify your prediction
-      from the block equation
-      $y = h + \mathrm{MLP}(\mathrm{Norm}(h))$, $h = x + \mathrm{MHA}(\mathrm{Norm}(x))$.
-    answer: |
-      Fluent text, measurably worse - typically a few percent on downstream
-      task accuracy, with the text staying coherent. The block equation is
-      additive: the stream arriving at block 13 is the embedding plus the 46
-      updates written by blocks 1-11 rather than 48. Nothing was in transit
-      between blocks 11 and 13 that block 12 was supposed to transform;
-      block 13 reads the stream, not block 12's output. Deleting a
-      block removes two terms from a sum, not a stage from a pipeline.
-    check: llm
-    rubric: |
-      Pass requires predicting graceful degradation AND grounding it in the
-      additive structure (a sum of updates, blocks read the stream not each
-      other). Predicting noise/garbage because "block 13 receives the wrong
-      stage's input" is M8 - the expected pretest failure, and worth flagging
-      explicitly in feedback since the whole of section 6 refutes it.
-      Predicting "no change at all" is also wrong (over-correction) but is a
-      less common and less costly error.
+      You have a trained 24-block transformer. At inference time you delete
+      block 12 entirely - its tensors are gone and the forward pass goes
+      straight from block 11 to block 13. Given
+      $h = x + \mathrm{MHA}(\mathrm{Norm}(x))$ and
+      $y = h + \mathrm{MLP}(\mathrm{Norm}(h))$, which outcome and reason are
+      correct?
+    options:
+      - text: "Fluent but measurably degraded text - a few percent on downstream accuracy - because the deletion removes 2 of 48 additive updates from a stream that blocks 13-24 read directly."
+        correct: true
+        explain: "Both sublayers add to a persistent stream, so $x_{24}$ is the embedding plus a sum of updates. Removing two terms perturbs that sum slightly; nothing downstream was reading block 12's output as its input."
+      - text: "Noise, because block 13's weights were fitted to consume block 12's output and now receive an activation from the wrong pipeline stage."
+        misconception: M8
+        explain: "This is the pipeline reading of a residual stack. Block 13 reads the residual stream through its own projections, not block 12's output; the stream still carries everything blocks 1-11 wrote."
+      - text: "Noise, because the residual connections exist to carry gradients during training and cannot repair a missing block at inference."
+        misconception: M8
+        explain: "The gradient-highway story is true but secondary. At inference the residual additions are the mechanism by which the stream persists, which is precisely why a missing middle block degrades gracefully."
+      - text: "No measurable change at all, because the residual path $x + \\mathrm{Sublayer}(x)$ means every block's contribution is optional."
+        explain: "An over-correction. Block 12's two updates were fitted to be useful; deleting them costs real quality, typically a few percent. Graceful is not free."
+        misconception: M8
+      - text: "Fluent text with no loss on any task, because the remaining 23 blocks re-normalize the stream and absorb the missing contribution."
+        misconception: M7
+        explain: "Normalization sits on each block's branch and discards magnitude; it does not reconstruct information that was never written. And in a pre-LN model the main path is untouched addition, so there is nothing to absorb the loss."
+    check: choice
 
   - id: u4-p3
     concept: c-layernorm
+    kind: mcq
     prompt: |
-      You load a trained model in full fp32 - no possibility of fp16
-      overflow - and delete every LayerNorm operation from the forward pass,
-      leaving all other weights untouched. Predict the output quality and
-      state the reason. Then answer: would running in fp64 instead change
-      your prediction?
-    answer: |
-      Garbage output, immediately, and fp64 changes nothing. LayerNorm is not
-      protecting against float range; it enforces a scale contract. Every
-      downstream weight matrix was fitted against normalized inputs, and the
-      residual stream's magnitude grows with depth, so without the norm each
-      block receives vectors in units it was never trained on. Nothing
-      overflows - the numbers are wrong by a depth-dependent factor.
-    check: llm
-    rubric: |
-      Pass requires BOTH "output is garbage" AND "precision is irrelevant".
-      Predicting that fp32/fp64 makes removal safe - or that the output would
-      be only slightly off - is M7, the expected pretest failure. Partial
-      credit for predicting garbage without being able to say why. An answer
-      citing "the weights were trained with it so you cannot remove it"
-      passes only if it also rejects the precision framing.
+      You load a trained model in full fp32 - no possibility of fp16 overflow -
+      and delete every LayerNorm operation from the forward pass, leaving all
+      other weights untouched. Which prediction is correct?
+    options:
+      - text: "Garbage output immediately, and running in fp64 would change nothing: every downstream matrix was fitted against normalized inputs and the residual stream's magnitude grows with depth."
+        correct: true
+        explain: "Normalization enforces a learned scale contract, not a float-range guard. Nothing overflows; the vectors are simply in units no downstream weight was trained on, at any precision."
+      - text: "Output is essentially unchanged, because fp32 has range $\\pm 3.4 \\times 10^{38}$ and normalization exists to keep activations from overflowing."
+        misconception: M7
+        explain: "This is the numerical-stability model. It predicts a cheap experiment that has been run: drop the norms in fp32 and the model emits garbage with nothing anywhere near overflow."
+      - text: "Output degrades slightly in fp32 and would be fully restored in fp64, since the remaining error is accumulated rounding in the unnormalized stream."
+        misconception: M7
+        explain: "Same float-range framing one step softer. The failure is a depth-dependent scale mismatch of order the stream's growth, not rounding; extra mantissa bits address neither."
+      - text: "Output is unchanged at batch size 1 and degrades only for larger batches, since without the norm the examples in a batch no longer share statistics."
+        misconception: U4M7
+        explain: "LayerNorm and RMSNorm compute statistics across the $d$ features of a single token vector - never across the batch. There is no cross-example coupling to lose."
+      - text: "Output is garbage in fp32 but would be fine in fp64, because the deeper layers' activations exceed fp32's precision once nothing rescales them."
+        misconception: M7
+        explain: "Precision is irrelevant here. $\\mathrm{LN}(au) = \\mathrm{LN}(u)$ for $a > 0$: a device whose defining property is that magnitude is discarded is not a magnitude-management device, and restoring it is what the model needs, not more bits."
+    check: choice
 
 check:
   - id: u4-q1
@@ -100,26 +101,11 @@ check:
     callback_eligible: true
     prompt: |
       Model configuration: $d = 4096$, $h = 32$ query heads, standard
-      multi-head attention, no biases. Show the parameter count for the
-      attention sublayer step by step, then state what the count would be at
-      $h = 8$ and at $h = 64$, and give the one-sentence reason.
-    answer: |
-      $d_k = 4096/32 = 128$.
-      $W^Q$: $4096 \times 4096 = 16{,}777{,}216$.
-      $W^K$: $16{,}777{,}216$. $W^V$: $16{,}777{,}216$. $W^O$: $16{,}777{,}216$.
-      Total $= 4d^2 = 67{,}108{,}864$.
-      At $h = 8$: $67{,}108{,}864$. At $h = 64$: $67{,}108{,}864$. The head
-      count only sets $d_k = d/h$, which determines how the four fixed
-      $d \times d$ matrices are sliced into per-head blocks - it never
-      changes their shapes.
-    check: llm
-    rubric: |
-      MUST contain: (1) all four matrices named as $d \times d$; (2) total
-      67,108,864 or "4d^2"; (3) both alternative head counts giving the SAME
-      total; (4) the reason stated as slicing/partitioning fixed matrices.
-      All four = pass. Missing (4) but correct on (3) = partial. Any answer
-      whose total scales with h is U4M1 - fail, and route to canon section 2.
-      An answer that adds 4d (norm gains) or biases is not penalized.
+      multi-head attention, no biases. The attention sublayer's four matrices
+      $W^Q, W^K, W^V, W^O$ are each $d \times d$. How many parameters does the
+      attention sublayer hold at $h = 64$? Give the number.
+    answer: "67108864"
+    check: numeric(0)
     difficulty: warmup
 
   - id: u4-q2
@@ -288,94 +274,64 @@ check:
 
   - id: u4-q6
     concept: c-mlp-block
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
       The MLP can be written exactly as
-      $\mathrm{MLP}(u) = \sum_{i=1}^{d_{ff}} \sigma(u \cdot k_i)\, v_i$,
-      where $k_i$ is column $i$ of the up-projection and $v_i$ is row $i$ of
-      the down-projection. A colleague concludes: "so the model is a
-      key-value store of facts, and hallucination is a cache miss returning
-      corrupted data - we should be able to fix it by storing more facts."
-      State (a) which part of their claim the equation supports, (b) the
-      specific prediction their model makes that is false, and (c) what is
-      actually happening.
-    answer: |
-      (a) The algebra is exact: $u \cdot k_i$ is a match score, $\sigma$
-      makes it a nonnegative coefficient, and the output is a
-      coefficient-weighted sum of $d_{ff}$ stored vectors. Soft associative
-      memory is a fair reading.
-      (b) A store predicts a miss for an absent key - an empty result, a
-      refusal, some signal of absence. What happens instead is a fluent,
-      specific, confident wrong answer. There is also no row to miss: single
-      neurons are polysemantic and features sit in overlapping non-orthogonal
-      directions (superposition), so ablating one neuron degrades many
-      behaviours slightly rather than deleting one fact.
-      (c) The dot product is continuous, so every $k_i$ returns some score
-      and near-misses return substantial ones; the output is a blend of the
-      values of related patterns. That blending is exactly what lets the
-      model answer questions phrased in ways it never saw. Generalization and
-      hallucination are the same mechanism evaluated at different distances
-      from a training-dense region, so "store more facts" cannot remove one
-      without removing the other.
-    check: llm
-    rubric: |
-      MUST contain: (1) acknowledgement that the key-value algebra is exact,
-      not a metaphor; (2) the failing prediction stated as "a lookup would
-      miss / return nothing, but the model returns confident fluent output";
-      (3) the identification of generalization and hallucination as one
-      mechanism. All three = pass. (3) is mandatory: an answer that treats
-      hallucination as a fixable retrieval defect is M4 uncorrected and
-      fails regardless of the rest. An answer that rejects the key-value
-      framing outright also fails - the algebra is exact and the error is the
-      "rows" reading, not the analogy. Superposition/polysemanticity earns
-      credit but is not required.
+      $\mathrm{MLP}(u) = \sum_{i=1}^{d_{ff}} \sigma(u \cdot k_i)\, v_i$, where
+      $k_i$ is column $i$ of the up-projection and $v_i$ is row $i$ of the
+      down-projection. A colleague concludes: "so the model is a key-value
+      store of facts, and hallucination is a cache miss returning corrupted
+      data - we should be able to fix it by storing more facts." Which
+      assessment is correct?
+    options:
+      - text: "The algebra is exact, but the claim fails: a store would return a miss for an absent key, whereas the model returns a fluent confident answer, because $u \\cdot k_i$ is continuous and near-misses blend related $v_i$ - the same operation as generalization."
+        correct: true
+        explain: "Soft associative memory is a fair reading of the sum. The error is the 'rows' reading: interpolation between stored patterns is what answers unseen questions and what hallucinates, so more capacity cannot remove one without the other."
+      - text: "The claim is right: each $(k_i, v_i)$ is a stored row, a bigger $d_{ff}$ holds more facts, and hallucination is what happens when the query misses every row."
+        misconception: M4
+        explain: "A lookup table returns nothing for an absent key. Models instead produce specific confident wrong answers - a successful soft match on near-misses, not a failed retrieval - and single neurons are polysemantic, so there is no row to miss."
+      - text: "The key-value framing is wrong from the start: $\\sigma(u \\cdot k_i)$ is just a nonlinearity, the MLP is plumbing that keeps the stack from collapsing to one linear map, and no memory reading of it is legitimate."
+        misconception: U4M5
+        explain: "The sum-over-$i$ form is an algebraic identity, not a metaphor, and probing does find $k_i$ that fire on legible patterns. The MLP also holds two thirds to four fifths of the block's parameters - it is not plumbing."
+      - text: "The algebra is exact and hallucination is a miss, but the fix is retrieval rather than more parameters: give the model an external store to consult when no $k_i$ matches."
+        misconception: M4
+        explain: "This keeps the failing prediction and changes only the remedy. There is no 'no $k_i$ matches' state to detect: every key returns some coefficient, and the blend that results is the same mechanism that generalizes."
+      - text: "The algebra is exact, and hallucination is a separate defect from generalization: blending near-miss values is a bug in $\\sigma$ that a sharper nonlinearity would remove while leaving generalization intact."
+        misconception: M4
+        explain: "Sharpening the match toward a hard lookup removes exactly the interpolation that lets the model answer questions phrased in ways it never saw. Generalization and hallucination are one map evaluated at different distances from training-dense regions."
     difficulty: core
+    check: choice
 
   - id: u4-q7
     concept: c-residual
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      Layer-pruning tools ship a recipe: "drop 25% of the middle blocks from
-      a 32-block model, then briefly fine-tune; expect a few points of
-      quality loss." Explain from the block equation why this recipe works at
-      all, and then explain why the same recipe applied to the first two
-      blocks or the last two blocks does not.
-    answer: |
-      Unrolling the pre-LN block equation gives
-      $x_L = e(t) + p(t) + \sum_{l}(\mathrm{MHA}_l + \mathrm{MLP}_l)$: the
-      final representation is the embedding plus $2L = 64$ additive updates
-      to a persistent $d$-wide residual stream. Deleting 8 middle blocks
-      removes 16 terms from a sum of 64 and leaves every other term intact.
-      Later blocks read the stream, not the deleted block's output, so their
-      inputs are only slightly perturbed - there is no pipeline stage to be
-      out of sync.
-      The ends are different. Early blocks write the low-level features that
-      every later block's read projections ($W^Q, W^K, W^V, W_1$) were
-      trained to find; delete them and 30 downstream blocks read empty or
-      wrong subspaces. Late blocks rotate the accumulated stream into the
-      directions the unembedding matrix reads; delete them and the stream is
-      never converted into logits the output layer can use. Neither is
-      "one more additive refinement on a stream that already has plenty."
-    check: llm
-    rubric: |
-      MUST contain: (1) the unrolled additive sum, or an equivalent statement
-      that the stream is embedding + 2L updates and nothing is overwritten;
-      (2) "removes k terms from a sum" as the reason middle pruning is
-      cheap; (3) a distinct reason for early blocks (later reads depend on
-      what they wrote) and for late blocks (conversion into unembedding-
-      readable directions). (1) and (2) are mandatory. Missing one of the two
-      end-cases = partial.
-      An answer that explains middle pruning by "redundancy from
-      overparameterization" without the additive structure = partial: right
-      conclusion, no mechanism. An answer that says pruning works because
-      residuals let gradients skip the block is M8 - fail; gradient flow is a
-      training-time property and says nothing about an inference-time
-      deletion.
+      Layer-pruning tools ship a recipe: "drop 25% of the middle blocks from a
+      32-block model, then briefly fine-tune; expect a few points of quality
+      loss." Which account of why this works in the middle but not at either
+      end is correct?
+    options:
+      - text: "Unrolled, $x_L = e(t) + p(t) + \\sum_l (\\mathrm{MHA}_l + \\mathrm{MLP}_l)$, so dropping 8 middle blocks removes 16 of 64 additive terms and later blocks still read the stream. Early blocks write the features later read projections were trained to find, and late blocks rotate the stream into the directions the unembedding reads."
+        correct: true
+        explain: "Nothing is overwritten, so a middle deletion is a perturbation of a sum. The ends are not interchangeable terms: one supplies what every later read expects, the other converts the accumulated stream into logits."
+      - text: "Residual connections let gradients skip a block, so a pruned block's absence is routed around; the ends fail because their gradients have no alternative path."
+        misconception: M8
+        explain: "Gradient flow is a training-time property and says nothing about an inference-time deletion. The inference-time fact is that each sublayer writes an additive update to a persistent stream that later blocks read directly."
+      - text: "Middle blocks are redundant copies of one another produced by overparameterization, so removing some loses nothing; the first and last blocks are the only ones doing distinct work."
+        misconception: M8
+        explain: "The conclusion is roughly right with no mechanism, and the premise is wrong: middle blocks write distinct features (entities, relations, factual associations). They prune gracefully because their contributions are terms in a sum, not because they duplicate each other."
+      - text: "Pruning works anywhere in the stack, ends included, provided you fine-tune afterwards, since the surviving blocks re-learn the missing computation."
+        misconception: M8
+        explain: "Empirically the ends are not droppable at acceptable cost. Deleting block 1 corrupts the input to all 31 downstream read projections, and deleting the last blocks leaves the stream in directions the unembedding cannot read."
+      - text: "Middle pruning works because each block re-normalizes the residual stream, so the stack self-corrects for a missing contribution; the ends lack a normalization to do this."
+        misconception: U4M4
+        explain: "In a pre-LN model the norm sits on the branch, not on the main path - the stream itself is never re-normalized, and a final norm before the unembedding is needed for exactly that reason. The graceful degradation comes from additivity, not from renormalization."
     difficulty: core
+    check: choice
 
   - id: u4-q8
     concept: c-residual
@@ -432,47 +388,31 @@ check:
 
   - id: u4-q9
     concept: c-layernorm
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
       An engineer proposes: "LayerNorm is a numerical-stability guard. We are
       serving in fp32 where overflow is impossible, so let us strip the norm
-      layers to save two kernel launches per block." Give (a) the specific
-      experimental result that refutes this, (b) two things normalization
-      actually does, and (c) the property of LayerNorm that is most directly
-      incompatible with the stability story.
-    answer: |
-      (a) Strip them and the model emits garbage - in fp32, in fp64, at any
-      precision. Nothing overflows. The outputs are wrong because every
-      downstream weight matrix was fitted against normalized inputs, and the
-      residual stream's magnitude grows with depth, so each block receives
-      vectors in units it never trained on.
-      (b) Any two of: it gives every block a fixed operating point regardless
-      of its depth, which is what makes a stack of identical blocks
-      trainable; it conditions the gradient - its Jacobian projects out the
-      component along the current activation and scales by $1/\sigma$, so the
-      optimizer cannot get credit for making a representation merely larger
-      and must spend updates on direction; it produces implicit learning-rate
-      decay, since scale invariance makes gradients shrink as weight norm
-      grows.
-      (c) Exact scale invariance: $\mathrm{LN}(a u) = \mathrm{LN}(u)$ for any
-      $a > 0$. Multiply a preceding weight matrix by 1000 and nothing
-      downstream changes. An operation whose defining property is that
-      magnitude is irrelevant to it is not managing magnitude for safety.
-    check: llm
-    rubric: |
-      MUST contain: (1) the refutation stated as "removal breaks the model at
-      any precision / precision is irrelevant"; (2) at least one correct
-      mechanism from conditioning, depth-independent operating point, or
-      gradient decoupling; (3) scale invariance named in part (c), or an
-      equivalent argument that the operation discards magnitude by
-      construction. All three = pass; (1) is mandatory.
-      Answers citing attention-logit overflow in fp16 or softmax
-      max-subtraction as support for the engineer are M7 - fail; those are
-      real numerics, in different places, and conflating them is precisely
-      the error. Answers that say "you cannot remove any trained component"
-      without engaging the precision claim = partial.
+      layers to save two kernel launches per block." Which single fact most
+      directly refutes the proposal?
+    options:
+      - text: "The stripped model emits garbage in fp32 and in fp64 alike, with nothing overflowing, because every downstream matrix was fitted against normalized inputs while the residual stream's magnitude grows with depth."
+        correct: true
+        explain: "This is the refutation: removal breaks the model at any precision, so the failure is a broken learned scale contract, not a float-range event. Normalization sets a fixed operating point at every depth and conditions the gradient (its Jacobian projects out the component along the current activation and scales by $1/\\sigma$)."
+      - text: "The proposal is sound at fp32 but unsafe at fp16, where attention logits can overflow and softmax needs max-subtraction; keep the norms only for reduced-precision serving."
+        misconception: M7
+        explain: "Attractive because those fp16 numerics are real - but they are different operations in different places. Conflating them with LayerNorm is exactly the stability story: it predicts that fp32 removal is harmless, and fp32 removal destroys the outputs."
+      - text: "Stripping the norms lets activations grow past the fp32 maximum of about $3.4 \\times 10^{38}$ after enough blocks, so the stream eventually overflows to inf and the logits become NaN."
+        misconception: M7
+        explain: "This keeps the overflow framing and merely moves the threshold. The model degrades immediately, long before any float range is approached, and it degrades identically in fp64 where the headroom is vastly larger."
+      - text: "The saving is illusory because LayerNorm's learned $\\gamma$ and $\\beta$ are $2d$ parameters per norm, so deleting them removes a large share of the block's weights."
+        misconception: M7
+        explain: "The parameter count is right and irrelevant - $2d$ is negligible against a block's $12d^2$. Arguing from parameters concedes that the operation itself is only numerical housekeeping, which is the error under test."
+      - text: "LayerNorm cannot be removed because it computes batch statistics that inference reuses as running averages, so the block would have no calibrated mean and variance to divide by."
+        misconception: U4M7
+        explain: "LayerNorm and RMSNorm compute their mean and variance across the $d$ features of a single token vector - never across the batch. There are no running averages, which is why batch-1 inference is exact and batch-order-independent."
+    check: choice
     difficulty: core
 
   - id: u4-q10
@@ -540,105 +480,59 @@ check:
 
   - id: u4-q11
     concept: c-depth
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      Give a specific capability that a two-layer attention-only transformer
-      has and that a one-layer attention-only transformer of arbitrary width
-      does not. Describe the mechanism, naming what each layer contributes
-      and what the residual stream does, and state precisely why width cannot
-      substitute for the second layer.
-    answer: |
-      In-context pattern completion: given `[A][B] ... [A]`, predict `[B]`,
-      for token pairs never seen in training. This is the induction-head
-      circuit.
-      Layer 1: a previous-token head at each position $i$ attends to position
-      $i-1$ and writes "my predecessor was $x_{i-1}$" as an additive update
-      into a subspace of position $i$'s residual stream.
-      Layer 2: an induction head at the current `[A]` builds its keys by
-      reading that subspace, so the highest-scoring position is the one whose
-      predecessor was `[A]` - the position holding `[B]` - and its OV path
-      copies `[B]` into the stream, raising its logit.
-      The residual stream is the channel: layer 1 does not hand its output to
-      layer 2, it writes into a shared bus that layer 2's read projection was
-      trained to look at. Any later layer could read the same thing.
-      Width cannot substitute because in a one-layer model every head's keys
-      are functions of the raw embeddings only. No head can ask "which
-      position follows an earlier `[A]`", since nothing has yet written any
-      position's predecessor into that position's stream. A one-layer
-      attention-only model is limited to bigrams and skip-trigrams
-      ($[A] \ldots [B] \to [C]$); more width buys more skip-trigrams and
-      never a second stage.
-    check: llm
-    rubric: |
-      MUST contain: (1) a named two-stage capability, with induction /
-      in-context copying the expected answer; (2) the second layer's QUERY or
-      KEY formation depending on what the first layer WROTE - this is the
-      composition claim and is mandatory; (3) the residual stream identified
-      as the shared write/read channel rather than a hand-off; (4) the
-      width argument: one-layer keys can only be functions of raw embeddings.
-      (2) mandatory, 3 of 4 overall = pass.
-      An answer that says the second layer "processes further" or "refines"
-      is U4M6 - fail. An answer claiming the pair must have been memorized
-      during training is M4 - fail, and note that the point of the example is
-      that the pair is novel. Naming the mechanism as "induction heads"
-      without the composition step = partial.
+      In-context pattern completion - given `[A][B] ... [A]`, predict `[B]` for
+      a token pair never seen in training - appears at two attention layers and
+      is unreachable at one, at any width. Which statement gives the reason?
+    options:
+      - text: "Layer 1's previous-token head writes \"my predecessor was $x_{i-1}$\" additively into a subspace of position $i$'s stream, and layer 2's induction head forms its KEYS by reading that subspace; a one-layer model's keys can only be functions of the raw embeddings, so no width supplies the missing stage."
+        correct: true
+        explain: "This is the composition claim: layer 2's keys are a function of what layer 1 wrote (K-composition), communicated through the residual stream as a shared bus rather than a hand-off. A one-layer attention-only model is limited to bigrams and skip-trigrams; more width buys more skip-trigrams, never a second stage."
+      - text: "The second layer receives a cleaner, sharper version of the first layer's representation and so resolves the pattern the first layer could only approximate; a wide enough one-layer model gets close but stays noisier."
+        misconception: U4M6
+        explain: "The refinement picture, and it predicts that width trades off against depth. It cannot: the boundary here is sharp, not a matter of quality, because the required key is a function of another layer's output."
+      - text: "Two layers hold twice the attention parameters, so the extra capacity stores the $[A] \\to [B]$ associations that a one-layer model has no room for."
+        misconception: M4
+        explain: "Two errors at once: the pair is novel, so no stored association could cover it, and parameter count is not what is missing - the missing thing is a stage of dependency."
+      - text: "With two layers there are twice as many heads, so one head can specialize in predecessors while another specializes in copying; a one-layer model must force both linguistic jobs through a single head."
+        misconception: U4M1
+        explain: "Head specialization is an emergent consequence of restricted read/write channels, not the mechanism, and head count is free within a layer - a one-layer model can have as many heads as you like and still cannot form the induction key."
+      - text: "Layer 1 hands its output vectors directly to layer 2 as a pipeline stage, and it is that sequential hand-off, absent in a single layer, that carries the earlier `[A]` forward to the final position."
+        misconception: M8
+        explain: "The pipeline reading of the stack. Blocks write additive updates into a persistent shared stream that any later block can read - which is why middle blocks drop gracefully - so 'hand-off' names the wrong object even though two layers are indeed needed."
+    check: choice
     difficulty: core
 
   - id: u4-q12
     concept: c-residual
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: false
     prompt: |
-      You are handed a 40-block pre-LN model, $d = 5120$, $h = 40$,
-      $d_k = 128$, $d_{ff} = 13824$ (SwiGLU), MHA, fp16. Serving is
-      latency-bound at 8k context with many concurrent sessions. You may
-      retrain. Propose the two highest-leverage architectural changes, and
-      for each state: what it costs in parameters, what it costs in quality,
-      and which of latency, memory or FLOPs it moves. Then name one change
-      that a colleague will propose which will not help, and say why.
-    answer: |
-      Change 1 - GQA at $g = 8$. Parameters: attention drops from $4d^2 =
-      104{,}857{,}600$ to $2d^2 + 2d^2(8/40) = 62{,}914{,}560$ per block, a
-      40% cut on attention; attention is about a third of this SwiGLU block
-      (the MLP is $3 d\,d_{ff} = 212{,}336{,}640$), so about 13% of the
-      block's total. Quality: small, typically
-      recoverable with retraining; $g = 8$ is the empirical sweet spot and
-      $g = 1$ is not. Moves: KV cache from $2 \cdot 40 \cdot 128 \cdot 2 =
-      20$ KiB per token per layer to 4 KiB, so 5x on cache footprint and on
-      the HBM traffic per generated token - which is decode latency, because
-      decode is bandwidth-bound. FLOPs unchanged.
-      Change 2 - prune middle blocks (say blocks 12-27, a quarter to a third
-      of the stack) with a short fine-tune. Parameters: proportional to the
-      blocks removed. Quality: a few points, because the stream is a sum of
-      additive updates and the middle contributes the most redundant terms.
-      Moves: all three - FLOPs, weight memory and cache both drop with layer
-      count, and latency drops roughly linearly. Do not touch the first two
-      or last two blocks.
-      Will not help: quantizing or shrinking the *query* heads, or any
-      proposal framed as "GQA cuts attention FLOPs so let us also apply it to
-      prefill". Score computation is $h \cdot n \cdot d_k$ MACs per token in
-      every variant - shared keys are broadcast, not skipped - so there are
-      no attention FLOPs to recover, and prefill is compute-bound and
-      essentially unaffected.
-    check: llm
-    rubric: |
-      This is the integrative stretch item; expect strong learners only.
-      Pass requires TWO defensible changes, each with the resource it moves
-      correctly identified, plus a correct non-help. GQA and layer pruning
-      are the expected pair; quantization is an acceptable substitute for
-      either if the candidate correctly says it moves weight memory and
-      bandwidth, not FLOPs (and it is the u6 answer, so credit it).
-      Mandatory: somewhere in the answer, decode latency must be tied to
-      BYTES MOVED rather than FLOPs. An answer that justifies GQA by FLOP
-      reduction is U4M3 and fails even if the recommendation is right - the
-      recommendation is right for the wrong reason and will misgeneralize.
-      An answer that proposes pruning the first or last blocks, or that
-      claims middle pruning is fatal, is M8 - fail. Numeric slips in the
-      parameter arithmetic are not penalized if the direction and the
-      resource attribution are right.
+      A 40-block pre-LN model, $d = 5120$, $h = 40$, $d_k = 128$,
+      $d_{ff} = 13824$ (SwiGLU), MHA, fp16. Serving is decode-latency-bound at
+      8k context with many concurrent sessions, and you may retrain. Which pair
+      of changes is highest-leverage, for the right reason?
+    options:
+      - text: "GQA at $g = 8$ - attention drops from $4d^2 = 104{,}857{,}600$ to $2d^2 + 2d^2(8/40) = 62{,}914{,}560$ per block and the cache from 20 KiB to 4 KiB per token per layer, cutting bytes streamed from HBM per generated token 5x - together with pruning middle blocks (say 12-27) plus a short fine-tune, which cuts FLOPs, weight memory and cache with layer count."
+        correct: true
+        explain: "Both are right and the attribution is right: decode is bandwidth-bound, so GQA's win is bytes moved, not arithmetic, and pruning is safe in the middle because the stream is a sum of $2L$ additive updates whose middle terms are the most redundant. Leave the first two and last two blocks alone."
+      - text: "GQA at $g = 8$ - it cuts the attention score computation by $h/g = 5$, so both prefill and decode run about 5x faster on the attention kernels - together with pruning middle blocks 12-27 plus a short fine-tune."
+        misconception: U4M3
+        explain: "The recommendation is right and the reason is wrong, which is worse than it looks: score computation is $h \\cdot n \\cdot d_k$ MACs per new token under MHA, GQA and MQA alike, because shared keys are broadcast to the query heads sharing them, not skipped. Prefill is compute-bound and essentially unaffected."
+      - text: "MQA at $g = 1$ for the largest possible cache cut, together with pruning the first two and last two blocks, which are cheapest to remove because the middle of the stack carries the model's abstract features."
+        misconception: M8
+        explain: "Pruning the ends is the damaging choice: early blocks write the features every later read projection expects and late blocks rotate the stream into the unembedding's directions, while the middle is what ablates gracefully. $g = 1$ also measurably degrades quality, where $g = 8$ does not."
+      - text: "Cut the query heads from $h = 40$ to $h = 8$ while keeping 40 key/value heads, so each query head attends over fewer positions and the KV cache shrinks with it - together with a short fine-tune."
+        misconception: U4M2
+        explain: "This reduces the wrong heads. In MHA, MQA and GQA the query-head count is unchanged and every query head still attends over every allowed position; only $W^K$ and $W^V$ shrink, to $d \\times (g \\cdot d_k)$. Cutting query heads leaves the cache at 20 KiB per token per layer."
+      - text: "Halve $d_{ff}$ from 13824 to 6912 and raise $h$ from 40 to 80 - the MLP is peripheral plumbing between attention layers, so most of the block's weight can be reclaimed there at little cost, and more heads add attention capacity to compensate."
+        misconception: U4M5
+        explain: "The MLP is $3 d\\, d_{ff} = 212{,}336{,}640$ parameters against attention's $104{,}857{,}600$ here - the majority of the block, not plumbing - so halving it is the largest quality cut on offer. Raising $h$ adds no parameters at all: $W^Q, W^K, W^V, W^O$ stay $d \\times d$ and are only sliced differently. Neither move touches the KV cache that is setting decode latency."
+    check: choice
     difficulty: stretch
 
   - id: u4-q13

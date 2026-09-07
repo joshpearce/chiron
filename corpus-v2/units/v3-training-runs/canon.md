@@ -37,39 +37,25 @@ id: v3-b1
 type: predict
 concept: d-compute-budget
 prompt: |
-  Before reading on, commit to three numbers. Put a dollar cost on (a), (b),
-  and (c) above - to within an order of magnitude is fine. Then answer the
-  question that matters more: what would you need to know to *compute* those
-  numbers rather than guess them? List the inputs.
-answer: |
-  As of mid-2026, on a rented 8xH100 node: (a) pennies, about 20 seconds of
-  wall clock. (b) $92, measured, 3 hours 51 minutes end to end. (c) $672,
-  measured, 24 hours.
-
-  The inputs you need are exactly four, and only four:
-
-  1. The number of parameters in the model.
-  2. The number of tokens it will be trained on.
-  3. How many floating-point operations per second the hardware actually
-     sustains (not its spec sheet peak).
-  4. The hourly rental price of that hardware.
-
-  Notably absent from that list: the architecture, the optimizer, the dataset,
-  the quality of the result, and how good you are at this. None of them enter
-  the cost. That is the whole point of the next two sections.
-rubric: |
-  The dollar guesses are not graded - they are a commitment device, and being
-  wrong is the expected outcome. Grade only the second half.
-  Pass requires the input list to contain, in any wording: (1) model size /
-  parameter count, (2) amount of training data / token count, (3) some notion
-  of hardware throughput or speed, (4) a price per unit time.
-  Three of four = pass. Listing only "GPU hours" or "how long it takes"
-  without decomposing into size and data = fail; that is the guess restated,
-  not a budget.
-  An answer that includes dataset quality, architecture choice, or model
-  capability as a cost input = fail, and diagnose V3-M1. That is the belief
-  this section exists to break.
-check: llm
+  Before reading on, commit. The three runs (a), (b) and (c) each carry a
+  measured invoice. Forget guessing the dollar figures - answer the question
+  that matters more: which list contains exactly what you need to *compute*
+  the cost of a pretraining run, with nothing missing and nothing that does
+  not belong?
+options:
+  - text: "Parameter count; token count; the FLOP/s the hardware actually sustains; the hourly rental price."
+    correct: true
+    explain: "Right, and the omissions are the point. Two integers you choose before the run, one hardware constant, one market price. The architecture, the optimizer, the corpus and the quality of the result appear nowhere."
+  - text: "Parameter count; token count; the quality of the corpus; the hourly rental price - a worse corpus needs a longer run to reach the same loss, so quality is a cost input."
+    misconception: V3-M1
+    explain: "The token count is chosen, not discovered. Train the 561M configuration on filtered text and on raw scrape at identical $D$: one is a chat model, one is gibberish, both cost $92 to the cent and finish at the same minute. The invoice is blind to the corpus."
+  - text: "GPU-hours and the hourly rental price - everything else is already folded into how long the run takes."
+    misconception: V3-M1
+    explain: "That is the guess restated, not a budget. Wall clock is the thing you are trying to predict; you get it from $C = 6ND$ divided by sustained throughput, which requires decomposing the run into its size and its data."
+  - text: "Parameter count; token count; the architecture and optimizer; the hardware's spec-sheet peak FLOP/s and price."
+    misconception: V3-M3
+    explain: "Two errors. Architecture and optimizer do not enter $C = 6ND$ at all. And peak FLOP/s is not what you divide by - a real run sustains about 40% of it, so budgeting against peak understates the bill by more than a factor of two."
+check: choice
 ```
 
 Here are the invoices. As of mid-2026, an 8xH100 node rents for $12-16/hour on
@@ -304,8 +290,6 @@ by a factor of 20.
 id: v3-b3
 type: completion
 concept: d-compute-budget
-# variants: blank the FLOP/s and the cost instead of the FLOPs and the hours;
-# or give the wall clock and blank D.
 prompt: |
   Budget a 124M-parameter model trained on 10 billion tokens, on the 8xH100
   node ($3.2 \times 10^{15}$ FLOP/s sustained, $24/hour as of mid-2026).
@@ -314,32 +298,24 @@ prompt: |
   Step 2. $t = C \,/\, (3.2 \times 10^{15}) =$ ____ seconds
   Step 3. In minutes: ____
   Step 4. Cost at $24/hour: ____
+  Step 5. If the corpus were swapped for one of identical token count but far
+          worse quality, the four numbers above would ____
 
-  Fill the four blanks. Then state, in one sentence, what would change about
-  every one of these four numbers if the corpus were replaced with one of
-  identical token count but far worse quality.
-answer: |
-  Step 1: $7.44 \times 10^{18}$ FLOPs
-  Step 2: 2,325 seconds
-  Step 3: 38.75 minutes, call it 40
-  Step 4: 0.646 hours x $24 = $15.50
-
-  Nothing would change. Not one of the four numbers. $C = 6ND$ contains no
-  term for data quality, and neither does the throughput or the price. The
-  worse corpus produces a worse model on exactly the same schedule for exactly
-  the same money.
-rubric: |
-  Required, to within 2%: blank 1 = 7.44e18; blank 2 = 2,325 s (accept
-  2,300-2,350); blank 3 = ~39 minutes (accept 38-40); blank 4 = ~$15.50
-  (accept $15-16).
-  The one-sentence answer must say that none of the numbers change, and cite
-  that C = 6ND has no data-quality term.
-  All four numbers plus the correct final sentence = pass.
-  An answer that says the worse corpus would need more tokens or more steps to
-  reach the same loss = fail, and diagnose V3-M1. That may be true of the
-  QUALITY you get, but the question fixed the token count; the budget is
-  determined by the integers you chose, not by the outcome you wanted.
-check: llm
+  Which filling of the five blanks is correct?
+options:
+  - text: "$7.44 \\times 10^{18}$; 2,325 s; ~39 minutes; ~$15.50; and none of the four numbers would change - $C = 6ND$ has no data-quality term, and neither does the throughput or the price."
+    correct: true
+    explain: "Right. $6 \\times 1.24{\\times}10^8 \\times 10^{10} = 7.44{\\times}10^{18}$; over $3.2{\\times}10^{15}$ FLOP/s that is 2,325 s = 0.646 h; at $24/h, $15.50. The worse corpus produces a worse model on exactly the same schedule for exactly the same money."
+  - text: "$7.44 \\times 10^{18}$; 2,325 s; ~39 minutes; ~$15.50; but the run would need roughly twice the steps to reach a usable loss, so the real wall clock and cost would roughly double."
+    misconception: V3-M1
+    explain: "The arithmetic is right and the last step smuggles in the belief the section exists to break. The question fixed $D$ at $10^{10}$ tokens; the budget is set by the integers you chose, not by the outcome you wanted. A worse corpus buys you a worse model on the same invoice."
+  - text: "$1.24 \\times 10^{18}$; 388 s; ~6.5 minutes; ~$2.60; and none of the four numbers would change."
+    misconception: V3-M3
+    explain: "The final claim is right but the arithmetic dropped the factor of 6 - one multiply-add forward plus two in the backward pass is $2 + 4 = 6$ FLOPs per parameter per token, not 1. Six times too cheap."
+  - text: "$7.44 \\times 10^{18}$; 942 s; ~16 minutes; ~$6.30; and none of the four numbers would change."
+    misconception: V3-M3
+    explain: "The FLOP count is right but the division used the node's spec-sheet peak of 7.9 PFLOP/s rather than the 3.2 PFLOP/s it sustains. Budgeting against peak is budgeting at 100% MFU, and no real run gets there; a job quoted this way arrives at 2.5x the estimate."
+check: choice
 ```
 
 ```beat
@@ -480,50 +456,22 @@ prompt: |
   phase, then branch 20 times - once per source removed - and run only the
   decay tail on each. Twenty conditions for the price of four runs."
 
-  In your own words: explain what makes this technically possible, then state
-  precisely what question the resulting numbers answer and what question they
-  do NOT answer. Say when you would use it anyway.
-answer: |
-  Why it works: during the stable phase the learning rate is constant, so no
-  checkpoint in that phase is partway through a schedule. It is a legitimate
-  starting state. A cosine run has no such checkpoint - every one of them is
-  mid-decay, so a branch inherits a learning rate that was on its way to zero
-  and the resulting model is not comparable to a full run.
-
-  The economics are right: with a 15% decay tail, 20 branches cost 20 x 0.15 =
-  3 run-equivalents plus the one shared trunk, about 4 total instead of 21.
-
-  What the numbers answer: how much source i contributes to the model's final
-  loss GIVEN that the model already trained on source i for 85% of the run.
-  That is a real quantity and it is measurable.
-
-  What they do not answer: what the model would be if source i had never been
-  in the corpus at all. The trunk saw source i. Whatever it learned from it -
-  vocabulary, domain structure, facts - is baked into the shared branch point
-  and is present in all 20 variants including the one that supposedly excludes
-  it. The branched estimate is systematically biased toward zero contribution,
-  and by an unknown amount.
-
-  When to use it anyway: screening. If you have 200 candidate sources and want
-  to find the 20 worth measuring properly, branch-and-decay is the right tool -
-  the bias is roughly shared across conditions so the ranking is informative
-  even when the magnitudes are not. Then pay for from-scratch runs on the
-  survivors, for any number you intend to put in front of someone.
-rubric: |
-  Must contain: (1) the stable phase has constant learning rate, which is what
-  makes a mid-run checkpoint a valid starting state, (2) the branched variants
-  all inherit the trunk's exposure to the removed source, so the counterfactual
-  is "contribution over the tail" not "contribution overall", (3) some
-  acknowledgement that this biases the measured contribution downward or makes
-  it not comparable to a from-scratch leave-one-out.
-  (1) and (2) = pass. (3) upgrades to full credit.
-  An answer that endorses the shortcut with no caveat = fail. The whole point
-  of v4's ground truth is that it is a from-scratch counterfactual; a learner
-  who will substitute a branched estimate for it without flagging the
-  substitution will produce a number that cannot survive review.
-  An answer that rejects branching entirely as invalid = partial. It is a
-  legitimate screening tool and refusing it costs real money.
-check: llm
+  Which explanation of what makes this possible, what its numbers mean, and
+  when to use it would you sign your name to?
+options:
+  - text: "It works because the stable phase holds $\\eta$ constant, so a checkpoint there is a legitimate starting state rather than a model mid-decay. But the trunk trained on every source, so each branch measures a source's contribution over the last 15% only - biased toward zero by an unknown amount, not a from-scratch counterfactual. Use it to screen many candidate sources, since the bias is roughly shared and the ranking survives; pay for from-scratch runs on any number you intend to defend."
+    correct: true
+    explain: "Right on all three. The economics are also right - 20 x 0.15 = 3 run-equivalents plus the trunk, about 4 instead of 21 - which is exactly why the caveat has to travel attached to the number."
+  - text: "It works because the stable phase holds $\\eta$ constant, so every branch starts from a valid state and each finishes its own decay. The 20 branched models are therefore proper leave-one-out models: use them as the ground truth for v4 and skip the 21 from-scratch runs entirely."
+    misconception: V3-M2
+    explain: "The first half is right and the conclusion is the expensive error. The trunk saw source $i$ - its vocabulary, domain structure and facts are baked into the shared branch point and are present in all 20 variants, including the one that supposedly excludes it. Substituting this for a from-scratch counterfactual produces a number that will not survive review."
+  - text: "Branching is invalid whatever the schedule: any two models sharing a trunk are correlated, so differences between them are not interpretable. Reject the shortcut and pay for all 21 from-scratch runs."
+    misconception: V3-M2
+    explain: "Too strict, and it costs real money. Branch-and-decay answers a narrower question - contribution over the decay tail - and answers it honestly; as a screen over 200 candidate sources it is the right tool. The error is substituting it for the from-scratch counterfactual, not using it at all."
+  - text: "It works because by the middle of the run the loss curve has already flattened, so the model has essentially converged and the remaining decay is cosmetic. Since the curves for all 20 branches look the same, the shortcut is validated empirically."
+    misconception: V3-M2
+    explain: "Two problems. What licenses the branch is the constant learning rate in the stable phase, not the shape of the loss curve - a cosine run's curve also flattens and none of its checkpoints are branchable. And matching loss curves validate nothing: a curve compares a model to its own past on data it trained on."
+check: choice
 ```
 
 ## What repeating data actually costs
@@ -607,8 +555,6 @@ outcome. Set it deliberately.
 id: v3-b6
 type: completion
 concept: d-data-constrained
-# variants: blank the epoch count and give the token target; or blank N_max
-# and give the ratio.
 prompt: |
   You have 250 million unique tagged tokens and want to train a model on a
   budget of 1 billion tokens.
@@ -620,33 +566,23 @@ prompt: |
           compute-optimal for: $10^9 / 20 =$ ____ parameters
   Step 4. If you instead insisted on one epoch only, your token budget would
           be ____ and the compute-optimal model size would be ____ parameters.
+  Step 5. So the epoch limit costs you ____
 
-  Fill the blanks. Then state in one sentence what the epoch limit costs you
-  in model size, comparing step 3 to step 4.
-answer: |
-  Step 1: 4 epochs
-  Step 2: Nearly free - right at the edge of the zone where a repeated token
-          is worth about as much as a fresh one.
-  Step 3: 50,000,000 parameters (50M)
-  Step 4: 250M tokens, supporting a 12,500,000-parameter (12.5M) model.
-
-  The one sentence: staying inside the free repetition zone lets the same
-  fixed corpus support a model four times larger, because the free zone
-  multiplies the effective token budget by 4 and compute-optimal model size is
-  linear in tokens.
-rubric: |
-  Required, exactly: blank 1 = 4; blank 2 = nearly free / free zone; blank 3 =
-  50M (50,000,000); blank 4 = 250M tokens and 12.5M parameters.
-  The final sentence must state the 4x factor in supportable model size and
-  tie it to the free repetition zone.
-  All blanks plus the factor = pass.
-  An answer that marks step 2 as "diminishing" or "overfitting territory" =
-  fail, diagnosing D17; 4 epochs is the measured boundary of the nearly-free
-  zone, not the start of trouble.
-  An answer that computes the blanks correctly but claims one epoch is
-  methodologically safer or more honest = fail; it is neither, it is just a
-  four-times-smaller experiment.
-check: llm
+  Which filling of the blanks is correct?
+options:
+  - text: "4 epochs; nearly free; 50M parameters; 250M tokens supporting 12.5M parameters; so staying inside the free repetition zone lets the same fixed corpus support a model four times larger, because the zone multiplies the effective token budget by 4 and compute-optimal size is linear in tokens."
+    correct: true
+    explain: "Right. Four epochs sits at the measured edge of the zone where a repeated token is worth very nearly as much as a fresh one, and the 4x in tokens passes straight through to 4x in supportable model size."
+  - text: "4 epochs; diminishing returns - past one pass the model is re-reading text it has already fit, so treat the effective budget as somewhere under 1B tokens and the supportable model as well under 50M parameters."
+    misconception: D17
+    explain: "Four epochs is the boundary of the nearly-free zone, not the start of trouble. Measured directly in the data-constrained scaling work, repeats stay nearly as valuable as fresh tokens out to ~4 epochs, decline steadily to ~16, and only die past ~40. The overfitting instinct comes from small labeled datasets, a different regime entirely."
+  - text: "4 epochs; nearly free; 50M parameters; 250M tokens supporting 12.5M parameters; but the one-epoch run is the methodologically sounder experiment, since every token is seen once and no result rests on repetition."
+    misconception: D17
+    explain: "The arithmetic is right and the verdict is wrong. One epoch is not safer or more honest here - it is simply a four-times-smaller experiment. Nothing about repetition inside the free zone compromises a held-out measurement."
+  - text: "4 epochs; nearly free; 50M parameters; 250M tokens supporting 50M parameters, since the model size is set by the corpus rather than by the run's token budget; so the epoch limit costs nothing."
+    misconception: D17
+    explain: "Compute-optimal size is 20 tokens per parameter against the tokens the run actually consumes, $D$, repeats included. One epoch means $D = 250$M, hence 12.5M parameters. The corpus size only bounds $D$ through the epoch count."
+check: choice
 ```
 
 ## The laptop and the node
@@ -747,42 +683,22 @@ prompt: |
   (i) 50M parameters on 960M tokens, one run per night.
   (ii) 10M parameters on 200M tokens, 24 runs per night.
 
-  Before reading on: which one do you pick for the leave-one-source-out ground
-  truth over 20 tagged sources, and why? Then state the one thing configuration
-  (ii) makes worse.
-answer: |
-  Pick (ii), and it is not close. Ground truth requires 21 runs minimum
-  (full plus 20 leave-one-out), and the whole enterprise wants 500-plus
-  random-subset runs on top of that for the regression in v4. Configuration
-  (i) delivers 21 runs in three weeks; configuration (ii) delivers them in one
-  night and the full 550-run program in about three weeks. The experiment is
-  measured in runs, not in model quality, so throughput in runs is the only
-  axis that matters.
-
-  What (ii) makes worse: the model. A 10M-parameter model at 20 tokens per
-  parameter is undertrained AND small, so its held-out loss is high, its
-  behavior is poor, and the differences you are trying to measure between
-  conditions are smaller in absolute terms and sit on top of proportionally
-  larger seed noise. There is a real floor below which the contributions you
-  are measuring drop under the noise, and the next section is about finding it.
-
-  The practical resolution: something in between. 20-30M parameters at
-  400-800M tokens keeps runs at 30-60 minutes, stays past Chinchilla ratio, and
-  still lands the sweep in a few nights.
-rubric: |
-  Pass requires: (1) choosing (ii) or an intermediate configuration, (2) the
-  reason being that the experiment's cost is measured in NUMBER OF RUNS
-  because ground truth is a counterfactual sweep, (3) naming the cost as
-  smaller effect sizes / worse signal relative to seed noise, or the model
-  being undertrained.
-  (1) and (2) = pass. Missing (3) = pass but flag: the learner has not yet
-  connected model scale to the noise floor and section 7 should be delivered
-  in full.
-  An answer choosing (i) on the grounds that a better model gives more
-  trustworthy attribution = fail. One model of any quality gives zero
-  counterfactual information; the ground truth is a difference across runs and
-  does not exist below 21 of them.
-check: llm
+  Before reading on, commit: which do you pick for leave-one-source-out ground
+  truth over 20 tagged sources, and what does the choice cost you?
+options:
+  - text: "Take the 10M configuration, or something between the two. Ground truth is 21 runs minimum and the v4 regression wants 500-plus more, so the experiment is priced in runs, not in model quality; one run per night delivers the minimum sweep in three weeks. The cost is a smaller, undertrained model whose between-condition differences are smaller in absolute terms and sit on proportionally larger seed noise."
+    correct: true
+    explain: "Right, and the practical landing spot is in between - 20-30M parameters on 400-800M tokens keeps runs at 30-60 minutes, stays past the Chinchilla ratio, and still lands the sweep in a few nights."
+  - text: "Take the 50M configuration. A better-trained model gives a more trustworthy attribution signal, and trustworthiness of the measurement matters more than how many models you can produce."
+    misconception: V3-M1
+    explain: "One model of any quality carries zero counterfactual information. The ground truth in v4 is a difference across runs and does not exist below 21 of them, so a configuration that yields one run per night yields no ground truth at all for three weeks."
+  - text: "Take the 50M configuration. Its loss curve will be lower and smoother, which is the evidence that the run is sound; a 10M model's curve is noisy enough that you could not trust anything measured from it."
+    misconception: V3-M2
+    explain: "The training loss curve compares a model to its own past on data it trained on - it is an optimizer health monitor, not evidence about data or about which condition wins. Everything in v4 is a comparison between different models on held-out text, and that comparison is unaffected by how pretty either curve was."
+  - text: "Take the 10M configuration, and the choice costs nothing: the smaller model finishes each run in a fraction of the time and held-out bpb is measurable with precision at any scale, so both throughput and signal improve."
+    misconception: D16
+    explain: "Half right - bpb is measurable at any scale - but the quantity you need is a *difference* between conditions, and at 10M parameters those differences shrink toward the seed-noise floor. There is a scale below which real contributions vanish under $\\sigma$, which is what the next section is for."
+check: choice
 ```
 
 ## Evaluation without self-deception
@@ -843,8 +759,6 @@ model size including the 10M-parameter ones you can actually afford.
 id: v3-b8
 type: completion
 concept: d-eval-noise
-# variants: give bpb and blank the loss; or blank bytes-per-token given both
-# ends.
 prompt: |
   A model scores $\mathcal{L} = 2.60$ nats per token on a held-out set of
   papers. Its tokenizer averages 3.5 bytes per token on that text.
@@ -853,33 +767,24 @@ prompt: |
   Step 2. Bits per byte: ____ $/\ 3.5 =$ ____
   Step 3. A second model, different tokenizer, scores 2.20 nats per token at
           4.1 bytes per token. Its bpb: ____
+  Step 4. Better model on this text, and what the raw losses alone establish:
+          ____
 
-  Fill the blanks, then state which model is better on this text and what the
-  raw loss numbers alone would have told you.
-answer: |
-  Step 1: 3.752 bits per token
-  Step 2: 3.752 / 3.5 = 1.072 bits per byte
-  Step 3: 2.20 / (0.6931 x 4.1) = 2.20 / 2.842 = 0.774 bits per byte
-
-  The second model is better, at 0.774 bpb against 1.072.
-
-  The raw losses would have said the same thing here (2.20 < 2.60), but only by
-  luck - the second model has BOTH the lower loss and the longer tokens, so the
-  two effects point the same way. Had the second model scored 2.90 nats at 4.1
-  bytes per token, its bpb would be 1.020, still better than the first model's
-  1.072, while its loss looked 12% worse. Loss comparisons across tokenizers
-  are unsafe in both directions.
-rubric: |
-  Required, to within 1%: blank 1 = 3.75; blank 2 = 1.07; blank 3 = 0.77.
-  The verdict must be that the second model is better.
-  The final sentence must recognize that comparing raw losses across different
-  tokenizers is invalid, whether or not it happens to agree here.
-  All three numbers plus the verdict = pass; the "agreed by luck" observation
-  upgrades to full credit.
-  An answer that divides by ln 2 in the wrong direction (multiplying instead)
-  = fail; check the direction by sanity: bits are SMALLER units than nats, so
-  a value in bits is LARGER than the same value in nats.
-check: llm
+  Which filling of the blanks is correct?
+options:
+  - text: "3.752 bits/token; 1.072 bpb; 0.774 bpb; the second model is better, and the raw losses happened to agree only by luck - it has both the lower loss and the longer tokens, so the two effects point the same way. At 2.90 nats and 4.1 bytes/token its bpb would be 1.020, still better, while its loss looked 12% worse."
+    correct: true
+    explain: "Right. Cross-tokenizer loss comparisons are unsafe in both directions; the agreement here carries no information, which is exactly why the reported number has to be bpb."
+  - text: "1.802 bits/token; 0.515 bpb; 0.372 bpb; the second model is better, and the raw losses agreed only by luck."
+    misconception: D16
+    explain: "The direction of the $\\ln 2$ conversion is inverted - this multiplied by 0.6931 instead of dividing. Sanity check it: a bit is a smaller unit than a nat, so the same surprise is a *larger* number in bits. 2.60 nats must exceed 2.60 when expressed in bits."
+  - text: "3.752 bits/token; 1.072 bpb; 0.774 bpb; the second model is better, and the raw losses already established that, since 2.20 < 2.60 - the bpb conversion confirms what the losses said."
+    misconception: D16
+    explain: "The arithmetic is right and the reading of it is not. The losses agreed with bpb here by coincidence: the second model has both the lower loss and the longer tokens. A model scoring 2.90 nats at 4.1 bytes/token wins on bpb while losing on loss by 12%. Loss across tokenizers is not evidence either way."
+  - text: "3.752 bits/token; 1.072 bpb; 0.774 bpb; but the comparison is void, because bits per byte is still computed from each model's own tokenizer and so inherits the same tokenizer dependence perplexity has."
+    misconception: D16
+    explain: "The bytes-per-token factor is precisely what cancels the tokenizer out. The held-out text's UTF-8 byte count was fixed before any tokenizer existed, so total nats over $\\ln 2$ times total bytes refers to the text alone. That invariance is the reason bpb is the reported metric."
+check: choice
 ```
 
 **Now the harder half: is the difference real?**
@@ -958,7 +863,6 @@ not *publish anyway*.
 id: v3-b9
 type: completion
 concept: d-eval-noise
-# variants: give n and delta, blank sigma; or blank the required n only.
 prompt: |
   Your setup has measured seed noise $\sigma = 0.0060$ bpb on held-out papers.
   You run two conditions with $n = 2$ seeds each. The full corpus averages
@@ -971,34 +875,21 @@ prompt: |
   Step 5. Now a different source U shows $\Delta = 0.0050$. Seeds needed to
           reach $z \geq 2$: $n \geq 8\sigma^2/\Delta^2 =$ ____
 
-  Fill the blanks. Then state in one sentence why step 5's answer is good news
-  rather than bad, given a run cost of 4 minutes.
-answer: |
-  Step 1: 0.0144 bpb
-  Step 2: 0.0060
-  Step 3: 2.4
-  Step 4: Real - it clears the z >= 2 bar.
-  Step 5: n >= 8 x (0.0060)^2 / (0.0050)^2 = 8 x 3.6e-5 / 2.5e-5 = 11.52,
-          so 12 seeds per condition.
-
-  Why that is good news: 12 seeds per condition is 24 runs, which at 4 minutes
-  each is 96 minutes of one GPU. At this model scale the remedy for an
-  underpowered result is to buy more seeds, and it costs about $6. The seed
-  count is a budget line, not a limitation.
-rubric: |
-  Required, exactly: step 1 = 0.0144; step 2 = 0.0060; step 3 = 2.4; step 4 =
-  real / significant; step 5 = 11.52 rounded up to 12.
-  The final sentence must connect the required seed count back to run cost and
-  observe that more seeds are affordable at this scale.
-  All five plus the final observation = pass.
-  Computing step 2 as sigma/sqrt(2) = 0.0042 = fail; that is the standard
-  error of ONE condition's mean, not of the difference between two, and the
-  error makes every result look more significant than it is. This is the single
-  most common way an attribution claim gets overstated.
-  An answer treating step 4's z = 2.4 as "proof" rather than as clearing a
-  pre-set bar = pass on the arithmetic, but flag D19 for v6 and v7; a z-score
-  is evidence against a null, not a proof.
-check: llm
+  Which filling of the five blanks is correct?
+options:
+  - text: "0.0144; 0.0060; 2.4; real, it clears the bar; $n \\geq 11.52$, so 12 seeds per condition - 24 runs at 4 minutes each, about 96 GPU-minutes and roughly \\$6."
+    correct: true
+    explain: "Right. $\\sqrt{2/2} = 1$, so $\\text{SE}_{\\text{diff}} = \\sigma = 0.0060$ and $z = 0.0144/0.0060 = 2.4$. For U, $8(0.0060)^2/(0.0050)^2 = 8 \\times 3.6\\times10^{-5} / 2.5\\times10^{-5} = 11.52 \\to 12$. The point of the last blank is that an underpowered result here is fixed by buying seeds, and the seeds cost about six dollars."
+  - text: "0.0144; 0.0042; 3.43; real, and comfortably so; $n \\geq 5.76$, so 6 seeds per condition."
+    misconception: D16
+    explain: "This divides by $\\sqrt{2}$ instead of multiplying: $0.0060/\\sqrt{2} = 0.0042$ is the standard error of ONE condition's two-seed mean, not of the difference between two conditions. Every $z$ computed that way is inflated by a factor of 2, and every required seed count is understated fourfold. It is the single most common way an attribution claim gets overstated."
+  - text: "0.0144; 0.0060; 2.4; real - $z = 2.4$ establishes that source T contributes, so no further seeds are needed for T; $n \\geq 11.52$, so 12 seeds for U."
+    misconception: D19
+    explain: "The arithmetic is right and the reading is not. A $z$ of 2.4 is evidence against a null at a bar you set in advance, not a proof that T contributes; with twenty sources tested the same way, one crossing 2 by chance is expected. Report the statistic, the pre-set bar, and the multiple-testing correction together."
+  - text: "0.0144; 0.0060; 2.4; not real - a difference of 0.0144 bpb is far too small to mean anything about a corpus; the fix is a larger model or a longer run, not more seeds."
+    misconception: D16
+    explain: "Smallness in absolute bpb is not the test; the test is size relative to the noise floor you measured, and 0.0144 is 2.4 of those. And a bigger model does not remove the noise - contribution is a random variable at every scale, so the remedy is $n$, which is exactly what step 5 prices."
+check: choice
 ```
 
 **The ablation discipline, in four rules.** These are lifted directly from the
@@ -1080,50 +971,22 @@ prompt: |
   the v4 counterfactual work to be possible at all. A colleague suggests
   recording the final training loss, the total wall clock, and the checkpoint.
 
-  That list is missing the load-bearing item. State what it is, why the other
-  three cannot substitute for it, and what specifically becomes impossible in
-  v4 without it. Answer from the unit's text; do not reference any run you
-  have or have not performed.
-answer: |
-  The missing item is the seed noise: held-out bits-per-byte from two or more
-  runs of the identical configuration with different seeds, reported as a mean
-  and a spread. The spread, sigma, is the load-bearing number.
-
-  Why the other three cannot substitute:
-
-  - Final training loss compares the model to its own past, on data it trained
-    on, under a schedule whose shape produces a late drop regardless of data
-    quality. It says nothing about how this model compares to a different
-    model, which is the only comparison v4 makes.
-  - Wall clock is a budget fact. It has no bearing on whether a measured
-    difference is real.
-  - The checkpoint is one sample from a distribution over training runs. One
-    sample carries no information about the width of that distribution.
-
-  What becomes impossible in v4: every ground-truth number in v4 is a
-  DIFFERENCE - full-corpus loss minus leave-one-source-out loss. The standard
-  error of a difference between two conditions with n seeds each is
-  sigma x sqrt(2/n), so without sigma there is no denominator, no z, and no way
-  to say whether a source's measured contribution is distinguishable from
-  zero. You would produce a table of numbers with no way to tell which entries
-  are signal. Since a source's contribution can swing by more than its own
-  magnitude across seeds, the table would be actively misleading rather than
-  merely incomplete.
-rubric: |
-  Must contain: (1) the missing item is seed noise / a multi-seed spread on a
-  held-out metric, ideally naming bpb, (2) a reason training loss is not a
-  substitute - it is same-data, self-comparison, and schedule-shaped, (3) the
-  specific v4 consequence: contributions are differences, and a difference
-  needs a standard error, which needs sigma.
-  (1) and (3) = pass. All three = full credit.
-  An answer naming "more seeds" without connecting sigma to the standard error
-  of a DIFFERENCE = partial, do not pass; the learner has the ritual and not
-  the reason.
-  An answer proposing to substitute a larger model or longer training to
-  reduce noise = fail, diagnosing D16. Noise is not a defect that goes away
-  with a better run; contribution is a random variable at every scale, and the
-  remedy is seeds, not size.
-check: llm
+  That list is missing the load-bearing item. Which explanation of what is
+  missing, and of why the other three cannot stand in for it, is the right one?
+options:
+  - text: "Missing: seed noise - held-out bpb from two or more runs of the identical configuration with different seeds, reported as a mean and a spread $\\sigma$. Training loss compares a model to its own past on data it trained on and drops late under any schedule; wall clock is a budget fact; a single checkpoint is one sample and says nothing about the width of the distribution it came from. Without $\\sigma$, v4's ground truth - which is a DIFFERENCE, full-corpus bpb minus leave-one-out bpb - has no $\\text{SE}_{\\text{diff}} = \\sigma\\sqrt{2/n}$, hence no $z$, and no way to tell which entries in the table are signal."
+    correct: true
+    explain: "Right, and the last clause is the load-bearing part: $\\sigma$ is not a quality report on the run, it is the denominator every downstream claim divides by. A contribution table with no error bar is worse than incomplete, because a source's measured contribution can swing by more than its own magnitude across seeds."
+  - text: "Missing: a second seed. Record two runs so the numbers can be averaged - averaging two runs cancels the randomness, and the averaged final training loss is then a stable quantity that v4 can difference across conditions."
+    misconception: D16
+    explain: "This has the ritual without the reason. Two seeds do not buy precision - at $n = 2$, $\\text{SE}_{\\text{diff}} = \\sigma\\sqrt{2/2} = \\sigma$, one full single-run standard deviation - they buy the ability to estimate $\\sigma$ and to know you have not bought precision. And the quantity to record is held-out bpb, not training loss, which compares a model only to its own past."
+  - text: "Missing: the held-out bpb itself. Once bpb replaces training loss the metric is tokenizer-invariant, low-variance and monotone, so a single well-run condition gives a trustworthy number; seeds matter only when two conditions land close together."
+    misconception: D16
+    explain: "Bpb is indeed the right metric, but 'low seed variance' is a comparative claim, not zero variance, and $\\sigma$ is a number you must measure rather than assume. The conditions in v4 land close together by construction - a single source's removal moves bpb by thousandths - so the case this treats as exceptional is the ordinary one."
+  - text: "Missing: nothing important yet. Record the three items, then in v4 reduce noise at the source - train a larger model for longer, since bigger converged models give more stable contribution estimates and make an explicit error bar unnecessary."
+    misconception: D16
+    explain: "Contribution is a random variable at every scale; scaling up does not turn it into a property of the source, and it forfeits the one thing that makes this book affordable - the ability to run twenty more seeds for a few dollars. The remedy for an underpowered difference is seeds, not size."
+check: choice
 ```
 
 ## What you can now do

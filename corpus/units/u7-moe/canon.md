@@ -38,21 +38,22 @@ prompt: |
   so about 19 GB of weights. Your machine sustains 153 GB/s of memory
   bandwidth. Batch size 1, one user, generating one token at a time.
 
-  Before reading on: what is the hard upper bound on tokens per second, and
-  what physical quantity sets it? Do not compute precisely - name the
-  bottleneck and give an order of magnitude.
-answer: |
-  Roughly 8 tokens per second. The bottleneck is memory bandwidth, not
-  compute: generating one token requires reading every weight from memory
-  exactly once, so the ceiling is (bandwidth) / (bytes of weights) =
-  153 / 19 = about 8 tok/s. No amount of GPU FLOPs helps.
-rubric: |
-  Must identify memory bandwidth (not FLOPs, not context length, not the KV
-  cache) as the binding constraint, and must express the ceiling as
-  bandwidth divided by total weight bytes. Order of magnitude "single-digit
-  tok/s" is a pass. Answering "depends on the GPU" or naming compute/FLOPs
-  as the limit is the classic systems mis-transfer - fail.
-check: llm
+  Before reading on, commit to an answer: what is the hard upper bound on
+  tokens per second, and what physical quantity sets it?
+options:
+  - text: "About 8 tok/s, set by memory bandwidth: one token needs one full read of the weights, so the ceiling is $153 / 19 \\approx 8$ tok/s."
+    correct: true
+    explain: "Right. At batch 1 every weight matrix takes part in exactly one matrix-vector product, so the traffic per token is the whole 19 GB, and bandwidth divided by that is the ceiling."
+  - text: "There is no fixed ceiling from the weights - the limit is the GPU's FLOP/s, so a faster GPU raises it roughly in proportion."
+    misconception: M10
+    explain: "A matrix-vector product offers only $2/b \\approx 3.7$ FLOP per byte moved while the machine wants about 65. The GPU is idle ~94% of decode; adding FLOPs buys nothing."
+  - text: "The ceiling is set by the KV cache: the growing cache is what must be re-read each step, so tokens per second falls as the context lengthens."
+    misconception: M17
+    explain: "The KV cache exists precisely so old tokens are not re-processed, and at short context it is small beside 19 GB of weights. The weights are re-read every single token; the cache is the optimization over the sequence, not the binding cost here."
+  - text: "About 90 tok/s: only the roughly 2 GB of weights that matter for this token have to be read, since the rest of the network contributes nothing."
+    misconception: U7-M1
+    explain: "That is the MoE answer applied to a dense model. In a dense 35B there is no selection - every weight participates in every token, so all 19 GB moves."
+check: choice
 ```
 
 <!-- fade: active-param-bandwidth -->
@@ -236,29 +237,26 @@ prompt: |
       Step 1 - route:   l_0 = 2,  l_1 = -1,  l_2 = ____,  l_3 = 0
       Step 2 - select:  experts ____ and ____ run
       Step 3 - gate:    softmax over the SELECTED logits only
-                        g for the larger  = e^3 / (e^3 + e^2) = ____
+                        g for the larger  = ____
                         g for the smaller = ____
       Step 4 - combine: E_2(x) = [1, 0, 0],  E_0(x) = [0, 2, 0]
                         y = ____
 
-  Fill every blank. Show the arithmetic for the gates.
-answer: |
-  Step 1: l_2 = 1(2) + 0(-1) + 1(1) = 3. So l = [2, -1, 3, 0].
-  Step 2: the two largest are l_2 = 3 and l_0 = 2, so experts 2 and 0 run.
-  Step 3: e^3 = 20.086, e^2 = 7.389, sum = 27.475.
-          g_2 = 20.086 / 27.475 = 0.731
-          g_0 =  7.389 / 27.475 = 0.269
-  Step 4: y = 0.731*[1,0,0] + 0.269*[0,2,0] = [0.731, 0.538, 0].
-rubric: |
-  All four blanks required. Pass needs: l_2 = 3; experts 2 and 0 selected;
-  gates 0.731 / 0.269 (+/- 0.01) computed over the two selected logits ONLY;
-  y = [0.731, 0.538, 0]. Softmaxing over all four logits (giving roughly
-  0.696 / 0.256 and a y that sums to less than 1 of the expert mass) is the
-  single most common error - mark fail and name the renormalization rule.
-  Selecting experts 2 and 3, or averaging the experts unweighted, is a fail.
-# variant blanking: blank Step 2 and Step 3 to drill selection+gating;
-# blank Step 1 and Step 4 to drill the linear algebra at both ends.
-check: llm
+  Which filling of the blanks is correct?
+options:
+  - text: "$l_2 = 3$; experts 2 and 0 run; $g_2 = e^3/(e^3+e^2) = 20.086/27.475 = 0.731$ and $g_0 = 7.389/27.475 = 0.269$; $y = 0.731[1,0,0] + 0.269[0,2,0] = [0.731,\\; 0.538,\\; 0]$."
+    correct: true
+    explain: "Right. $l_2 = 1(2) + 0(-1) + 1(1) = 3$, the two largest of $[2,-1,3,0]$ are $l_2$ and $l_0$, and the softmax is taken over those two logits alone so the gates sum to 1."
+  - text: "$l_2 = 3$; experts 2 and 0 run; softmax over all four logits gives $g_2 = e^3/(e^2+e^{-1}+e^3+e^0) = 0.696$ and $g_0 = 0.256$; $y = [0.696,\\; 0.512,\\; 0]$."
+    misconception: M2
+    explain: "The gates must be renormalized over the selected set only. Softmaxing over all $N$ and keeping two weights leaves them summing to 0.952, so the block's write to the residual stream is silently scaled down by a token-dependent factor."
+  - text: "$l_2 = 3$; experts 2 and 3 run (the top score and the router's default row); $g = 0.953 / 0.047$; $y = 0.953[1,0,0] = [0.953,\\; 0,\\; 0]$."
+    misconception: M12
+    explain: "Top-$k$ is just the $k$ largest entries of $\\ell = [2,-1,3,0]$: that is $l_2 = 3$ and $l_0 = 2$. Row 3 is not a default or fallback handler, it is an expert that scored 0 and lost."
+  - text: "$l_2 = 3$; experts 2 and 0 run; the selected experts are averaged unweighted, $g_2 = g_0 = 0.5$; $y = [0.5,\\; 1,\\; 0]$."
+    misconception: M12
+    explain: "The gate weights are the point of the softmax: they carry how strongly the router preferred each selected expert, and they are the path by which $W_r$ receives gradient. An unweighted average discards both."
+check: choice
 ```
 
 ## Experts are not domain specialists
@@ -383,37 +381,27 @@ type: self-explain
 concept: c-moe-routing
 prompt: |
   You now have two facts: (a) the router is trained only by the next-token
-  loss, and (b) an auxiliary loss penalizes any routing distribution that
-  concentrates on a few experts.
+  loss, and (b) an auxiliary loss $L_{\text{aux}} = \alpha N \sum_i f_i P_i$
+  penalizes any routing distribution that concentrates on a few experts.
 
-  In your own words, explain why these two forces together make
-  *domain-specialist* experts unlikely to emerge - even though "one expert
-  per domain" would be a perfectly reasonable way to partition the work.
-  Then state what the experts do end up partitioning on.
-answer: |
-  Domain is a badly balanced variable. Training corpora are wildly
-  non-uniform across domains - far more general English than, say, Lisp - so
-  a domain partition would put hugely unequal token counts on different
-  experts, which is precisely what the load-balancing loss penalizes. The
-  aux loss wants every expert to see roughly 1/N of the tokens in every
-  batch, and domains cannot supply that. Meanwhile the LM loss is indifferent
-  to whether the partition is interpretable; it only rewards picking experts
-  that reduce loss on this token. So the router settles on a partition that is
-  (i) roughly equal-frequency and (ii) locally predictive - which turns out to
-  be token-level and syntactic: subword shape, punctuation, numerals,
-  whitespace, position-in-word. Specialization is real but emergent,
-  token-granular, and mostly not nameable.
-rubric: |
-  Pass requires BOTH: (1) the balance argument - domain frequencies in the
-  corpus are highly skewed, so a domain-based partition is exactly the kind
-  of imbalance the aux loss punishes; (2) the LM-loss argument - nothing in
-  the objective rewards interpretability, only per-token loss reduction.
-  Must also land that the emergent partition is token-level/syntactic rather
-  than semantic. One of the two arguments plus the correct conclusion =
-  partial. Answers that still describe the router as classifying content, or
-  that say experts specialize by domain "but the router is imperfect", are
-  M12 surviving - fail and re-state the failing prediction.
-check: llm
+  Which explanation correctly accounts for why *domain-specialist* experts do
+  not emerge - even though "one expert per domain" would be a perfectly
+  reasonable way to partition the work - and for what the experts do end up
+  partitioning on?
+options:
+  - text: "Domain is a badly balanced variable: corpora hold far more general English than, say, Lisp, so a domain partition gives wildly unequal $f_i$ - exactly what the aux loss punishes, since it wants each expert near $1/N$ of every batch. Meanwhile the LM loss rewards only per-token loss reduction and is indifferent to whether the partition is nameable. So the router settles on something roughly equal-frequency and locally predictive: subword shape, punctuation, numerals, whitespace."
+    correct: true
+    explain: "Both forces, correctly. The aux loss rules out the skew that any domain partition would produce, and nothing in the objective ever pays for interpretability - so the emergent partition is token-level and syntactic."
+  - text: "Specialists do form - the router really is classifying content - but the aux loss forces it to spread overflow onto neighbouring experts, so the domain structure is there and merely blurred by imperfect routing."
+    misconception: M12
+    explain: "This is the specialist story surviving as 'specialists plus noise'. The failing prediction still holds: routing changes token to token inside one sentence and again at every one of 48 layers. A French expert deselected between the article and the noun was never a French expert."
+  - text: "The router has its own training objective - the balance loss - which is a different goal from the LM loss, and optimizing that separate objective is what scrambles the domain partition the language model would otherwise have learned."
+    misconception: U7-M2
+    explain: "There is no separate router objective or training stage. $W_r$ is one linear layer inside the block receiving gradient through the gates $g_i$ from the same next-token loss; the aux term is added to that one objective, not optimized apart from it."
+  - text: "Each expert is effectively a small complete model, and complete models trained on the same data all learn much the same thing, so no expert can end up specialized in any particular domain."
+    misconception: U7-M3
+    explain: "An expert is one MLP sublayer in one layer of forty-eight - no attention, no embeddings, no output head. It maps a residual-stream vector to a residual-stream update and cannot be run alone."
+check: choice
 ```
 
 Say this precisely, because it is the takeaway: experts are parallel MLP blocks
@@ -466,23 +454,21 @@ prompt: |
       Step 5 - speedup:             ____ x
       Step 6 - RAM you must own:    ____ GB
 
-  Fill every blank. Step 6 is the one people get wrong.
-answer: |
-  Step 2: 6e9 * 0.5 = 3 GB read per token.
-  Step 3: 400 / 3 = 133.3 tok/s.
-  Step 4: 400 / 24 = 16.7 tok/s.
-  Step 5: 133.3 / 16.7 = 8x, which is just 48/6 = 8, the total/active ratio.
-  Step 6: 24 GB. All 48B of weights must be resident, because any expert may
-  be selected by the next token. MoE buys bandwidth, not capacity.
-rubric: |
-  Pass requires: 3 GB/token; 133 tok/s; 16.7 tok/s; 8x; and critically
-  Step 6 = 24 GB (full model resident). Answering 3 GB for Step 6 is the
-  "MoE saves memory" error (U7-M1) - automatic fail regardless of the other
-  five blanks, and the feedback must state that all experts stay resident.
-  Noticing that the speedup equals total/active exactly is a strong signal.
-# variant blanking: blank steps 3 and 6 to isolate the bandwidth/capacity
-# distinction; blank steps 2 and 5 to drill the ratio itself.
-check: llm
+  Which filling of the blanks is correct?
+options:
+  - text: "Step 2: 3 GB. Step 3: $400/3 = 133$ tok/s. Step 4: $400/24 = 16.7$ tok/s. Step 5: 8x, which is exactly the total/active ratio $48/6$. Step 6: 24 GB."
+    correct: true
+    explain: "Right, and Step 6 is the one that matters: all 48B stay resident because the next token may select any expert. The speedup equalling total/active is not a coincidence - both ceilings are $400$ divided by bytes read."
+  - text: "Step 2: 3 GB. Step 3: $400/3 = 133$ tok/s. Step 4: $400/24 = 16.7$ tok/s. Step 5: 8x. Step 6: 3 GB - only the active slice has to be held in RAM."
+    misconception: U7-M1
+    explain: "Total parameters set the capacity requirement; active parameters set the per-token bandwidth cost. Any expert may be selected by the next token, so all 24 GB must be resident - streaming 3 GB per token off a ~5 GB/s SSD would land you below the dense ceiling you were beating."
+  - text: "Step 2: 3 GB. Step 3: $400/3 = 133$ tok/s. Step 4: $400/24 = 16.7$ tok/s. Step 5: 8x. Step 6: 6 GB - enough to hold the 6B of active parameters plus room for the router and attention."
+    misconception: U7-M1
+    explain: "Same error in a more careful disguise. The active set is not a fixed 6B of weights you could keep resident - it is re-chosen per token and per layer, so the residency requirement is the full 24 GB."
+  - text: "Step 2: 24 GB, since a forward pass still touches every weight. Step 3: $400/24 = 16.7$ tok/s. Step 4: 16.7 tok/s. Step 5: 1x - MoE saves FLOPs, not memory traffic. Step 6: 24 GB."
+    misconception: M10
+    explain: "At batch 1 the unselected experts are never loaded, so only 3 GB moves; the FLOP saving and the bandwidth saving are the same ratio here. The union over experts only approaches the full model at large batch, which is a separate regime."
+check: choice
 ```
 
 The full comparison, all at 4-bit on the same 153 GB/s machine:
@@ -530,23 +516,23 @@ prompt: |
   handling 64 concurrent users. You batch their decode steps together: one
   forward pass advances all 64 sequences by one token.
 
-  Before reading on: what fraction of the 128 experts does that batched
-  forward pass have to load? Assume routing is well balanced, so each token
-  picks 8 experts roughly uniformly at random.
-answer: |
-  Almost all of them - about 126 of 128, or 98%. The probability a given
-  expert is missed by one token is (1 - 8/128) = 0.9375; missed by all 64
-  is 0.9375^64 = 0.016. So the expected number of distinct experts touched
-  is 128 * (1 - 0.016) = 125.9. The batch must read essentially the entire
-  35B model, and the MoE bandwidth advantage collapses to nothing.
-rubric: |
-  Must reach "nearly all of them" / >90%, and must give the reason: the
-  union of 64 independent top-8 selections covers almost the whole expert
-  set. Exact arithmetic not required, but the union-of-random-subsets
-  argument is. Answering "still 8" or "still 1/16 of them" is the key error -
-  it treats routing as a per-request property rather than a per-token,
-  per-layer one. Answering "half" without reasoning = partial.
-check: llm
+  Commit before reading on: what fraction of the 128 experts does that
+  batched forward pass have to load? Assume routing is well balanced, so
+  each token picks 8 experts roughly uniformly at random.
+options:
+  - text: "Nearly all of them - about 126 of 128. One token misses a given expert with probability $1 - 8/128 = 0.9375$, all 64 miss it with probability $0.9375^{64} = 0.016$, so $128(1 - 0.016) \\approx 125.9$ distinct experts are read and the bandwidth advantage collapses."
+    correct: true
+    explain: "Right. The union of 64 independent top-8 draws covers almost the whole pool, so the batched pass reads essentially all 35B. Note the irony: good load balancing is exactly what makes the union cover everything."
+  - text: "Still 8 of 128. The batch shares a routing decision per forward pass, so batching 64 users multiplies the tokens produced without changing which experts are loaded."
+    misconception: U7-M4
+    explain: "Routing is per token and per layer, never per pass or per request. Sixty-four tokens make sixty-four independent top-8 selections at every layer, and their union is nearly the whole set."
+  - text: "About 64 of 128 - roughly half. The experts each token selects overlap heavily with the others', so the batch converges on the commonly-used half of the pool."
+    misconception: M12
+    explain: "Heavy overlap on a favoured subset is what the aux loss is built to prevent; routing is close to uniform. Compute the union rather than guessing at overlap: $128(1 - (1 - 8/128)^{64}) \\approx 126$."
+  - text: "A number that grows with users but stays small: about 1/16 of the experts per user, so the serving node keeps the roughly 10x bandwidth win at any batch size."
+    misconception: U7-M4
+    explain: "The distinct-expert count grows as $N(1 - (1-k/N)^B)$ - 8 at $B{=}1$, 29 at $B{=}4$, 82 at $B{=}16$, 126 at $B{=}64$. The win is 10.6x at batch 1 and about 1.02x by batch 64: a small-batch, memory-bound win, not an unconditional one."
+check: choice
 ```
 
 The general shape: with $N$ experts, top-$k$, and batch size $B$, the expected
@@ -614,24 +600,21 @@ prompt: |
   They ask whether they should run a 4-bit 35B-A3B (19 GB) or a 4-bit dense
   8B (4.4 GB).
 
-  Give them the answer and the reason, in terms of which resource binds.
-  Then state the one machine change that would flip your recommendation.
-answer: |
-  The dense 8B. The 35B-A3B does not fit: all 128 experts must be resident,
-  so it needs 19 GB regardless of the fact that only 1.8 GB is read per
-  token. Capacity binds before bandwidth does, and a model that does not fit
-  runs at swap speed or not at all. The active-parameter advantage is
-  irrelevant when you cannot hold the total parameters.
-  The change that flips it: more RAM (32 GB+). Adding bandwidth would not
-  help - bandwidth is the resource MoE is good at spending capacity to save,
-  and they have no capacity to spend.
-rubric: |
-  Pass requires: (1) recommend the dense 8B; (2) the reason is capacity -
-  total params, not active params, set the RAM requirement; (3) the flip is
-  more RAM, not more bandwidth / not a faster GPU. Recommending the A3B
-  because "only 3B is active" is U7-M1 and is a fail. Saying "more bandwidth"
-  for the flip shows the two resources are still conflated - partial at best.
-check: llm
+  Which answer would you give them, and for which reason?
+options:
+  - text: "The dense 8B. The A3B needs all 128 experts resident, so it wants 19 GB whatever the 1.8 GB read per token says - capacity binds before bandwidth does, and a model that does not fit runs at swap speed or not at all. What would flip the recommendation is more RAM (32 GB+), not more bandwidth."
+    correct: true
+    explain: "Right on both counts. MoE spends the resource you have (capacity) to buy the one you lack (bandwidth); with no spare capacity there is nothing to spend, and adding bandwidth improves the resource MoE was already going to save you."
+  - text: "The 35B-A3B. Only 3.3B parameters are active per token, about 1.8 GB, which fits inside 8 GB comfortably - and you get the knowledge of a 35B for the footprint of a small model."
+    misconception: U7-M1
+    explain: "Active parameters are a bandwidth figure, not a residency figure. The selected set changes every token at every layer, so all 19 GB must be held; below about 19 GB it does not run."
+  - text: "The dense 8B, because 100 GB/s is too little bandwidth to feed an MoE's gather and scatter. What would flip it is a faster memory bus - at 400 GB/s the 35B-A3B becomes the better choice on this machine."
+    misconception: U7-M1
+    explain: "The recommendation is right but the reason is not, so the fix is wrong: bandwidth is the resource MoE saves. Tripling it still leaves 19 GB of weights with nowhere to sit; only more RAM changes the answer."
+  - text: "The 35B-A3B, keeping only the hot experts in the 8 GB and paging the rest from SSD as the router selects them - the working set is small enough that most selections hit RAM."
+    misconception: U7-M1
+    explain: "There is no stable working set: routing is re-decided per token per layer, so you would stream about 1.8 GB per token over a ~5 GB/s link - roughly 2.8 tok/s, worse than the dense ceiling you were trying to beat."
+check: choice
 ```
 
 **Where this leaves you.** The model narrating this book is 35B of trained

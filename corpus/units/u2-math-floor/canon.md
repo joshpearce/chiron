@@ -194,23 +194,44 @@ prompt: |
   forward pass, from $W_2 W_1 x$ to $W_1 W_2 x$. Both are square and the same
   size, so nothing crashes and the shapes still line up.
 
-  Before reading on, answer two things. (1) Is the resulting function the same?
-  (2) Is there any case where the swap is genuinely harmless?
-answer: |
-  (1) No. Matrix multiplication does not commute, so $W_2 W_1 \neq W_1 W_2$ in
-  general and the network now computes a different function. Same shapes only
-  means no type error, not same semantics.
-  (2) Yes, in special cases. If both matrices are diagonal they commute. If one
-  is a scalar multiple of the identity ($cI$) it commutes with everything.
-  Identical matrices commute with themselves. These are measure-zero cases;
-  learned weight matrices essentially never satisfy them.
-rubric: |
-  Must state that the function changes because matmul is not commutative, and
-  must distinguish "shapes still match" from "semantics preserved". Pass without
-  part (2). Fail if the learner says order does not matter, or reasons only about
-  shape compatibility. Answering "it might be fine, matrices are just numbers"
-  indicates U2-M3.
-check: llm
+  Before reading on, commit: is the resulting function the same, and is there any
+  case where the swap is genuinely harmless?
+options:
+  - text: |
+      No - the network now computes a different function. Matrix multiplication
+      does not commute, so $W_2 W_1 \neq W_1 W_2$ in general, and matching shapes
+      only mean there is no type error. The swap is harmless in special cases -
+      both matrices diagonal, one a scalar multiple of the identity $cI$, or the
+      two matrices equal - which learned weights essentially never satisfy.
+    correct: true
+    explain: |
+      Right. Composition order is semantics, not convention. With the rotation $R$
+      and the stretch $B = \begin{bmatrix} 2 & 0 \\ 0 & 1\end{bmatrix}$,
+      $(RB)e = \begin{bmatrix} 0 \\ 2\end{bmatrix}$ while
+      $(BR)e = \begin{bmatrix} 0 \\ 1\end{bmatrix}$ for $e = \begin{bmatrix} 1 \\ 0\end{bmatrix}$.
+      The commuting cases are measure-zero.
+  - text: |
+      Yes, the function is unchanged. Matrix multiplication is associative, so the
+      ordering of the factors is a convention; only how you group the parentheses
+      is a real choice, and that is an optimization question.
+    misconception: U2-M3
+    explain: |
+      Associativity lets you regroup - $(AB)C = A(BC)$, which is why LoRA computes
+      $B(Ax)$ rather than $(BA)x$. It does not let you swap factors. Commutativity
+      would, and $AB = BA$ only when the matrices share a full set of eigenvectors:
+      $RB = \begin{bmatrix} 0 & -1 \\ 2 & 0\end{bmatrix}$ against
+      $BR = \begin{bmatrix} 0 & -2 \\ 1 & 0\end{bmatrix}$.
+  - text: |
+      The computation is equivalent because nothing errored. Both matrices are
+      square and the same size, so every shape still lines up end to end; if the
+      swap changed the semantics the framework would have raised.
+    misconception: U2-M6
+    explain: |
+      Shape is the interface, not the implementation. Swapping two same-shaped
+      operands runs cleanly and silently computes a different function - the model
+      simply trains to a worse loss with no error anywhere. Shape checking rules
+      out one specific class of wiring error and is the first check, never the last.
+check: choice
 ```
 
 ## A matrix multiply by hand
@@ -394,23 +415,39 @@ prompt: |
 
   Before reading on, predict: which of $k_1$, $k_2$ is physically *closer* to
   $q$ in the plane, and does the ranking by distance agree with the ranking by
-  dot product? Commit to an answer before you compute anything.
-answer: |
-  $k_1$ is much closer - $\lVert q - k_1 \rVert \approx 2.53$ against
-  $\lVert q - k_2 \rVert \approx 8.54$ - and the two rankings disagree
-  completely. $k_1$ is the nearer vector and scores $1.8$; $k_2$ is over three
-  times farther away and scores $18$. The dot product is not a distance and is
-  not even a decreasing function of distance.
-rubric: |
-  Pass requires both: (1) $k_1$ identified as the closer vector (exact
-  distances not required - "the short one, obviously" is fine); (2) an explicit
-  statement that the distance ranking and the dot-product ranking disagree.
-  Partial = (1) with no statement about the disagreement, or a hedge that they
-  "usually" agree.
-  Fail and what it diagnoses: predicting that $k_2$ is closer because it scores
-  higher, or that the rankings must agree = U0-M6, and it means the next
-  paragraph must be delivered rather than skipped.
-check: llm
+  dot product? Commit before you compute anything.
+options:
+  - text: |
+      $k_1$ is much closer - $\lVert q - k_1 \rVert \approx 2.53$ against
+      $\lVert q - k_2 \rVert \approx 8.54$ - and the two rankings disagree
+      completely: the nearer vector scores $1.8$ while the one over three times
+      farther away scores $18$.
+    correct: true
+    explain: |
+      Right. The dot product is not a distance and is not even a decreasing
+      function of distance. The two quantities are related by
+      $\lVert u - v \rVert^2 = \lVert u \rVert^2 - 2(u \cdot v) + \lVert v \rVert^2$,
+      which ranks the same way only when all the norms are equal.
+  - text: |
+      $k_2$ is closer. It scores $18$ against $1.8$, and a larger dot product means
+      the vectors sit nearer one another, so the two rankings have to agree.
+    misconception: U0-M6
+    explain: |
+      Measure it instead: $\lVert q - k_1 \rVert \approx 2.53$ and
+      $\lVert q - k_2 \rVert \approx 8.54$. The higher-scoring key is over three
+      times farther away, so the score is rising as the distance grows - the exact
+      opposite of a proximity measure.
+  - text: |
+      $k_1$ is closer, but the two keys score identically: they point in exactly
+      the same direction, and the dot product measures how aligned two vectors are,
+      so scaling one of them cannot change its score.
+    misconception: U0-M2
+    explain: |
+      That describes cosine similarity, which is $0.6$ for both. The dot product is
+      the cosine multiplied by both magnitudes, so $q \cdot k_1 = 1.8$ and
+      $q \cdot k_2 = 18$ - ten times the score for zero change in direction. Your
+      vector database normalizes first; a transformer does not.
+check: choice
 ```
 
 <!-- refutes: U0-M6 -->
@@ -549,33 +586,57 @@ prompt: |
   We rejected "square the logits and normalize" using a specific counterexample:
   $z = (2, 1, 0)$ and $z = (-2, 1, 0)$ both produce $(0.8, 0.2, 0)$.
 
-  In your own words, explain what property of the exponential makes it survive
-  that test, and say what would go wrong during training if we used squaring
-  anyway. Two or three sentences.
-answer: |
-  $e^{z}$ is strictly increasing over the entire real line and strictly positive,
-  so a lower score always yields a strictly lower weight and sign information is
-  preserved. Squaring is not monotone on the reals - it folds negatives onto
-  positives - so the mapping from score to weight is not order-preserving and is
-  many-to-one. During training the gradient would push a logit in a direction
-  that reduces its own weight whenever the logit is negative, so the optimizer
-  gets a signal pointing the wrong way, and the network cannot express
-  "this option is strongly disfavored" at all.
-rubric: |
-  Must contain: (1) $e^z$ is monotone increasing and positive over all reals,
-  therefore order-preserving; (2) squaring folds sign / is not monotone on
-  negatives, so the score-to-weight map is not order-preserving. Both required to
-  pass. Full credit adds a training consequence (wrong-direction gradient, or
-  inability to express strong disfavor).
-  Answering only "exp makes things positive" is partial credit - normalization of
-  absolute values also makes things positive, so positivity alone is not the
-  discriminating property; probe for monotonicity.
-  Saying exp is used "to avoid overflow" or "for numerical stability" is
-  backwards - exp causes the overflow that the max-subtraction trick fixes - and
-  indicates M7-style numerics-first reasoning.
-  Saying softmax uses exp "because the outputs are probabilities and probabilities
-  are exponential" indicates M2.
-check: llm
+  Which explanation correctly says what property of the exponential survives that
+  test, and what would go wrong during training if we used squaring anyway?
+options:
+  - text: |
+      $e^{z}$ is strictly increasing and strictly positive over the entire real
+      line, so a lower score always yields a strictly lower weight and the sign of
+      a logit is preserved. Squaring folds negatives onto positives, so its
+      score-to-weight map is not order-preserving and is many-to-one; inside a
+      softmax it would hand the optimizer a gradient that raises an option's weight
+      as its negative logit falls, and the network could never express "strongly
+      disfavored" at all.
+    correct: true
+    explain: |
+      Right. Monotonicity over all of $\mathbb{R}$, not positivity, is what kills
+      squaring - and requirement 5, that only differences matter, is what then
+      forces the exponential specifically.
+  - text: |
+      The exponential's job is to make the numbers positive, since logits are
+      routinely negative and you cannot sample from negative weights. Squaring is
+      positive too but throws the sign away, so exp is simply the cleaner way of
+      handling negatives before normalizing.
+    misconception: U2-M1
+    explain: |
+      Positivity does not discriminate: $|z_i| / \sum_j |z_j|$ is also positive and
+      also broken. What exp alone gives you is
+      $e^{z_i}/e^{z_j} = e^{z_i - z_j}$ - differences turned into ratios - which is
+      the property requirement 5 forces, and normalization is the visible step that
+      hides it.
+  - text: |
+      The exponential keeps the computation numerically safe: it maps any real
+      logit into a well-behaved positive range so nothing overflows, whereas
+      squaring large logits would blow up in floating point and destabilize
+      training.
+    misconception: M7
+    explain: |
+      Backwards. $e^{z}$ is what threatens to overflow, which is why every
+      implementation subtracts $\max_j z_j$ first - free, because softmax is
+      shift-invariant. The exponential is there for order preservation and for
+      turning differences into ratios, not for float safety.
+  - text: |
+      Softmax outputs are probabilities that each option is correct, and
+      probabilities are exponential in the score - that is why exp is the right
+      function, and squaring would not produce valid probabilities.
+    misconception: M2
+    explain: |
+      Squaring and normalizing also produces non-negative numbers summing to 1,
+      which is all "valid distribution" means - it is rejected for breaking
+      monotonicity, not for failing to be a distribution. Softmax is a
+      differentiable soft-argmax parameterizing a sampling distribution; nothing
+      about exp makes those numbers correctness probabilities.
+check: choice
 ```
 
 ```beat
@@ -668,29 +729,52 @@ prompt: |
   confidently, so at least now I know what it really believes. At temperature 1 it
   was hedging."
 
-  Before reading on: what is wrong with both halves of that claim? Be specific
-  about which quantity changed and which did not.
-answer: |
-  Neither half holds. The logits are identical at $T = 0$ and $T = 1$ - the model
-  ran the same forward pass and produced the same numbers. Temperature is applied
-  after the logits, so it changes only how mass is distributed for sampling.
-  $T = 0$ is argmax over the same distribution, so it does not reveal a hidden
-  belief; it reveals the top-ranked option, which is already visible in the
-  $T = 1$ distribution as the largest probability. And "hedging" at $T = 1$ is not
-  uncertainty about correctness - a spread-out distribution reflects that many
-  continuations were frequent in training data after similar context. Confidence
-  displayed at any temperature is a frequency-shaped weighting, not a calibrated
-  probability of being right.
-rubric: |
-  Must identify that logits are unchanged across temperatures and that only the
-  sampling distribution shape changes (M6/M2 core). Must also reject the
-  "hedging = uncertainty about truth" reading, or at minimum state that softmax
-  mass is not a correctness probability.
-  Getting only the first point = partial credit.
-  Accepting that $T = 0$ reveals true belief indicates M6.
-  Accepting that the $T = 1$ spread measures the model's uncertainty about
-  correctness indicates M2.
-check: llm
+  Before reading on, commit: which reading is right about what changed and what
+  did not?
+options:
+  - text: |
+      Both halves fail. The logits are identical at $T = 0$ and $T = 1$ - the same
+      forward pass produced them - and temperature only rescales them downstream at
+      sampling time, so $T = 0$ is argmax over the same distribution and reveals
+      only the option already ranked top at $T = 1$. The spread at $T = 1$ is not
+      uncertainty about correctness either: it is a frequency-shaped weighting over
+      continuations, not a calibrated probability of being right.
+    correct: true
+    explain: |
+      Right on both counts. $p_i(T) = e^{z_i/T} / \sum_j e^{z_j/T}$ moves mass over
+      fixed logits and cannot reorder them, so nothing hidden is exposed at $T = 0$
+      and nothing about truth is being reported at $T = 1$.
+  - text: |
+      The first half is sound: $T = 0$ strips out the sampler's randomness, so what
+      is left is the model's actual belief. Only the second half is sloppy - the
+      "hedging" at $T = 1$ is the noise that temperature adds back in.
+    misconception: M6
+    explain: |
+      Nothing is added or removed. $T = 0$ is argmax over the very same numbers
+      that produced the $T = 1$ spread, and the top-ranked option is already visible
+      there as the largest probability. Ranking is invariant across every $T$,
+      because dividing by a positive number preserves order.
+  - text: |
+      The first half is wrong - the logits do not change - but the second half
+      stands: a spread-out distribution at $T = 1$ is the model reporting genuine
+      uncertainty about which answer is correct, which is what "hedging" describes.
+    misconception: M2
+    explain: |
+      Softmax mass is a normalized exponential weighting calibrated to how often
+      continuations followed similar context in training, not to truth. A quantity a
+      config flag can move from $0.117$ to $0.307$ with the model's computation
+      bit-identical throughout was never measuring correctness.
+  - text: |
+      Temperature is part of the forward pass, so at $T = 0$ the model computes
+      different, sharper logits than at $T = 1$; the colleague is reading a real
+      change in the model's own scores, which is why the answer came out confident.
+    misconception: M6
+    explain: |
+      Temperature is applied after the logits, often in the serving layer rather
+      than the model at all. With $z = (2, 1, 0)$ the logits are byte-identical at
+      every $T$; only $z/T$ entering the softmax differs, giving
+      $(0.867, 0.117, 0.016)$ at $T = 0.5$ and $(0.665, 0.245, 0.090)$ at $T = 1$.
+check: choice
 ```
 
 ## From derivative to gradient
@@ -839,28 +923,54 @@ id: u0-b6
 type: self-explain
 concept: c-notation
 prompt: |
-  In your own words, in two or three sentences: a transformer's MLP has a weight
-  matrix $W$ of shape $(d_{\text{model}}, d_{\text{ff}})$. What shape is
-  $\partial L / \partial W$, and what does one single entry of it tell you?
-answer: |
-  Same shape as $W$, namely $(d_{\text{model}}, d_{\text{ff}})$. Entry $(i,j)$
-  is the partial derivative of the scalar loss with respect to the single weight
-  $W_{ij}$: how much $L$ changes per unit increase in that one weight, holding
-  all other weights fixed. Matching shapes is what makes the entrywise update
-  $W \leftarrow W - \eta \, \partial L / \partial W$ well-defined.
-rubric: |
-  Must contain both: (1) the gradient has the SAME shape as $W$,
-  $(d_{\text{model}}, d_{\text{ff}})$ - stating the shape correctly is required,
-  not merely "same shape"; (2) one entry is the sensitivity of the scalar loss
-  to one individual weight (partial derivative w.r.t. $W_{ij}$).
-  Pass = both. Partial = (1) only, or (2) phrased as "how much that weight
-  matters" without the derivative/sensitivity idea.
-  Fail conditions and what they diagnose: calling the gradient a scalar or a
-  single direction = U0-M3. Giving the transposed shape
-  $(d_{\text{ff}}, d_{\text{model}})$ = numerator/denominator layout confusion,
-  re-teach the layout paragraph. Describing an entry as "the value the weight
-  should become" rather than a sensitivity = confusing gradient with update.
-check: llm
+  A transformer's MLP has a weight matrix $W$ of shape
+  $(d_{\text{model}}, d_{\text{ff}})$. Which account correctly states the shape of
+  $\partial L / \partial W$ and what one single entry of it tells you?
+options:
+  - text: |
+      Same shape as $W$, namely $(d_{\text{model}}, d_{\text{ff}})$. Entry $(i,j)$
+      is $\partial L / \partial W_{ij}$: how much the scalar loss $L$ moves per unit
+      increase in that one weight, holding every other weight fixed. The matching
+      shapes are what make the entrywise update
+      $W \leftarrow W - \eta \, \partial L / \partial W$ well-defined.
+    correct: true
+    explain: |
+      Right. The gradient is shaped like the thing you differentiate with respect
+      to, never like the loss - that is denominator layout, and it is why the update
+      rule is shape-correct by construction.
+  - text: |
+      It is a single number - the slope of the loss - which is what a derivative is.
+      The update $W \leftarrow W - \eta \, \partial L / \partial W$ subtracts that
+      one number from the weight matrix.
+    misconception: U0-M3
+    explain: |
+      That would move every weight by the identical amount in the identical
+      direction forever, making training a single global dial. There are
+      $d_{\text{model}} \times d_{\text{ff}}$ partial derivatives, one per weight,
+      and each weight gets its own step.
+  - text: |
+      Shape $(d_{\text{model}}, d_{\text{ff}})$, matching $W$ entry for entry. Entry
+      $(i,j)$ measures how important that weight is to the network - the large
+      entries are the load-bearing weights and the small ones are the ones you can
+      safely prune.
+    misconception: U2-M5
+    explain: |
+      Shape right, reading wrong. A partial derivative is a local sensitivity at
+      this exact point, not an attribution of the current loss. A weight sitting at
+      its optimum has gradient zero and can still be load-bearing, and the ranking
+      by gradient magnitude changes completely from step to step.
+  - text: |
+      Shape $(d_{\text{ff}}, d_{\text{model}})$, the transpose of $W$, and entry
+      $(i,j)$ is the value that weight should be moved to, since the gradient tells
+      you where the loss is minimized.
+    misconception: U2-M2
+    explain: |
+      Two errors. Frameworks use denominator layout, so the gradient is
+      $(d_{\text{model}}, d_{\text{ff}})$, entry for entry with $W$. And an entry is
+      computed entirely from the surface right here and carries no information about
+      where any minimum lies - which is why you take a small step $\eta$ and
+      recompute rather than jumping to a target value.
+check: choice
 ```
 
 ## The chain rule
@@ -940,7 +1050,7 @@ id: u2-b9
 type: completion
 concept: c-gradient
 prompt: |
-  Same network, new numbers. Fill in the four blanks.
+  Same network, new numbers.
 
   $$z = wx + b \qquad h = z^2 \qquad L = (h - y)^2$$
 
@@ -952,37 +1062,51 @@ prompt: |
   $L = (4 - 5)^2 = 1$
 
   Local derivatives:
-  $\dfrac{\partial L}{\partial h} = 2(h - y) = $ ____
-  $\dfrac{\partial h}{\partial z} = 2z = $ ____
+  $\dfrac{\partial L}{\partial h} = 2(h - y) = $ ____   <- A
+  $\dfrac{\partial h}{\partial z} = 2z = $ ____   <- B
   $\dfrac{\partial z}{\partial w} = x = 3$
 
   Chain them:
-  $\dfrac{\partial L}{\partial w} = $ ____
+  $\dfrac{\partial L}{\partial w} = $ ____   <- C
 
-  And state in one sentence why $\dfrac{\partial L}{\partial w}$ here has a larger
-  magnitude than the $-16$ we got in the worked example, even though the loss is
-  the same value of 1. ____
-answer: |
-  $\partial L / \partial h = 2(4 - 5) = -2$
-  $\partial h / \partial z = 2 \cdot 2 = 4$
-  $\partial L / \partial w = (-2)(4)(3) = -24$
-  Larger magnitude because $\partial z / \partial w = x$, and the input is $x = 3$
-  here versus $x = 2$ in the worked example; the two upstream factors are
-  identical, so the gradient scales directly with the input magnitude.
-rubric: |
-  All three numeric blanks must be exactly $-2$, $4$, and $-24$. A sign error on
-  $\partial L/\partial h$ (giving $+2$ and $+24$) is a fail - the sign is the part
-  that determines the update direction.
-  The explanation must attribute the difference to $\partial z/\partial w = x$
-  being larger, not to the loss, the weight, or the bias. Attributing it to the
-  loss value indicates the learner is treating the gradient as a function of the
-  loss magnitude alone rather than of the path.
-  Getting all three numbers but flubbing the explanation = partial credit.
-check: llm
-# fade: chain-rule, stage 2 of 3. Blanked steps are the two local derivatives and
-# the product, which carry the concept. Variant A: blank the forward pass instead
-# and give the derivatives (tests forward/backward separation). Variant B: blank
-# only the product and ask for dL/db as well (tests path reuse of dL/dh).
+  And why does $\dfrac{\partial L}{\partial w}$ here have a larger magnitude than
+  the $-16$ of the worked example, when the loss is the same value of 1? ____ <- D
+
+  Choose the filling that completes all four blanks.
+options:
+  - text: |
+      A $= -2$, B $= 4$, C $= (-2)(4)(3) = -24$. D: the magnitude is larger because
+      $\partial z / \partial w = x$, and the input is $x = 3$ here against $x = 2$
+      in the worked example; the two upstream factors are identical, so the gradient
+      scales directly with the input magnitude.
+    correct: true
+    explain: |
+      Right: $2(4 - 5) = -2$, $2 \cdot 2 = 4$, and $(-2)(4)(3) = -24$. The path sets
+      the magnitude and the input sits on that path, which is most of why input
+      normalization matters.
+  - text: |
+      A $= 2$, B $= 4$, C $= (2)(4)(3) = 24$. D: larger because the input $x = 3$ is
+      bigger than the $x = 2$ of the worked example, and the gradient scales with
+      the input.
+    misconception: U2-M2
+    explain: |
+      The magnitudes are right and the sign is not: $\partial L / \partial h = 2(h - y) = 2(4 - 5) = -2$,
+      so $\partial L / \partial w = -24$. The sign is the part that sets the update
+      direction. Sanity-check it: $h = 4$ sits below the target $y = 5$, so we want
+      $z$ bigger, so we want $w$ bigger, and $w \leftarrow w - \eta(-24)$ raises $w$.
+      A positive gradient would walk uphill.
+  - text: |
+      A $= -2$, B $= 4$, C $= (-2)(4)(3) = -24$. D: larger because $w$ carries more
+      of the blame for the loss in this network - a bigger gradient means more of
+      the current loss is attributable to that weight.
+    misconception: U2-M5
+    explain: |
+      Numbers right, story wrong. The loss is 1 in both networks; the only thing
+      that differs is one factor on the path, $\partial z / \partial w = x$. A
+      partial derivative is a local sensitivity, not a share of the loss - a
+      parameter sitting at its optimum has zero gradient and can still be
+      load-bearing.
+check: choice
 ```
 
 ## Loss surfaces and why SGD works anyway
@@ -1049,35 +1173,22 @@ prompt: |
   random seed. The final weight tensors are nothing alike, but both models score
   within noise of each other on every benchmark.
 
-  Explain in three or four sentences why this is expected rather than a bug, using
-  the dimensionality argument. Then say what you *would* conclude if the two runs
-  produced identical weights.
-answer: |
-  The loss surface lives in a space with billions of dimensions and has an
-  enormous number of distinct low-loss regions, so the seed - which sets weight
-  initialization and data order - selects which one the trajectory lands in.
-  There is no reason for two trajectories starting from different points to arrive
-  at the same place, and no need for them to. Matching benchmark scores show the
-  regions are of comparable quality, which is the property that matters; the
-  identity of the weights is not. Additionally, permutation symmetry means many
-  weight configurations compute the identical function, so even functionally
-  identical models need not have matching tensors.
-  Identical weights from different seeds would mean the run is not actually
-  seeded - some source of randomness is pinned or the initialization is
-  deterministic - which is a bug in the experiment, not a triumph of optimization.
-rubric: |
-  Must contain: (1) many distinct low-loss regions exist, and the seed selects
-  among them; (2) equivalent benchmark performance is the criterion, not weight
-  identity. Both required to pass. Credit for mentioning permutation symmetry or
-  wide-basin generalization as a bonus, not a requirement.
-  Answering that one run found the global minimum and the other found a local
-  minimum indicates M5 persists - the learner has kept the "one true minimum"
-  frame and merely relabeled the second run as a failure. This is the most common
-  failure mode; fail it explicitly.
-  Answering that high dimension means more local minima to get trapped in
-  indicates U2-M4.
-  Failing to flag identical weights as a seeding bug = partial credit.
-check: llm
+  Which explanation of that result is right - and which reading of "the two runs
+  came out with identical weights" goes with it?
+options:
+  - text: "A surface in $10^9$-plus dimensions has an astronomical number of distinct low-loss regions, and the seed - which fixes initialization and data order - selects which one the trajectory lands in. Comparable benchmark scores say the two regions are of comparable quality, which is the property that matters; weight identity is not, especially since permutation symmetry means many different tensors compute the same function. Identical weights across different seeds would mean some source of randomness is pinned - a bug in the experiment."
+    correct: true
+    explain: "Right. There is no reason two trajectories from different starting points should meet, and no need for them to. The seed picks a region; the benchmark checks the region is good. And because different seeds genuinely should diverge, matching tensors is evidence the seeding is broken, not evidence of convergence on a true answer."
+  - text: "One run reached the global minimum and the other settled in a nearby local minimum that happens to be almost as deep, which is why the scores are within noise. Identical weights from two seeds would be the ideal outcome - it would mean both runs found the one true optimum."
+    misconception: M5
+    explain: "This keeps the 'one true minimum' frame and just relabels the second run a near-miss. SGD is not hunting a unique optimum: it finds one of astronomically many good-enough low-loss regions, and which one depends on seed, data order and hardware nondeterminism. Nearly all of them are fine, so neither run is the failure."
+  - text: "With billions of parameters the surface has vastly more local minima to fall into, so each run gets trapped in a different one. The matching scores are luck; identical weights would show the optimizer had escaped the traps."
+    misconception: U2-M4
+    explain: "Backwards. Being trapped requires the surface to curve upward along all $d$ directions at once, so each added dimension is another chance for an escape route - entrapment gets rarer with scale, not commoner. Almost every critical point is a saddle, and minibatch gradient noise walks off saddles."
+  - text: "The weight tensors only look different because the loss landed at the same depth by chance; benchmark scores are too coarse to see the difference. A finer evaluation would separate the runs, and identical weights would simply mean the evaluation was finally sensitive enough."
+    misconception: M5
+    explain: "This still assumes there is a single correct set of weights that a sharp enough test would reveal. The regions really are different and really are of comparable quality - wide low-loss basins are the normal case, and 'found a different one this time' is not a measurement artifact to be resolved away."
+check: choice
 ```
 
 ### The floor is not zero

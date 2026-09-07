@@ -173,40 +173,24 @@ prompt: |
     Card A:  320 TFLOP/s bf16,  1.6 TB/s HBM
     Card B:  160 TFLOP/s bf16,  2.4 TB/s HBM
 
-  Card A has twice the FLOPs. Before reading on:
-
-  (a) Which card generates tokens faster, and by what ratio?
-  (b) How many of Card A's advertised FLOP/s does this workload actually use?
-  (c) What single change to the workload - not the hardware - would make Card
-      A the better choice?
-answer: |
-  (a) Card B, by 1.5x. Decode at batch 1 reads all 13B weights from HBM per
-  token: 26 GB per token. Card A: 1.6 TB/s / 26 GB = 61.5 tok/s. Card B:
-  2.4 / 0.026 = 92.3 tok/s. The ratio is exactly the bandwidth ratio,
-  2.4 / 1.6 = 1.5, because the FLOPs term never enters.
-
-  (b) The work is 2 x 13e9 = 26 GFLOP per token at 61.5 tok/s, which is
-  1.6 TFLOP/s of 320 - about 0.5%. Card A idles its arithmetic units 99.5% of
-  the time.
-
-  (c) Raise the batch size. Weight bytes are read once per forward pass and
-  shared across every sequence in the batch, so intensity grows with batch
-  while bytes stay fixed. Past a batch size around 200 (Card A's FLOPs/byte
-  balance) the workload becomes compute-bound and Card A's 2x arithmetic finally
-  buys something.
-rubric: |
-  Pass requires: (1) Card B, (2) the reason being that decode traffic is
-  weight bytes and the ceiling is bandwidth / bytes, (3) part (c) naming batch
-  size (or any batching-equivalent: larger batch, speculative decoding,
-  processing a prompt rather than generating).
-  Answering Card A, or "A for throughput and B for latency", is U10-M1 - the
-  spec-sheet comparison - and fails. The FLOPs number is not merely less
-  important here; it is not in the cost model at all.
-  Getting (a) right by intuition without the division is partial: ask for the
-  ratio, since the point is that it equals the bandwidth ratio exactly.
-  Answering (c) with "a faster card" or "more memory" misses that the regime,
-  not the hardware, is what has to change.
-check: llm
+  Card A has twice the FLOPs. Before reading on, commit to one answer: which
+  card decodes faster, by what ratio, how much of the winner's arithmetic the
+  workload uses, and what single change to the *workload* would make Card A the
+  better buy.
+options:
+  - text: "Card B, by exactly 1.5x. Batch-1 decode reads all 13B weights per token (26 GB), so the ceiling is bandwidth / bytes: 1.6/0.026 = 61.5 tok/s against 2.4/0.026 = 92.3 tok/s. The workload uses about 0.5% of Card A's 320 TFLOP/s. Raising the batch size past roughly 200 positions per pass makes it compute-bound and Card A wins."
+    correct: true
+    explain: "Right. The FLOPs term is not merely less important at batch 1 - it never enters the cost model, so the throughput ratio equals the bandwidth ratio 2.4/1.6 to two significant figures. Weight bytes are read once per forward pass and shared across the batch, so only batching raises intensity."
+  - text: "Card A, by about 2x. It has twice the arithmetic throughput and the model is the same on both cards, so the extra FLOP/s translate into roughly twice the tokens per second; nothing about the workload needs to change."
+    misconception: U10-M1
+    explain: "This is the spec-sheet comparison. At batch 1 each token requires 26 GFLOP but moves 26 GB, an intensity of 1 FLOP/byte against Card A's balance of 200 - the arithmetic units idle 99.5% of the time. Card A's extra FLOP/s buy exactly nothing here."
+  - text: "Card A for throughput and Card B for latency: A's arithmetic advantage shows up in aggregate tokens per second while B's bandwidth advantage only shortens the wait for the first token."
+    misconception: U10-M1
+    explain: "There is no such split at batch 1. Every decoded token requires the full 26 GB weight read, so bandwidth sets both the latency per token and the aggregate rate - which is why Card B wins on both by the same 1.5x."
+  - text: "Card B, by 1.5x, and the fix is better hardware: buy a card with both 320 TFLOP/s and 2.4 TB/s, since a decode loop at batch 1 has no free parameter left to change."
+    misconception: U10-M3
+    explain: "The card is right and the reason for it is right, but batch size is exactly the free parameter. Weight bytes stay fixed while FLOPs grow linearly with positions per pass, so intensity is 2 B_tok / b - the regime, not the hardware, is what has to move."
+check: choice
 ```
 
 ## Arithmetic intensity and the roofline
@@ -397,22 +381,21 @@ id: u10-b3
 type: completion
 concept: c-roofline
 prompt: |
-  Run the five-step roofline procedure on a workload you have not seen. Fill
-  in every blank.
+  Run the five-step roofline procedure on a workload you have not seen.
 
     Hardware:  peak 400 TFLOP/s bf16,  HBM bandwidth 2.0 TB/s
     Workload:  one forward pass over a dense 20B-parameter model, bf16 weights
                (2 bytes each), with 8 token positions in the pass
 
     Step 1 - FLOPs required:
-        2 * (parameters) * (positions) = 2 * 20e9 * 8 = ____(a)____ FLOPs
+        2 * (parameters) * (positions) = 2 * 20e9 * 8 = 3.2e11 FLOPs
 
     Step 2 - bytes across the HBM boundary:
         (parameters) * (bytes per weight) = 20e9 * 2 = 40e9 bytes
         (read once per pass, reused across all 8 positions)
 
     Step 3 - arithmetic intensity:
-        I = ____(a)____ / 40e9 = ____(b)____ FLOP/byte
+        I = 3.2e11 / 40e9 = ____(b)____ FLOP/byte
 
     Step 4 - machine balance and regime:
         B = 400e12 / 2.0e12 = ____(c)____ FLOP/byte
@@ -422,39 +405,25 @@ prompt: |
         attainable = ____(e)____ FLOP/s
         tokens per second = attainable / (FLOPs per token) = ____(f)____ tok/s
 
-    Step 6 - one sentence: the vendor releases a new card with the same 2.0 TB/s
-    and 800 TFLOP/s. State the new tokens-per-second figure and why.
+    Step 6 - the vendor releases a new card with the same 2.0 TB/s and
+    800 TFLOP/s. New tokens-per-second figure, and why:
         ____(g)____
-answer: |
-  (a) 2 * 20e9 * 8 = 3.2e11 FLOPs
-  (b) 3.2e11 / 40e9 = 8 FLOP/byte
-  (c) 400e12 / 2.0e12 = 200 FLOP/byte
-  (d) I = 8 is far below B = 200, so the workload is bandwidth-bound
-  (e) attainable = I * bandwidth = 8 * 2.0e12 = 1.6e13 = 16 TFLOP/s
-      (equivalently: 40e9 bytes / 2.0e12 B/s = 0.02 s per pass, 3.2e11 FLOPs
-      in 0.02 s = 1.6e13 FLOP/s)
-  (f) FLOPs per token = 2 * 20e9 = 4e10. So 1.6e13 / 4e10 = 400 tok/s
-      aggregate across the 8 sequences, i.e. 50 tok/s each.
-  (g) Unchanged at 400 tok/s. Doubling peak FLOP/s moves the compute roof and
-      the ridge point (B becomes 400 FLOP/byte), but the workload sits at
-      I = 8, on the bandwidth roof, and the bandwidth roof did not move. The
-      only levers are more bandwidth or higher intensity.
-rubric: |
-  (a) 3.2e11 exact. (b) 8 exact. (c) 200 exact. (e) 16 TFLOP/s (+/- 0.2).
-  (f) 400 tok/s aggregate (+/- 5); accepting 50 tok/s per sequence with the
-  aggregate shown is equally correct.
-  (d) and (g) carry the concept and must both be right to pass. (d) must name
-  bandwidth-bound with the comparison stated, not asserted. (g) must say the
-  figure does not change AND give the reason in roofline terms - the workload
-  is on the bandwidth roof and only the compute roof moved.
-  Answering (g) with "800 tok/s" or "twice as fast" is U10-M1 and is an
-  automatic fail regardless of (a)-(f), because it is the exact error the
-  procedure exists to prevent.
-  Pass = (d) and (g) correct AND at least three of (a), (b), (c), (e), (f).
-# variant blanking: blank (a) and (e) in one variant, (c) and (f) in another.
-# (d) and (g) should be blank in every variant - naming the regime and knowing
-# which roof a change moves are the two transferable skills.
-check: llm
+
+  Which filling of the blanks is correct?
+options:
+  - text: "(b) 8; (c) 200; (d) I = 8 is far below B = 200, so bandwidth-bound; (e) I x bandwidth = 8 * 2.0e12 = 1.6e13 FLOP/s; (f) 1.6e13 / 4e10 = 400 tok/s aggregate over the 8 sequences; (g) unchanged at 400 tok/s - doubling peak FLOP/s raises the compute roof and moves the ridge to B = 400, but the workload sits at I = 8 on the bandwidth roof, and that roof did not move."
+    correct: true
+    explain: "Right. The regime is named by the comparison, not asserted, and the ceiling is read off the binding roof. Only more bandwidth or higher intensity - more positions per pass, fewer bytes per weight - changes this number."
+  - text: "(b) 8; (c) 200; (d) bandwidth-bound; (e) 1.6e13 FLOP/s; (f) 400 tok/s; (g) 800 tok/s - peak FLOP/s doubled, so the attainable throughput and the token rate double with it."
+    misconception: U10-M1
+    explain: "Every blank before the last one is right, which is what makes this the dangerous answer: the procedure was run and then ignored. attainable = min(peak, I x bandwidth), and at I = 8 the min is the bandwidth term. Raising peak moves a roof the workload is nowhere near."
+  - text: "(b) 8; (c) 200; (d) I = 8 is far below B = 200, so compute-bound; (e) peak = 4.0e14 FLOP/s; (f) 4.0e14 / 4e10 = 10,000 tok/s; (g) 20,000 tok/s, since the ceiling is peak FLOP/s and peak doubled."
+    misconception: U10-M1
+    explain: "The regime is named backwards. I < B means the arithmetic units are starved and the ceiling is I x bandwidth; I > B is the case where peak binds. Taking peak as the answer whenever the number is available is the spec-sheet error the procedure exists to prevent."
+  - text: "(b) 8; (c) 200; (d) bandwidth-bound; (e) I x peak = 8 * 4.0e14 = 3.2e15 FLOP/s; (f) 3.2e15 / 4e10 = 80,000 tok/s; (g) 160,000 tok/s, doubling with peak."
+    misconception: U10-M2
+    explain: "Check the units: FLOP/byte x FLOP/s is not FLOP/s. Only I x bandwidth has the right dimensions, and the resulting 3.2e15 exceeds the machine's own peak, which is the tell. The bandwidth roof is what the arithmetic has to be fed through."
+check: choice
 ```
 
 Two corollaries worth carrying out of this section.
@@ -585,50 +554,23 @@ prompt: |
   description: "FlashAttention is a faster attention algorithm - it does less
   work."
 
-  In your own words: (a) say precisely what is wrong with that sentence,
-  (b) explain what actually changed, in roofline terms, and (c) explain why
-  the speedup was 4x and not, say, 65x, given that HBM traffic dropped by
-  about 65x.
-answer: |
-  (a) It does not do less work. FLOP counts are identical - the same 4 n^2 d
-  multiply-accumulates for QK^T and PV, and the same output values to the last
-  bit, since the online softmax rescaling is exact rather than approximate.
-  What changed is not the numerator.
-
-  (b) The denominator. The textbook version materializes the n x n score
-  matrix in HBM and reads it back, twice over, which for n = 8192 is 512 MiB of
-  traffic against 8 MiB of unavoidable Q/K/V/O traffic. That puts arithmetic
-  intensity at roughly 63 FLOP/byte, well below the H100's balance of 295, so
-  attention runs on the bandwidth roof at about a fifth of peak. Tiling into
-  SRAM removes the intermediate entirely, raising intensity to order n/b, which
-  crosses the ridge point and puts the same arithmetic on the compute roof.
-
-  (c) Because once you cross the ridge, further traffic reduction buys nothing -
-  the compute roof is flat. Attention was running at roughly 63/295 = 21% of
-  peak and can rise to at most 100%, which caps the attention speedup near 4.7x.
-  Cutting traffic by 65x when only 4.7x of it was binding wastes the surplus.
-  On top of that, attention is only part of the forward pass; the weight
-  matmuls did not change at all, so Amdahl caps the end-to-end number below
-  even the kernel-level one.
-rubric: |
-  Must contain all three: (1) FLOPs are unchanged and the output is exact, so
-  "less work" is wrong; (2) the change is HBM traffic / arithmetic intensity,
-  stated as a move from the bandwidth roof to the compute roof; (3) the
-  speedup saturates at the compute roof - traffic reduction past the ridge
-  point buys nothing, so 65x less traffic cannot produce 65x more speed.
-  Pass = all three in the learner's own phrasing.
-  Partial = (1) and (2) present, (3) answered only as "Amdahl / attention is
-  part of the model". That is true but secondary; the roofline saturation
-  argument is the one this section teaches, so probe for it.
-  Fail patterns to name:
-  - "it approximates the softmax to save memory" - this is the most common
-    wrong belief about FlashAttention and it is false; the algorithm is exact.
-    Correct it directly with the rescaling-by-e^(m-m') mechanism.
-  - "it reduces attention from O(n^2) to O(n)" - conflates memory traffic with
-    compute complexity. Compute is still O(n^2 d); it is HBM traffic that drops
-    to O(n d). This is M10 in a new costume - flag it.
-  - answers that credit "better parallelism" or "more cores used" are U10-M2.
-check: llm
+  Which explanation correctly says what is wrong with that sentence, what
+  actually changed in roofline terms, and why the speedup was 4x rather than
+  the 65x by which HBM traffic dropped?
+options:
+  - text: "It does not do less work: the FLOP count is identical, $4n^2d$ for $QK^T$ and $PV$, and the online-softmax rescaling by $e^{m-m'}$ makes the output bit-comparable to the batch computation. What changed is the denominator - the $n \\times n$ matrix $S$ is never written to HBM, so intensity rises from about 63 FLOP/byte to order $n/b$, carrying attention from the bandwidth roof across the ridge at $B = 295$ to the compute roof. The speedup saturates there: attention was at 63/295 = 21% of peak and can reach at most 100%, capping the kernel gain near 4.7x, and the weight matmuls did not change at all."
+    correct: true
+    explain: "Right on all three. The numerator is untouched, the traffic reduction is the whole mechanism, and once the workload crosses the ridge the compute roof is flat - cutting traffic 65x when only 4.7x of it was binding spends the surplus on nothing."
+  - text: "The sentence is roughly right in spirit: FlashAttention approximates the softmax so that the full $n \\times n$ score matrix never has to be formed, trading a small amount of numerical accuracy for a large reduction in memory. The speedup was only 4x because the approximation has to stay tight enough not to hurt long-context quality."
+    misconception: M7
+    explain: "FlashAttention is exact, not approximate. The running maximum $m$ and sum $\\ell$ are rescaled by $e^{m - m'}$ whenever a tile brings a larger maximum, so the streaming result reproduces the batch softmax. Framing the tiling as a numerical-safety trade misreads what the memory system is being protected from."
+  - text: "The sentence understates it: FlashAttention reduces attention from $O(n^2)$ to $O(n)$ by never forming the score matrix, so it genuinely does less work. The measured 4x is smaller than the asymptotic win only because $n = 8192$ is not yet large enough for the complexity difference to dominate."
+    misconception: M10
+    explain: "Compute is still $O(n^2 d)$ - every query is dotted with every key, tile by tile. What falls to $O(nd)$ is HBM traffic. Conflating bytes moved with operations performed is the same substitution that makes attention look linear because it is parallel."
+  - text: "The work is unchanged, but what improved is occupancy: tiling into SRAM lets far more warps stay resident and issue, so more of the chip's 132 SMs are doing useful arithmetic at once. The 4x is the ratio of achieved occupancy before and after."
+    misconception: U10-M2
+    explain: "The textbook kernel already saturates the cores; it is short of bytes, not of parallelism. A fused elementwise kernel runs at 100% occupancy and under 2% of peak for exactly this reason. Occupancy hides HBM latency - it does not create the bandwidth the old kernel was spending on $S$."
+check: choice
 ```
 
 ### The same lens on the KV cache
@@ -1019,57 +961,24 @@ prompt: |
   16-bit formats. The team makes two changes: they switch the storage format,
   and they delete the dynamic loss scaler and its overflow-detection logic.
 
-  Predict, before reading on:
-  (a) Why is deleting the loss scaler safe in bf16 when it was mandatory in
-      fp16? Be specific about which field of the format changed.
-  (b) bf16 has three fewer mantissa bits than fp16 - eight times coarser
-      resolution. Name the one place in the training loop where that coarseness
-      does bite, and what the standard fix is.
-  (c) The team also considers storing the AdamW moment estimates in bf16 to
-      save memory. Predict what happens.
-answer: |
-  (a) The exponent field. fp16 has 5 exponent bits, giving a smallest normal
-  value of 6.1e-5 and a smallest subnormal of 6.0e-8; gradients below that
-  flush to zero, so loss scaling exists purely to shift gradients up into
-  representable range. bf16 has 8 exponent bits - the same as fp32 - so its
-  floor is 1.2e-38 and no realistic gradient underflows. The mantissa loss is
-  irrelevant to that failure; range was always the binding constraint.
-
-  (b) The weight update. bf16's relative resolution is 2^-8, about 0.4%, so the
-  spacing of representable values just below 1.0 is 0.0039. A per-step update
-  of relative size 1e-4 - entirely typical - is more than an order of magnitude
-  below half a step, so w + dw rounds straight back to w and the update is lost
-  completely. The standard fix is fp32 master weights: the optimizer keeps an
-  fp32 copy of every parameter, applies updates to that, and casts down to bf16
-  for the forward and backward passes. This is why mixed-precision training
-  costs 16 bytes per parameter rather than 4.
-
-  (c) It degrades or destroys the run, for the same reason as (b) plus one
-  more. Adam's second moment v accumulates squared gradients: squaring a 1e-8
-  gradient gives 1e-16, which bf16 represents fine on range but with 0.4%
-  error, and the epsilon-regularized division amplifies error in the small-v
-  regime. More importantly both moments are exponential moving averages with
-  decay 0.9 / 0.999, so each step adds a contribution ~0.001 of the running
-  value - far below bf16's 0.4% resolution, so the accumulation stalls exactly
-  as the weight update does. Optimizer moments stay fp32 (or use a compensated
-  format like stochastic rounding).
-rubric: |
-  (a) MUST name the exponent field / dynamic range as the difference, not
-  "bf16 is more accurate" or "bf16 has more bits". Naming the specific floor
-  (fp16 ~6e-8 vs bf16 ~1e-38) is a strong pass.
-  (b) MUST land on the weight update / accumulation of small increments into
-  large values, and MUST name fp32 master weights as the fix. Answering
-  "the forward pass gets less accurate" is the U10-M4 error surviving - the
-  forward pass tolerates 0.4% fine, which is exactly M16's point about
-  quantization; flag the connection.
-  (c) Pass with any answer that identifies accumulation-of-small-increments as
-  the failure. Full credit for also noting the EMA decay rates make the
-  per-step contribution smaller than bf16's resolution.
-  Pass = (a) and (b) correct. (c) is the stretch.
-  Fail patterns: any answer framed as "16 bits means half the accuracy of 32
-  bits" (U10-M4); any answer that says bf16 is safe because it is "newer" or
-  "designed for ML" without naming the exponent.
-check: llm
+  Before reading on, commit to a prediction covering all three: why deleting
+  the scaler is safe in bf16, the one place bf16's eight-times-coarser mantissa
+  does bite and the standard fix, and what happens if the team also stores the
+  AdamW moment estimates in bf16.
+options:
+  - text: "The exponent field changed: fp16's 5 bits floor normals at $6.1 \\times 10^{-5}$ and subnormals near $6.0 \\times 10^{-8}$, so small gradients flush to zero and loss scaling exists to lift them; bf16 carries fp32's 8 exponent bits and a floor of $1.2 \\times 10^{-38}$, so nothing underflows. The coarseness bites at the weight update - with spacing 0.0039 below 1.0, a relative update of 1e-4 rounds $w + \\Delta w$ back to $w$ - and the fix is fp32 master weights. bf16 moments would stall the same way: the EMA decays 0.9 and 0.999 add about 0.001 of the running value per step, below bf16's 0.4% resolution."
+    correct: true
+    explain: "Right. Range is what training needs and mantissa is what it can spend, with one exception - accumulating small increments into large values - which is why mixed precision costs 16 bytes per parameter rather than 4."
+  - text: "bf16 is safe without a scaler because it simply has better numerical behaviour than fp16 at the same width, and the coarser mantissa bites in the forward pass, where activations and logits carry only 0.4% precision; the fix is to keep the forward pass in fp32. Storing the moments in bf16 would likewise make the optimizer step 0.4% less accurate - a proportional quality loss the run absorbs."
+    misconception: U10-M4
+    explain: "This is the bit-counting model surviving the port. The forward pass tolerates 0.4% perturbation without complaint - the same robustness that makes 4-bit weights viable. What breaks is not proportional error anywhere but increments vanishing entirely into a coarse accumulator."
+  - text: "Deleting the scaler is safe because bf16 has more mantissa headroom than fp16, so gradients round more gracefully instead of overflowing the format's maximum of 65,504. The coarseness bites in the attention softmax, where exponentials need fine resolution, and the fix is to compute the softmax in fp32. bf16 moments are fine, since the moments are averages and averaging cancels rounding error."
+    misconception: U10-M4
+    explain: "bf16 has fewer mantissa bits than fp16, not more, and the fp16 failure being repaired is underflow at the bottom of the range rather than overflow at the top. Rounding error in an EMA does not cancel - it accumulates in one direction and then stalls once the per-step contribution falls below one representable step."
+  - text: "The scaler can go because bf16 keeps values in a wider range, but the deeper reason both formats work at all is that low precision is really a numerical-stability question: 16-bit training needs normalization layers to keep activations from overflowing, and with LayerNorm present the format hardly matters. Moments in bf16 are safe for the same reason."
+    misconception: M7
+    explain: "Normalization conditions the optimization landscape; it is not a float-range guard, and removing it breaks a network in fp32 just as thoroughly. The fp16-versus-bf16 difference is entirely in the exponent field, and no normalization layer restores a gradient that has already rounded to zero."
+check: choice
 ```
 
 **fp8** pushes further and the same logic governs it. H100 and later support

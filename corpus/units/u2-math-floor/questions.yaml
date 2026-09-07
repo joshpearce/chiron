@@ -6,27 +6,28 @@
 pretest:
   - id: u2-p1
     concept: c-softmax
+    kind: mcq
     prompt: |
-      A language model's output layer produces a probability of 0.87 for one
-      token. State as precisely as you can what that 0.87 is a probability of.
-    answer: |
-      It is the weight that token receives in a sampling distribution over the
-      vocabulary, produced by exponentiating and normalizing the model's logits.
-      It is calibrated - to whatever extent it is calibrated at all - against how
-      often that token followed similar contexts in the training corpus. It is not
-      a probability that the token is correct, true, or the answer the user wants,
-      and it can be moved to a completely different value by a temperature setting
-      applied after the model has finished computing.
-    check: llm
-    rubric: |
-      Pass requires the answer to be about a sampling distribution over the
-      vocabulary and about training-data frequency, and to explicitly decline the
-      "probability of being correct" reading.
-      "Probability the token is right / true / what the model believes" = M2.
-      "Probability the model is 87 percent confident" without unpacking what
-      confidence means = partial credit, probe further.
-      Most learners fail this item. Failure is the intended calibration signal and
-      primes the softmax section; do not treat it as a deficit.
+      A language model's output layer produces a value of 0.87 for one token.
+
+      Which statement describes most precisely what that 0.87 is?
+    options:
+      - text: "The weight that token receives in a sampling distribution over the vocabulary, obtained by exponentiating and normalizing the logits, calibrated only against how often that token followed similar contexts in training data."
+        correct: true
+        explain: "Right. Softmax is a normalized exponential weighting of logits. In an output layer it parameterizes a sampling distribution over the vocabulary, and whatever calibration it has is to training-corpus frequencies, not to truth."
+      - text: "The probability that this token is the correct continuation - the model is 87 percent likely to be right here."
+        misconception: M2
+        explain: "Attractive because the numbers are non-negative and sum to 1, and every library calls them probabilities. But a correctness probability cannot be moved by a knob applied after the forward pass; a temperature setting reshapes this number with no new evidence anywhere in the system."
+      - text: "The model's internal confidence that it knows the answer, measured on its own belief scale."
+        misconception: M2
+        explain: "Attractive because a spread-out distribution looks like hedging. But the number is a frequency-shaped weighting over the vocabulary; nothing in the computation measures the model's belief about being right."
+      - text: "The fraction of training documents in which this exact token followed this exact context."
+        misconception: M4
+        explain: "Attractive because it makes the number auditable, like a row count in a store. But parameters define a function, not a table of counts; the model assigns weight to continuations that appear nowhere in the data at all."
+      - text: "The value that the model would report at temperature 0, since temperature 0 shows what it really believes."
+        misconception: M6
+        explain: "Attractive because temperature visibly changes behaviour. But temperature rescales fixed logits before sampling: at $T = 0$ the top option takes all the mass, so 0.87 is not what $T = 0$ reports, and no temperature reveals a hidden belief."
+    check: choice
 
   - id: u2-p2
     concept: c-gradient
@@ -41,69 +42,63 @@ pretest:
 
   - id: u2-p3
     concept: c-loss-surface
+    kind: mcq
     prompt: |
       Two engineers train an identical architecture on identical data, changing
       only the random seed. The resulting weight tensors have essentially nothing
       in common, yet the two models score within noise of each other on every
       benchmark.
 
-      Which run got closer to the minimum of the loss, and how would you tell?
-    answer: |
-      The question does not have an answer, because it presupposes a single
-      minimum that runs get closer to or further from. The loss surface in a
-      billion-dimensional parameter space has an enormous number of distinct
-      low-loss regions; the seed selects which one the trajectory reaches. Matching
-      benchmark scores mean the two regions are of comparable quality, which is the
-      only property that matters. Neither run is "closer".
-    check: llm
-    rubric: |
-      Pass requires rejecting the premise: there is no single minimum being
-      approached, and comparable held-out performance is the criterion rather than
-      proximity to any point.
-      Answering "compare final training loss, lower is closer" = M5, and is the
-      expected pretest failure.
-      Answering "whichever generalizes better" without rejecting the single-minimum
-      framing = partial credit.
+      Which run got closer to the minimum of the loss?
+    options:
+      - text: "The question has no answer: there is no single minimum being approached. The seed selects which of an enormous number of comparable low-loss regions the trajectory reaches, and matching held-out scores say the two regions are of comparable quality."
+        correct: true
+        explain: "Right. In a parameter space of $10^9$ to $10^{12}$ dimensions there are astronomically many good-enough low-loss regions. Neither run is 'closer' to anything; comparable performance is the only property that matters."
+      - text: "Whichever run reached the lower final training loss - that one descended further toward the minimum."
+        misconception: M5
+        explain: "Attractive because school calculus was about convex bowls with one bottom, and 'optimization' implies an optimum. But if training converged on the global minimum, two seeds would land at matching weights; they never do, and both models work."
+      - text: "The one with the smoother loss curve - it avoided getting trapped in local minima, which the other one fell into."
+        misconception: U2-M4
+        explain: "Attractive by extrapolation from the 2D picture, where a crater traps a downhill walker. But being trapped requires the surface to curve upward along all $d$ directions at once; with $d$ in the billions, almost every critical point is a saddle and minibatch noise walks off it."
+      - text: "Neither, because both runs stopped early - given enough steps they would converge to the same weights."
+        misconception: M5
+        explain: "Attractive because it preserves the single-minimum frame by blaming the budget. But runs trained to convergence still end at wildly different weights, not close under any permutation, and both perform equally well."
+      - text: "Whichever has the larger weights, since larger weights mean the model stored more of the training data."
+        misconception: M11
+        explain: "Attractive on a storage intuition: more capacity used, more learned. But capacity buys richer feature composition, not stored rows, and weight magnitude does not track held-out performance."
+    check: choice
 
 check:
   - id: u2-q1
     concept: c-matrix-transform
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
-    difficulty: core
     prompt: |
-      A weight matrix $W$ has shape $512 \times 2048$.
+      A weight matrix $W$ has shape $512 \times 2048$, and it is applied as $Wx$
+      with $x$ a column vector. During training a scalar loss $L$ is used.
 
-      (a) What is the dimension of the vectors it consumes, and of the vectors it
-      produces?
-      (b) Can two distinct inputs produce the same output? Justify from the shapes
-      alone.
-      (c) During training you compute $\partial L / \partial W$ for a scalar loss
-      $L$. What shape is it?
-    answer: |
-      (a) It consumes vectors in $\mathbb{R}^{2048}$ (the column count is the input
-      dimension) and produces vectors in $\mathbb{R}^{512}$ (the row count is the
-      output dimension).
-      (b) Yes, necessarily. The output space has dimension 512 and the input space
-      has dimension 2048, so the map cannot be injective - at least a
-      1536-dimensional subspace of inputs maps to zero, and every output has an
-      entire 1536-dimensional family of inputs producing it. Information is
-      destroyed and no inverse exists.
-      (c) $512 \times 2048$, the same shape as $W$. The gradient of a scalar with
-      respect to a tensor always has that tensor's shape.
-    check: llm
-    rubric: |
-      (a) Must map columns to input dimension and rows to output dimension.
-      Reversing them is the single most common failure and is a fail on this part.
-      (b) Must answer yes AND give the dimension-counting reason (output space
-      smaller than input space, so the map cannot be one-to-one). Answering yes
-      without a reason = partial credit. Answering "only if the weights happen to
-      be degenerate" misses that the shape alone forces it.
-      (c) Must be $512 \times 2048$. Answering "a scalar" or "$1 \times 512$"
-      indicates the learner has not internalized that gradients are shaped like the
-      parameter, which will break every backward pass they read in u5.
-      Pass = 2 of 3 parts, with (a) required.
+      Which line is correct on all three counts - the input dimension, whether two
+      distinct inputs can produce the same output, and the shape of
+      $\partial L / \partial W$?
+    options:
+      - text: "Consumes $\\mathbb{R}^{2048}$, produces $\\mathbb{R}^{512}$; two distinct inputs must collide, because a 2048-dimensional space cannot map one-to-one into a 512-dimensional one; $\\partial L / \\partial W$ is $512 \\times 2048$."
+        correct: true
+        explain: "Right. Columns tell you what the map eats, rows what it emits. The output space is smaller, so the map cannot be injective - a 1536-dimensional family of inputs shares each output. And the gradient of a scalar with respect to a tensor has that tensor's shape."
+      - text: "Consumes $\\mathbb{R}^{512}$, produces $\\mathbb{R}^{2048}$; distinct inputs must collide; $\\partial L / \\partial W$ is $512 \\times 2048$."
+        misconception: U2-M6
+        explain: "Attractive because the first number in a shape reads like 'the input size'. But $(Wx)_i = \\sum_{j=1}^{n} W_{ij} x_j$ runs $j$ over the columns, so the column count is the input dimension. Reading the type signature backwards is the wiring error shape-checking exists to catch."
+      - text: "Consumes $\\mathbb{R}^{2048}$, produces $\\mathbb{R}^{512}$; distinct inputs collide only if the learned weights happen to be degenerate; $\\partial L / \\partial W$ is $512 \\times 2048$."
+        misconception: U2-M6
+        explain: "Attractive because degeneracy is the usual cause of collisions among square matrices. But here the shapes alone force it: no map into a 512-dimensional space can be injective on a 2048-dimensional one, whatever the entries are."
+      - text: "Consumes $\\mathbb{R}^{2048}$, produces $\\mathbb{R}^{512}$; distinct inputs must collide; $\\partial L / \\partial W$ is a scalar, since $L$ is a scalar."
+        misconception: U2-M5
+        explain: "Attractive because one-variable calculus gives a derivative as a single number - a slope. But then the update $W \\leftarrow W - \\eta\\, \\partial L / \\partial W$ would subtract a scalar from a matrix, moving every weight identically forever. Each entry $(i,j)$ carries its own sensitivity."
+      - text: "Consumes $\\mathbb{R}^{2048}$, produces $\\mathbb{R}^{512}$; distinct inputs must collide; $\\partial L / \\partial W$ is $2048 \\times 512$."
+        misconception: U2-M6
+        explain: "Attractive because gradients feel like they should transpose, the way a backward pass transposes weights. But frameworks use denominator layout precisely so the entrywise update is shape-correct: the gradient is $512 \\times 2048$, entry for entry with $W$."
+    difficulty: core
+    check: choice
 
   - id: u2-q2
     concept: c-matmul
@@ -132,10 +127,9 @@ check:
 
   - id: u2-q3
     concept: c-dotprod
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
-    difficulty: core
     prompt: |
       A query $q = \begin{bmatrix} 2 \\ 1\end{bmatrix}$ is scored against three
       keys:
@@ -144,35 +138,29 @@ check:
       k_2 = \begin{bmatrix} 1 \\ 1\end{bmatrix} \quad
       k_3 = \begin{bmatrix} -1 \\ 2\end{bmatrix}$$
 
-      (a) Compute the three dot products.
-      (b) Which key wins on raw dot product?
-      (c) The cosine similarities are 0.894, 0.949, and 0.000 respectively. A
-      different key wins on cosine than on raw score. Explain why, in terms of what
-      the dot product actually measures.
-    answer: |
-      (a) $q \cdot k_1 = 6$, $q \cdot k_2 = 3$, $q \cdot k_3 = -2 + 2 = 0$.
-      (b) $k_1$, with a score of 6.
-      (c) The dot product is $\lVert q\rVert \lVert k\rVert \cos\theta$, so it
-      mixes alignment with magnitude. $k_1$ has length 3 while $k_2$ has length
-      $\sqrt{2} \approx 1.41$, so $k_1$ wins on raw score by being long, not by
-      being well-aligned. $k_2$ actually points more nearly in the direction of $q$
-      - cosine 0.949 versus 0.894 - but its shorter length costs it the raw
-      comparison. Cosine similarity divides the magnitudes out and reports
-      alignment alone. $k_3$ scores exactly zero because it is perpendicular to
-      $q$, which is a statement about direction and holds regardless of its length.
-    check: llm
-    rubric: |
-      (a) Must be exactly 6, 3, 0. Any arithmetic error fails part (a).
-      (c) Must state that the dot product confounds magnitude with alignment, and
-      must attribute $k_1$'s win specifically to its larger norm. Full credit
-      identifies that cosine normalizes the magnitudes away.
-      Answering that $k_1$ is "more semantically similar" because it scored higher
-      indicates the learner is reading dot product as pure similarity and will
-      misread attention score matrices in u3.
-      Answering that $k_3$ scores zero "because it has a negative component"
-      indicates a sign-level rather than geometric reading; the correct reason is
-      perpendicularity.
-      Pass = (a) exact and (c) naming magnitude as the confound.
+      The cosine similarities are 0.894, 0.949 and 0.000 respectively, so a
+      different key wins on cosine than on raw dot product.
+
+      Which line gives the three dot products and the right reason for the
+      disagreement?
+    options:
+      - text: "$6$, $3$, $0$. $k_1$ wins on raw score because $\\lVert k_1\\rVert = 3$ against $\\lVert k_2 \\rVert = \\sqrt{2}$: the dot product is $\\lVert q\\rVert \\lVert k\\rVert \\cos\\theta$, so it confounds magnitude with alignment, and cosine divides the magnitudes out."
+        correct: true
+        explain: "Right. $k_2$ points more nearly along $q$ (0.949 against 0.894) but is shorter, so it loses the raw comparison on length alone. $k_3$ scores exactly 0 because it is perpendicular to $q$."
+      - text: "$6$, $3$, $0$. $k_1$ wins on raw score because it is the most similar key to $q$; cosine similarity is a cruder approximation that has thrown away information."
+        misconception: U0-M2
+        explain: "Attractive because embedding databases store unit-length vectors, where the dot product and the cosine are literally the same number. That is a property of the normalization, not of the dot product: nothing here is normalized, so the score rewards $k_1$ for being long."
+      - text: "$6$, $3$, $0$. $k_3$ scores zero because it has a negative component, and a negative entry cancels a positive one; nothing about direction is involved."
+        misconception: U0-M2
+        explain: "Attractive because the arithmetic does show $-2 + 2$. But the zero is geometric: $a \\cdot b = \\lVert a\\rVert \\lVert b\\rVert \\cos\\theta$ vanishes exactly when $\\theta = 90^\\circ$, and it stays zero however long $k_3$ is made."
+      - text: "$6$, $3$, $0$. $k_1$ wins on raw score because it is closest to $q$ in the plane, and the dot product falls off with distance."
+        misconception: U0-M6
+        explain: "Attractive because 'nearest neighbour' is the operation you actually run in a vector store. But $\\lVert q - k_1 \\rVert = \\sqrt{2}$ while $\\lVert q - k_2 \\rVert = \\sqrt{1} = 1$, so $k_2$ is the nearer key and still scores lower. The dot product is not a distance."
+      - text: "$5$, $3$, $0$. The disagreement is a rounding artefact in the quoted cosine values; on exact arithmetic the two rankings agree."
+        misconception: U0-M2
+        explain: "The first product is $q \\cdot k_1 = (2)(3) + (1)(0) = 6$, not 5. And the disagreement is real, not rounding: raw score ranks $k_1$ first, cosine ranks $k_2$ first, because only one of the two divides out the norms."
+    difficulty: core
+    check: choice
 
   - id: u2-q4
     concept: c-softmax
@@ -215,57 +203,34 @@ check:
 
   - id: u2-q6
     concept: c-softmax
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
-    difficulty: stretch
     prompt: |
       Someone proposes replacing softmax with "square each logit and divide by the
-      sum of squares" on the grounds that it is cheaper and still produces
+      sum of squares", on the grounds that it is cheaper and still produces
       non-negative numbers summing to 1.
 
-      (a) Give a specific numeric counterexample that kills it. Use three logits
-      and show the resulting weights.
-      (b) State the requirement on the score-to-weight map that forces an
-      exponential specifically, rather than merely forcing something positive.
-      (c) Explain what that requirement has to do with the fact that logits have no
-      absolute zero.
-    answer: |
-      (a) With $z = (2, 1, 0)$ the squares are $(4, 1, 0)$, summing to 5, giving
-      $(0.8, 0.2, 0.0)$. With $z = (-2, 1, 0)$ the squares are identical, so the
-      weights are identical: $(0.8, 0.2, 0.0)$. The option the network scored
-      lowest received the largest weight. Squaring is not monotone on the reals; it
-      folds the negative half onto the positive half and discards sign, which is
-      most of the information in a logit.
-      (b) The map $f$ must satisfy $f(z_i)/f(z_j) = g(z_i - z_j)$: the ratio of any
-      two weights must depend only on the difference of the corresponding scores.
-      Equivalently, adding a constant to every logit must leave the output
-      distribution unchanged. Reducing to $g(s+t) = g(s)g(t)$, the only continuous
-      positive solutions are $g(s) = e^{\beta s}$, so exponentials are not merely
-      sufficient but unique.
-      (c) Logits are produced by an unconstrained linear layer and have no
-      reference point - there is no score that means "neutral", and nothing
-      observable distinguishes the logit vector $z$ from $z + c\mathbf{1}$. So the
-      distribution must be invariant to that shift, which is exactly the
-      shift-invariance requirement in (b). The exponential delivers it by turning
-      the additive constant into a multiplicative factor $e^{c}$ that cancels
-      between numerator and denominator. This is also why implementations subtract
-      $\max_j z_j$ before exponentiating: the output is provably unchanged and it
-      prevents overflow.
-    check: llm
-    rubric: |
-      (a) Must give a pair of logit vectors differing in the sign of a component
-      and show identical outputs, or otherwise demonstrate non-monotonicity
-      numerically. An assertion without numbers is a fail on this part.
-      (b) Must state shift-invariance or the differences-to-ratios property. Stating
-      only "exp is positive" is a fail - absolute-value normalization is also
-      positive and is also wrong, so positivity does not discriminate.
-      (c) Must connect the absence of an absolute zero for logits to the
-      shift-invariance requirement.
-      Pass = (a) plus (b). Full credit = all three.
-      Answering "exp is used for numerical stability" inverts cause and effect and
-      indicates M7-style numerics-first reasoning.
-      This is the stretch item for the >90% path.
+      Which line pairs a counterexample that kills the proposal with the
+      requirement that forces an exponential specifically?
+    options:
+      - text: "$z = (2, 1, 0)$ and $z = (-2, 1, 0)$ both give $(0.8, 0.2, 0.0)$, so the lowest-scored option takes the most weight. The forcing requirement is that only score differences may matter - $f(z_i)/f(z_j) = g(z_i - z_j)$, reducing to $g(s+t) = g(s)g(t)$, whose only continuous positive solutions are $g(s) = e^{\\beta s}$."
+        correct: true
+        explain: "Right. Squaring is not monotone on the reals: it folds the negative half onto the positive half and discards sign. And shift-invariance is what singles out the exponential, because logits come from an unconstrained linear layer and have no absolute zero - nothing distinguishes $z$ from $z + c\\mathbf{1}$, and $e^{c}$ cancels between numerator and denominator."
+      - text: "$z = (2, 1, 0)$ and $z = (-2, 1, 0)$ both give $(0.8, 0.2, 0.0)$, so the lowest-scored option takes the most weight. The forcing requirement is that the weights be non-negative, which $e^{z} > 0$ guarantees for every real $z$."
+        misconception: U2-M1
+        explain: "The counterexample is right, but positivity does not discriminate: $|z_i| / \\sum_j |z_j|$ is also non-negative and also sums to 1, and it is also wrong. Positivity is satisfied by many maps; turning differences into ratios is satisfied by exactly one family."
+      - text: "Squaring is fine on monotonicity but overflows on large logits. The exponential is chosen because $e^{z}$ with the max subtracted is the numerically stable way to normalize scores."
+        misconception: M7
+        explain: "This inverts cause and effect. Exponentiating is what creates the overflow risk; subtracting $\\max_j z_j$ is free repair, provably leaving the output unchanged. And squaring does fail monotonicity - $(2,1,0)$ and $(-2,1,0)$ give identical weights."
+      - text: "No counterexample exists for three logits; the proposal only breaks once the vocabulary is large. Softmax is preferred because its outputs are genuine probabilities of correctness and squared weights are not."
+        misconception: M2
+        explain: "Three logits are enough: $(2,1,0)$ and $(-2,1,0)$ both give $(0.8, 0.2, 0.0)$. And softmax outputs are not correctness probabilities either - a temperature knob reshapes them with no new evidence, which is exactly what a correctness probability could not do."
+      - text: "$z = (2, 1, 0)$ and $z = (-2, 1, 0)$ both give $(0.8, 0.2, 0.0)$. The forcing requirement is that the map be differentiable everywhere, which squaring fails at zero."
+        misconception: U2-M1
+        explain: "The counterexample is right, but the diagnosis is not: $z^2$ is differentiable everywhere, including at zero - it is $|z|$ that has the kink. Differentiability is a requirement softmax must meet, but it is shift-invariance that picks out the exponential uniquely."
+    difficulty: stretch
+    check: choice
 
   - id: u2-q7
     concept: c-softmax
@@ -301,48 +266,35 @@ check:
 
   - id: u2-q9
     concept: c-gradient
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
-    difficulty: core
     prompt: |
       A network computes $z = wx + b$, then $h = z^2$, then $L = (h - y)^2$.
 
-      With $x = 4$, $w = 1$, $b = -2$, $y = 1$:
+      With $x = 4$, $w = 1$, $b = -2$, $y = 1$, the forward pass gives $z = 2$,
+      $h = 4$, $L = 9$.
 
-      (a) Run the forward pass, reporting $z$, $h$, and $L$.
-      (b) Compute $\partial L / \partial w$ and $\partial L / \partial b$ by the
-      chain rule, showing each local derivative.
-      (c) The gradient with respect to $w$ is positive here, where it was negative
-      in the worked example. Say what that sign means for the update, and check it
-      against the forward values.
-    answer: |
-      (a) $z = 1 \cdot 4 + (-2) = 2$, $h = 2^2 = 4$, $L = (4 - 1)^2 = 9$.
-      (b) Local derivatives: $\partial L/\partial h = 2(h - y) = 2(4 - 1) = 6$;
-      $\partial h/\partial z = 2z = 4$; $\partial z/\partial w = x = 4$ and
-      $\partial z/\partial b = 1$.
-      Chaining: $\partial L/\partial w = 6 \cdot 4 \cdot 4 = 96$ and
-      $\partial L/\partial b = 6 \cdot 4 \cdot 1 = 24$.
-      (c) A positive gradient means increasing $w$ increases the loss, so the
-      descent update $w \leftarrow w - \eta \,\partial L/\partial w$ decreases $w$.
-      That checks out: $h = 4$ overshoots the target $y = 1$, so we want $h$
-      smaller, hence $z$ smaller, hence $w$ smaller. The sign agrees with the
-      forward values.
-    check: llm
-    rubric: |
-      (a) Must be $z = 2$, $h = 4$, $L = 9$.
-      (b) Must be $\partial L/\partial w = 96$ and $\partial L/\partial b = 24$,
-      with the three local factors 6, 4, and 4 (or 1) shown. A sign error anywhere
-      is a fail - the sign is what determines update direction, and getting the
-      magnitude right with the wrong sign is worse than useless.
-      (c) Must state that a positive gradient means the update decreases $w$, and
-      must ground that in $h > y$.
-      Reporting $\partial L/\partial b$ as equal to $\partial L/\partial w$
-      indicates the learner did not apply $\partial z/\partial b = 1$ and is
-      pattern-matching rather than tracing the path.
-      Pass = (a) and (b) exact. Full credit adds (c).
-      This is the solo stage of the chain-rule fade sequence; it must be scheduled
-      after u2-b9, and it is the primary callback item for u5's backprop section.
+      Which line gives $\partial L / \partial w$ and $\partial L / \partial b$
+      together with the right reading of the sign?
+    options:
+      - text: "$\\partial L/\\partial w = 96$ and $\\partial L/\\partial b = 24$, from local factors $\\partial L/\\partial h = 6$, $\\partial h/\\partial z = 4$, and $\\partial z/\\partial w = 4$ or $\\partial z/\\partial b = 1$. Positive means the update $w \\leftarrow w - \\eta\\,\\partial L/\\partial w$ decreases $w$, which agrees with $h = 4$ overshooting $y = 1$."
+        correct: true
+        explain: "Right. $\\partial L/\\partial h = 2(4-1) = 6$, $\\partial h/\\partial z = 2z = 4$, and the two paths differ only in the last factor. Since $h$ is above the target, we want $z$ smaller, hence $w$ smaller - the sign agrees with the forward values."
+      - text: "$\\partial L/\\partial w = -96$ and $\\partial L/\\partial b = -24$. Negative means increasing $w$ reduces the loss, so the update raises $w$ toward the target."
+        misconception: U2-M2
+        explain: "Attractive because the worked example came out negative and the shape of the computation looks the same. But there $h = 4$ was below $y = 5$; here $h = 4$ is above $y = 1$, so $\\partial L/\\partial h = 2(h-y) = +6$ and the whole chain is positive. Sign-checking against the forward values catches this in ten seconds."
+      - text: "$\\partial L/\\partial w = 96$ and $\\partial L/\\partial b = 96$. Both parameters feed the same node $z$, so they inherit the same sensitivity; positive means the update decreases both."
+        misconception: U2-M5
+        explain: "Attractive because $w$ and $b$ do share the upstream factors $\\partial L/\\partial h$ and $\\partial h/\\partial z$. But the last factor differs: $\\partial z/\\partial w = x = 4$ while $\\partial z/\\partial b = 1$, giving 96 against 24. The bias is not multiplied by the input."
+      - text: "$\\partial L/\\partial w = 96$ and $\\partial L/\\partial b = 24$. The large gradient on $w$ shows $w$ is the more important parameter of the two, and the sign says the loss is currently heading upward."
+        misconception: U2-M5
+        explain: "The numbers are right and the sign reading is not. A partial derivative is a local sensitivity at this exact point, not an attribution of importance - $w$'s factor is larger only because it multiplies $x = 4$. And the sign says increasing $w$ would increase $L$, so the update moves $w$ down; the loss under the update falls."
+      - text: "$\\partial L/\\partial w = 24$ and $\\partial L/\\partial b = 96$, since $\\partial z/\\partial b$ carries the input $x = 4$ and $\\partial z/\\partial w$ is 1. Positive means the update decreases both."
+        misconception: U2-M6
+        explain: "The two paths have been swapped. In $z = wx + b$, differentiating with respect to $w$ leaves $x = 4$ and differentiating with respect to $b$ leaves 1, so the weight gets 96 and the bias 24 - which is most of why input normalization matters."
+    difficulty: core
+    check: choice
 
   - id: u2-q10
     concept: c-gradient
@@ -370,7 +322,7 @@ check:
 
   - id: u2-q11
     concept: c-loss-surface
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     difficulty: core
@@ -378,40 +330,29 @@ check:
       A colleague proposes: "Let us run 50 seeds and keep the model with the lowest
       final training loss, since that one got closest to the true minimum."
 
-      Critique the proposal. Address both the framing and whether the selection
-      procedure is a good idea on its own terms.
-    answer: |
-      The framing is wrong. There is no single true minimum being approached. The
-      surface has an astronomical number of distinct low-loss regions and the seed
-      selects which one the trajectory reaches, so "closest to the minimum" is not
-      a quantity any run has. Permutation symmetry alone means functionally
-      identical networks can have completely different weights, so even a
-      well-defined optimum would be an enormous orbit rather than a point.
-      The selection procedure is also wrong on its own terms, for a separate and
-      more practical reason: selecting on training loss selects for memorization.
-      The run with the lowest training loss is the one that fit its training set
-      hardest, which is anticorrelated with held-out performance past a point.
-      What would be defensible: run the seeds, select on validation loss or on
-      benchmark performance, and expect the spread across seeds to be small. If it
-      is large, the finding is that the setup is high-variance, which is a reason
-      to fix the setup rather than to cherry-pick a seed.
-    check: llm
-    rubric: |
-      Must contain both: (1) rejection of the single-minimum framing - many
-      low-loss regions exist, the seed selects among them, "closest" is undefined;
-      (2) identification that selecting on training loss selects for memorization
-      and that validation or held-out performance is the right criterion.
-      Only (1) = partial credit. Only (2) = partial credit and indicates M5
-      persists even though the practical instinct is sound.
-      Accepting the "true minimum" framing and merely debating the selection
-      criterion = M5, fail.
-      Arguing that a lower training loss run must have found a deeper basin
-      indicates M5 combined with M18 - the learner is treating lower loss as
-      monotonically better with no floor and no overfitting regime.
+      Which response is correct on both counts - the framing and the selection
+      procedure?
+    options:
+      - text: "Both halves are wrong: there is no single true minimum being approached (the surface has astronomically many distinct low-loss regions and the seed selects among them), and selecting on training loss selects for memorization - select on validation or benchmark performance instead."
+        correct: true
+        explain: "Both errors named. 'Closest to the minimum' is not a quantity any run has: permutation symmetry alone means functionally identical networks can have completely different weights. And the run that fit its training set hardest is anticorrelated with held-out performance past a point, so held-out loss is the criterion. A small spread across seeds is expected; a large one is a finding about the setup, not a seed to cherry-pick."
+      - text: "The framing is fine - runs do approach the minimum at different rates - but the selection should use validation loss rather than training loss."
+        misconception: M5
+        explain: "Attractive because the practical instinct is sound: validation loss is indeed the right criterion. But it keeps the single-minimum frame. SGD finds one of astronomically many good-enough low-loss regions; two seeds land in different ones and both work, so no run is 'closer' to anything."
+      - text: "The proposal is sound: lower final training loss means the run found a deeper basin, so it is the better model."
+        misconception: M18
+        explain: "Treats loss as monotonically better all the way down, with no floor and no overfitting regime. Cross-entropy has an irreducible floor set by the entropy of the data; a training loss driven unusually low is a symptom of memorization, not depth of basin."
+      - text: "Running many seeds is pointless: with enough parameters every seed converges to the same function, so the 50 runs will have near-identical training loss anyway."
+        misconception: U2-M4
+        explain: "Inverts the dimensionality argument. High dimension does not funnel every trajectory to one answer; it makes distinct low-loss regions abundant. Seeds land in different regions with different weights, and scores agree only within noise."
+      - text: "The framing is wrong because more parameters means more local minima, so with 50 seeds most runs are trapped - keep the lowest-loss one as the only escapee."
+        misconception: U2-M4
+        explain: "Extrapolates the 2D crater picture. Entrapment requires upward curvature along all $d$ directions at once, so it gets rarer with scale, not commoner; nearly every critical point is a saddle and minibatch noise walks off it."
+    check: choice
 
   - id: u2-q12
     concept: c-loss-surface
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     difficulty: stretch
@@ -420,44 +361,28 @@ check:
       each of the $d$ parameter directions. The point is a local minimum only if it
       curves up along all $d$ of them.
 
-      (a) Treat the $d$ directions as independent fair coin flips. For a model with
-      $d = 10^{9}$ parameters, what is the probability that a given critical point
-      is a local minimum? Give the order of magnitude.
-      (b) State the conclusion this supports about the folk claim that more
-      parameters means more local minima to get trapped in.
-      (c) The independence assumption is false. Say what the real curvature
-      structure looks like and what it means training actually struggles with.
-    answer: |
-      (a) $2^{-10^{9}}$, which in base 10 is about $10^{-301029996}$. This is not a
-      small probability; it is zero for every practical purpose.
-      (b) The folk claim is backwards. Being trapped requires a conjunction over
-      all $d$ directions, so each added dimension roughly halves the probability of
-      entrapment. High dimension makes local minima vanishingly rare above the very
-      bottom of the loss range; nearly every critical point is a saddle with at
-      least one escape direction, and minibatch gradient noise finds those
-      directions.
-      (c) Curvature directions are strongly correlated. The Hessian is not a random
-      sign pattern - it has a small number of large eigenvalues and a long tail of
-      near-zero ones. The practical consequence is that the problem is not traps
-      but plateaus and ill-conditioning: vast regions where the gradient is tiny in
-      every direction, and valleys where the ratio of largest to smallest curvature
-      is enormous so plain descent zigzags. Momentum and adaptive per-parameter
-      step sizes address exactly these, which is why they exist and why "escaping
-      local minima" is not what they are for.
-    check: llm
-    rubric: |
-      (a) Must be $2^{-d}$ with $d = 10^{9}$. Accept any correct rendering of the
-      magnitude, including "$10^{-300000000}$ or so" or "effectively zero". A
-      numerically wrong exponent with the right reasoning = partial credit.
-      (b) Must invert the folk claim and give the conjunction-over-directions
-      reason. Restating the folk claim indicates U2-M4.
-      (c) Must move the difficulty from traps to plateaus or conditioning. Credit
-      for naming Hessian eigenvalue structure, near-zero gradients over large
-      regions, or condition number; credit for connecting to why momentum and Adam
-      exist.
-      Pass = (a) and (b). Full credit = all three.
-      This is the second stretch item for the >90% path and the natural callback
-      into u5's optimizer section.
+      Treat the $d$ directions as independent fair coin flips, and take
+      $d = 10^{9}$. Which statement gets all three of these right: the probability
+      that a given critical point is a local minimum, what that implies about the
+      folk claim that more parameters means more traps, and what training actually
+      struggles with once the false independence assumption is dropped?
+    options:
+      - text: "$2^{-10^{9}} \\approx 10^{-301029996}$; the folk claim is backwards, since entrapment is a conjunction over all $d$ directions and each added dimension roughly halves its probability; real curvature is strongly correlated (a few large Hessian eigenvalues, a long near-zero tail), so the difficulty is plateaus and ill-conditioning rather than traps."
+        correct: true
+        explain: "All three. The probability is zero for every practical purpose, so local minima are vanishingly rare above the very bottom of the loss range and nearly every critical point is a saddle with an escape direction that minibatch noise finds. Dropping independence does not restore traps: it gives vast low-gradient plateaus and valleys whose largest-to-smallest curvature ratio is enormous, which is what momentum and adaptive per-parameter step sizes exist for - not 'escaping local minima'."
+      - text: "$2^{-10^{9}}$, so traps are rare in the idealized model - but real curvature is correlated, which restores the folk claim: correlated directions curve up together, so large models are riddled with local minima and momentum exists to escape them."
+        misconception: U2-M4
+        explain: "Gets the arithmetic and then smuggles the trap story back in through correlation. Correlated curvature produces a few large eigenvalues and a long near-zero tail - flat and ill-conditioned, not walled in. Momentum and Adam address conditioning and plateaus; escaping minima is not their job."
+      - text: "About $1/(2 \\times 10^{9})$; the probability shrinks only linearly in $d$, so a billion-parameter model still meets many local minima, and training struggles mainly with getting trapped in them."
+        misconception: U2-M4
+        explain: "Reads the conjunction as if the chances added rather than multiplied. All $d$ directions must curve up simultaneously, giving $2^{-d}$, not $1/(2d)$ - the difference is the whole argument."
+      - text: "$2^{-10^{9}}$, so essentially every critical point is a saddle and gradient descent stalls on them; with local minima ruled out, what training struggles with is that descent halts at saddles and needs random restarts to continue."
+        misconception: M5
+        explain: "Right on (a) and (b), wrong on what remains. A saddle stalls descent only if you land exactly on it; minibatch gradient noise walks off it, and restarts are unnecessary. The residual difficulty is plateaus and ill-conditioning."
+      - text: "The probability cannot be stated, because a billion-parameter loss surface has a single global minimum that SGD converges to; the coin-flip model applies only to toy problems."
+        misconception: M5
+        explain: "Keeps 'the minimum' as a real destination. Different seeds end at wildly different weights that no permutation matches, and both models work - evidence that SGD finds one of many good-enough regions rather than converging on one point."
+    check: choice
 
   - id: u2-q13
     concept: c-loss-surface

@@ -127,8 +127,8 @@ id: v9-b1
 type: predict
 concept: d-demo-assembly
 prompt: |
-  Before reading on. Three interventions, one at a time, on the system that
-  produced the screen above.
+  Before reading on, commit to an answer. Three interventions, one at a time, on
+  the system that produced the screen above.
 
   (a) You leave the model's weights untouched and rebuild the suffix-array
       index over a different corpus.
@@ -137,51 +137,66 @@ prompt: |
   (c) You retrain the model from scratch on the identical corpus with a
       different random seed.
 
-  For each intervention, predict which of the four claims on the screen change
-  and which cannot, and give the mechanism. Then say which intervention is the
-  one a skeptic in the room will actually propose.
-answer: |
-  (a) Rebuild the index only. Panel 1 changes completely - it is a function of
-  the corpus being searched and the output string, and you replaced the corpus.
-  Panels 2 and 3 cannot change at all: the influence scores are computed from
-  gradients of a model whose weights did not move, and the allocation comes from
-  a ledger accumulated during a training run that did not happen again. The
-  footnote cannot change; the watermark test queries the model, and the model is
-  identical. This is the swap-the-index experiment, and it is the fastest way to
-  tell a corroborative panel from a contributive one.
-
-  (b) Retrain without source 7. Everything changes. The output string itself
-  probably changes, so Panel 1's spans change downstream of that even before you
-  consider that source 7's documents are gone from the index. Panel 2 changes
-  because the model is a different model. Panel 3 changes because the in-run
-  ledger is computed inside the run. And the footnote's test should now fail to
-  fire if the watermarks were in source 7, which is the negative control.
-
-  (c) Retrain with a different seed. Panels 2 and 3 change by an amount that is
-  not a fact about the world - it is seed noise, and the whole point of carrying
-  sigma and the SNR is to say how much of the change is that. Panel 1 changes
-  only through the output string. The footnote's z moves too, but its validity
-  does not: the false-positive rate comes from the never-published controls,
-  which do not care what seed you used.
-
-  The skeptic proposes (a), because it is free, takes minutes, and is the
-  question that decides whether the demo is a search engine with a language
-  model attached or an attribution system.
-rubric: |
-  Must contain: (1) under (a), panel 1 changes and panels 2/3 and the footnote
-  cannot, because nothing about the weights moved; (2) under (c), panels 2 and 3
-  move by seed noise specifically, and this is why the noise figures are on the
-  screen; (3) the identification of (a) as the skeptic's move.
-  (1) plus either (2) or (3) = pass. All three = full credit.
-  Fail patterns: claiming the influence panel changes when the retrieval index
-  changes = D1, the citation-is-attribution error in its most durable form, and
-  it is the one this whole unit exists to close.
-  Claiming the retrieval panel is unaffected by (b) because "the text is the
-  text" = has not noticed that removing a source changes the model's output,
-  which is the string the panel matches against.
-  Claiming seed changes invalidate the footnote's p-value = has confused a
-  measured effect with a constructed null; the controls define the FPR.
-check: llm
+  Which account of what changes, what cannot change, and which intervention the
+  skeptic in the room actually proposes is right?
+options:
+  - text: |
+      (a) changes Panel 1 completely and cannot touch Panels 2, 3 or the
+      footnote: the influence scores are gradients of a model whose weights did
+      not move, the allocation comes from a ledger accumulated inside a run that
+      did not happen again, and the watermark test queries the same model.
+      (b) changes all four, including the output string itself, and the
+      footnote's test should now fail to fire, which is the negative control.
+      (c) moves Panels 2 and 3 by seed noise - not by a fact about the world -
+      which is what $\sigma$ and the SNR are printed to quantify; the footnote's
+      $z$ moves but its validity does not. The skeptic proposes (a).
+    correct: true
+    explain: |
+      Right, and (a) is the whole diagnostic: a quantity that moves when only the
+      index moves is a property of the index. It is free, it takes minutes, and
+      it decides whether the screen is a search engine with a language model
+      attached or an attribution system.
+  - text: |
+      (a) changes Panel 1 and Panel 2 together, because the influence ranking is
+      computed over the documents the index surfaces, so a new corpus gives new
+      contributors. (b) changes everything. (c) leaves Panels 2 and 3 essentially
+      fixed, since the corpus is identical and only the seed differs. The skeptic
+      proposes (b), the expensive retrain.
+    misconception: D1
+    explain: |
+      This is the citation-is-attribution error in its most durable form. No
+      weight moved under (a), so nothing gradient-based and nothing accumulated
+      during training can respond to it; Panel 2 is a fact about the model, Panel
+      1 a fact about whatever text you pointed the index at. And (c) is exactly
+      where Panels 2 and 3 do move, by seed noise.
+  - text: |
+      (a) changes Panel 1 only. (b) leaves Panel 1's spans as they stand - the
+      text the answer matches is still sitting in the corpus - while Panels 2 and
+      3 change; and if the verbatim evidence is unchanged after removing source
+      7, that is itself the sign that source 7 contributed little. (c) moves
+      Panels 2 and 3 by seed noise. The skeptic proposes (a).
+    misconception: D3
+    explain: |
+      Removing a source changes the model, and the model produces the string the
+      panel matches against, so Panel 1's spans change downstream of that before
+      you even reach source 7's documents leaving the index. Verbatim match is a
+      lower bound anyway: knowledge survives intact while the surface form
+      changes, so unchanged spans license no conclusion about contribution.
+  - text: |
+      (a) changes Panel 1 only. (b) changes all four. (c) invalidates the
+      footnote as well as moving Panels 2 and 3: $z$ shifts with the training
+      seed, so the stated $p = 3.4 \times 10^{-6}$ is not stable and membership
+      has to be re-established for every run. The skeptic proposes (c), because
+      seed sensitivity is the cheapest attack on a proof claim.
+    misconception: D19
+    explain: |
+      The measured statistic moves with the seed; the null does not. The
+      footnote's false-positive rate comes from 250 never-published controls
+      generated under a key committed before the model existed, and those
+      controls can be resampled at will regardless of seed. A constructed null is
+      exactly what makes this the only line on the screen using the word
+      "proven".
+check: choice
 ```
 
 ## The retrieval panel, built honestly
@@ -306,53 +321,69 @@ prompt: |
   maximal verbatim spans, rarity ranking - and calls it "training data
   attribution." They pay publishers pro-rata by number of surfaced spans.
 
-  In your own words: state what their product measures, state the one
-  experiment that establishes it, and then explain the specific way their
-  payment rule is gameable that a rarity ranking makes worse rather than
-  better. Do not argue that verbatim matching is "just lexical" - say what
-  breaks.
-answer: |
-  What it measures: string containment. For a given output string and a given
-  indexed corpus, which documents contain which spans of it, ranked by how few
-  documents contain each span. That is a corroborative statement - these
-  documents support this text - and it is exact for what it claims.
-
-  The experiment: hold the model's weights fixed and rebuild the index over a
-  different corpus, or simply add documents to it. The rankings change; the
-  model did not. A quantity that moves when only the index moves is a property
-  of the index. Running it the other direction works too: take a source whose
-  content the model demonstrably learned but that never resurfaces verbatim, and
-  the panel scores it at zero.
-
-  The gaming: payment is proportional to surfaced spans, and rarity ranking pays
-  more for spans that few documents contain. So the optimal supplier strategy is
-  to publish text that is (a) plausible enough to be emitted and (b) rare in the
-  corpus. Both are cheap. Generating large volumes of plausible, distinctive
-  prose costs almost nothing, and unlike a stream farm it does not need anyone to
-  listen to it - it needs only to sit in an index and occasionally match. Rarity
-  ranking, which is the right choice for making the panel informative, is
-  precisely the wrong choice for making it a payment basis, because it converts
-  "nobody else wrote this" into money and nobody else writing it is the cheapest
-  property to manufacture.
-
-  There is also the honest half: their product is a real product. Metering
-  surfaced spans is a defensible thing to sell if it is sold as what it is.
-  The failure is the word "attribution" on the label.
-rubric: |
-  Must contain: (1) the product measures containment in an index, not causation;
-  (2) the swap-or-extend-the-index experiment as the discriminator; (3) a gaming
-  argument that specifically connects rarity ranking to the incentive to
-  manufacture rare-but-plausible text.
-  (1) and (2) = pass. All three = full credit.
-  Missing (3) but otherwise correct = pass with a flag: the learner has the
-  epistemics and not the mechanism design, and the mechanism design is the half
-  that survives contact with an economist.
-  An answer that rejects the product entirely = fail on the same grounds as
-  accepting it uncritically. Metering is honest when labeled; the diagnosis is
-  the label.
-  An answer relying on "the model might paraphrase" alone = partial; that is
-  D3's territory and it is correct, but it does not touch the payment rule.
-check: llm
+  Which explanation correctly states what their product measures, the one
+  experiment that establishes it, and the specific way their payment rule is
+  gameable?
+options:
+  - text: |
+      It measures string containment: for a given output string and a given
+      indexed corpus, which documents contain which spans, ranked by how few
+      documents contain each. The establishing experiment is to hold the weights
+      fixed and rebuild or extend the index - the rankings change, the model did
+      not. The gaming follows from the ranking: payment rises with rarity, so the
+      optimal supplier publishes text that is plausible enough to be emitted and
+      rare in the corpus, both of which are cheap. Rarity ranking is the right
+      choice for making the panel informative and the wrong one for making it a
+      payment basis, because "nobody else wrote this" is the cheapest property to
+      manufacture. Metering surfaced spans is a real product; the failure is the
+      word "attribution" on the label.
+    correct: true
+    explain: |
+      Exactly the shape of the diagnosis: a corroborative measurement, a
+      swap-the-index discriminator, and a payment rule whose incentive runs
+      backwards. Unlike a stream farm, manufactured prose needs nobody to consume
+      it - it needs only to sit in an index and occasionally match.
+  - text: |
+      It measures where the answer came from: maximal spans resolving to single
+      documents are the causal trace, and what establishes it is that the rare
+      spans resolve to one document in one source rather than to the corpus at
+      large. The payment rule is sound for the same reason - rarity ranking pays
+      the documents that genuinely distinguish themselves from everything else in
+      the index.
+    misconception: D1
+    explain: |
+      Resolving to one document shows only that one document contains the string.
+      Hold the weights fixed, rebuild the index over other text, and the panel
+      changes completely while nothing the model learned changed; the quantity is
+      a property of the index. And the property being paid for - rarity - is the
+      one an adversary can manufacture at essentially zero cost.
+  - text: |
+      It measures contribution well enough in practice, because content a source
+      really taught the model can be surfaced verbatim. The establishing
+      experiment is to remove a source and watch its spans disappear from
+      answers. Farming is a limited worry, since manufactured text still has to
+      be emitted by the model before anyone is paid for it.
+    misconception: D3
+    explain: |
+      A filter that blocks verbatim emission perfectly is defeated by asking for
+      the same content in a different style, and influence at scale becomes more
+      abstract - documents sharing no n-grams with an output can be among its
+      strongest contributors. The panel is a lower bound. Emission is also a low
+      bar: plausible distinctive prose costs nothing to generate in volume.
+  - text: |
+      It measures containment in an index, and swapping the index is what shows
+      that. But paying pro-rata by surfaced spans is a defensible proxy for use -
+      share of spans is share of use - and rarity ranking makes farming harder
+      rather than easier, because rare, distinctive text is expensive to produce
+      at scale.
+    misconception: D10
+    explain: |
+      Under pro-rata nobody's payout is a function of their own usage; it is a
+      share of a platform-wide total whose denominator belongs to everyone, which
+      is how the reference market leaves 99.8% of suppliers with effectively
+      nothing. And rarity is cheap, not expensive: generating large volumes of
+      plausible, distinctive prose costs almost nothing and needs no reader.
+check: choice
 ```
 
 ## Assembling the pipeline
@@ -453,12 +484,9 @@ reason a unit sits where it sits.
 id: v9-b3
 type: completion
 concept: d-demo-assembly
-# variants: blank the manifest and sigma rows for a learner who lost the
-# systems chain; blank the utility-table and correlation rows for one who lost
-# the measurement chain; blank the commitment row alone as a warmup.
 prompt: |
-  Fill the blanks. Each row is one step of the chain: the artifact it emits,
-  and the single thing that becomes impossible if that artifact is missing.
+  Fill the blanks. Each row is one step of the chain: the artifact it emits, and
+  the single thing that becomes impossible if that artifact is missing.
 
   | step | artifact emitted | impossible without it |
   | --- | --- | --- |
@@ -469,39 +497,76 @@ prompt: |
   | notary run | signed report + verifier script | the footnote's stated false-positive rate |
   | gradient tracing | per-source scores + ____ | the header of panel 2 |
 
-  Then answer in one sentence: which two of these artifacts, if produced out of
-  order, cannot be repaired by re-running anything?
-answer: |
-  Row 1: the provenance manifest (doc_id, source_id, shard_id, offset, length,
-  cluster_id).
-  Row 2: sigma, the seed-noise standard deviation of held-out bits per byte.
-  Impossible without it: saying whether any measured difference downstream is
-  real, since every z in the book divides by a standard error built from sigma.
-  Row 3: the cached (S, v(S)) utility table.
-  Row 4: impossible without it - stating what a source's share is, and whether
-  the split is resolvable at all rather than a flat fee.
-  Row 6: the Spearman rank correlation against the counterfactual table.
-
-  Out of order and unrepairable: the pre-commitment (the key and protocol hash
-  must be timestamped before the model is trained - committing afterwards is not
-  a weaker commitment, it is no commitment), and the source partition plus
-  duplicate-cluster recording in the corpus pipeline (once duplicates are
-  collapsed without recording which sources were in the cluster, the credit
-  decision has been made and the information to revisit it is gone).
-rubric: |
-  Rows 1, 2, 3 and 6 must be the manifest, sigma, the cached utility table, and
-  the rank correlation respectively. Row 2's consequence must be about
-  significance or the noise floor, not about model quality. Row 4's consequence
-  must mention the allocation AND the flat-fee verdict; naming only the shares
-  is partial.
-  The final sentence must name the pre-commitment and the corpus-side
-  partition/cluster recording. Accept "the manifest" for the second.
-  Pass = four blanks correct plus one of the two unrepairable items.
-  Full credit = all blanks plus both.
-  Naming the trained model as unrepairable = fail; retraining is exactly what
-  the whole book budgets for, and the point of the question is which decisions
-  are NOT re-runnable.
-check: llm
+  Then: which two artifacts, if produced out of order, cannot be repaired by
+  re-running anything? Choose the filling that gets both the blanks and that
+  question right.
+options:
+  - text: |
+      Corpus pipeline: the provenance manifest (`doc_id`, `source_id`,
+      `shard_id`, offset, length, `cluster_id`). Training run: $\sigma$, the
+      seed-noise SD of held-out bits per byte - without it you cannot say whether
+      any measured difference downstream is real, since every $z$ in the book
+      divides by a standard error built from $\sigma$. Counterfactual sweep: the
+      cached $(S, v(S))$ utility table. Fair split: without it you cannot state
+      what a source's share is, or whether the split is resolvable at all rather
+      than a flat fee. Gradient tracing: the Spearman rank correlation against
+      the counterfactual table. Unrepairable out of order: the pre-commitment
+      (key and protocol hash timestamped before the model is trained) and the
+      source partition with its recorded duplicate clusters.
+    correct: true
+    explain: |
+      Right on both counts. Committing after the model exists is not a weaker
+      commitment, it is no commitment; and once duplicates are collapsed without
+      recording which sources were in the cluster, the credit decision has been
+      made and the information to revisit it is gone.
+  - text: |
+      Corpus pipeline: the provenance manifest. Training run: $\sigma$ - without
+      it you cannot say whether the run trained well, since $\sigma$ is how you
+      check that held-out loss landed where it should. Counterfactual sweep: the
+      cached $(S, v(S))$ utility table. Fair split: without it you cannot state
+      each source's share. Gradient tracing: the Spearman rank correlation.
+      Unrepairable out of order: the trained model itself, which is the most
+      expensive thing in the chain, and the pre-commitment.
+    misconception: D16
+    explain: |
+      $\sigma$ is not a quality check, it is the denominator of significance:
+      contribution is a noisy random variable, and $\text{SE}_\Delta =
+      \sigma\sqrt{2/n}$ is what decides whether a source sits above the noise
+      floor. And retraining is exactly what this book budgets for - the question
+      is which decisions are not re-runnable, and the model is not one of them.
+  - text: |
+      Corpus pipeline: the provenance manifest. Training run: $\sigma$, the
+      seed-noise SD of held-out bits per byte - without it no downstream
+      difference can be called real. Counterfactual sweep: the cached
+      $(S, v(S))$ utility table. Fair split: without it you cannot state each
+      source's share. Gradient tracing: the per-checkpoint gradient dot products
+      the scores were accumulated from. Unrepairable out of order: the
+      pre-commitment and the corpus-side manifest.
+    misconception: D6
+    explain: |
+      Panel 2's header is the measured correlation against the counterfactual
+      table, not the internals of the estimator. A ranking without its
+      correlation is a demo; measured against actual retraining, scalable
+      gradient methods on a 2B model came out no better than random guessing, so
+      the trust number is the deliverable. The fair-split row also needs the
+      flat-fee verdict, not just the shares.
+  - text: |
+      Corpus pipeline: per-shard token counts and the tokenizer vocabulary -
+      duplicate-cluster records are pipeline hygiene rather than an artifact.
+      Training run: $\sigma$, the seed-noise SD, without which no downstream
+      difference can be called real. Counterfactual sweep: the cached
+      $(S, v(S))$ utility table. Fair split: without it you cannot state a
+      source's share or whether the split beats a flat fee. Gradient tracing: the
+      Spearman rank correlation. Unrepairable out of order: the trained model and
+      the counterfactual sweep, because they cost the most.
+    misconception: D9
+    explain: |
+      Token counts cannot answer "which spans belong to source k"; `source_id`
+      and `cluster_id` can. Dedup is a payout decision, not hygiene - keeping one
+      copy chooses which source gets credit for everything that passage teaches -
+      and doing it silently is precisely the unrepairable step. Cost is not the
+      criterion; re-runnability is.
+check: choice
 ```
 
 ## What the demo claims and what it does not
@@ -1019,64 +1084,79 @@ prompt: |
   told them they don't have to, and Cloudflare owns the pipe. What exactly am I
   funding?"
 
-  Answer them. State their case back in its strongest form first, concede what
-  is true, and then give the response - without contradicting anything they
-  said. Name what specifically survives all three objections and why.
-
-  Answer from the unit's text. Do not appeal to any market development that has
-  not happened.
-answer: |
-  Their case, strongest form and all of it correct: there is no demand-side
-  buyer for a data marketplace - the leading licensing standard has thousands of
-  endorsers and no AI licensees, and the gatekeeper's payment scheme never left
-  beta. The largest settlement priced one-time acquisition of pirated copies
-  after the court held training on lawful copies is fair use, so the legal
-  pressure produces clean-copy purchases rather than royalty streams. And the
-  gatekeeper holds the chokepoint, the identity standard, the preference
-  standard, the payment rail and a marketplace.
-
-  What I concede: the royalty exchange has no counterparty today, and I am not
-  asking anyone to bet on one. Contribution-proportional payment is the vision
-  slide, and I can tell you exactly what would have to become true for it to
-  ship, including a signal-to-noise measurement on my own corpus that currently
-  says flat fee.
-
-  What survives: measurement, and specifically independent verification. Run the
-  branches. Courts hold the line: labs buy clean copies and need provenance
-  established for what they bought. Output substitution wins in the pending
-  litigation: ongoing payment arrives and needs an auditable allocation and an
-  auditor. Nothing changes: disclosure stays mandatory and explicitly unverified,
-  and someone has to check it. There is no branch where an independent party
-  being able to establish what a model trained on is worthless.
-
-  And unlike every other slot in this space, this one does not wait for a
-  voluntary buyer. The disclosure obligation is mandatory, enforcement is live
-  with fines to 3% of global revenue, it refreshes every six months, and the
-  regulator has stated in writing that it will not check whether specific content
-  was used. That is a deadline, not a hope.
-
-  Finally, the downside is bounded in a specific way: the artifact is a
-  publishable contribution regardless of what any lab decides, because nobody has
-  shipped tagged corpus to trained model to per-source payout with a
-  counterfactual ground truth attached, and the direct precedent published no
-  code and no cost figures.
-rubric: |
-  Must contain: (1) the objections restated as correct, with at least two of the
-  three given accurately - no rebuttal of the facts anywhere; (2) an explicit
-  concession that the royalty layer has no buyer and is the vision, not the lead;
-  (3) the branch argument - measurement is needed under every legal and market
-  outcome; (4) the regulatory forcing function as the thing that distinguishes
-  verification from every other slot.
-  (1), (2) and (3) = pass. All four = full credit.
-  Fail patterns: disputing any of the three facts, especially arguing the courts
-  will still force royalties = D13, and it is the answer that loses the room
-  because the objector already knows the settlement's terms.
-  Answering only "we will pivot to verification" without the branch argument =
-  partial; the branch argument is what makes verification a considered position
-  rather than a retreat.
-  Claiming the demo proves the royalty mechanism works = fails on the unit's
-  central discipline regardless of the rest.
-check: llm
+  Which answer states their case back in its strongest form, concedes what is
+  true, and then names what survives all three objections - without contradicting
+  anything they said, and without appealing to a market development that has not
+  happened?
+options:
+  - text: |
+      All three are correct: the leading licensing standard has ~1,500 endorsers
+      and zero confirmed AI licensees, the largest settlement priced one-time
+      acquisition of pirated copies after the court held training on lawful
+      copies is fair use, and the gatekeeper holds the chokepoint, the identity
+      and preference standards, the payment rail and a marketplace. So I concede
+      the royalty exchange has no counterparty today; it is the vision slide, and
+      my own SNR measurement currently says flat fee. What survives is
+      measurement, specifically independent verification. Run the branches:
+      courts hold the line and labs must establish provenance of the clean copies
+      they bought; output substitution wins and ongoing payment needs an
+      auditable allocation and an auditor; nothing changes and disclosure stays
+      mandatory and explicitly unverified. There is no branch where an
+      independent party establishing what a model trained on is worthless - and
+      unlike every other slot, this one has a deadline rather than a hope:
+      enforcement live from 2 August 2026, fines to 3% of global revenue,
+      six-monthly refresh, and a regulator that has said in writing it will not
+      check whether specific content was used. The downside is bounded too: the
+      artifact is a publishable contribution whatever any lab decides.
+    correct: true
+    explain: |
+      Right. The objections are conceded intact and the answer is the branch
+      argument plus a forcing function that depends on nobody's goodwill. That
+      combination is what makes verification a considered position rather than a
+      retreat.
+  - text: |
+      Two of the three stand, but the legal one is overstated: a $1.5B settlement
+      is the dam breaking, the pending output-substitution and market-harm cases
+      are the ones that matter, and when they land labs will be in ongoing
+      royalty relationships. What you are funding is the exchange that will
+      already exist when that happens.
+    misconception: D13
+    explain: |
+      That settlement priced acquisition of pirated copies at roughly $3,000 per
+      work, once, across ~500,000 works, after the same court held that training
+      on lawfully acquired copies is fair use, and three jurisdictions have
+      converged on that line. Read as an incentive it tells a lab to buy one
+      clean copy. Disputing a fact the objector already knows is the answer that
+      loses the room; the substitution theories are unresolved, which is why they
+      are a reprice, not a plan.
+  - text: |
+      Concede the marketplace point and answer that the money is in training
+      rights: that is what the original scandal was about, content deals are the
+      visible spend, and a product that prices measured training contribution
+      plugs directly into the licensing that labs are already doing.
+    misconception: D12
+    explain: |
+      Only about 40% of recent deals include training rights, down from
+      near-universal, while attribution and live-access deals went 2 in 2023 to
+      18 in 2025 to roughly 34 projected in 2026, and expert-labeled data - $14.3B
+      for 49% of one labeller - dwarfs all disclosed content licensing. The market
+      moved away from the thing this prices, which is why the answer has to point
+      at verification, audit and procurement.
+  - text: |
+      Concede all three without argument, then say what is being funded is the
+      royalty engine itself: the demo runs tagged corpus to trained model to
+      per-source Shapley payout end to end, so the mechanism demonstrably works,
+      and the residual noise in the shares is a methods problem that the next
+      generation of estimators closes.
+    misconception: D20
+    explain: |
+      Below a threshold signal-to-noise ratio the welfare-optimal contract *is* a
+      flat fee - no estimator improvement crosses it, only more signal does - and
+      this corpus measures 1.37 against a bar of 2. Claiming the demo proves the
+      royalty mechanism works fails the unit's central discipline, and it also
+      skips the branch argument, which is the part that makes the answer
+      survivable.
+check: choice
 ```
 
 ## What to build next
@@ -1183,63 +1263,80 @@ concept: d-demo-assembly
 prompt: |
   You are writing the memo's headline block. Your sweep produced a measured SNR
   of 1.37 against a bar of 2, and your gradient tracer correlated with the
-  counterfactual table at rho = 0.61.
+  counterfactual table at $\rho = 0.61$.
 
-  Write the claim you are entitled to make in that block, and then list the
-  three claims a reader might reasonably infer from your screen that you must
-  explicitly disclaim. For each disclaimer say which panel invites the wrong
-  inference and what the correct statement is.
-
-  Answer from the unit's text. Do not reference any run you have or have not
-  performed.
-answer: |
-  The claim I am entitled to make: on this corpus, at this model scale, with
-  this value function and this many seeds, the attribution signal-to-noise ratio
-  is 1.37, below the threshold at which contribution-proportional payment beats
-  a flat fee; the correct contract here is therefore a flat fee, and reaching an
-  SNR of 2 requires a stated number of additional seeds at a stated cost.
-  Separately, the cheap gradient tracer ranks sources with Spearman correlation
-  0.61 against the counterfactual table it was graded on, measured over 12
-  sources at 3 seeds - a number nobody else in this market publishes, in either
-  direction.
-
-  Three disclaimers.
-
-  First, invited by Panel 1: that the highlighted verbatim spans show where the
-  answer came from. The correct statement is that those documents contain that
-  text; containment is corroborative, it is a function of the corpus being
-  indexed rather than of the model, and swapping the index changes the panel
-  while the weights do not move.
-
-  Second, invited by Panel 2: that the influence ranking is the truth about
-  which sources mattered. The correct statement is that it is an estimate whose
-  agreement with retrained truth on this corpus is 0.61 - the panel's own header
-  says the ranking disagrees with the ground truth at the top - and that nothing
-  here licenses the same figure at another scale, where measured performance of
-  scalable methods against ground truth has been no better than chance.
-
-  Third, invited by Panel 3: that the shares are payments owed. The correct
-  statement is that they are the unique allocation implied by four fairness
-  requirements given this value function, displayed as an illustration of a rule,
-  and that at SNR 1.37 the differences between sources are not resolvable against
-  seed noise - which is why the chart is grey and the verdict beneath it says
-  flat fee.
-rubric: |
-  The entitled claim must be scoped to this corpus, this scale, this value
-  function and this seed count, and must state the flat-fee verdict rather than
-  hedging it. An entitled claim that reports the split as a payment schedule
-  with a caveat = fail, diagnosing D20 in its most durable form; a caveat under
-  a pie chart is not the same claim as a flat-fee recommendation.
-  All three disclaimers must be present and attached to the right panel.
-  Disclaimer 1 must invoke containment versus causation (D1). Disclaimer 2 must
-  invoke the measured correlation AND the scale limitation (D6). Disclaimer 3
-  must invoke the SNR verdict, not merely "these are estimates."
-  Pass = a correctly scoped entitled claim plus two correct disclaimers.
-  Full credit = all three disclaimers with the right panel attached to each.
-  Any answer that omits the flat-fee verdict from the headline = fail regardless
-  of the disclaimers; the headline is the deliverable of the whole book and
-  burying it is the specific failure this unit exists to prevent.
-check: llm
+  Which version states the claim you are entitled to make, together with the
+  three inferences your screen invites that you must explicitly disclaim, each
+  attached to the panel that invites it?
+options:
+  - text: |
+      Entitled: on this corpus, at this model scale, with this value function and
+      this seed count, the attribution SNR is 1.37, below the threshold at which
+      contribution-proportional payment beats a flat fee, so the correct contract
+      here is a flat fee, and reaching SNR 2 costs a stated number of additional
+      seeds at a stated price; separately, the cheap tracer ranks sources at
+      $\rho = 0.61$ against the counterfactual table, over 12 sources at 3 seeds.
+      Disclaimers - Panel 1: the spans show containment, not causation; the panel
+      is a function of the indexed corpus, and swapping the index changes it
+      while no weight moves. Panel 2: the ranking is an estimate that agrees with
+      retrained truth at 0.61 here, it disagrees with the ground truth at the
+      top, and nothing licenses the figure at another scale, where scalable
+      methods measured against retraining came out no better than chance. Panel
+      3: the shares are the unique allocation implied by four fairness
+      requirements given this value function, illustrated not owed, and at SNR
+      1.37 the differences between sources are not resolvable against seed noise.
+    correct: true
+    explain: |
+      Right: scoped claim, flat-fee verdict stated rather than hedged, and each
+      disclaimer attached to the panel that manufactures the wrong inference.
+  - text: |
+      Entitled: the per-source split is the headline - source 7 at 19%, source 3
+      at 14%, source 11 at 11% - presented as the schedule the method produces,
+      with the measured SNR of 1.37 noted underneath as a caveat and more seeds
+      already in progress to move it. Disclaimers as usual: Panel 1 shows
+      containment, not causation; Panel 2 is an estimate at $\rho = 0.61$ that
+      does not transfer to frontier scale; Panel 3's shares are provisional.
+    misconception: V9-M2
+    explain: |
+      A caveat under a pie chart is not the same claim as a flat-fee
+      recommendation, and the difference is exactly what an opposing expert or a
+      diligence process finds. The comparison in the room is not 1.37 against
+      somebody's better number - nobody publishes one - it is a measured 1.37
+      against an unmeasured assertion. The measurement is the asset in either
+      direction; lead with it.
+  - text: |
+      Entitled: on this corpus, at this scale, with this value function and seed
+      count, the SNR is 1.37, below the bar, so the correct contract here is a
+      flat fee. Disclaimers - Panel 2: the ranking is an estimate at $\rho =
+      0.61$ and does not transfer to other scales. Panel 3: the shares are an
+      illustration of a rule, not payments owed, which is why the chart is grey.
+      Panel 1 needs no disclaimer and is the verifiable part of the exhibit: the
+      spans are exact, they link to real documents, and they show which sources
+      the answer drew on.
+    misconception: D1
+    explain: |
+      That is the inference the panel's legibility manufactures, and it is the
+      one the whole unit exists to close. Hold the weights fixed, rebuild the
+      index over different text, and the panel changes completely - it was never
+      a fact about the model. The team that shipped the deployed version wrote
+      the disclaimer into their own paper; the header sentence is non-optional.
+  - text: |
+      Entitled: on this corpus, at this scale, with this value function and seed
+      count, the SNR is 1.37, below the bar, so the correct contract here is a
+      flat fee. Disclaimers - Panel 1: containment, not causation. Panel 3: an
+      illustration of a rule, not payments owed, unresolvable against seed noise
+      at 1.37. Panel 2: $\rho = 0.61$ is a conservative floor obtained on a tiny
+      model, and the correlation improves as the model and corpus grow, so the
+      figure understates what the method delivers in production.
+    misconception: D6
+    explain: |
+      Measured against actual retraining on a 2B-parameter model, scalable
+      gradient methods performed no better than random guessing, and influence
+      becomes structurally different with scale - concentrated, more abstract -
+      rather than merely noisier. The number is scoped to this corpus at this
+      scale; what transfers is the instruction to measure your own correlation,
+      not the value.
+check: choice
 ```
 
 ## What you can now do

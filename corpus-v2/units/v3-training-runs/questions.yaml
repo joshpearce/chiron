@@ -9,35 +9,25 @@ pretest:
     concept: d-compute-budget
     prompt: |
       A single engineer, working alone in 2026, pretrains a 561-million-parameter
-      chat model from scratch on a rented machine - tokenizer, pretraining,
-      fine-tuning, a working chat interface, the whole thing.
+      chat model from scratch on a rented 8xH100 node - tokenizer, pretraining,
+      fine-tuning, a working chat interface, the whole thing, on 11.2 billion
+      tokens.
 
-      What did it cost, and how did you arrive at that number?
-    answer: |
-      $92, measured, for 3 hours 51 minutes on a rented 8xH100 node.
-
-      The way to arrive at it rather than guess: total floating-point operations
-      are about 6 times parameters times tokens. At 561M parameters and 11.2B
-      tokens that is 6 x 5.61e8 x 1.12e10 = 3.77e19 FLOPs. The node sustains
-      about 3.2e15 FLOP/s, giving 11,780 seconds or 3.27 hours of pretraining;
-      the rest of the 3h51m is tokenizer training, midtraining, fine-tuning, and
-      evaluation. At roughly $24/hour on demand as of mid-2026, 3.85 hours is
-      $92.
-
-      Nothing about the data, the architecture, or the quality of the result
-      enters that calculation.
-    check: llm
-    rubric: |
-      Pass requires a figure within one order of magnitude of $92 AND a method
-      that decomposes into model size, token count, hardware throughput, and a
-      price. Expected to fail at pretest: most engineers guess $10,000 to
-      $1,000,000, anchored on frontier-run reporting.
-      An answer in the tens of thousands or higher, justified by "training is
-      expensive" or "you need a cluster", = fail, diagnosing V3-M1. That is the
-      calibration this item exists to produce.
-      A correct order of magnitude reached by recalling a headline, with no
-      decomposition offered, = partial; the learner has the fact and not the
-      tool.
+      Which figure is right, and by which route? Choose one.
+    options:
+      - text: "About $50,000 - a model that holds a conversation is not a hundred-dollar artifact, and the price of a run is a price for what comes out of it."
+        misconception: V3-M1
+        explain: "Appealing because frontier runs cost hundreds of millions and produce the best models, so cost and quality look perfectly correlated. But C ~= 6ND has no term for the corpus, the recipe or the outcome: the same 561M configuration on unfiltered scrape produces gibberish for the same $92, to the cent, finishing at the same minute."
+      - text: "About $92, from 6ND = 3.77e19 FLOPs at the 3.2e15 FLOP/s the node sustains - 3.27 hours of pretraining, 3.85 hours for the whole pipeline, at about $24/hour."
+        correct: true
+        explain: "Correct, and it is the measured receipt: $92 for 3h51m. 6 x 5.61e8 x 1.12e10 = 3.77e19 FLOPs; 3.77e19 / 3.2e15 = 11,780 s = 3.27 h, which is 85% of the wall clock, the rest being tokenizer training, midtraining, SFT and eval. Four inputs and only four: parameters, tokens, sustained throughput, hourly price."
+      - text: "About $32 - 6ND divided by the node's 7.9 PFLOP/s peak is 4,770 seconds, 1.33 hours at $24/hour."
+        misconception: V3-M3
+        explain: "The arithmetic is right and the divisor is wrong. Peak is a spec sheet; a well-tuned run sustains about 40% of it, and that Model FLOPs Utilization is the exchange rate between FLOPs and hours. Treating it as a slide metric rather than a budget term underprices this run by a factor of nearly three."
+      - text: "It cannot be computed in advance - the cost depends on the corpus, the recipe, and how many restarts convergence takes."
+        misconception: V3-M1
+        explain: "Appealing because in most engineering the bill depends on how the work goes. Here the two integers that fix the cost - parameter count and token count - are chosen before the run starts, multiplied by a hardware constant and a market price. A data-loader bug that feeds one shard 400 times costs exactly what the correct run costs."
+    check: choice
 
   - id: v3-p2
     concept: d-data-constrained
@@ -46,119 +36,71 @@ pretest:
       train a model on 2 billion tokens, so you plan to pass over the corpus
       four times.
 
-      Is that a legitimate experiment or are you fooling yourself? Justify.
-    answer: |
-      Legitimate, and by a measured margin rather than by hope. Data-constrained
-      scaling has been studied directly: repeating a fixed corpus for up to
-      about 4 epochs costs almost nothing relative to training on the same
-      number of fresh tokens. Returns diminish steadily out to roughly 16
-      epochs and vanish past about 40.
-
-      Four epochs of 500M unique tokens sits exactly at the edge of the
-      nearly-free zone. This is the fact that lets a small specialist corpus
-      support a real training run, and it is load-bearing for every experiment
-      in this book.
-
-      The one thing to set deliberately rather than accidentally: repetition
-      also drives memorization, so the same epoch count that buys you capability
-      also controls how extractable your corpus is from the finished model.
-    check: llm
-    rubric: |
-      Pass requires: (1) yes, it is legitimate, and (2) some version of "up to
-      roughly 4 epochs, repeated tokens are worth nearly as much as fresh ones,
-      measured."
-      Answering "no - the model will just memorize" or "no, only unique tokens
-      count" = fail, diagnosing D17. Expected to fail at pretest.
-      Answering "yes" from generic ML-practice intuition with no threshold and
-      no notion that the free zone ENDS = partial; the learner will happily run
-      60 epochs and report the result.
+      Which verdict is right? Choose one.
+    options:
+      - text: "Not legitimate: only unique tokens carry information, so this is a 500M-token run wearing a 2B-token label."
+        misconception: D17
+        explain: "If repeated tokens were worthless, 4 epochs over 500M would land at the loss of a 500M-token run. Measured directly in the data-constrained scaling work, it lands near the loss of a 2B fresh-token run instead - up to about 4 epochs a repeated token is worth very nearly as much as a fresh one."
+      - text: "Not legitimate: four passes over one corpus overfits, and held-out loss will turn upward before the end."
+        misconception: D17
+        explain: "That is supervised-learning folklore, where a small labeled set and a large model really do turn validation loss upward after a few epochs. Language modeling on hundreds of millions of tokens with tens of millions of parameters is nowhere near that capacity ratio; the measured returns diminish out to ~16 epochs and vanish past ~40, without the classical turn."
+      - text: "Legitimate: 4 epochs sits at the edge of the zone where a repeated token is worth nearly as much as a fresh one."
+        correct: true
+        explain: "Correct, and by measurement rather than hope. 2e9 / 5e8 = 4 epochs, the boundary of the nearly-free zone; returns diminish steadily to about 16 epochs and are gone past about 40. One thing to set deliberately: repetition is also the primary driver of memorization, so the same dial that buys capability from a small corpus controls how extractable that corpus is later."
+      - text: "Not legitimate: run quality is set by corpus SIZE, so repetition cannot substitute for tokens - get to 2 billion unique first."
+        misconception: D8
+        explain: "Scaling-law headlines are about size, so more tokens sounds strictly better. But past a floor it is quality that dominates - a 1.3T-token filtered corpus beats its own 15T-token superset - and at 30M parameters a 400-500M-token corpus already supports runs well past the compute-optimal 20 tokens per parameter. The corpus here is ample, not the binding constraint."
+    check: choice
 
   - id: v3-p3
     concept: d-eval-noise
     prompt: |
-      Two models, same architecture, same hyperparameters, same token count.
-      Model A trained on the full corpus and scores 0.7420 bits per byte on
-      held-out text. Model B trained on the corpus with one source removed and
-      scores 0.7455.
+      Two models, same architecture, same hyperparameters, same token count, one
+      run each. Model A trained on the full corpus and scores 0.7420 bits per
+      byte on held-out text. Model B trained on the corpus with one source
+      removed and scores 0.7455.
 
-      What can you conclude about that source's contribution?
-    answer: |
-      Nothing yet. The difference is 0.0035 bpb and you have no idea what a
-      difference of 0.0035 means until you know how much held-out bpb moves
-      when NOTHING changes except the random seed.
-
-      What you need is sigma, the standard deviation of held-out bpb across
-      runs of an identical configuration with different seeds. For a
-      30M-parameter setup sigma is on the order of 0.004 bpb - larger than the
-      difference above. With n seeds per condition, the standard error of the
-      difference is sigma x sqrt(2/n), so with one run per condition this
-      measurement is indistinguishable from noise.
-
-      A source's contribution is a random variable, not a fixed property. It
-      gets reported as an estimate with an error bar or it does not get
-      reported.
-    check: llm
-    rubric: |
-      Pass requires: (1) you cannot conclude anything from single runs, and
-      (2) the missing ingredient is run-to-run variation under seed changes.
-      Answering "source S contributes 0.0035 bpb" = fail, diagnosing D16. This
-      is the primary calibration item for the unit and is expected to fail.
-      Answering "you need more data" or "you need to repeat the experiment"
-      without naming seed variation as the specific quantity = partial.
+      What can you conclude about that source's contribution? Choose one.
+    options:
+      - text: "That the source contributes 0.0035 bpb - that difference is what a leave-one-out measurement means."
+        misconception: D16
+        explain: "This treats contribution as a fixed property you measure once. Retrain with a different seed, changing nothing but initialization and shuffle order, and a single source's marginal contribution can swing by more than its own magnitude; of everything that perturbs these measurements, data order introduces the largest variation."
+      - text: "Nothing yet: without sigma, the spread of held-out bpb across seeds of an identical configuration, 0.0035 has no scale."
+        correct: true
+        explain: "Correct. For a 30M-parameter setup sigma runs around 0.004 bpb, larger than the gap itself; with n seeds per condition the standard error of a difference is sigma x sqrt(2/n), so z = 0.0035 / 0.0040 = 0.88 at n = 2 - under one standard error. The remedy at this scale is more seeds (8 sigma^2 / delta^2 of them), not more confidence."
+      - text: "That the gap is small because the estimator is crude; a better attribution method would resolve the same source sharply."
+        misconception: D20
+        explain: "This is the builder's optimism: noise as a temporary methods problem. The quantity here is a difference between two noisy random variables, and no estimator removes that - only more signal (more seeds, larger effects) does. Below a signal-to-noise threshold the welfare-optimal contract is provably a flat fee, and measuring which side you are on is the result."
+      - text: "Compare the two training loss curves; if the removed-source run sits higher throughout, the contribution is real."
+        misconception: V3-M2
+        explain: "A training curve compares a model to its own past on data it trained on, and it is schedule-shaped - under cosine the loss drops in the last 10% of every run, including deliberately sabotaged ones. It is a diagnostic for optimizer health. Every claim in this book compares one model to a different model, which needs held-out bpb across seeds."
+    check: choice
 
 check:
   - id: v3-q1
     concept: d-compute-budget
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      Write down the compute budget formula for a training run, define every
-      symbol, and account for the constant: state where each of its units comes
-      from. Then name two situations in which the formula undercounts, and say
-      what you would substitute in each case.
-    answer: |
-      C ~= 6ND, where C is total floating-point operations for the run, N is the
-      number of parameters in the model, and D is the number of training tokens
-      counting repeats.
+      The compute budget for a training run is $C = 6ND$.
 
-      The 6, per parameter per token:
-      - Forward pass: the parameter multiplies an activation and the product is
-        accumulated. One multiply plus one add = 2 FLOPs.
-      - Backward pass: two gradients are needed, one with respect to the
-        parameter (so it can be updated) and one with respect to the incoming
-        activation (so blame keeps flowing to earlier layers). Each is another
-        multiply-accumulate = 2 FLOPs each = 4 FLOPs.
-      - Total 2 + 4 = 6.
-
-      Where it undercounts:
-      1. Long context. Attention compares every query against every key, which
-         is quadratic in sequence length and not proportional to parameter
-         count, so 6ND misses it. The missed fraction is roughly sequence
-         length over twelve times model width - a couple of percent at frontier
-         width, closer to 15% for a narrow model. Substitute: keep 6ND paired
-         with an EFFECTIVE throughput fitted against 6ND at a comparable
-         context length, which absorbs the term, and refit if context length
-         changes by an order of magnitude.
-      2. Mixture-of-experts. The formula assumes every parameter participates
-         in every token, but MoE routes each token to a fraction of the network.
-         Substitute ACTIVE parameters per token for N; total parameters
-         overstates the compute badly.
-    check: llm
-    rubric: |
-      Must contain: (1) C ~= 6ND with all three symbols defined, (2) the split
-      of the 6 into 2 forward and 4 backward, with a reason for each - accept
-      "backward is about twice the forward cost because it computes two
-      gradients", (3) at least one of the two undercount cases with its
-      substitution.
-      (1) and (2) and one correct case = pass.
-      (1) alone, formula recalled with no account of the constant, = fail; the
-      whole point is that this is derivable in ten seconds rather than
-      memorized, and a learner who cannot rebuild it will not notice when it
-      does not apply.
-      An answer that includes dataset size in bytes, corpus quality, or number
-      of epochs as a SEPARATE term = fail; epochs are already inside D, and
-      quality is not a compute quantity (V3-M1).
+      Which statement about that formula - the constant, the symbols, and where
+      it breaks - is correct? Choose one.
+    options:
+      - text: "The 6 is 2 FLOPs forward (one multiply-accumulate per parameter per token) plus 4 backward (a multiply-accumulate for the gradient with respect to the parameter and another for the gradient with respect to the incoming activation); for a mixture-of-experts model substitute active parameters for N."
+        correct: true
+        explain: "Correct, and rebuildable in ten seconds rather than memorized. N is parameters, D is training tokens counting repeats, C is total floating-point operations. MoE routes each token to a fraction of the network, so total parameters overstates the compute badly - active parameters is the right N there."
+      - text: "N is the parameter count and D is the number of UNIQUE tokens in the corpus; repeated passes reuse data already paid for and do not add to C."
+        misconception: D17
+        explain: "Repeats are free in information, not in arithmetic. Every token that passes through the loop costs its 6N FLOPs whether the model has seen it before or not, so 4 epochs over 500M unique tokens is D = 2e9 in the budget. The epoch count is exactly how you turn a small corpus into a large D."
+      - text: "The 6 is a clean-corpus constant: a noisier corpus needs more steps to reach the same loss, so quality raises the effective constant, and epochs enter as a separate multiplier on top of D."
+        misconception: V3-M1
+        explain: "Two errors from the same belief. Epochs are already inside D. And C = 6ND has no term for data quality at all: the filtered and the unfiltered run of identical N and D finish at the same minute for the same money, which is precisely why quality is free at fixed compute and why a filtering classifier outvalues any architecture change."
+      - text: "The 6 already contains attention's sequence-length term, so dividing 6ND by the hardware's peak FLOP/s gives an honest wall clock."
+        misconception: V3-M3
+        explain: "Both halves are wrong. 6ND counts only parameter-proportional work and genuinely undercounts attention - by roughly sequence length over twelve times model width, closer to 15% for the narrow models here. The budget stays honest only because you divide by an EFFECTIVE throughput fitted against 6ND, about 40% of peak, which absorbs that term. Peak would underprice the run by more than half."
+    check: choice
     difficulty: core
 
   - id: v3-q2
@@ -201,55 +143,30 @@ check:
 
   - id: v3-q4
     concept: d-training-recipes
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      Contrast the cosine learning-rate schedule with warmup-stable-decay for a
-      project whose central experiment is a leave-one-source-out sweep over 20
-      tagged sources.
+      Your central experiment is a leave-one-source-out sweep over 20 tagged
+      sources. A colleague proposes: train one model with warmup-stable-decay,
+      keep a checkpoint from the middle of the stable phase, branch 20 times -
+      one per removed source - and run only the 15% decay tail on each.
 
-      Cover: what property of WSD enables the cheaper design, the cost of each
-      design in run-equivalents with a 15% decay tail, and the reason the cheap
-      design's numbers cannot be substituted for the expensive design's.
-    answer: |
-      The enabling property: WSD holds the learning rate CONSTANT through the
-      bulk of the run before a short decay tail, so every checkpoint in the
-      stable phase is a legitimate starting state. Cosine has no such
-      checkpoint - every one of them is partway through a decay that was headed
-      to zero, so a model branched from the middle of a cosine run is not
-      comparable to a completed one and cannot be extended.
-
-      Cost, 20 conditions plus a full-corpus baseline:
-      - Cosine: 21 full runs from scratch.
-      - WSD, 15% tail: one shared trunk plus 20 x 0.15 = 3 run-equivalents,
-        about 4 total. Roughly five times cheaper.
-
-      Why the numbers are not substitutable: every branched variant trained on
-      the removed source for the first 85% of the run. Whatever that source
-      taught the trunk - vocabulary, domain structure, facts - is present in the
-      branch point and therefore in all 20 variants, including the one that
-      supposedly excludes it. The branched estimate answers "what does this
-      source contribute over the decay tail," not "what would the model be if
-      this source had never existed," and it is biased toward zero by an
-      unknown amount.
-
-      The right use: screening. Branch to rank many candidate sources cheaply,
-      since the bias is roughly shared across conditions, then pay for
-      from-scratch runs on the survivors for any number you intend to defend.
-    check: llm
-    rubric: |
-      Must contain: (1) constant learning rate during the stable phase is what
-      makes a mid-run checkpoint a valid branch point, and cosine lacks this,
-      (2) the arithmetic - 21 runs versus about 4, or an equivalent correct
-      count, (3) the branched variants inherit trunk exposure to the removed
-      source, so the counterfactual is different and biased toward zero.
-      All three = pass. (1) and (3) without the arithmetic = pass. (1) and (2)
-      without (3) = fail; a learner who will report branched numbers as
-      leave-one-out ground truth has built a result that does not survive
-      review, and this is the specific error to catch.
-      An answer rejecting WSD branching outright as invalid = partial; it is a
-      legitimate screening tool and refusing it costs real money.
+      Which assessment is right? Choose one.
+    options:
+      - text: "Sound and cheap - about 4 run-equivalents against 21 - and the branched numbers stand in for from-scratch leave-one-out, since the method that scales to 20 conditions is the one to trust."
+        misconception: D6
+        explain: "The economics are right and the substitution is not. Every branch trained on its own removed source for the first 85% of the run, so what that source taught the trunk is baked into all 20 variants. Cheap-and-scalable is not the same as correlated with counterfactual ground truth; that gap is the whole reason v4 pays for from-scratch runs."
+      - text: "Possible because the stable phase holds the learning rate constant, costs about 4 run-equivalents against 21, but measures contribution over the decay tail only and is biased toward zero - use it for screening."
+        correct: true
+        explain: "Correct on all three. Constant learning rate makes a mid-run checkpoint a legitimate starting state; a cosine run has no such checkpoint, since every one is mid-decay. Cost: trunk plus 20 x 0.15 = 3 run-equivalents, about 4 total, five times cheaper. And the branch answers 'what does this source contribute over the last 15%', not 'what if it had never existed' - the bias is roughly shared across conditions, so the ranking is informative even when the magnitudes are not."
+      - text: "The schedule is beside the point - branch from a cosine run just as well, and confirm each branch by checking that its loss curve descends normally."
+        misconception: V3-M2
+        explain: "Every cosine checkpoint is partway through a decay headed to zero, so a branch inherits a learning rate that was on its way somewhere and is not comparable to a completed run. The curve will not tell you: under cosine the loss drops in the last 10% of every run, including one trained on worthless data, because the rate is going to zero and the model is settling."
+      - text: "Reject it - a 15%-tail run is a cheap run and therefore a worse model, and a worse model cannot support a defensible contribution number."
+        misconception: V3-M1
+        explain: "Cost does not price the artifact, so 'cheaper' is not an argument about quality; and refusing branching outright forfeits a legitimate screening tool that costs real money. The reason to distrust a branched number is the counterfactual it answers, not its price."
+    check: choice
     difficulty: core
 
   - id: v3-q5
@@ -279,55 +196,29 @@ check:
 
   - id: v3-q6
     concept: d-training-recipes
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: false
     prompt: |
-      You are moving a recipe from a batch of 262,144 tokens per step to
-      524,288 tokens per step, using AdamW.
+      You are moving a recipe from a batch of 262,144 tokens per step to 524,288
+      tokens per step, using AdamW.
 
-      State what you do to the learning rate and why, then state the two
-      conditions under which the rule you just applied stops being correct.
-      Finally: is learning-rate tuning a good use of your time on this project?
-      Answer with a reason, not a preference.
-    answer: |
-      Doubling the batch halves the noise in the gradient estimate, so a larger
-      step is affordable. For Adam-family optimizers the heuristic is
-      square-root scaling: multiply the learning rate by sqrt(2), about 1.41.
-      (Linear scaling - double the batch, double the rate - is the SGD
-      heuristic and overshoots for Adam.)
-
-      Where it stops being correct:
-      1. Past the critical batch size. Beyond some batch, the gradient estimate
-         is already about as accurate as it is going to get, so further batch
-         increases buy no additional noise reduction and the scaling rule
-         overshoots the learning rate.
-      2. During warmup. The rule assumes AdamW's running estimates of gradient
-         magnitude are converged. In the first 1-2% of steps they are built from
-         almost no data, which is exactly why the learning rate ramps from zero
-         rather than starting at its peak.
-
-      Is tuning it a good use of time: no, and the reason is arithmetic rather
-      than taste. Learning-rate search costs one run per candidate, and this
-      project's currency is runs - the counterfactual ground-truth sweep needs
-      21 to 550 of them. Spending 10 runs to find a marginally better learning
-      rate buys a slightly better model, which is not what any claim in this
-      book rests on; spending those 10 runs on seeds buys a smaller error bar,
-      which is what every claim rests on. Take the rate from a published recipe
-      at a similar batch size and move on.
-    check: llm
-    rubric: |
-      Must contain: (1) increase the learning rate, by sqrt(2) for AdamW -
-      accept "roughly 1.4x" or an explicit statement that square-root scaling
-      applies to Adam and linear to SGD, (2) the reason: larger batch means
-      less gradient noise means a larger step is safe, (3) at least one of the
-      two breakdown conditions, (4) a reasoned no on tuning.
-      (1), (2) and (3) = pass; (4) upgrades to full credit.
-      Answering "double the learning rate" without distinguishing SGD from Adam
-      = partial, do not pass.
-      An answer that recommends a learning-rate sweep because "hyperparameters
-      matter" = fail; the run budget is the binding constraint and the learner
-      has not internalized that runs are the currency.
+      Which is the right move on the learning rate, and the right use of the run
+      budget? Choose one.
+    options:
+      - text: "Leave it where it is and sweep 10 candidate rates; a better-optimized run tightens the contribution error bars later."
+        misconception: D20
+        explain: "Optimization quality and estimator noise are different quantities: a source's contribution is a random variable, and the width of that distribution comes down with seeds, not with a tuned learning rate. Ten runs spent on rate candidates are ten seeds not bought, and seeds are what every claim from v4 onward rests on."
+      - text: "Double it (linear scaling), then run both settings and keep whichever training loss curve descends faster."
+        misconception: V3-M2
+        explain: "Linear scaling is the plain-SGD heuristic and overshoots for Adam-family optimizers, which already divide the gradient by a running estimate of its own magnitude. And the tiebreak is worse than the error: a training curve is an optimizer health monitor, and the smoother, lower curve can belong to the more broken run."
+      - text: "Multiply it by sqrt(2), about 1.41, and take the value from a published recipe at a similar batch size rather than tuning it."
+        correct: true
+        explain: "Correct. Doubling the batch halves the noise in the gradient estimate, so a larger step is affordable; square-root scaling is the Adam-family rule, linear scaling the SGD one. The rule stops holding past the critical batch size, where the gradient is already about as accurate as it will get, and during warmup, where AdamW's running estimates are built from almost no data. Learning-rate search is the least profitable hyperparameter search available here, because the currency is runs."
+      - text: "Halve it - each step now passes over twice as much data, so a smaller step keeps the model from overfitting the larger batch."
+        misconception: D17
+        explain: "This imports overfitting folklore into a place it does not apply. A larger batch gives a less noisy gradient, which licenses a bigger step, not a smaller one; and at these token-to-parameter ratios the classical overfitting regime is not what is happening at all."
+    check: choice
     difficulty: core
 
   - id: v3-q7
@@ -402,7 +293,7 @@ check:
 
   - id: v3-q11
     concept: d-eval-noise
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
@@ -411,51 +302,71 @@ check:
         Model A: 2.30 nats per token, tokenizer averages 4.8 bytes per token.
         Model B: 1.60 nats per token, tokenizer averages 3.2 bytes per token.
 
-      A colleague reports that B is roughly twice as good as A, citing
-      perplexity. Compute the honest comparison, explain what produced the
-      colleague's error, and state the structural property that makes your
-      metric immune to it.
-    answer: |
-      Perplexity is e^L, so A is e^2.30 = 9.97 and B is e^1.60 = 4.95. That is
-      where "twice as good" comes from.
+      A colleague reports that B is roughly twice as good as A. Which
+      comparison is the honest one?
 
-      Bits per byte, which divides total surprise by the held-out text's byte
-      count rather than by its token count:
-
-        A: 2.30 / (ln 2 x 4.8) = 2.30 / 3.327 = 0.691 bpb
-        B: 1.60 / (ln 2 x 3.2) = 1.60 / 2.218 = 0.721 bpb
-
-      A is better. The verdict reverses.
-
-      What produced the error: B's tokenizer chops the text into more, shorter
-      pieces. Predicting a shorter piece is an easier problem, so B's
-      per-token loss is lower without B knowing the text better. Perplexity
-      inherits that entirely and exponentiates it, which is why the illusion is
-      bigger in perplexity than in raw loss.
-
-      The structural property: bpb's denominator is the held-out text's length
-      in UTF-8 bytes, which was fixed before any tokenizer existed and is
-      identical for every model evaluated on that file. Any metric whose
-      denominator is chosen by the model under test can be gamed by that
-      choice. Bits per byte cannot, which is why it is the only safe metric for
-      comparing across tokenizers - and every comparison against a public
-      baseline crosses a tokenizer boundary.
-    check: llm
-    rubric: |
-      Must contain: (1) both bpb values to within 0.01 - A = 0.69, B = 0.72,
-      (2) the verdict reverses, A is better, (3) the mechanism: the smaller
-      vocabulary produces shorter tokens, and shorter tokens are an easier
-      prediction problem, so per-token loss falls without the model improving,
-      (4) the invariance reason: the byte count of the held-out text is fixed
-      independently of the model's tokenizer.
-      (1), (2) and (3) = pass; (4) upgrades to full credit.
-      Numbers correct but the reversal reported as a rounding curiosity or a
-      tie = fail; the point is that the ordering is wrong, not close.
-      An answer that proposes fixing the comparison by retokenizing both models'
-      eval sets with the same tokenizer = partial. It is not wrong for a
-      like-for-like ablation, but it is unavailable whenever you compare against
-      a published model whose tokenizer you cannot change, which is the case
-      that matters.
+      ($\ln 2 = 0.6931$)
+    options:
+      - text: |
+          A is better: 0.691 bpb against B's 0.721 bpb, from
+          $2.30/(0.6931 \times 4.8)$ and $1.60/(0.6931 \times 3.2)$.
+        correct: true
+        explain: |
+          Bits per byte divides total surprise by the held-out text's length in
+          UTF-8 bytes, a denominator fixed before any tokenizer existed and
+          identical for every model scored on that file. A = 2.30/3.327 = 0.691,
+          B = 1.60/2.218 = 0.721, so the verdict reverses: A is better. Any
+          metric whose denominator is chosen by the model under test can be
+          moved by that choice; bpb cannot, which is why it is the only safe
+          metric across a tokenizer boundary - and every comparison against a
+          published baseline crosses one.
+      - text: |
+          B is better, and by about a factor of two: perplexity $e^{1.60} = 4.95$
+          against $e^{2.30} = 9.97$.
+        misconception: V3-M2
+        explain: |
+          The arithmetic is right and the conclusion is backwards. Perplexity is
+          $e^{\mathcal{L}}$ and $\mathcal{L}$ is nats per TOKEN, so perplexity
+          inherits the tokenizer's denominator and then exponentiates it. B's
+          3.2-byte tokens chop the text into more, shorter pieces, and predicting
+          a shorter piece is an easier problem - B's per-token loss falls without
+          B knowing the text better. This is the number-on-the-screen read as a
+          quality verdict, the same habit that trusts a descending loss curve.
+      - text: |
+          B is better: 1.60 nats per token against 2.30. Bytes per token is a
+          property of the tokenizer, not of the model, so it does not enter the
+          comparison.
+        misconception: V3-M2
+        explain: |
+          Bytes per token is exactly what must enter, because it is the exchange
+          rate between the model's denominator and the text's. Raw loss is nats
+          per token and a token is whatever this model's tokenizer says it is, so
+          two models with different tokenizers are reporting surprise per
+          different-sized unit. Comparing those numbers directly is unsafe in
+          both directions: here it flips the ordering.
+      - text: |
+          B is better: converting to bits per token, $1.60/0.6931 = 2.31$ against
+          A's $2.30/0.6931 = 3.32$, and bits are the tokenizer-invariant unit.
+        misconception: V3-M2
+        explain: |
+          Converting nats to bits changes the unit of surprise, not the unit of
+          text. Bits per token still counts per token, so it is exactly as
+          tokenizer-dependent as the raw loss was, and it produces the same wrong
+          ordering. The invariance comes from the second division - by bytes per
+          token - which is the step this option stops short of.
+      - text: |
+          B is better: at 3.2 bytes per token its tokenizer emits more tokens for
+          the same text, so B was trained on more tokens and got more out of the
+          same run.
+        misconception: V3-M1
+        explain: |
+          This confuses what a run buys with what a metric measures. Both models
+          are being scored on one fixed held-out file; nothing here is a claim
+          about their training budgets, and $C \approx 6ND$ has no term that
+          would make a finer tokenizer a better model. Re-slicing the same text
+          into more pieces adds no information - it only makes each prediction
+          easier, which is precisely the artifact bpb removes.
+    check: choice
     difficulty: stretch
 
   - id: v3-q12
@@ -485,7 +396,7 @@ check:
 
   - id: v3-q13
     concept: d-eval-noise
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
@@ -493,54 +404,70 @@ check:
       about 14,000 items. The previous configuration scored 25.1%. Your
       collaborator wants to put "+1.2 points" in the writeup.
 
-      Make the quantitative case against it, then state the four rules you
-      would adopt instead for choosing evaluation metrics at this scale.
-    answer: |
-      The quantitative case. A 4-choice benchmark has a chance floor of 25%,
-      and both scores are sitting on it. From sampling alone, the standard
-      deviation of a score at chance on 14,000 items is
-      sqrt(0.25 x 0.75 / 14,000) = 0.0037, or 0.37 percentage points. Seed
-      variation - retraining the identical configuration with a different
-      random seed - is larger still. A 1.2-point move is roughly three sampling
-      standard deviations of pure noise stacked on top of an unmeasured and
-      larger seed term, on a metric where neither model is above chance in the
-      first place. Reporting it is not optimism; it is a fabricated result, and
-      anyone who has run these evaluations will recognize it on sight.
-
-      The four rules:
-
-      1. At least two models per condition, different seeds, averaged. Not for
-         precision - with n = 2 the standard error of a difference is one full
-         single-run sigma - but because one run per condition makes seed noise
-         structurally invisible and every reported difference unfalsifiable.
-      2. Choose metrics for low seed variance and monotone improvement, and
-         choose them BEFORE the run. A metric that jumps across seeds detects
-         nothing; a non-monotone metric cannot be interpreted when it moves.
-      3. Require scores above random. A benchmark the model answers at chance
-         is measuring nothing at all.
-      4. Below about 1 billion parameters, drop reasoning benchmarks entirely
-         and report held-out bits per byte on domain text reserved before
-         training. It is tokenizer-invariant, monotone, low-variance, and works
-         at every model size.
-
-      Note what is NOT being conceded: the model being weak does not make the
-      measurement weak. Held-out bpb is precisely measurable on a 10M-parameter
-      model, and attribution asks which data moved held-out loss. Those are
-      unrelated properties.
-    check: llm
-    rubric: |
-      Must contain: (1) the chance floor is 25% and both scores are at it,
-      (2) a sampling-noise calculation or a clear statement that the standard
-      deviation from sampling alone is on the order of a few tenths of a point
-      and seed variation is larger, (3) at least three of the four rules,
-      including two-seeds-minimum and held-out bpb as the replacement metric.
-      (1), (2) and (3) = pass.
-      (1) and (3) without any quantitative noise estimate = partial, do not
-      pass; the argument that persuades a collaborator is the number, and a
-      learner who can only say "that seems like noise" will lose the argument.
-      An answer concluding that small models cannot be evaluated and the
-      project should move to a larger scale = fail. That inverts the trade the
-      unit establishes: small scale is what makes 550-run counterfactual ground
-      truth affordable, and held-out loss is measurable with precision at any
-      size.
+      Which assessment is correct?
+    options:
+      - text: |
+          Both scores sit on the 25% chance floor, where sampling alone gives
+          $\sqrt{0.25 \times 0.75 / 14{,}000} = 0.37$ percentage points and seed
+          variation is larger still; drop the benchmark and report held-out bits
+          per byte over at least two seeds per condition.
+        correct: true
+        explain: |
+          A benchmark the model answers at chance measures nothing, so the move
+          is noise on top of noise: about three sampling standard deviations of
+          an unmeasured and larger seed term, on a metric neither configuration
+          clears. Below roughly 1B parameters the rule is to drop reasoning
+          benchmarks entirely and report held-out bpb on domain text reserved
+          before training - tokenizer-invariant, monotone, low seed variance,
+          two seeds minimum.
+      - text: |
+          Report it: 1.2 points is more than three sampling standard deviations
+          (0.37 pp), so the improvement is significant at better than $p < 0.01$.
+        misconception: D19
+        explain: |
+          The arithmetic on the sampling term is right and the inference is not.
+          A significance calculation is only as good as its null, and this null
+          omits the larger term - retraining the identical configuration with a
+          different seed moves the score by more than sampling does. It also
+          ignores that the threshold was chosen after seeing the number, and that
+          both scores sit at chance, where the metric is not measuring the model
+          at all. A small $p$ against the wrong null is not evidence.
+      - text: |
+          The measurement is weak because the model is weak; move the program to
+          at least 1B parameters, where benchmark scores clear chance, before
+          making any claim.
+        misconception: V3-M1
+        explain: |
+          This inverts the trade the whole book rests on. Model weakness and
+          measurement weakness are unrelated properties: held-out bpb is
+          precisely measurable on a 10M-parameter model, and attribution asks
+          which data moved held-out loss. Since cost is linear in $N$, scaling up
+          by 20x scales the 550-run counterfactual sweep by 20x and destroys the
+          ground truth the small scale exists to buy. The benchmark is what to
+          drop, not the scale.
+      - text: |
+          Corroborate it: the training loss also fell across the same change, so
+          report the 1.2 points with the loss curve as supporting evidence.
+        misconception: V3-M2
+        explain: |
+          A training loss curve compares a model to its own past on data it
+          trained on, under a schedule that drops the loss in the last 10% of
+          every run including sabotaged ones. It cannot corroborate a comparison
+          between two different models - a repeated-shard bug produces a smoother,
+          lower curve than the correct run. Two uninformative numbers agreeing is
+          not evidence.
+      - text: |
+          Get an error bar first: re-run the benchmark on the same two
+          checkpoints several times, and if the 1.2 points survives that spread,
+          report it.
+        misconception: D16
+        explain: |
+          Re-scoring a fixed checkpoint only resamples the benchmark; the
+          checkpoint itself is one draw from a distribution over training runs,
+          and that is where the larger variance lives. The error bar that matters
+          comes from retraining each condition with different seeds, giving
+          $\text{SE}_{\text{diff}} = \sigma\sqrt{2/n}$. Treating a single
+          checkpoint as the model - measure once, report forever - is what makes
+          seed noise structurally invisible.
+    check: choice
     difficulty: stretch

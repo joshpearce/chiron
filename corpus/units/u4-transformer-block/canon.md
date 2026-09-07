@@ -101,32 +101,22 @@ concept: c-mha
 prompt: |
   A block has $d = 512$. Configuration A uses 1 attention head of width
   $d_k = 512$. Configuration B uses 8 heads of width $d_k = 64$. Before
-  reading on, answer both:
-  (a) How many parameters does B have in its attention sublayer, relative
-  to A?
-  (b) If the parameter counts are what you said, what does B actually gain
-  over A? Name the resource that heads spend, given that it is not
-  parameters.
-answer: |
-  (a) Identical. Both are four $512 \times 512$ matrices ($W^Q, W^K, W^V,
-  W^O$) = $4 \times 262{,}144 = 1{,}048{,}576$ parameters. Heads slice those
-  matrices; they do not add matrices.
-  (b) B gains 8 independent attention distributions per query position
-  instead of 1. Configuration A computes exactly one softmax row per query,
-  so every one of the 512 output dimensions is mixed across positions with
-  the *same* weights. B can copy from position 3 into one 64-dim subspace
-  while copying from position 17 into another, in the same layer. What heads
-  spend is per-head rank/width ($d_k$ drops from 512 to 64), not parameters.
-rubric: |
-  (a) Must say the counts are equal (or "4 d^2 either way"). Saying B has
-  8x more is U4M1 - the target error - and fails the item outright.
-  (b) Must identify that multiple heads buy multiple simultaneous attention
-  patterns / mixing distributions per position. Credit also for "each head
-  reads and writes a different subspace". Answers that only say "heads
-  specialise in different linguistic features" get partial credit - that is
-  an observed consequence, not the mechanism. Mentioning the $d_k$ / rank
-  cost is a full-credit bonus, not required.
-check: llm
+  reading on, commit to an answer: how do B's attention-sublayer parameters
+  compare to A's, and what does B buy with whatever resource it does spend?
+options:
+  - text: "Identical counts - four $512 \\times 512$ matrices ($W^Q, W^K, W^V, W^O$), $4 \\times 262{,}144 = 1{,}048{,}576$ either way. B buys 8 simultaneous attention distributions per query position instead of 1, and pays in per-head rank: each head's score-forming matrix is limited to rank $d_k = 64$ instead of 512."
+    correct: true
+    explain: "Right. Heads slice the four fixed $d \\times d$ matrices into contiguous column blocks of width $d_k = d/h$; nothing is added. What changes is that A must mix all 512 output dimensions across positions with one softmax row, while B can copy from position 3 into one 64-dim subspace and from position 17 into another in the same layer."
+  - text: "B has 8x the parameters ($8{,}388{,}608$ against $1{,}048{,}576$), because each head needs its own $W^Q, W^K, W^V$; that extra capacity is what lets different heads specialise in different linguistic phenomena."
+    misconception: U4M1
+    explain: "This is the replication model, and it fails on the count. In multi-head attention $W^Q$ is still $d \\times d$; head $i$ uses the column block $W^Q_i \\in \\mathbb{R}^{d \\times d_k}$. Reconfiguring 8 heads to 1 at fixed $d$ produces byte-identical weight shapes. Specialisation is an emergent consequence of having several restricted read/write channels, not the mechanism that pays for them."
+  - text: "Identical counts, but B gains nothing an equally wide single head could not do - $\\mathrm{concat}[\\mathrm{head}_1 | \\cdots | \\mathrm{head}_8]W^O$ is just a re-partition of the same linear map, so B is a bookkeeping convention."
+    misconception: U4M6
+    explain: "The parameter claim is right and the conclusion is wrong. The softmax sits between the slices, so the heads are not one linear map: A computes exactly one probability distribution over source positions per query, B computes eight, each on a different learned subspace. That is a strictly larger set of functions, at the cost of each head's $W^Q_i W^{K\\top}_i$ having rank at most 64."
+  - text: "B has 1/8 the parameters, since each head's matrices are only $512 \\times 64$ and there are the same four of them; multi-head attention is a parameter-saving factorization."
+    misconception: U4M1
+    explain: "There are $8 \\times 4$ such slices, not 4: the per-head $d \\times d_k$ blocks tile the full $d \\times d$ matrices, so they sum back to $4d^2 = 1{,}048{,}576$. Head count is neutral in both directions - it neither multiplies nor divides the budget, it only sets how the budget is sliced."
+check: choice
 ```
 
 The reason to want several patterns at once is mechanical, not linguistic. One
@@ -171,22 +161,22 @@ prompt: |
   5. Attention sublayer total $=$ ____ parameters, which equals $4d^2$.
   6. Now change $h$ to $4$, holding $d = 768$. The new total is ____ ,
      because ____ .
-answer: |
-  1. $d_k = 64$
-  4. $768 \times 768$
-  5. $2{,}359{,}296$
-  6. $2{,}359{,}296$ - unchanged - because the head count only sets how the
-     four fixed $d \times d$ matrices are sliced. Changing $h$ changes $d_k$
-     (768/4 = 192) and therefore the rank of each head, not the parameter
-     count.
-# Variant blanks: blank steps 2+3 instead of 1+4 to drill matrix shapes;
-# blank only step 6 for a fast recall pass; blank 5+6 for the mastery pass.
-rubric: |
-  Blank 1 must be 64. Blank 4 must be 768 x 768. Blank 5 must be 2,359,296
-  (accept "4 d^2" or "~2.36M"). Blank 6 must state the total is UNCHANGED
-  and attribute this to slicing fixed d x d matrices. Any answer that scales
-  the total with h is U4M1 and fails regardless of the other blanks.
-check: llm
+
+  Which set of fillings is right?
+options:
+  - text: "(1) $64$; (4) $768 \\times 768$; (5) $2{,}359{,}296$; (6) $2{,}359{,}296$ - unchanged - because the head count only sets how the four fixed $d \\times d$ matrices are sliced; $h = 4$ changes $d_k$ to $192$ and therefore each head's rank, not the parameter count."
+    correct: true
+    explain: "Correct throughout. $d_k = d/h$ appears only in the slicing; $W^Q, W^K, W^V, W^O$ are each $768 \\times 768$ regardless, so the total is $4d^2 = 2{,}359{,}296$ at $h = 12$ and at $h = 4$."
+  - text: "(1) $64$; (4) $768 \\times 768$; (5) $2{,}359{,}296$; (6) $786{,}432$ - one third of the previous total - because dropping from 12 heads to 4 removes two thirds of the per-head $W^Q, W^K, W^V$ machinery."
+    misconception: U4M1
+    explain: "Steps 1, 4 and 5 are right, but step 6 treats heads as copies. There is no per-head machinery to remove: the 4 heads at $h = 4$ tile the same $768 \\times 768$ matrices in blocks of width 192 that the 12 heads tiled in blocks of width 64. The total stays $2{,}359{,}296$."
+  - text: "(1) $64$; (4) $64 \\times 768$; (5) $2{,}359{,}296$; (6) $2{,}359{,}296$ - unchanged - because $W^O$ absorbs the head count by growing as $h$ shrinks."
+    misconception: U4M1
+    explain: "$W^O$ is $d \\times d = 768 \\times 768$; it maps the concatenation of all $h$ head outputs (total width $h \\cdot d_k = d$) back to width $d$. The $64 \\times 768$ shape is one row-block $W^O_i$ of the split used in the identity $\\sum_i \\mathrm{head}_i W^O_i$, not the whole matrix, and nothing needs to grow to compensate: the total is $h$-independent because every matrix is $d \\times d$."
+  - text: "(1) $192$; (4) $768 \\times 768$; (5) $2{,}359{,}296$; (6) $2{,}359{,}296$ - unchanged - because $d_k$ is fixed by convention at $d/4$ and the head count is only a scheduling choice."
+    misconception: U4M2
+    explain: "$d_k = d/h = 768/12 = 64$ at step 1; $192$ is the value for the $h = 4$ configuration in step 6. Head width is set by the head count, not fixed by convention - and it is $d_k$, not the parameter total, that moves when $h$ moves."
+check: choice
 ```
 
 One more structural fact, because it connects heads to the residual stream and
@@ -309,25 +299,22 @@ prompt: |
   5. The ratio in step 4 over step 3 is 8. The number of multiply-accumulates
      spent forming attention scores for a new token changes by a factor of
      ____ , because ____ .
-answer: |
-  1. $2 \times 8 \times 128 \times 2 = 4096$ B
-  2. $4096 \times 80 = 327{,}680$ B (320 KiB) per token
-  3. $327{,}680 \times 32{,}768 = 10{,}737{,}418{,}240$ B $= 10$ GiB
-  4. $80$ GiB
-  5. Factor of 1 - unchanged - because all 64 query heads still form scores
-     against all $n$ positions at width $d_k$; shared K/V vectors are
-     broadcast to the query heads that share them, not skipped. GQA changes
-     bytes stored and moved, not arithmetic done.
-# Variant blanks: blank steps 2+3 only for a quick recomputation drill;
-# blank 1+5 to isolate the g-vs-h distinction; blank 4+5 for mastery.
-rubric: |
-  Blank 1 must use g = 8 (not h = 64) and yield 4096 B. Blank 2: 327,680 B.
-  Blank 3: 10 GiB. Blank 4: 80 GiB. Blank 5 MUST say the factor is 1 /
-  unchanged AND give the broadcast reason. Using h in step 1 is U4M2
-  (conflating query heads with KV heads) - fail. Saying step 5 is a factor
-  of 8 or 1/8 is U4M3 (believing GQA cuts FLOPs) - fail even if 1-4 are
-  right, since that is the concept under test.
-check: llm
+
+  Which set of fillings is right?
+options:
+  - text: "(1) $2 \\times 8 \\times 128 \\times 2 = 4096$ B; (2) $327{,}680$ B; (3) $10$ GiB; (4) $80$ GiB; (5) a factor of $1$ - unchanged - because all 64 query heads still form scores against all $n$ positions at width $d_k$, and shared K/V vectors are broadcast to the query heads sharing them rather than skipped."
+    correct: true
+    explain: "Correct. One $K$ and one $V$ per KV head gives $2g$ cached vectors per token per layer, so $g = 8$ yields 4 KiB, 320 KiB across 80 layers, 10 GiB at 32k context against MHA's 80 GiB. GQA cuts bytes stored and streamed by $h/g$; the arithmetic of score formation, $h \\cdot n \\cdot d_k$ multiply-accumulates per new token, is identical under every variant."
+  - text: "(1) $2 \\times 64 \\times 128 \\times 2 = 32{,}768$ B; (2) $2{,}621{,}440$ B; (3) $80$ GiB; (4) $80$ GiB; (5) a factor of $1$ - unchanged - because GQA reduces query heads to 8 while leaving the 64 K/V heads in the cache."
+    misconception: U4M2
+    explain: "This puts $h$ where $g$ belongs. GQA leaves the number of query heads at $h = 64$ and reduces the key/value heads to $g = 8$; $W^Q$ and $W^O$ stay $8192 \\times 8192$ while $W^K$ and $W^V$ shrink to $8192 \\times 1024$. Step 1 must use $g = 8$, giving 4096 B and a 10 GiB cache."
+  - text: "(1) $2 \\times 8 \\times 128 \\times 2 = 4096$ B; (2) $327{,}680$ B; (3) $10$ GiB; (4) $80$ GiB; (5) a factor of $1/8$ - eight times fewer - because with only 8 key heads there are 8 times fewer query-key dot products to compute."
+    misconception: U4M3
+    explain: "Steps 1-4 are right and step 5 is the whole point of the item. Every one of the 64 query heads still forms its own scores against every allowed position: $h \\cdot n \\cdot d_k$ multiply-accumulates, unchanged. A shared key is read by the 8 query heads in its group, not read once for all of them. That is why prefill, which is compute-bound, does not speed up under GQA while decode, which is bandwidth-bound, does."
+  - text: "(1) $2 \\times 8 \\times 128 \\times 2 = 4096$ B; (2) $327{,}680$ B; (3) $10$ GiB; (4) $80$ GiB; (5) a factor of $8$ - eight times more - because the broadcast of each shared $K$ and $V$ out to its group of query heads is extra work that MHA does not do."
+    misconception: U4M3
+    explain: "The broadcast is a `repeat_interleave` view, not arithmetic: it re-reads a key that is already in registers or cache rather than recomputing anything. Score formation costs $h \\cdot n \\cdot d_k$ multiply-accumulates per new token under MHA, GQA and MQA alike, so the factor is 1."
+check: choice
 ```
 
 ## The MLP block: where the parameters actually live
@@ -394,22 +381,22 @@ prompt: |
   4. Block total $=$ ____ , of which the MLP share is ____ %
   5. Doubling $h$ from 32 to 64 changes the MLP share to ____ , because
      ____ .
-answer: |
-  1. $67{,}108{,}864$
-  2. $134{,}217{,}728$ (this is $8d^2$)
-  3. $67{,}108{,}864$ (this is $4d^2$)
-  4. $201{,}326{,}592$ ($12d^2$); MLP share $= 8/12 = 66.7\%$
-  5. Unchanged at 66.7%, because head count does not change the attention
-     parameter count - $W^Q, W^K, W^V, W^O$ stay $d \times d$ and are merely
-     sliced differently.
-# Variant blanks: blank 1+4 for the arithmetic drill; blank 3+5 to force the
-# head-count-independence link back to section 2; blank 2+4+5 for mastery.
-rubric: |
-  1: 67,108,864. 2: 134,217,728. 3: 67,108,864. 4: 201,326,592 and 66.7%
-  (accept 2/3). 5 MUST say unchanged and give the slicing reason. An answer
-  that shrinks the MLP share when h doubles is U4M1 carried forward. An
-  answer that puts attention above the MLP in step 4 is U4M5.
-check: llm
+
+  Which set of fillings is right?
+options:
+  - text: "(1) $67{,}108{,}864$; (2) $134{,}217{,}728$, i.e. $8d^2$; (3) $67{,}108{,}864$, i.e. $4d^2$; (4) $201{,}326{,}592 = 12d^2$, MLP share $8/12 = 66.7\\%$; (5) unchanged at $66.7\\%$, because head count does not change the attention parameter count - $W^Q, W^K, W^V, W^O$ stay $d \\times d$ and are merely sliced differently."
+    correct: true
+    explain: "Correct. $2 d \\, d_{ff} = 8d^2$ against attention's $4d^2$ makes the block two thirds MLP, and doubling $h$ moves only $d_k$ (from 128 to 64), leaving both totals and the share where they were."
+  - text: "(1) $67{,}108{,}864$; (2) $134{,}217{,}728$; (3) $67{,}108{,}864$; (4) $201{,}326{,}592$, MLP share $66.7\\%$; (5) $50\\%$, because at $h = 64$ the attention sublayer holds $8d^2$ and matches the MLP."
+    misconception: U4M1
+    explain: "Steps 1-4 are right; step 5 lets heads multiply the budget. Attention is $4d^2$ at every head count: 64 heads slice the same four $4096 \\times 4096$ matrices into blocks of width 64 instead of 128. The share stays $8/12 = 66.7\\%$."
+  - text: "(1) $67{,}108{,}864$; (2) $67{,}108{,}864$, since $W_1$ and $W_2$ are transposes of one shape; (3) $67{,}108{,}864$; (4) $134{,}217{,}728$, MLP share $50\\%$; (5) unchanged at $50\\%$, because head count does not change the attention parameter count."
+    misconception: U4M5
+    explain: "$W_1$ and $W_2$ have the same shape but are separate matrices, so they add: $2 d \\, d_{ff} = 134{,}217{,}728 = 8d^2$. Counting them once puts the MLP level with attention and hides the fact that two thirds of this block - and four fifths of a SwiGLU block at $d_{ff} = 3.5d$ - is feed-forward weight."
+  - text: "(1) $67{,}108{,}864$; (2) $134{,}217{,}728$; (3) $268{,}435{,}456$, since each of the 32 heads contributes its own share of $W^Q, W^K, W^V, W^O$; (4) $402{,}653{,}184$, MLP share $33.3\\%$; (5) $20\\%$ at $h = 64$, because attention doubles again."
+    misconception: U4M1
+    explain: "Attention is four $d \\times d$ matrices in total, $4d^2 = 67{,}108{,}864$, as the step-3 hint says - the heads partition those matrices rather than each contributing a set. The block is $12d^2$ and two thirds MLP, and nothing in that moves with $h$."
+check: choice
 ```
 
 Two production details worth having.
@@ -496,34 +483,25 @@ id: u4-b5
 type: self-explain
 concept: c-mlp-block
 prompt: |
-  In your own words, in 3-5 sentences: the equation
-  $\mathrm{MLP}(u) = \sum_i \sigma(u \cdot k_i) v_i$ really does look like a
-  key-value lookup. Explain what a strict lookup-table model predicts about
-  a model asked for a fact it was never trained on, what actually happens,
-  and why the difference is a property of the mechanism rather than a bug in
-  it.
-answer: |
-  A lookup table predicts a miss: no key matches, so nothing is returned.
-  What happens instead is a confident, fluent, specific wrong answer,
-  because $u \cdot k_i$ is a continuous dot product - every key returns some
-  score, near-misses return substantial ones, and the output is a weighted
-  blend of the values of related patterns. That blending is the same
-  operation that lets the model answer questions it never saw verbatim, so
-  generalization and hallucination are one mechanism, not two. There is also
-  no row to miss: superposition means features are stored as overlapping
-  non-orthogonal directions across many polysemantic neurons.
-rubric: |
-  Must contain: (1) the lookup model predicts a miss/empty result;
-  (2) what actually happens is a confident wrong answer produced by soft
-  matching / weighted blending of near-miss values; (3) an explicit
-  statement that this is the same mechanism as generalization, so it cannot
-  be removed without removing generalization. All three = pass. Missing (3)
-  = partial. An answer that treats hallucination as a lookup failure to be
-  fixed with more parameters or better retrieval is M4 uncorrected - fail.
-  Credit but do not require polysemanticity/superposition. An answer that
-  rejects the key-value framing entirely also fails: the algebra is exact,
-  the error is the "rows" reading.
-check: llm
+  The equation $\mathrm{MLP}(u) = \sum_i \sigma(u \cdot k_i) v_i$ really does
+  look like a key-value lookup. Which explanation correctly says what a strict
+  lookup-table reading predicts when the model is asked for a fact it was
+  never trained on, what actually happens, and why the difference is a
+  property of the mechanism rather than a bug in it?
+options:
+  - text: "A lookup table predicts a miss - no key matches, nothing is returned. What happens instead is a confident, fluent, specific wrong answer, because $u \\cdot k_i$ is a continuous dot product: every key returns some score, near-misses return substantial ones, and the output is a weighted blend of the values of related patterns. That blending is the same operation that answers questions never seen verbatim, so generalization and hallucination are one mechanism and neither can be removed alone. There is also no row to miss - superposition stores features as overlapping non-orthogonal directions across polysemantic neurons."
+    correct: true
+    explain: "Right on all three counts. The algebra is an exact lookup, but over learned continuous directions in an overloaded space rather than over rows, so a near-miss returns a blend instead of nothing."
+  - text: "A lookup table predicts a miss, and that is roughly what you get: the coefficients $\\sigma(u \\cdot k_i)$ are all near zero for an unstored fact, so the MLP writes almost nothing and the confident wrong answer comes from elsewhere in the stack. The fix is more rows - a larger $d_{ff}$, or an external retrieval store consulted before the MLP - so that the key is present next time."
+    misconception: M4
+    explain: "This keeps the rows. If the coefficients really collapsed for unstored facts the model would produce a shrug, not a specific wrong name with a plausible date; the observed behaviour is exactly what soft matching over near-miss keys predicts. And enlarging $d_{ff}$ does not eliminate near-misses - it is the same interpolation that produces correct answers to novel questions, so removing it would remove generalization too."
+  - text: "A lookup table predicts a miss, and the model does produce a confident wrong answer instead - but the key-value reading is simply mistaken. $\\mathrm{MLP}(u) = \\sigma(u W_1) W_2$ is a matrix product with a nonlinearity, and rewriting it as $\\sum_i \\sigma(u \\cdot k_i) v_i$ is a loose analogy, so no prediction about lookups follows either way."
+    misconception: M4
+    explain: "The rewriting is an exact identity, not an analogy: $k_i$ is the $i$-th column of $W_1$, $v_i$ the $i$-th row of $W_2$. Rejecting the algebra means missing why the failure is diagnostic. The error in the lookup model is the word 'rows' - discrete separable entries - not the matching-and-retrieval structure, which is real."
+  - text: "A lookup table predicts a miss, and what actually happens is a confident wrong answer, because a fact is stored in one neuron $i$ and an unstored fact simply picks up whichever neighbouring neuron's $v_i$ happens to fire. Ablate that neuron and its one fact disappears cleanly, which is how model editing localizes and deletes individual facts."
+    misconception: M4
+    explain: "The one-neuron-one-fact picture fails its own test: ablating a single neuron produces diffuse, small degradation across many unrelated behaviours, not the clean deletion of one fact. Superposition means a layer represents far more features than it has dimensions, so one neuron participates in many features and one feature is spread across many neurons."
+check: choice
 ```
 
 ## The residual stream is a workspace, not a shortcut
@@ -592,37 +570,30 @@ type: predict
 concept: c-residual
 prompt: |
   A 32-layer model. You will run three surgeries at inference time and
-  measure downstream task accuracy. Rank them from least to most damaging,
-  and give the reason your ranking follows from
-  $x_L = e + \sum_{l} (\mathrm{MHA}_l + \mathrm{MLP}_l)$:
+  measure downstream task accuracy:
   (A) delete block 16
   (B) delete block 1
   (C) replace the residual additions in block 16 with plain assignment,
       i.e. $y = \mathrm{MLP}(\mathrm{Norm}(\mathrm{MHA}(\mathrm{Norm}(x))))$,
       keeping every weight
-answer: |
-  Least to most damaging: A, then B, then C.
-  (A) removes 2 of 64 additive terms; the stream still carries the other 62,
-  and later blocks read the stream rather than block 16, so degradation is a
-  few percent.
-  (B) is worse: block 1 writes the low-level features that every later
-  block's read projections were trained to expect, so its absence corrupts
-  the inputs of all 31 downstream blocks rather than removing one term.
-  (C) is catastrophic: assignment discards the accumulated sum. Everything
-  written by blocks 1-15 and by the embedding is thrown away at block 16,
-  and blocks 17-32 receive a vector with no history, in the wrong scale and
-  the wrong subspaces.
-rubric: |
-  Ordering must be A < B < C in damage. Reason for A must be "removes a
-  small number of terms from a sum, stream is intact". Reason for C must be
-  "the accumulated stream is discarded / overwritten rather than added to".
-  Getting A vs C right is the M8 discrimination and is required to pass;
-  swapping A and B is a partial credit miss. Predicting that A is
-  catastrophic because downstream blocks get the wrong stage's input is M8
-  (pipeline model) - fail. Predicting C is harmless because "the weights are
-  all still there" misses that the residual sum, not the weights, carries
-  the state - fail.
-check: llm
+
+  Before reading on, commit to a ranking from least to most damaging, with
+  the reason it follows from
+  $x_L = e + \sum_{l} (\mathrm{MHA}_l + \mathrm{MLP}_l)$.
+options:
+  - text: "A, then B, then C. A removes 2 of 64 additive terms and the stream still carries the other 62, so degradation is a few percent; B is worse because block 1 writes the low-level features every later block's read projections expect, corrupting the inputs of all 31 downstream blocks; C is catastrophic because assignment discards the accumulated sum - everything the embedding and blocks 1-15 wrote is thrown away, and blocks 17-32 receive a vector with no history, in the wrong scale and the wrong subspaces."
+    correct: true
+    explain: "Right, and the A-versus-C gap is the point: what carries the state is the running sum, not the weights. C keeps every parameter and still destroys the model, while A deletes parameters and barely dents it."
+  - text: "C, then A, then B. C is the mildest because every weight is still present and the block still computes its usual function - only the bookkeeping changed; A is worse because block 16's output is missing from the pipeline entirely; B is worst because the first block's error propagates through the most subsequent layers."
+    misconception: M8
+    explain: "This treats the residual addition as bookkeeping around a pipeline. It is the opposite: $x_L$ is the embedding plus a sum of $2L$ updates, so the additions are where the state lives. Assignment at block 16 discards $e$ and every term from blocks 1-15 at once, which is why C is the catastrophic surgery even with all weights intact."
+  - text: "C, then B, then A - all three are severe. Deleting block 16 hands block 17 an input from the wrong stage of the pipeline, so everything downstream is misaligned and the output is incoherent; the deeper the deleted block, the more computation is built on the bad input."
+    misconception: M8
+    explain: "That is the pipeline prediction, and it is what layer-pruning experiments falsify: delete a middle block of a 32-block model and quality drops a few percent with the text still coherent; delete two or three non-adjacent middle blocks and it degrades smoothly. Block 17 reads the stream, not block 16, and the stream still holds the other 62 terms."
+  - text: "A, then C, then B. A is mild for the additive-sum reason and C is survivable because a single block's assignment merely renormalizes the stream - later blocks re-derive what they need from the tokens still visible to attention; B is worst because block 1 is the only layer with direct access to the raw embeddings."
+    misconception: M8
+    explain: "Attention at block 17 reads the residual stream at each position, not the raw tokens, so there is nothing to re-derive from: the token identities were themselves written into the stream by the embedding, and assignment at block 16 erased them. Deleting block 1 is bad because later reads lose the features it writes, but it removes 2 terms from the sum; C removes all of them."
+check: choice
 ```
 
 ## Normalization conditions the optimization; it does not save your floats
@@ -778,32 +749,24 @@ prompt: |
   You are handed a checkpoint with no architecture documentation, containing
   per-layer weights plus a single extra parameter tensor named `norm.weight`
   of shape $[d]$ applied after the last block and before the unembedding.
-  Predict:
-  (a) Is this pre-LN or post-LN, and what is the one-sentence reason?
-  (b) The training log shows a 2000-step linear learning-rate warmup. Is
-  that consistent with your answer, weak evidence against it, or irrelevant?
-  (c) You now delete that final norm tensor and run inference. What happens,
-  and does your answer depend on running in fp32 rather than bf16?
-answer: |
-  (a) Pre-LN. A trailing normalization before the unembedding is only needed
-  when the residual stream is never normalized on the main path, which is
-  exactly the pre-LN arrangement.
-  (b) Weak evidence against but not disqualifying. Warmup is *required* for
-  post-LN and merely *common* for pre-LN, since it also helps Adam's
-  second-moment estimates settle. The trailing norm is the stronger signal.
-  (c) The unembedding receives a vector whose norm is far larger than
-  anything it was trained against, so the logits are badly scaled and the
-  output distribution degenerates - the model emits garbage. Precision is
-  irrelevant: this is a learned scale contract, not a float-range problem,
-  and fp32 or fp64 changes nothing (M7).
-rubric: |
-  (a) Must answer pre-LN AND give the reason "the stream is otherwise never
-  normalized". Answering post-LN is U4M4 - fail. (b) Must recognize warmup
-  is not decisive; either "weak evidence against" or "consistent with both"
-  passes; claiming warmup proves post-LN fails. (c) Must say the model
-  breaks AND that precision does not matter. Saying fp32 would rescue it is
-  M7 - fail.
-check: llm
+  The training log also shows a 2000-step linear learning-rate warmup.
+  Before reading on, commit to a reading of all three: which arrangement
+  this is, what the warmup tells you, and what happens if you delete that
+  final tensor and run inference.
+options:
+  - text: "Pre-LN, because a trailing norm before the unembedding is only needed when the main path is never normalized; the warmup is weak evidence against but not decisive, since warmup is required for post-LN and merely common for pre-LN; deleting the tensor makes the model emit garbage at any precision, fp32 included."
+    correct: true
+    explain: "Right on all three. Pre-LN is $x_l = x_{l-1} + \\mathrm{Sublayer}(\\mathrm{Norm}(x_{l-1}))$, so the stream is pure addition from embedding to the end and something must normalize it before the unembedding - that is GPT-2's `ln_f` and Llama's `model.norm`. Warmup helps Adam's second moments settle in any architecture, so it cannot outweigh the trailing norm. And the breakage is a learned scale contract: the unembedding meets a vector whose norm is far outside anything it trained against, which no amount of float range repairs."
+  - text: "Post-LN, because the norm sits on the main path after the residual addition, and this tensor is the last such norm in the stack; the 2000-step warmup confirms it, since post-LN at depth cannot be trained without warmup; deleting the tensor mainly costs the last block its normalization."
+    misconception: U4M4
+    explain: "This has the two placements swapped. In post-LN, $x_l = \\mathrm{Norm}(x_{l-1} + \\mathrm{Sublayer}(x_{l-1}))$ - the norm is already inside every block, so a post-LN checkpoint has no dangling tensor after the last block; its final operation was a norm. A separately named tensor applied after all blocks is precisely the signature of the arrangement that never touches the main path. Warmup is a symptom shared by both and settles nothing."
+  - text: "Pre-LN, and deleting the final norm is only a problem in low precision: the accumulated stream has a large magnitude, so in bf16 the logits overflow, but rerunning the same deletion in fp32 restores essentially correct outputs."
+    misconception: M7
+    explain: "The architecture call is right and the reason for the damage is wrong. Nothing overflows: fp32 reaches $\\pm 3.4 \\times 10^{38}$ and the stream is nowhere near it. The unembedding was trained against normalized inputs and is now receiving vectors whose scale grows with depth, so the logits are badly scaled and the distribution degenerates - in fp32, in fp64, at any precision. Normalization is a conditioning and scale-contract device, not float-range management."
+  - text: "Undetermined from the tensor alone, since both arrangements ship a final norm; the 2000-step warmup is the decisive evidence and settles it as post-LN."
+    misconception: U4M4
+    explain: "The premise is false, and it inverts which signal carries information. Post-LN models do not ship a trailing norm - the last thing the last block did was normalize. Pre-LN models always ship one. The tensor is the strong signal; warmup is the weak one, since it is standard practice for pre-LN training too."
+check: choice
 ```
 
 ## Depth: composition through the stream
@@ -873,38 +836,25 @@ id: u4-b9
 type: self-explain
 concept: c-depth
 prompt: |
-  Explain, in 4-6 sentences and without using the word "refine": why can a
-  two-layer attention-only transformer complete the pattern
-  `[A][B] ... [A] -> [B]` for token pairs it never saw in training, while a
-  one-layer attention-only transformer of any width cannot? Your explanation
-  must say what the residual stream does in the mechanism.
-answer: |
-  In layer 1 a previous-token head at each position attends one position
-  back and writes "my predecessor was $x_{i-1}$" as an additive update into
-  a subspace of that position's residual stream. In layer 2, an induction
-  head at the current `[A]` forms its keys by reading that subspace, so the
-  position scoring highest is the one whose predecessor was `[A]` - the
-  position holding `[B]` - and its value/output path copies `[B]` into the
-  stream, raising its logit. The essential step is that layer 2's *keys are
-  a function of what layer 1 wrote*, which requires two sequential attention
-  stages. A one-layer model's keys can only be functions of the raw
-  embeddings, so no head can ever ask "which position follows an earlier
-  `[A]`", no matter how wide it is. The residual stream is the channel that
-  makes this composition possible: layer 1 does not pass its output to layer
-  2, it writes into a shared bus that layer 2's read projection was trained
-  to look at.
-rubric: |
-  Must contain: (1) a two-stage mechanism where the first stage writes
-  something about the previous token; (2) the second stage's QUERY/KEY
-  matching depends on what the first stage wrote (composition), not merely
-  that it runs later; (3) an explicit statement that a one-layer model's
-  keys can only depend on raw embeddings, so width cannot substitute;
-  (4) the residual stream named as the shared write/read channel.
-  3 of 4 = pass, but (2) is mandatory - an answer that says the second layer
-  "does more processing" or "has a cleaner input" is U4M6 and fails. An
-  answer claiming the pair [A][B] must have been memorized during training
-  is M4 and fails.
-check: llm
+  A two-layer attention-only transformer completes the pattern
+  `[A][B] ... [A] -> [B]` for token pairs it never saw in training. A
+  one-layer attention-only transformer of any width cannot. Which
+  explanation of that gap is correct? Judge each on what it says the
+  residual stream is doing.
+options:
+  - text: "In layer 1 a previous-token head at each position attends one position back and writes \"my predecessor was $x_{i-1}$\" as an additive update into a subspace of the residual stream. In layer 2 an induction head at the current `[A]` forms its keys by reading that subspace, so the highest-scoring position is the one whose predecessor was `[A]` - the position holding `[B]` - and its OV path copies `[B]` into the stream. Layer 2's keys are a function of what layer 1 wrote, and a one-layer model's keys can only be functions of the raw embeddings, so no width substitutes."
+    correct: true
+    explain: "That is the mechanism, and it names the right bottleneck. This is K-composition: the second stage's matching criterion depends on the first stage's write. The residual stream is what carries it - layer 1 does not hand its output to layer 2, it adds into a shared $d$-wide bus that layer 2's read projection was trained to look at. Depth is the number of times a feature can be a function of another feature, which is why the boundary here is sharp rather than gradual."
+  - text: "The second layer receives a cleaner, better-formed representation than the first layer had, so it can resolve the match that the first layer got approximately right. A one-layer model has only one pass and so only a rough version of the same computation; a sufficiently wide one-layer model closes most of the gap."
+    misconception: U4M6
+    explain: "This is the refinement picture, and it predicts a gradual gap that width can narrow. The gap is not gradual: a one-layer attention-only model does not develop induction heads at any width. The reason is structural rather than about quality - in one layer every head's keys are functions of the raw embeddings only, so no head can pose the query \"which position follows an earlier `[A]`\" at all. It is a missing composition stage, not a coarse version of one."
+  - text: "The two-layer model has seen enough text that pairs like `[A][B]` are stored in its weights and retrieved when `[A]` reappears; the extra layer supplies the capacity for that store, which a one-layer model lacks."
+    misconception: M4
+    explain: "Storage cannot be the account, because the completion works for token pairs that appear nowhere in training - freshly made-up formats, novel names, arbitrary symbol pairs. Parameters define a function over the token stream rather than holding rows to retrieve. What the second layer supplies is a stage of composition: keys that depend on what an earlier stage wrote into the stream."
+  - text: "Two attention layers give twice as many heads, so more simultaneous attention patterns are available per position, and one of them can cover the copy pattern. A one-layer model of double width has the same head budget and can do it too."
+    misconception: U4M1
+    explain: "Head count is the wrong axis. Heads within a layer all read the same stream state and form their keys from it in parallel, so adding heads buys more patterns at one stage, never a second stage. The induction circuit needs layer 2's keys to be computed from something layer 1 wrote - a sequential dependency that no number of parallel heads at a single stage provides."
+check: choice
 ```
 
 ## What to carry forward

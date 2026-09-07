@@ -8,99 +8,90 @@
 pretest:
   - id: v1-p1
     concept: d-contributive-corroborative
+    kind: mcq
     prompt: |
       An AI answer engine responds to a question and lists three sources under
-      the answer, with links. What do those three citations establish about
-      which data produced the model's ability to answer?
-    answer: |
-      Nothing. The citations are a list of what a retriever placed in the
-      context window seconds before the answer was generated, selected by
-      similarity to the query over an index that was built independently of the
-      model. Hold the model's weights fixed and swap the index and the
-      citations change completely, while everything the model learned stays
-      identical. Turn retrieval off and the model usually still answers, with no
-      citations at all.
-
-      Citations are corroborative: these sources support this claim.
-      Attribution to training data is contributive: this data caused this
-      capability. Only the second one is a fact about the model.
-    check: llm
-    rubric: |
-      Pass requires: (1) the citations describe retrieved context, not training
-      data, and (2) some version of the swap-the-index or retrieval-off
-      argument showing the citation can change while the model does not.
-      Answering that the citations show which sources the model "used" or
-      "drew on" = fail, diagnosing D1. This is the primary calibration item for
-      the unit and is expected to fail.
-      Answering "nothing, because the model just makes things up" = fail; that
-      is a different error and misses that the citations are real facts about a
-      real retrieval, just not facts about training.
+      the answer, with links. Which statement is true of what those three
+      citations establish about the data that produced the model's ability to
+      answer?
+    check: choice
+    options:
+      - text: "Nothing about it: the citations name what a retriever placed in the context window seconds before the answer, so swapping the index changes them while every weight stays identical."
+        correct: true
+        explain: "Right. Citation is corroborative - these sources support this claim - and is a fact about a retriever's ranking, not about training. Hold the weights fixed and swap the index and the citations change completely; turn retrieval off and the model usually still answers with no citations at all."
+      - text: "They name the training documents the model drew on for this answer, ranked by how much each one contributed."
+        misconception: D1
+        explain: "This is the inference every AI search interface is built to produce, because citations use the visual grammar of footnotes. But no deployed system computes a training-data ranking per answer; the list is the retrieved set, and it would change under a new index with the model untouched."
+      - text: "They establish that the answer's content was not memorized verbatim from training data, since a memorized answer would need no sources."
+        misconception: D3
+        explain: "This makes verbatim reproduction the test of whether training data was used. Citations say nothing either way about memorization - the model can cite while also having been shaped by the same text, and most training contribution is semantic and never resurfaces verbatim."
+      - text: "Nothing, because the citations are generated text and need not correspond to any real document."
+        misconception: D1
+        explain: "The conclusion is right by accident and the reason is wrong. In a RAG product the citations are real facts about a real retrieval - they just are not facts about training. Treating them as fabrications misses the actual distinction the unit turns on."
+      - text: "They establish the model's weights contain copies of those three documents, since it could quote them."
+        misconception: D4
+        explain: "Model capacity is roughly 3.6 bits per parameter, far too small to hold a corpus as an archive. And the cited documents were pasted into the prompt as text at answer time; the model read them the way it reads anything in its context."
 
   - id: v1-p2
     concept: d-data-market
+    kind: mcq
     prompt: |
-      Roughly what share of recent AI content licensing deals include training
-      rights, and is that share rising or falling? Separately: name the single
-      largest category of AI data spending, and say roughly how it compares in
-      size to the whole disclosed content-licensing market.
-    answer: |
-      About 40% of recent deals include training rights, down from
-      near-universal in 2023-24 and falling. Inference-time access and
-      attribution deals are the growing category, roughly doubling year over
-      year.
-
-      The largest category of AI data spending is expert-labeled data, and it
-      is not close: Meta paid $14.3B for 49% of Scale AI in June 2025, and
-      Mercor booked $614M in the first half of 2026, roughly $2B annualized,
-      about 90% of it from labs. Disclosed content licensing is
-      low-single-digit billions cumulative. One labeling vendor out-earns the
-      entire disclosed content-licensing market. All figures as of mid-2026.
-    check: llm
-    rubric: |
-      Pass requires: (1) a share well below universal - accept anything in the
-      30-50% range - AND that it is falling, and (2) expert/labeled data named
-      as the larger market, with any correct order-of-magnitude comparison.
-      Answering that most or all deals include training rights = fail,
-      diagnosing D12. Expected to fail at pretest.
-      Naming content licensing as the largest category = fail, same diagnosis.
-      Getting (1) right and (2) wrong = partial; the learner has the trend but
-      not the scale, and the scale is the part that changes a pitch.
+      As of mid-2026, which pair correctly states (i) the share of recent AI
+      content licensing deals that include training rights and its direction,
+      and (ii) the largest category of AI data spending relative to the whole
+      disclosed content-licensing market?
+    check: choice
+    options:
+      - text: "About 40% and falling from near-universal; expert-labeled data is the largest category - Meta paid $14.3B for 49% of Scale AI and Mercor booked $614M in H1 2026 (~$2B annualized), so one labeling vendor out-earns all disclosed content licensing."
+        correct: true
+        explain: "Right on both counts. Training rights fell from near-universal in 2023-24 to about 40% while inference-time access and attribution deals roughly double year over year, and labs' scarcity budget goes to expert judgment about text, not to text."
+      - text: "Near-universal and holding steady; content licensing is the largest category, at low-single-digit billions cumulative."
+        misconception: D12
+        explain: "This is the received framing - the original scandal was about training and the earliest deals really were training deals. Both halves fail on the public record: the training-rights share is a falling ~40%, and a single labeling vendor at ~$2B annualized dwarfs the whole disclosed content market."
+      - text: "About 40% and falling; content licensing is still the largest data spending category because inference-time access deals are also content deals."
+        misconception: D12
+        explain: "The trend is right and the scale is wrong, which is the half that changes a pitch. Access deals are growing but the money in data is in expert labeling: Scale at $14.3B for a minority stake, Mercor at ~$2B annualized with about 90% from labs."
+      - text: "About 40% and rising as the market matures; expert-labeled data is the largest category."
+        misconception: D12
+        explain: "If training rights were the demand, their share would be stable or rising as the market matured. It is the reverse: down from near-universal, while attribution and live-access deals went from 2 in 2023 to 18 in 2025 to roughly 34 projected in 2026."
+      - text: "About 40% and falling; litigation settlements are the largest category of AI data spending, given the $1.5B Bartz figure."
+        misconception: D13
+        explain: "A settlement is not data spending, and $1.5B priced the one-time acquisition of ~500,000 pirated copies after the court held that training on lawfully acquired copies is fair use. The recurring spend is on expert labeling."
+    band: 3
 
   - id: v1-p3
     concept: d-compensation-schemes
+    kind: mcq
     prompt: |
       A marketplace collects subscription fees into a single pool and pays
       sources pro-rata by their share of platform-wide usage - the Spotify
-      model.
+      model, $s_i = w_i / \sum_j w_j$ with payout $s_i \times P$.
 
-      You subscribe and consume exactly one source all month. Where does your
-      subscription money go, and what does that imply about who does well under
-      this design?
-    answer: |
-      Not to the source you consumed, except incidentally. Your fee joins the
-      pool, and the pool is divided by platform-wide share, so your money is
-      distributed across every source in proportion to everyone else's usage.
-      The source you actually consumed receives a share determined by the whole
-      platform's behavior, not by yours. Money flows from your pocket to sources
-      you never touched.
-
-      Implication: the design cross-subsidizes from niche consumption toward
-      whatever dominates the platform, and it concentrates - in music, 99.8% of
-      artists receive effectively nothing. It also invites farming, because
-      payout follows a countable event that can be manufactured.
-    check: llm
-    rubric: |
-      Pass requires: (1) the money is allocated by platform-wide share rather
-      than by the payer's own consumption, and (2) at least one consequence -
-      cross-subsidy, concentration, or gaming.
-      Answering that the source you consumed gets your money, or gets most of
-      it, = fail, diagnosing D10. Expected to fail at pretest, and this one is
-      pitch-fatal: it is the standard design and the standard misreading of it.
+      You subscribe and consume exactly one source all month. Which statement
+      correctly describes where your fee goes and what follows from it?
+    check: choice
+    options:
+      - text: "It is distributed across every enrolled source in proportion to everyone else's usage, so money flows to sources you never touched; the design cross-subsidizes toward whatever dominates the platform and concentrates - in music 99.8% of artists receive effectively nothing."
+        correct: true
+        explain: "Right, and it follows straight from the formula: nobody's payout is a function of their own usage, only of their weight relative to a denominator that belongs to everyone. Cross-subsidy, winner-take-most concentration and farming are what the rule says, not implementation bugs."
+      - text: "It goes to the source you consumed, since your share of usage was entirely that source - which is why pro-rata pays in proportion to actual use."
+        misconception: D10
+        explain: "'Share of streams' sounds like 'share of use', but the share is computed platform-wide, not per subscriber. Your one source receives a fraction determined by the whole platform's behavior; your listening changes the numerator by a rounding error."
+      - text: "It goes mostly to the source you consumed, with a small platform-wide component, so the tail is protected against concentration."
+        misconception: D10
+        explain: "There is no per-subscriber component in pro-rata at all. And a pool divided by a power-law weight pays a power law: the user-centric repair that would do what this option imagines has been modeled and shifts only 1 to 5 percentage points toward independents."
+      - text: "It is held back until a causal measurement determines which sources actually shaped the answers you received, then paid on measured contribution."
+        misconception: D20
+        explain: "This describes a different scheme, and one nobody deploys. Pooled pro-rata pays on a countable weight because it is cheap; measured contribution is noisy enough that below a proven signal-to-noise threshold the welfare-optimal contract is a flat fee."
+      - text: "It goes to the source you consumed once the platform corrects for gaming, since farming is the only reason payouts diverge from usage."
+        misconception: D10
+        explain: "Farming is a consequence of the design, not the cause of the divergence. Even with zero fraud, the formula routes your fee by platform-wide share; whatever a scheme counts, somebody will also manufacture."
+    band: 3
 
 check:
   - id: v1-q1
     concept: d-contributive-corroborative
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
@@ -108,43 +99,25 @@ check:
       back to the training data that produced it, and pays rightsholders
       accordingly."
 
-      State which of the two kinds of attribution the vendor is almost
-      certainly doing, give the single experiment that settles it, and state
-      what the vendor would have to show for the stronger claim to be true.
-    answer: |
-      Almost certainly corroborative. Deployed commercial systems attribute to
-      the retrieved context - the documents a retriever placed in the context
-      window - because that information is available at answer time at no cost.
-      Contributive attribution is a claim about training data and requires
-      either counterfactual retraining or a gradient-based estimator, neither of
-      which runs per answer at production latency.
-
-      The experiment: hold the model's weights fixed and change the retrieval
-      index - remove a cited document, add an equivalent one, or change the
-      ranking function - then re-ask the identical question. If the attributions
-      change, they were computed over the retrieved set and are corroborative. A
-      contributive number cannot move without retraining. The cheap variant is
-      to disable retrieval: if the system answers but produces no attributions,
-      the attributions were about retrieval.
-
-      For the stronger claim the vendor would have to show attributions that are
-      a function of the training corpus and not of the query-time index: a
-      measured relationship to ground truth obtained by retraining without a
-      source, on some corpus small enough to do it, with a reported noise floor
-      across seeds. Absent that, the claim is a name, not a measurement.
-    check: llm
-    rubric: |
-      Must contain: (1) corroborative, with the reason that the retrieved set is
-      what is available at answer time; (2) the swap-the-index-with-fixed-weights
-      experiment and the correct prediction under each hypothesis; (3) some form
-      of "show me the correlation against counterfactual ground truth" as the
-      standard for the stronger claim.
-      (1) and (2) = pass. All three = full credit.
-      An answer that accepts the claim because the vendor says it uses gradients
-      or influence functions = fail, diagnosing D1: the method name is not the
-      test, the intervention is.
-      An answer that says no attribution of any kind is possible = fail; that
-      overcorrects past the unit and past units v4 and v5, which measure it.
+      Which single test settles what kind of attribution the vendor is doing,
+      and what does it predict?
+    check: choice
+    options:
+      - text: "Hold the weights fixed and change the retrieval index, then re-ask the identical question: if the attributions move they were computed over the retrieved set and are corroborative, since a contributive number cannot change without retraining."
+        correct: true
+        explain: "Right - the intervention, not the vendor's vocabulary, is the test. The cheap variant is to disable retrieval: if the system still answers but shows no attributions, the attributions were about retrieval. Deployed systems attribute to context because that is what is available at answer time at production latency."
+      - text: "Ask which estimator the vendor uses: if the answer is gradient influence functions rather than similarity, the attributions are contributive."
+        misconception: D1
+        explain: "The method name is not the test. A gradient-flavored score computed over the three documents in the context window is still a statement about retrieval, and no per-answer gradient attribution over a full corpus runs at production latency."
+      - text: "Check whether the attributed documents share n-grams with the generated sentence: overlap means the training data was genuinely used."
+        misconception: D3
+        explain: "Lexical overlap is a corroborative baseline and a lower bound. Large models are shaped by documents sharing no n-grams with the outputs they influence, so this test finds surface form, not contribution - and would pass just as happily on retrieved context."
+      - text: "Confirm the per-sentence weights sum to 100%: a normalized allocation over the corpus is what contributive attribution produces."
+        misconception: D1
+        explain: "Backwards - a tidy sum to 100% over a handful of documents is evidence the denominator is the retrieved set. Contribution measured against millions of documents does not conveniently normalize over three."
+      - text: "Ask for a zero-knowledge proof of the training run: cryptographic attestation is the standard that settles contributive claims."
+        misconception: D14
+        explain: "The best published proof-of-training throughput is ~0.4 GFLOP/s, putting a 1B-parameter model on the order of 10,000 years, and attestation only covers a cooperating trainer. The standard for the stronger claim is a measured correlation against counterfactual retraining with a reported noise floor."
     difficulty: core
 
   - id: v1-q2
@@ -195,71 +168,39 @@ check:
 
   - id: v1-q4
     concept: d-compensation-schemes
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
       Three sources feed an AI legal-research product:
 
-      - A: a court-reporting service that publishes opinions the day they are
-        issued. Its text is the official record and is republished verbatim by
-        a dozen aggregators within hours.
-      - B: a treatise publisher whose commentary exists nowhere else and is
-        behind a paywall the aggregators never reach.
-      - C: a large open Q&A forum where practitioners discuss the same cases,
-        with enormous volume and highly variable quality.
+      - A: a court-reporting service publishing opinions the day they issue;
+        its text is the official record and is republished verbatim by a dozen
+        aggregators within hours.
+      - B: a treatise publisher whose commentary exists nowhere else, behind a
+        paywall the aggregators never reach.
+      - C: a large open Q&A forum discussing the same cases, enormous volume,
+        highly variable quality.
 
-      Run the three-scheme comparison. For flat fee, citation counting, and
-      causal attribution, say who does best, who does worst, and what the scheme
-      is proportional to. Then name the single source most likely to be
-      mispriced by every scheme, and say why.
-    answer: |
-      Flat fee (equal split among enrolled sources): all three receive the same.
-      Proportional to enrollment. Best for whoever contributes least - here C,
-      whose volume is large but whose marginal value is low because it is
-      redundant with A and with itself. Worst for B, the source with unique
-      content.
-
-      Citation counting: proportional to retrieval placement. A and C do well: A
-      because official text matches queries about cases directly, C because
-      volume and open access mean it dominates any index. B does badly and may
-      score zero, because a paywalled treatise is often not in the retrieval
-      index at all. Note that the scheme is measuring index membership as much
-      as it is measuring anything.
-
-      Causal attribution: proportional to measured marginal effect on the model.
-      B does best, because its commentary is the only place that content exists,
-      so removing it removes capability. A does surprisingly badly despite being
-      the official record, because a dozen aggregators republish it verbatim -
-      remove A and the model learns the same text from the copies. C is mixed
-      and probably low: high volume, high redundancy, and the measurement is
-      likely inside the noise floor.
-
-      The most mispriced source is A, and the reason is the important one. A is
-      the origin of the most authoritative text in the corpus, and it scores
-      well only under the scheme that measures placement rather than
-      contribution. Under counterfactual measurement its own redundancy destroys
-      its measured value - the more widely it is copied, the less it appears to
-      be worth. Any scheme intending to pay origins needs an explicit policy for
-      duplicate clusters, because no measurement of marginal effect will find
-      the origin on its own.
-    check: llm
-    rubric: |
-      Must contain: (1) the correct proportionality target for each of the three
-      schemes - enrollment, retrieval placement, marginal effect; (2) B named as
-      the winner under causal attribution with the uniqueness/no-substitute
-      reason; (3) A's redundancy problem - widely republished content measures as
-      low-contribution under counterfactual removal.
-      All three = pass. (1) and (3) = pass; (3) is the load-bearing insight.
-      An answer that ranks A highest under causal attribution because it is the
-      authoritative original = fail, and route to the duplication argument: this
-      is the most common wrong intuition about counterfactual attribution and it
-      recurs in units v4 and v5.
-      An answer that treats citation counting as measuring usage = fail,
-      diagnosing D1.
-      An answer that never mentions B being absent from the retrieval index = do
-      not deduct, but note it: the learner is not yet seeing that citation
-      schemes measure index membership.
+      Under causal attribution (leave-one-source-out effect on held-out loss),
+      which source does best and which does worst, and why?
+    check: choice
+    options:
+      - text: "B best, A worst: B's commentary has no substitute, so removing it removes capability, while removing A changes little because a dozen aggregators carry the same text verbatim."
+        correct: true
+        explain: "Right, and it is the load-bearing insight: counterfactual measurement prices substitutability, so the more widely a source is copied the less it appears to be worth. Paying origins therefore needs an explicit duplicate-cluster policy - no marginal-effect measurement finds the origin on its own."
+      - text: "A best, C worst: A is the authoritative original that every other source is derived from, so it must carry the largest measured effect."
+        misconception: D5
+        explain: "This is the most common wrong intuition about counterfactual attribution and it recurs in units v4 and v5. Influence measures what moved the loss, not what originated or entails the claim; A's own redundancy destroys its measured value."
+      - text: "C best, B worst: C's volume dominates the token count, and B is behind a paywall so the retriever cannot reach it."
+        misconception: D1
+        explain: "Paywall reachability is a fact about a retrieval index, which governs citation counting, not contribution. Under causal attribution what matters is whether the text was in the training corpus and whether removing it hurts; C's volume is largely redundant with A and with itself."
+      - text: "A best, B worst: B's contribution is too small to separate from the seed noise floor, so it measures at zero and the official record wins by default."
+        misconception: D16
+        explain: "The noise point is real - contribution is a noisy random variable and small effects can be indistinguishable from zero - but it is applied to the wrong source. B is the one source with no substitute; C's small, redundant effect is the one most likely to sit inside the noise floor."
+      - text: "All three measure roughly equally, since each supplies a comparable share of the corpus and contribution tracks token count."
+        misconception: D8
+        explain: "Contribution does not track volume. Past a floor, quality and non-redundancy dominate: content the model can already predict from copies has near-zero marginal effect however many tokens of it there are."
     difficulty: core
 
   - id: v1-q5
@@ -288,55 +229,33 @@ check:
 
   - id: v1-q6
     concept: d-data-market
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
       A colleague argues: "The $1.5B Bartz settlement is the dam breaking. Labs
-      are going to be paying rightsholders for training data from now on, so a
-      royalty product has a forcing function behind it."
+      will be paying rightsholders for training data from now on, so a royalty
+      product has a forcing function behind it."
 
-      State exactly what that settlement priced, compute the rational response
-      of a lab that reads the judgment, and name the specific pending question
-      that could still change the answer.
-    answer: |
-      It priced acquisition, once. The court held that training on lawfully
-      acquired books is quintessentially transformative fair use, and that
-      retaining pirated copies is not. The settlement resolves the second
-      holding: roughly $3,000 per work across about 500,000 works, one time,
-      with output-side claims explicitly preserved and unresolved. It
-      establishes no rate for use of any kind.
-
-      The rational lab response is to buy one clean copy of everything, at
-      retail, and train freely. Nothing recurring is owed. The comparison is
-      stark: at the settlement's implied $3,000 per work, one year of the
-      Google-Reddit deal at about $60M would buy 20,000 works outright and
-      forever - and the actual cost of a lawfully purchased book is closer to
-      the cover price than to $3,000. Three jurisdictions have converged on some
-      version of "acquire legitimately and you may train."
-
-      What could still change it: the output-side theories, substitution and
-      market harm, which the acquisition holding does not touch and which a
-      clean-copy purchase cannot cure. NYT v. OpenAI is where they get tested -
-      the court declined to hold that training is inherently transformative,
-      leaving fair use fact-dependent on those questions, with trial expected
-      late 2026 or early 2027. That is a genuine repricing event in either
-      direction, which is the argument for building what is needed under every
-      outcome rather than under one.
-    check: llm
-    rubric: |
-      Must contain: (1) the settlement priced acquisition of pirated copies, one
-      time, not use; (2) the rational response is a one-time clean-copy
-      purchase, ideally with the arithmetic contrast; (3) the output-side
-      claims - substitution and market harm - named as the unresolved theory
-      that could still force recurring payment.
-      (1) and (2) = pass. All three = full credit.
-      An answer that agrees a royalty regime is now likely = fail, diagnosing
-      D13, which is pitch-fatal in front of anyone who has read the opinion.
-      An answer that says the case law makes any payment for training data
-      impossible = fail; deals exist and are signed voluntarily for access,
-      exclusivity, and peace. The holding removes the forcing function, not the
-      market.
+      Which statement correctly gives what the settlement priced, the rational
+      lab response, and the question that could still change the answer?
+    check: choice
+    options:
+      - text: "It priced acquisition of ~500,000 pirated copies at about $3,000 per work, once, after the court held training on lawfully acquired books is fair use; the rational response is to buy one clean copy of everything at retail, and the unresolved output-side theories - substitution and market harm, tested in NYT v. OpenAI - could still force recurring payment."
+        correct: true
+        explain: "Right. It establishes no rate for use of any kind, output-side claims were explicitly preserved, and three jurisdictions have converged on 'acquire legitimately and you may train'. That pending repricing event is the argument for building what is needed under every outcome."
+      - text: "It priced use of the works in training at about $3,000 each, establishing a benchmark rate that later deals will index to, so ongoing royalties now have a floor."
+        misconception: D13
+        explain: "$1.5B is an enormous number and every previous copyright fight ended in a licensing regime, which is why this reads as the dam breaking. But the court had already held that training on lawfully bought copies is fair use; the settlement resolves an acquisition defect, once, and sets no recurring rate."
+      - text: "It priced acquisition, once, and the rational response is a one-time clean-copy purchase - which forecloses payment for training data entirely, since the fair use holding is now settled across three jurisdictions."
+        misconception: D13
+        explain: "The first half is right and the conclusion overshoots. The holding removes the forcing function, not the market: deals are signed voluntarily for access, exclusivity and litigation peace, and the output-side theories remain unresolved."
+      - text: "It priced the outputs the model produced from the books, so the forcing function is real but attaches to inference rather than training, which is why access deals are growing."
+        misconception: D13
+        explain: "Output-side claims were explicitly preserved and not resolved by this settlement - it reached the retention of pirated copies. The growth in access deals is a market development, not a consequence of this judgment."
+      - text: "It priced acquisition, once, and the rational response is a clean-copy purchase - but the unresolved question is whether crawler-blocking and RSL terms will make lawful acquisition impossible without a licence."
+        misconception: V1-M1
+        explain: "RSL has roughly 1,500 endorsing organizations and no confirmed licensee; a posted price with no bid is an ask. Blocking is negotiating leverage at the origin, not a bar to lawful acquisition, and it is not the theory that could force recurring payment - substitution and market harm are."
     difficulty: core
 
   - id: v1-q7
@@ -365,7 +284,7 @@ check:
 
   - id: v1-q8
     concept: d-data-market
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
@@ -373,181 +292,226 @@ check:
       shipped, and its dashboard shows millions of blocked requests. It asks you
       to confirm that its archive is therefore absent from models trained since.
 
-      Explain why you cannot confirm that, quantify the effect blocking actually
-      has, and state what you would build instead if the goal is protection
-      rather than leverage.
-    answer: |
-      Blocking controls one host. The content exists on more than one: wire
-      pickups, aggregators, quote-heavy secondary coverage, scraped mirrors, and
-      archived crawls, none of which touch the publisher's CDN. A lab that wants
-      the text takes it from any of them, and the block is invisible to that
-      path.
+      Model the exposure: the archive's content exists on $k$ hosts (wire
+      pickups, aggregators, quote-heavy coverage, scraped mirrors), a corpus
+      builder crawls any given host independently with probability $q$, so
+      capture probability is $1 - (1-q)^k$. Take $q = 0.3$ and $k = 10$.
 
-      Quantify it with a simple exposure model. If the content exists on k hosts
-      and a corpus builder crawls any given host with probability q
-      independently, then capture probability is 1 - (1-q)^k, and blocking your
-      own origin changes it to 1 - (1-q)^(k-1). With q = 0.3 and k = 10, that is
-      97.2% versus 96.0%: blocking bought 1.2 percentage points. The marginal
-      value of blocking one host is q(1-q)^(k-1), which decays geometrically in
-      k. Origin blocking is highly effective for content that exists in exactly
-      one place and asymptotically worthless for content that syndicates.
-
-      What blocking is genuinely good for is leverage: it is why 50-plus major
-      licensing agreements got signed in the past year. That is a negotiating
-      instrument, not protection.
-
-      What to build for protection: near-duplicate detection at web scale to
-      find where the copies live and when they appeared, dated against model
-      training cutoffs; plus evidence machinery that still works when the copy
-      the model saw came from somebody else - keyed markers planted in the
-      content before scraping, with a pre-committed detection procedure. That is
-      units v6 and v7, and leakage tracking is one of the few genuinely open
-      commercial slots in this ecosystem.
-    check: llm
-    rubric: |
-      Must contain: (1) syndication and mirroring as the mechanism - copies that
-      never touch the origin; (2) some quantified or explicitly structural
-      statement that blocking's value decays as the number of copies grows -
-      the exposure model, or an equivalent argument; (3) the distinction between
-      leverage and protection; (4) a discovery-based answer for what to build,
-      near-duplicate detection or equivalent.
-      (1), (3) and (4) = pass. Adding (2) = full credit.
-      An answer that confirms the archive is absent = fail, diagnosing D11.
-      An answer whose entire account of leakage is crawler evasion - proxies,
-      user-agent spoofing - = fail, same diagnosis: evasion is real and it is not
-      the main path, and treating it as the main path sends the budget to better
-      blocking.
+      Which response is correct?
+    options:
+      - text: |
+          You cannot confirm it. Blocking the origin moves capture probability
+          from $1-(1-q)^{10} = 97.2\%$ to $1-(1-q)^{9} = 96.0\%$, a gain of 1.2
+          percentage points, because the marginal value of blocking one host is
+          $q(1-q)^{k-1}$ and decays geometrically in $k$. Blocking is
+          negotiating leverage, not protection; for protection build
+          near-duplicate detection at web scale to locate and date the copies
+          against training cutoffs, plus keyed markers planted before scraping
+          with a pre-committed detection procedure.
+        correct: true
+        explain: |
+          Right on all three counts: the copies never touch the publisher's CDN,
+          so blocking one host out of ten buys 1.2 points; the 50-plus licensing
+          agreements signed off the back of blocking are what it is genuinely
+          good for; and discovery plus evidence machinery (units v6 and v7) is
+          what survives the copy having come from somebody else.
+      - text: |
+          Confirmed. The blocked-request count is direct evidence the archive was
+          never fetched, and content that never left the origin cannot be in a
+          corpus built since the block went up.
+        misconception: D11
+        explain: |
+          The wall is the one part the publisher controls and the one part with a
+          dashboard, so blocked requests feel like a proof of absence. They are a
+          count of what one host refused. With $k = 10$ hosts carrying the
+          content, refusing at one leaves capture probability at 96.0%.
+      - text: |
+          Not confirmed, because the block leaks technically: residential
+          proxies and spoofed user agents get through. The fix is better bot
+          detection and fingerprinting at the origin.
+        misconception: D11
+        explain: |
+          Evasion is real but it is not the main path, and this answer keeps the
+          whole problem inside the origin. Syndication and mirroring put the text
+          on hosts that were never asked to block; no amount of fingerprinting at
+          one CDN changes $1-(1-q)^{k-1}$. Believing this sends the budget to
+          better blocking.
+      - text: |
+          Not confirmed, but it is directly testable: prompt each model for
+          passages from the archive. If nothing comes back verbatim, the archive
+          was not used.
+        misconception: D3
+        explain: |
+          Verbatim emission is a lower bound and a measurement artifact. Ask for
+          the same content in another style and the knowledge is intact with no
+          n-gram match; most of what training data contributes is semantic and
+          never resurfaces verbatim.
+      - text: |
+          Confirmed for training, and checkable: ask the models a question only
+          the archive answers and read the citations. If the publisher is not
+          cited, its content did not shape the model.
+        misconception: D1
+        explain: |
+          Citations are emitted by a retriever seconds before the answer. Swap
+          the index and they change while every weight stays identical; switch
+          retrieval off and the model still answers with no citations at all. A
+          citation is corroborative and says nothing about the training corpus.
+    check: choice
     difficulty: core
 
   - id: v1-q9
     concept: d-data-market
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      Make the strongest possible case against building a training-data royalty
-      product. Use at least four independent lines of argument drawn from the
-      market, the courts, the technology, and the competitive landscape.
+      State the skeptical case against a training-data royalty product at full
+      strength: no buyer has ever paid into a neutral marketplace (roughly 1,500
+      organizations endorsing RSL, no confirmed licensee; no production AIPREF
+      reader at any major lab; Pay Per Crawl never out of private beta); training
+      on lawfully acquired copies is fair use in the decided cases and the $1.5B
+      settlement priced a one-time acquisition defect at about $3,000 per work;
+      training rights are about 40% of recent deals and falling while access
+      deals double annually, in a $75-100M-per-year market dwarfed by expert-data
+      spend; training-time attribution is not credible at frontier scale and
+      RAG-time attribution is commoditized; and the attribution startups get
+      acquired by rightsholders or gatekeepers.
 
-      Then state what survives that case, and explain why the surviving argument
-      does not require you to predict which way the market goes.
-    answer: |
-      The case, four or more independent lines:
-
-      1. Demand side: no buyer has ever paid into a neutral marketplace. The
-         standardized licensing terms have roughly 1,500 endorsing organizations
-         and no confirmed licensee; the IETF preference vocabulary has no
-         production reader at any major lab; Pay Per Crawl never left private
-         beta. Every real cheque was a bilateral negotiation.
-      2. Courts: the acquisition holding removes the forcing function. Training
-         on lawfully acquired copies is fair use in the decided cases, and the
-         large settlement priced a one-time acquisition defect.
-      3. Market shape: training rights are about 40% of recent deals and
-         falling, while access deals double annually, and the whole
-         training-rights market is an estimated $75-100M per year - smaller than
-         a mid-size financing round, and dwarfed by expert-data spend.
-      4. Technology: training-time attribution is not credible at frontier scale
-         as a payment basis, and RAG-time attribution is already commoditized by
-         several funded vendors and a major platform marketplace.
-      5. Competitive: attribution startups in this space get acquired by
-         rightsholders or gatekeepers rather than becoming independent royalty
-         exchanges, and the gatekeeper is vertically integrated across
-         chokepoint, identity, preference, payment, index and marketplace.
-      6. Substitutes: labs that can generate synthetic text spend their scarcity
-         budget on expert labeling instead.
-
-      What survives: every one of those is an argument about payment. None is an
-      argument about measurement. Verification has buyers already - a disclosure
-      obligation with a supervisor and a fining power from August 2, 2026;
-      buy-side procurement, where labs demonstrably spend billions; and
-      publishers who need evidence for negotiations they are already in.
-
-      Why it needs no prediction: a royalty split that nobody can audit is not a
-      royalty split, so measurement is required in the branch where the royalty
-      market appears. Disclosure, procurement and leakage claims require it in
-      the branch where it does not. A capability needed under both branches
-      dominates a larger capability needed under one, and the dominance argument
-      goes through without assigning a probability to either branch. That is the
-      argument to lead with, because an argument that survives without a
-      forecast is stronger than one that depends on a forecast.
-    check: llm
-    rubric: |
-      Must contain: (1) at least four genuinely independent objections spanning
-      at least three of {demand side, courts, market shape, technology,
-      competition, substitutes}; (2) the observation that all of them concern
-      payment rather than measurement; (3) at least one verification buyer that
-      exists independently of a royalty market; (4) the branch-independence
-      argument - measurement is needed under both outcomes, so no forecast is
-      required.
-      (1), (2) and (4) = pass. All four = full credit.
-      An answer that rebuts the objections by predicting the market will develop
-      = fail: the point of the item is that the surviving argument does not
-      depend on the prediction.
-      An answer that concedes the whole space is worthless = fail; it has
-      swallowed the skeptical case without noticing that every line of it is
-      about payment.
-      Citing "courts will eventually force royalties" as a survival argument =
-      fail, diagnosing D13.
+      Which statement correctly identifies what survives that case, and why the
+      surviving argument needs no forecast of which way the market goes?
+    options:
+      - text: |
+          Every one of those objections is an argument about payment; none is an
+          argument about measurement. Verification has buyers already - Article
+          53(1)(d) disclosure with a supervisor and a fining power from August 2,
+          2026, buy-side procurement where labs demonstrably spend billions, and
+          publishers needing leakage evidence for negotiations they are already
+          in. A royalty split nobody can audit is not a royalty split, so
+          measurement is required in the branch where royalties appear too, and a
+          capability needed under both branches dominates a larger one needed
+          under a single branch without assigning a probability to either.
+        correct: true
+        explain: |
+          This is the argument that survives the question in the room: it
+          concedes the entire demand-side, legal, market-shape and competitive
+          case, then observes that all of it concerns who pays rather than what
+          can be measured, and it goes through as a dominance argument rather
+          than a forecast.
+      - text: |
+          The objections are timing. The output-side theories - substitution and
+          market harm - are still live in NYT v. OpenAI, with trial expected late
+          2026 or early 2027, and a ruling there forces labs into ongoing royalty
+          payments, which is what the product is built for.
+        misconception: D13
+        explain: |
+          A repricing event in either direction is not a survival argument; it is
+          the forecast the item asks you to avoid. Current case law pushes the
+          other way: buy one clean copy at retail, once. The settlement
+          established a price for an acquisition defect, not a recurring rate.
+      - text: |
+          The market-shape objection is the misread one. Training rights are what
+          labs buy content for, the deal count is rising toward about 36 public
+          deals in 2026, and the private multiple is 50 to 100 deals for every
+          public one, so training-rights demand is large and growing.
+        misconception: D12
+        explain: |
+          The public record runs the other way: training rights fell from
+          near-universal to about 40% of recent deals while attribution and
+          live-access deals went 2 to 18 to roughly 34. A single expert-labeled-
+          data vendor at about $2B annualized out-earns the whole disclosed
+          content-licensing market. Labs are short of expert judgment, not text.
+      - text: |
+          The objections are stale, because a paying attribution market already
+          exists: ProRata splits ad revenue across cited sources, Comet Plus
+          funds a $42.5M pool, and Microsoft's Publisher Content Marketplace pays
+          when Copilot grounds an answer in a page.
+        misconception: D1
+        explain: |
+          Those are real businesses paying honestly for retrieval placement in a
+          context window, which is corroborative. None of them pays for training
+          contribution, so they are evidence about a different market and citing
+          them as validation loses the room to anyone who knows the difference.
+      - text: |
+          The load-bearing objection is the technical one, and it is temporary.
+          Attribution noise is a methods problem; a better estimator makes
+          training-time contribution billable, at which point the demand-side and
+          legal objections resolve themselves.
+        misconception: D20
+        explain: |
+          Below a proven signal-to-noise threshold the welfare-optimal contract
+          is a flat fee, and no better estimator changes that - only more signal
+          does. It also answers a payment objection with an engineering promise,
+          which is exactly the move the skeptical case is designed to catch.
+    check: choice
     difficulty: stretch
 
   - id: v1-q10
     concept: d-compensation-schemes
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: false
     prompt: |
       You are specifying the royalty-bearing units for a proof of concept built
-      on an open papers corpus. Someone proposes: "one paper, one source - it is
-      the finest granularity available, and we can always aggregate later."
+      on an open papers corpus of about 100,000 papers, with a $12,000 pool.
+      Someone proposes: "one paper, one source - it is the finest granularity
+      available, and we can always aggregate later."
 
-      Give the two independent reasons this is wrong, state the definition of a
-      source you would use instead, and name the two manifest fields whose
-      absence would make a later payout dispute unanswerable.
-    answer: |
-      Reason one: a paper is not a payment counterparty. Nobody signs a contract
-      or cashes a cheque as "paper #40118." A $12,000 pool over 100,000 papers
-      averages $0.12 per paper, below the cost of the transfer. The attribution
-      unit has to be the payment unit, and the payment unit has a hard floor set
-      by transaction cost.
-
-      Reason two: "aggregate later" assumes the aggregation rule is neutral. It
-      is not - it is the allocation policy, and deferring it means the payout
-      table's shape is decided later by whoever writes the rollup, with no
-      justification recorded. Note that the combinatorial cost is a third
-      objection but the weakest one, since sampling estimators exist; the two
-      above do not go away with more compute.
-
-      The definition: a source is a payment counterparty - an entity that could
-      sign a contract and receive money. Not a file, not a shard, not a
-      document. If you cannot name who would be paid, it is not a source. Two
-      constraints follow: the identity must be stable across pipeline reruns, or
-      contributions computed in different weeks are not comparable; and source
-      assignment must happen before deduplication, because when the pipeline
-      keeps one copy of a shared passage the surviving copy silently receives
-      credit for everything that passage teaches.
-
-      The two fields whose absence is fatal: the duplicate-cluster ID together
-      with the full set of sources in that cluster, without which the objection
-      "you paid them for my text" cannot be answered at all; and a stable
-      source_id, without which this run's numbers cannot be tied to the entity
-      being paid or compared with any other run. Token counts and the extraction
-      code version are close behind, but those two are the ones that make a
-      dispute unanswerable rather than merely awkward.
-    check: llm
-    rubric: |
-      Must contain: (1) a paper is not a payment counterparty and/or the payouts
-      fall below transaction cost - the attribution unit must match the payment
-      unit; (2) that deferring aggregation defers the allocation policy rather
-      than avoiding it; (3) the payment-counterparty definition of a source;
-      (4) duplicate-cluster membership named among the fatal missing fields.
-      (1), (3) and (4) = pass.
-      An answer whose only objection is that 2^n coalitions is too large = fail:
-      the compute objection is answerable by sampling and it conceals the real
-      defect.
-      An answer that treats deduplication as neutral cleanup = fail, diagnosing
-      D9 - which copy survives is a payout decision.
-      An answer that assigns source identity after deduplication = fail; the
-      information required to do it is destroyed by then.
+      Which statement gives the two independent defects, the definition of a
+      source to use instead, and the manifest fields whose absence makes a later
+      payout dispute unanswerable?
+    options:
+      - text: |
+          Defects: a paper is not a payment counterparty - $12{,}000 / 100{,}000
+          = \$0.12$ per paper, below the cost of the transfer - and "aggregate
+          later" defers the allocation policy rather than avoiding it, leaving
+          the payout table's shape to whoever writes the rollup with no
+          justification recorded. Definition: a source is a payment counterparty,
+          an entity that could sign a contract and receive money, with an
+          identity stable across pipeline reruns and assigned before
+          deduplication. Fatal fields: a stable source_id, and the
+          duplicate-cluster ID together with the full set of sources in that
+          cluster.
+        correct: true
+        explain: |
+          Both defects survive unlimited compute, which is what makes them the
+          real ones. The counterparty definition is what forces the attribution
+          unit to match the payment unit, and without cluster membership the
+          objection "you paid them for my text" cannot be answered at all.
+      - text: |
+          The defect is combinatorial: $2^{100{,}000}$ coalitions cannot be
+          enumerated, so per-paper valuation is hopeless. Keep one paper per
+          source, use a sampling estimator for the Shapley values, and record
+          document ids and token counts in the manifest.
+        misconception: D7
+        explain: |
+          The combinatorial objection is real at per-datum granularity and it is
+          the weakest of the three, because sampling estimators answer it - and
+          answering it leaves the payout at $0.12 per counterparty nobody can
+          name. Choose the unit to match the payment unit and $2^{12} = 4{,}096$
+          coalitions are exactly enumerable.
+      - text: |
+          Per-paper is fine as a pipeline unit. Run deduplication first, assign
+          source ids to the copies that survive, and skip the cluster records:
+          dedup is cleanup, and one canonical copy per passage is what any clean
+          corpus wants.
+        misconception: D9
+        explain: |
+          Keeping one copy of a shared passage decides which source gets credit
+          for everything that passage teaches the model. Done after assignment
+          that is an auditable policy; done before it, the information needed to
+          adjudicate a dispute has already been destroyed by pipeline ordering.
+      - text: |
+          Per-paper is fine, because contribution is a property of the corpus.
+          Record token counts and ingestion timestamps, measure once, and a
+          single training run settles any dispute; source identity can be
+          recomputed from file paths on each rerun.
+        misconception: D16
+        explain: |
+          Contribution is a noisy random variable - reseed and a source's
+          marginal effect can swing by more than its own magnitude - so one run
+          settles nothing. And identity recomputed from file paths is not stable
+          across reruns, so March's numbers and June's are not comparable.
+    check: choice
     difficulty: stretch
 
   - id: v1-q11
@@ -594,53 +558,74 @@ check:
 
   - id: v1-q13
     concept: d-contributive-corroborative
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      Classify each of the following as contributive, corroborative, or
-      neither, and give the one-line reason:
+      Classify each of the following:
 
       1. ProRata's Gist answer engine splitting ad revenue pro-rata across the
          sources cited in an answer.
-      2. Perplexity's Comet Plus pool paying publishers on visits, citations,
-         and agent actions.
-      3. Microsoft's Publisher Content Marketplace paying when Copilot grounds
-         an answer in a publisher's page.
+      2. Perplexity's Comet Plus pool paying publishers on visits, citations and
+         agent actions.
+      3. Microsoft's Publisher Content Marketplace paying when Copilot grounds an
+         answer in a publisher's page.
       4. Cloudflare's Pay Per Use charging a crawler when it fetches a page.
       5. Retraining a model with one source removed and measuring the change in
          held-out loss.
-    answer: |
-      1. Corroborative. The split is over the sources a retriever placed in the
-         context window for that answer; it is a fact about the index, not
-         about training.
-      2. Corroborative. Visits and citations are retrieval and traffic events at
-         answer time. Agent actions are further from attribution still - they
-         measure product behavior.
-      3. Corroborative. "Grounds an answer in your page" is a description of
-         retrieval: the page was in the context when the answer was produced.
-      4. Neither. A per-fetch charge is metering at the transport layer. It
-         measures transfer, is charged identically whether the bytes end up in
-         a training corpus, an index, or a bucket, and makes no attribution
-         claim of any kind. Honest, and about a different quantity.
-      5. Contributive, and it is the definition rather than an estimate of it:
-         the change in what the model can do when a source is absent. It is
-         also the only one of the five that requires touching the training
-         process, which is why it is the only one that costs a training run and
-         the only one nobody sells.
-    check: llm
-    rubric: |
-      Required classifications: 1, 2 and 3 corroborative; 4 neither (accept
-      "neither" or an explicit statement that metering makes no attribution
-      claim); 5 contributive.
-      Pass = at least 4 of 5 correct with reasons, including 5 correct.
-      Classifying any of 1-3 as contributive = fail, diagnosing D1: these are
-      the deployed products the confusion is built on, and getting them wrong
-      in a pitch is the failure mode this unit exists to prevent.
-      Classifying 4 as corroborative = partial, do not deduct heavily: it is a
-      reasonable slip, but per-fetch metering makes no claim about what supports
-      an answer either.
-      Treating 5 as impractical rather than as the definition = flag: units v4
-      and v5 do exactly this at small scale, and the whole book depends on it
-      being the reference against which cheap methods are measured.
+
+      Which classification is correct?
+    options:
+      - text: |
+          1, 2, 3 corroborative; 4 neither; 5 contributive.
+        correct: true
+        explain: |
+          1-3 all pay for placement in a context window chosen by a retriever at
+          answer time. 4 is metering at the transport layer: it charges per fetch
+          whether the bytes end up in a training corpus, a retrieval index or a
+          bucket nobody reads, and makes no attribution claim of any kind. 5 is
+          the definition of contributive attribution rather than an estimate of
+          it - the change in what the model can do when a source is absent - and
+          the only one of the five that touches the training process.
+      - text: |
+          1, 2, 3 contributive; 4 neither; 5 contributive.
+        misconception: D1
+        explain: |
+          Paying on citations, visits and grounding events looks like paying for
+          use of the content, but hold the weights fixed and swap the retrieval
+          index: the payouts change completely while nothing the model learned
+          changed. These schemes pay for retrieval placement, which is tunable
+          and purchasable without having written anything.
+      - text: |
+          1, 2, 3 corroborative; 4 corroborative; 5 contributive.
+        misconception: D1
+        explain: |
+          A per-fetch charge makes no claim about what supports an answer either
+          - it is priced identically for an investigative piece and a 2019
+          holiday-hours notice, and charged before anyone knows what the bytes
+          are for. Calling metering corroborative reads an attribution claim into
+          a transport-layer invoice.
+      - text: |
+          1, 2, 3 corroborative; 4 neither; 5 neither - a leave-one-out loss
+          change says only that the loss moved, not which document contains the
+          fact, so it attributes nothing.
+        misconception: D5
+        explain: |
+          This conflates influence with entailment. They are two distinct
+          targets, and they disagree: at 8B scale plain BM25 beats gradient
+          influence at finding the document that contains a fact. Leave-one-out
+          measures influence, which is precisely the quantity a royalty is
+          supposed to be proportional to.
+      - text: |
+          1, 2, 3 corroborative; 4 neither; 5 corroborative at best - seed noise
+          means a retraining measurement establishes nothing until the estimators
+          improve.
+        misconception: D20
+        explain: |
+          Seed noise is real and it is why v4 and v5 report a noise floor, but a
+          noisy measurement of the right quantity does not become a measurement
+          of a different quantity. Leave-one-out is the ground truth cheap
+          methods are scored against; treating it as unusable removes the
+          reference the whole book depends on.
+    check: choice
     difficulty: core

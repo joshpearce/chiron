@@ -66,44 +66,27 @@ type: self-explain
 concept: c-qkv
 prompt: |
   Design it. You have $n$ token vectors $x_1, \dots, x_n$, each of dimension
-  $d_{model}$. Produce $n$ output vectors where output $i$ depends on all $n$
-  inputs. You may use matrix multiplies, elementwise functions, and softmax.
-  You may not use recurrence, and you may not use any parameter whose shape
-  depends on $n$.
+  $d_{model}$. You must produce $n$ output vectors where output $i$ depends on
+  all $n$ inputs. You may use matrix multiplies, elementwise functions, and
+  softmax. You may not use recurrence, and you may not use any parameter whose
+  shape depends on $n$.
 
-  Write down, in two or three sentences, the operation you would use. What
-  determines how much position $i$'s output is influenced by position $j$?
-answer: |
-  Compute a scalar compatibility score between every pair of positions from
-  the content of their vectors - a dot product is the natural choice, since it
-  is the only bilinear scalar you can form from two vectors with no per-pair
-  parameters. Turn each row of scores into non-negative weights summing to 1
-  with a softmax. Then set output $i$ to the weighted average of all input
-  vectors (or of a linear transform of them) using row $i$'s weights.
-
-  This is attention. The parameters are the fixed-size matrices that transform
-  $x$ before the scores and before the averaging - none of them depend on $n$,
-  which is exactly why the mechanism handles any sequence length.
-rubric: |
-  PASS if the answer contains BOTH of:
-    (1) a content-derived pairwise score or similarity between positions -
-        dot product, inner product, "how aligned the vectors are", a learned
-        bilinear form, cosine similarity, or a small function of the pair all
-        count;
-    (2) a weighted combination / weighted average / convex mixture of the
-        other positions' vectors using those scores as weights.
-  Credit generously on (1): any content-based scoring idea passes, even if the
-  learner proposes something other than a dot product.
-  Softmax specifically, separate Q/K/V projections, and scaling are NOT
-  required for a pass - they are the refinements the section develops next.
-  PARTIAL (note but pass) if the learner proposes weighted averaging with
-  weights that are learned per-position rather than computed from content -
-  flag that this breaks the variable-$n$ constraint, then pass.
-  FAIL if the proposal is: sequential/recurrent, a hard argmax selection with
-  no soft weighting, concatenation of all positions into a fixed-size vector
-  (breaks variable $n$), or a restatement of "the model attends to what
-  matters" with no operation named.
-check: llm
+  Commit before you read on: which of these operations satisfies all four
+  constraints, and would you have written it down?
+options:
+  - text: 'Score every pair of positions with a dot product of linear projections of their vectors, softmax each row of scores into non-negative weights summing to 1, and set output $i$ to the weighted average of the projected input vectors using row $i$ of those weights.'
+    correct: true
+    explain: 'This is attention. The score is computed from content, so which position matters depends on what the tokens are; the softmax keeps it differentiable everywhere; and every parameter is a fixed $d_{model} \times d_k$ matrix, so nothing in the mechanism grows with $n$.'
+  - text: 'Carry a running summary vector along the sequence: output $i$ is a learned function of $x_i$ and the summary produced at position $i-1$, so information reaches position $i$ from everything before it.'
+    misconception: M9
+    explain: 'This is recurrence, banned by constraint 4. A dependency chain of length $n$ serializes: position $i$ cannot start until position $i-1$ finishes, so the operation cannot be spread across a GPU. Within a transformer forward pass no position ever waits on another.'
+  - text: 'For each position $i$, score the other positions on relevance and take the single highest-scoring one: output $i$ is the vector of the position it selects.'
+    misconception: M1
+    explain: 'A hard selection has zero gradient almost everywhere, so nothing about how to select could ever be learned, which is constraint 2. The mechanism has to be a soft weighted average with no branch and no chosen winner.'
+  - text: 'Learn a weight matrix $W$ of shape $n \times n$ whose entry $(i,j)$ records how much position $j$ contributes to output $i$, and compute $O = WX$.'
+    misconception: M4
+    explain: 'That parameter is a stored table whose shape depends on $n$, so the same weights cannot serve 3 tokens and 300,000, which is constraint 1. The weights have to be computed from the content at run time rather than looked up per position pair.'
+check: choice
 ```
 
 Whatever you wrote, the rest of this unit builds the specific version that
@@ -181,36 +164,25 @@ type: predict
 concept: c-qkv
 prompt: |
   Two experiments on a trained attention layer. Predict the effect of each on
-  (a) the attention weight matrix, and (b) the layer's output.
+  (a) the attention weight matrix, and (b) the layer output, and commit to a
+  prediction before reading on.
 
   1. Replace $W^V$ with random values. $W^Q$ and $W^K$ untouched.
   2. Replace $W^K$ with random values. $W^Q$ and $W^V$ untouched.
-answer: |
-  Experiment 1: the attention weights are completely unchanged - they depend
-  only on $Q$ and $K$, and neither was touched. The output is garbage, because
-  the payloads being averaged are now noise. Weights unchanged, output
-  destroyed.
-
-  Experiment 2: the attention weights are destroyed - scores are dot products
-  of queries against now-random keys, so the weight distribution is
-  meaningless. The output is a weighted average of the *correct* value
-  vectors under meaningless weights, so it is some arbitrary convex
-  combination of real payloads. Weights destroyed, output destroyed, but the
-  output still lies in the convex hull of the true value vectors.
-
-  The asymmetry is the point. Experiment 1 proves the weights are not
-  "looking at" content: the content changed completely and the weights did not
-  move.
-rubric: |
-  Must get experiment 1 right in both halves: weights UNCHANGED (this is the
-  M1 refutation and is non-negotiable), output destroyed. A learner who says
-  the weights change in experiment 1 is holding M1 - the weights are computed
-  from Q and K alone.
-  Experiment 2: must say the weights change/are destroyed. The convex-hull
-  observation is a bonus, not required.
-  PASS = experiment 1 fully correct AND experiment 2 weights-change correct.
-  FAIL = any claim that $W^V$ influences the attention weights.
-check: llm
+options:
+  - text: 'Experiment 1: the weights are bit-identical and the output is garbage. Experiment 2: the weights are destroyed, and the output is an arbitrary convex combination of the true value vectors.'
+    correct: true
+    explain: 'Right, and the asymmetry is the whole point. The weights are $\text{softmax}(QK^T/\sqrt{d_k})$, in which $W^V$ never appears, so the content being averaged changed completely and not one weight moved. In experiment 2 the scores are dots against random keys, but the payloads are still the real $v_j$, so the output stays inside their convex hull.'
+  - text: 'Both experiments change the weights, because attention inspects the content it selects and in experiment 1 that content is now noise.'
+    misconception: M1
+    explain: 'Nothing inspects anything. The weights come from $Q$ and $K$ alone; the values enter only at the final multiply $AV$. Run the experiment and the recorded weights are identical to the last decimal.'
+  - text: 'Experiment 1 changes the weights, because $W^V$ builds the store the queries are matched against; experiment 2 leaves the weights alone, because keys are only an index into that store.'
+    misconception: U3-M1
+    explain: 'There is no store. $Q$, $K$ and $V$ are three projections of the same $X$, each with $n$ rows. The key is the matching surface and the value is the payload, so $S_{ij} = q_i \cdot k_j$ is destroyed by randomizing $W^K$ and cannot be touched by randomizing $W^V$.'
+  - text: 'Experiment 1 leaves both the weights and the output essentially intact, since the attention map is what the layer produces; experiment 2 destroys both.'
+    misconception: U3-M4
+    explain: 'The layer produces $AV$, shape $n \times d_v$, not the $n \times n$ map. In experiment 1 the map survives untouched and the output is noise, because the output is an average of the value vectors that were just replaced.'
+check: choice
 ```
 
 ## Scaled dot-product attention: the equation
@@ -347,35 +319,23 @@ id: u3-b3
 type: predict
 concept: c-sdpa
 prompt: |
-  We have scores $S = QK^T$. Before reading on - or before continuing, if you
-  already have: what specifically goes wrong if we softmax $S$ directly when
-  $d_k = 512$, and what is the fix?
-
-  Then answer the follow-up: your colleague proposes fixing it by switching
-  the whole layer to float64. Does that work?
-answer: |
-  Raw dot products have variance $d_k$, so at $d_k = 512$ scores are spread
-  over roughly $\pm 22$. Softmax over scores that far apart produces one
-  weight near 1 and the rest near 0, and the local derivative $p(1-p)$
-  collapses toward 0, so no gradient flows back through the layer. It is
-  saturated at initialization and cannot learn. The fix is to divide the
-  scores by $\sqrt{d_k}$ before the softmax, restoring roughly unit variance.
-
-  float64 does not help at all. Nothing is overflowing - $e^{22}$ is a
-  perfectly representable float32. The problem is the mathematical shape of
-  the distribution, not the precision it is stored in. A saturated softmax has
-  a near-zero derivative in exact arithmetic.
-rubric: |
-  Must identify: (1) score magnitude grows with dimension (variance $d_k$ /
-  standard deviation $\sqrt{d_k}$); (2) softmax saturates, so gradients
-  vanish; (3) scale by $\sqrt{d_k}$. Any 2 of the 3 = pass on the first half.
-  The follow-up must be answered "no" with the reason that this is not a
-  range/precision problem. Answering "yes, float64 helps" indicates M7-style
-  confusion (normalization-as-numerical-stability) and is a fail regardless of
-  the first half.
-  Mentioning "numerical overflow" alone, with no variance or gradient
-  argument, is M7-style confusion - fail.
-check: llm
+  We have scores $S = QK^T$. Before reading on: what specifically goes wrong
+  if we softmax $S$ directly when $d_k = 512$, what is the fix, and does a
+  colleague fix it instead by switching the whole layer to float64?
+options:
+  - text: 'Scores have variance $d_k$, so at $d_k = 512$ they spread over roughly $\pm 22$; the softmax saturates, its local derivative $p(1-p)$ collapses toward zero, and the layer stops learning at initialization. Divide by $\sqrt{d_k}$ before the softmax. float64 does not help.'
+    correct: true
+    explain: 'Right. The variance of a dot product of $d_k$-dimensional vectors grows with the dimension, pushing softmax into its flat region. And $e^{22}$ is a perfectly representable float32: a saturated softmax has a near-zero derivative in exact arithmetic, so wider floats change nothing.'
+  - text: 'The exponentials overflow at that magnitude, so the fix is wider floats or an overflow-safe softmax; float64 does work.'
+    misconception: M7
+    explain: 'Overflow is real but is handled separately and completely by subtracting the row max before exponentiating, and the scaling would still be needed if floats had infinite range. The scaling exists for the gradients, not the numerics.'
+  - text: 'Nothing goes wrong: softmax is scale-invariant, so the magnitude of the scores does not matter, and the precision question is moot.'
+    misconception: M2
+    explain: 'Softmax is shift-invariant, not scale-invariant. Multiplying every score by ten sharpens the distribution toward a hard argmax; a gap of 10 between two scores already gives weights of $0.9999546$ and $0.0000454$.'
+  - text: 'The scores are simply un-normalized, so divide each row by its largest entry, or each $q_i$ by its norm, to bring them into range; float64 would not fix that.'
+    misconception: U3-M2
+    explain: 'That is a normalization read off the data. The correction here is a fixed variance correction chosen from the architecture alone: raw dot products have variance $d_k$, so the divisor is the standard deviation $\sqrt{d_k}$, the same constant for a row of tiny scores and a row of enormous ones.'
+check: choice
 ```
 
 ## The whole computation by hand
@@ -665,46 +625,30 @@ prompt: |
 
   Step 2, score. $S = QK^T =$ `____(a)`  (a $2 \times 2$ matrix of integers)
 
-  Step 3, scale. Divide every entry of $S$ by `____(b)` - give both the
-  symbolic form and its numeric value here.
+  Step 3, scale. Divide every entry of $S$ by `____(b)`.
 
   Step 5, normalize. Using $e^{0} = 1$, $e^{0.707107} = 2.028115$,
-  $e^{1.414214} = 4.113250$:
-  row 1 of $A$ is $[0.330238,\ 0.669762]$; row 2 of $A$ is
-  $[0.195570,\ 0.804430]$.
+  $e^{1.414214} = 4.113250$: row 1 of $A$ is $[0.330238,\ 0.669762]$; row 2
+  of $A$ is $[0.195570,\ 0.804430]$.
 
-  Step 6, aggregate. $O = $ `____(c)` - write the expression for output row 1
-  in terms of $A$ and the rows of $V$, then evaluate it to two decimals.
+  Step 6, aggregate. Output row 1 of $O$ is `____(c)` - the expression in
+  terms of $A$ and the rows of $V$, evaluated to two decimals.
 
-  <!-- variant blanks: blank steps 5 and 6 (keep 2,3 shown) to drill softmax;
-       blank steps 2 and 3 to drill projection-to-score; never blank fewer
-       than 2 or the procedure is not being reconstructed. -->
-answer: |
-  (a) $S = \begin{bmatrix} 1 & 2 \\ 0 & 2 \end{bmatrix}$.
-      $S_{11} = [1,1]\cdot[1,0] = 1$; $S_{12} = [1,1]\cdot[1,1] = 2$;
-      $S_{21} = [0,2]\cdot[1,0] = 0$; $S_{22} = [0,2]\cdot[1,1] = 2$.
-
-  (b) $\sqrt{d_k} = \sqrt{2} = 1.414214$. Scaled scores are
-      $[0.707107,\ 1.414214]$ and $[0,\ 1.414214]$.
-
-  (c) Output row 1 $= A_{11}v_1 + A_{12}v_2
-      = 0.330238[2,0] + 0.669762[0,4] = [0.660477,\ 2.679046]$,
-      so $[0.66,\ 2.68]$ to two decimals.
-      (Row 2, not asked for, is $[0.391141,\ 3.217719]$.)
-rubric: |
-  (a) All four entries correct. Getting $S^T$ instead - that is
-  $\begin{bmatrix} 1 & 0 \\ 2 & 2 \end{bmatrix}$ - means the learner computed
-  $KQ^T$ or transposed the wrong factor; mark wrong and name the error.
-  (b) Must give $\sqrt{d_k}$ AND recognize $d_k = 2$ here, so $1.414214$
-  (accept $1.41$, $\sqrt2$). Answering $d_k = 2$ (unsquare-rooted) is the
-  characteristic error - the variance-vs-standard-deviation confusion.
-  Answering "the row max" or "the norm of $q$" indicates U3-M2.
-  (c) Must be a weighted sum of the ROWS of $V$ using row 1 of $A$, evaluating
-  to $[0.66, 2.68]$ within $\pm 0.01$. Using column 1 of $A$ instead of row 1
-  indicates the row-vs-column softmax error (U3-M5).
-  PASS = all three blanks correct. PARTIAL = (a) and (b) correct, arithmetic
-  slip in (c).
-check: llm
+  Which filling of the three blanks is correct?
+options:
+  - text: '(a) $S = \begin{bmatrix} 1 & 2 \\ 0 & 2 \end{bmatrix}$; (b) $\sqrt{d_k} = \sqrt{2} = 1.414214$; (c) $A_{11}v_1 + A_{12}v_2 = 0.330238[2,0] + 0.669762[0,4] = [0.66,\ 2.68]$.'
+    correct: true
+    explain: 'Right on all three. $S_{ij} = q_i \cdot k_j$ gives $S_{11}=1$, $S_{12}=2$, $S_{21}=0$, $S_{22}=2$; the divisor is the standard deviation $\sqrt{d_k}$ with $d_k = 2$ here; and output row 1 is a convex combination of the rows of $V$, so it lands inside the hull of $[2,0]$ and $[0,4]$.'
+  - text: '(a) $S = \begin{bmatrix} 1 & 0 \\ 2 & 2 \end{bmatrix}$; (b) $\sqrt{2} = 1.414214$; (c) $A_{11}v_1 + A_{21}v_2 = 0.330238[2,0] + 0.195570[0,4] = [0.66,\ 0.78]$.'
+    misconception: U3-M5
+    explain: 'Both errors are the same axis slip. $S_{12} = q_1 \cdot k_2 = [1,1]\cdot[1,1] = 2$ sits in row 1, not row 2 - this filling computed $KQ^T$. And the softmax and the aggregation both run along rows, so output row 1 must use row 1 of $A$; the column entries do not even sum to 1, which is why the result falls outside the convex hull.'
+  - text: '(a) $S = \begin{bmatrix} 1 & 2 \\ 0 & 2 \end{bmatrix}$; (b) $d_k = 2$, the head dimension itself, or equivalently the largest score in each row; (c) $A_{11}v_1 + A_{12}v_2 = [0.66,\ 2.68]$.'
+    misconception: U3-M2
+    explain: 'The score matrix and the aggregation are right, the divisor is not. The variance of a raw dot product is $d_k$, and it is the standard deviation $\sqrt{d_k} = 1.414214$ that sets the spread the softmax sees. A divisor read off the data - the row max, the norm of $q_i$ - would be a normalization; this is a constant fixed by the architecture.'
+  - text: '(a) $S = \begin{bmatrix} 1 & 2 \\ 0 & 2 \end{bmatrix}$; (b) $\sqrt{2} = 1.414214$; (c) the output is $A$ itself, so output row 1 is $[0.33,\ 0.67]$.'
+    misconception: U3-M4
+    explain: 'The $2 \times 2$ weight matrix is a transient intermediate, consumed by the final multiply and never passed forward. The output is $AV$, of shape $n \times d_v$, so output row 1 is $0.330238[2,0] + 0.669762[0,4] = [0.66,\ 2.68]$.'
+check: choice
 ```
 
 ## Causal masking
@@ -879,47 +823,27 @@ id: u3-b10
 type: self-explain
 concept: c-sdpa
 prompt: |
-  A colleague says: "Self-attention is $O(n)$ - it's fully parallel, that's
+  A colleague says: "Self-attention is $O(n)$ - it is fully parallel, that is
   the whole reason transformers replaced RNNs."
 
-  Explain exactly what they have confused with what. Then answer the sharper
-  version of their question: given that attention does *more* total
-  arithmetic than an RNN layer ($n^2 d$ versus $n d^2$), why did transformers
-  win?
-answer: |
-  They have confused parallelism with asymptotic work. Attention does
-  $\Theta(n^2 d)$ arithmetic because every query is dotted against every key.
-  What parallelism buys is sequential depth: attention's critical path is
-  $O(1)$ matrix operations regardless of $n$, while an RNN's is $O(n)$
-  because step $i$ needs step $i-1$'s output. Parallel hardware hides the
-  quadratic work at small $n$ by doing it all at once, which is why it feels
-  linear until context gets long.
-
-  Transformers won despite the extra work because modern accelerators are
-  massively parallel and bottlenecked on sequential dependencies, not on
-  FLOPs. A $O(n)$-work RNN that cannot use more than one core at a time
-  trains far slower in wall-clock than a $O(n^2)$-work attention layer that
-  saturates the whole device. Trading total work for shorter critical path is
-  a winning trade when the hardware has idle parallel capacity - and a losing
-  one once $n$ is large enough that the $n^2$ term exhausts it, which is
-  exactly the long-context regime everyone is now fighting.
-rubric: |
-  PASS requires BOTH:
-    (1) naming the confusion correctly - parallelism/wall-clock/latency versus
-        asymptotic work or FLOPs. Must state that attention is $O(n^2)$ in
-        sequence length, and ideally why (every query dots every key).
-    (2) a coherent answer to the second half in terms of hardware
-        utilization / sequential dependency / critical path - the trade is
-        more total work for a shorter dependency chain, which wins on
-        parallel hardware.
-  PARTIAL (fail, but note the specific gap) if the learner gets (1) and says
-  only "transformers are faster" for (2) with no mention of parallel
-  utilization or dependency chains.
-  FAIL if the learner defends the $O(n)$ claim, or attributes the quadratic
-  cost to the KV cache or to memory rather than to the query-key product -
-  the KV cache grows linearly in $n$; it is attention COMPUTE per new token
-  that grows with $n$ (M10, and M17 if they lean on the cache).
-check: llm
+  Which explanation names exactly what they have confused with what, and
+  answers the sharper version of their question: given that attention does
+  more total arithmetic than an RNN layer ($n^2 d$ versus $n d^2$), why did
+  transformers win?
+options:
+  - text: 'They have confused parallelism with asymptotic work. Attention does $\Theta(n^2 d)$ arithmetic because every query is dotted against every key; what parallelism buys is sequential depth, $O(1)$ matrix operations against the $O(n)$ dependency chain of an RNN. Transformers won because accelerators are bottlenecked on dependency chains rather than on FLOPs, so trading more total work for a shorter critical path saturates the device.'
+    correct: true
+    explain: 'Right. At $n = 512$ attention really is faster in wall-clock despite doing more arithmetic, which is why the intuition survives; push $n$ to 128k and the $n^2$ term dominates the whole network, which is the long-context regime everyone is now fighting.'
+  - text: 'They are right. Every query-key pair is computed in one parallel step, so the cost in sequence length is linear, and transformers won because that single step replaced a chain of $n$ steps.'
+    misconception: M10
+    explain: 'Count the arithmetic: $n^2$ scores, each a dot product of length $d_k$, then an $n \times n$ by $n \times d_v$ multiply. Going from $n = 1024$ to $n = 8192$ is 8 times the tokens and 64 times the attention arithmetic. Parallelism changes latency, never work.'
+  - text: 'The confusion is about memory rather than compute: attention compute per token really is linear, and what grows quadratically is the KV cache, which is why long context is expensive. Transformers won because the cache made generation cheap.'
+    misconception: M17
+    explain: 'The KV cache grows linearly in $n$ - one key and one value per token - and it only avoids recomputing projections for tokens already seen. The quadratic term is the query-key product itself: each new token dots its query against all $n$ keys.'
+  - text: 'The confusion is that attention is not parallel at all - inside a forward pass each position waits for the one before it, so it is $O(n)$ work with $O(n)$ depth just like an RNN. Transformers won on a better parameterization, not on parallelism.'
+    misconception: M9
+    explain: 'Nothing in $S = QK^T$, the row-wise softmax, or $O = AV$ needs row 1 before row 2; the whole prompt goes through in one forward pass, which is why prefill saturates a GPU and generation does not. Only generation is sequential, because each new token must be sampled before it can be embedded.'
+check: choice
 ```
 
 ## What you now know

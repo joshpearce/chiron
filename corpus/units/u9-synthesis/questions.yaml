@@ -6,57 +6,120 @@
 pretest:
   - id: u9-p1
     concept: c-full-trace
+    kind: mcq
     prompt: |
       Before we trace it: you hit enter in Claude Code with a question about a
-      file. List, in order, every distinct stage between your keypress and the
-      first character appearing on your screen. Name at least six. Do not look
-      anything up - write what you currently believe, including the parts you
-      are unsure about.
-    answer: |
-      Harness concatenates system prompt + tool schemas + CLAUDE.md + history +
-      your text into one string; tokenizer (BPE) converts it to token IDs;
-      embedding matrix gathers one vector per token ID; a single forward pass
-      (prefill) runs all positions through all transformer blocks in parallel,
-      each block doing norm -> multi-head attention -> add, then norm -> MoE
-      router -> selected expert MLPs -> add, writing K and V for every position
-      into the KV cache along the way; the final residual vector at the LAST
-      position is multiplied by the unembedding matrix to give logits over the
-      vocabulary; temperature and top-p reshape those logits into a sampling
-      distribution; one token is drawn and streamed to the terminal.
-    check: llm
-    rubric: |
-      This item is expected to be incomplete - it calibrates, it does not gate.
-      Score the ORDER and the OMISSIONS, not the vocabulary.
-      Full: tokenize -> embed -> parallel prefill through blocks -> KV cache
-      written -> final-position logits -> sample. Partial: has the stages but
-      places tokenization after embedding, or omits that only the last
-      position's output is used.
-      Diagnostic signals to record for the planner: describing the forward pass
-      as token-by-token = M9 (route to Stage 3 at full depth). Describing
-      "the model receives the messages/roles" = M13. Omitting the KV cache
-      entirely = weak u6. Omitting the router = weak u7.
+      file, and the first character appears on your screen about a second later.
+      Which sequence describes what actually happened in that second?
+    options:
+      - text: |
+          The harness concatenates system prompt, tool schemas, CLAUDE.md,
+          history and your sentence into one flat string; BPE turns it into
+          ~8,192 token IDs; the embedding matrix gathers one $d_{model}$-wide
+          vector per ID; a single forward pass runs all 8,192 positions through
+          all 64 blocks in parallel (norm, attention, add; norm, router,
+          expert MLPs, add), writing K and V for every position into the KV
+          cache; the residual vector at the LAST position alone is unembedded to
+          128,000 logits; temperature and top-p reshape them; one token is drawn.
+        correct: true
+        explain: |
+          This is the trace. Note the two details that carry most of the
+          arithmetic later: all positions go through the stack at once, and only
+          the final position's output is used for prediction.
+      - text: |
+          The harness builds the string, BPE turns it into ~8,192 token IDs, and
+          the model then walks the prompt one token at a time - each token's
+          forward pass producing the state the next token's pass consumes - until
+          it reaches the end of the prompt and begins generating.
+        misconception: M9
+        explain: |
+          Generation looks sequential on screen, and the causal mask makes each
+          position depend only on earlier ones, so a left-to-right schedule feels
+          right. But a dependency structure is not an execution order: at 5.5 ms
+          per step this would put the first character 45 seconds away, not one
+          second. Prefill is one parallel pass over all 8,192 positions.
+      - text: |
+          The API sends the model a list of message objects with `role` fields
+          plus a tool registry; the model reads the system prompt, then indexes
+          through the conversation turns, then the user message, and generates a
+          reply against that structure.
+        misconception: M13
+        explain: |
+          The structure is real on the harness side and it is good engineering -
+          but it does not survive serialization. What crosses the boundary is one
+          sequence of token IDs; roles are special delimiter tokens the model
+          learned to condition on, which is exactly why text inside a user
+          message can impersonate the assistant.
+      - text: |
+          The harness sends only the new turn, because the KV cache on the server
+          already holds the earlier conversation as the model's session state;
+          the model attends to that stored state and generates.
+        misconception: M17
+        explain: |
+          The cache does persist across tokens and chat does feel stateful, but
+          the cache is a memo table over tokens, not memory: recompute it from
+          the same sequence and you get bit-identical keys and values. The
+          harness re-sends every prior token every turn.
+      - text: |
+          The question is embedded, the nearest matching facts are looked up in
+          the parameters, and the retrieved rows are decoded back into text; the
+          forward pass is that lookup plus formatting.
+        misconception: M4
+        explain: |
+          The database analogy is the engineer's first reach, and retrieval
+          failures do look like missing rows. But a lookup table cannot answer
+          questions about items it never stored, whereas this model composes
+          features - which is why it also confidently produces facts that were
+          never in the data.
+    check: choice
   - id: u9-p2
     concept: c-full-trace
+    kind: mcq
     prompt: |
-      Same session. Which is more expensive per token on identical hardware:
-      processing a token of your 8,000-token prompt, or generating a token of
-      the reply? Give a rough ratio and, in one sentence, the reason.
-    answer: |
-      Generating is far more expensive per token - roughly 40-50x on typical
-      hardware. Processing the prompt reads the model's weights from memory once
-      and amortizes that read across all 8,000 positions; generating reads the
-      same weights for a single token, so it is limited by memory bandwidth
-      rather than arithmetic.
-    check: llm
-    rubric: |
-      Expected to fail or to be guessed with the wrong reason. Pass = generation
-      is more expensive per token AND the reason involves amortizing weight
-      reads / memory bandwidth. Direction-only (generation is slower, reason
-      "because it is sequential") = partial; record as M9-adjacent and route to
-      Stage 3 and Stage 6.
-      Answering "the same, it is the same model" = U9-M1, the flat-cost model.
-      Answering "prompt processing is more expensive because there are more
-      tokens" confuses total with per-token; record and correct explicitly.
+      Same session, identical hardware. Which costs more per token - processing
+      one token of your 8,000-token prompt, or generating one token of the reply
+      - and by roughly what ratio, for what reason?
+    options:
+      - text: |
+          Generating, by roughly 40-50x: one weight read from memory is
+          amortized across all 8,000 prompt positions at once, but the same read
+          buys only a single generated token, so generation is limited by memory
+          bandwidth rather than by arithmetic.
+        correct: true
+        explain: |
+          The two phases sit on opposite sides of the hardware's ~225 FLOPs-per-
+          byte balance point: ~33,000 FLOPs per byte for prefill, ~4 for decode.
+          This is why providers price input and output tokens differently.
+      - text: |
+          The same, to within noise: it is one model, one set of weights, one
+          code path, so total cost is just (prompt + output) tokens times a
+          constant.
+        misconception: U9-M1
+        explain: |
+          Both are billed in "tokens" and the model genuinely is identical, so a
+          common unit of work is the natural assumption. But an 8,192-token
+          prompt at the per-token generation latency would take ~45 seconds to
+          first token; measured time-to-first-token is under one second.
+      - text: |
+          Generating, by roughly 40-50x, because generation is sequential while
+          prompt processing is parallelised across cores.
+        misconception: M9
+        explain: |
+          The direction is right and parallelism is the enabling condition, but
+          it is not the cause. Parallelism changes the wall clock; the cost gap
+          is that decode moves the whole weight set to produce one token while
+          prefill moves it once for thousands.
+      - text: |
+          Processing the prompt, because each of its 8,000 positions must dot
+          against every other position ($O(n^2)$ arithmetic), whereas a generated
+          token is only one position of work.
+        misconception: U9-M3
+        explain: |
+          Attention really is quadratic in $n$, but this attributes latency to
+          arithmetic. Prefill's 430 TFLOPs run at near-peak because the units are
+          fed; decode's 44 GFLOPs run at ~2% utilisation because the bus is the
+          limit. Per token, prefill is the cheap phase.
+    check: choice
   - id: u9-p3
     concept: c-full-trace
     prompt: |
@@ -78,7 +141,7 @@ pretest:
 check:
   - id: u9-q1
     concept: c-full-trace
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     spans: [u3, u6, u8]
@@ -87,101 +150,117 @@ check:
       An agentic session runs 30 tool calls. Each turn appends roughly 3,000
       tokens (tool result plus model output) and generates 400 tokens. Wall-clock
       per turn at turn 25 is several times what it was at turn 2, on identical
-      hardware with no other load and no harder task.
+      hardware, with no other load and no harder task.
 
-      Explain why total session cost grows faster than linearly in turn count.
-      Identify the two structurally different mechanisms that each contribute a
-      quadratic term, and say which phase (prefill or decode) each one lives in.
-    answer: |
-      Context length n grows monotonically because every turn appends. Two
-      independent quadratic contributions follow.
-
-      1. Prefill attention. Each turn prefills its ~3,000 new tokens, and those
-      queries attend to all n existing keys, so per-turn attention work is
-      proportional to (new tokens) x n. Since n itself grows linearly in turn
-      count, summing over turns gives a term proportional to turn count squared.
-      This lives in prefill and is compute-bound.
-
-      2. KV cache reads during decode. Each generated token's forward pass reads
-      the entire KV cache, which is linear in n. Each turn generates ~400 tokens,
-      so per-turn decode cost has a term proportional to 400 x n; summing the
-      linearly growing n over turns is again quadratic. This lives in decode and
-      is memory-bandwidth-bound.
-
-      The mechanisms are different: one is attention's n^2 score computation
-      (u3), the other is the cache's linear byte growth multiplied by a linear
-      number of decode steps (u6). Both are driven by the harness's
-      append-only loop (u8). Prefix caching removes re-prefill of unchanged
-      tokens but removes neither quadratic term.
-    check: llm
-    rubric: |
-      MUST contain: (1) context accumulates because every turn appends tool
-      results and output - the task did not get harder; (2) a prefill-side
-      quadratic from attention over a growing context; (3) a decode-side
-      quadratic from reading a KV cache that grows linearly, multiplied by a
-      linear number of generated tokens; (4) correct assignment of each to its
-      phase.
-      Pass = (1) plus either (2) or (3) with correct mechanism. Full = all four.
-      Partial credit: naming a single quadratic and identifying it correctly.
-      Characteristic errors: "attention is O(n^2) so each generated token is
-      quadratically expensive" - false, per-token decode attention is LINEAR in
-      n; the quadratic appears when summed over tokens or in prefill. Marking
-      this correct rewards a real confusion.
-      "It's slower because the context is fuller so the model has more to think
-      about" = M17 plus anthropomorphism.
-      "Prefix caching should have fixed this" = has not separated re-prefill
-      avoidance from the growing per-token read.
+      Which option names the two structurally different mechanisms that each
+      contribute a term quadratic in turn count, and places each in the right
+      phase?
+    options:
+      - text: |
+          (a) Prefill attention: each turn's ~3,000 new queries attend to all $n$
+          existing keys, so per-turn work goes as (new tokens) $\times n$, and
+          $n$ grows linearly with turn count - compute-bound. (b) Decode KV reads:
+          each of the ~400 generated tokens reads the whole cache, which is
+          linear in $n$, so per-turn work goes as $400 \times n$ - memory-
+          bandwidth-bound. Summing a linearly growing $n$ over turns is quadratic
+          in both cases.
+        correct: true
+        explain: |
+          Two independent quadratics from one cause: the harness appends every
+          turn, so $n$ appears multiplicatively against the work of every later
+          turn. Prefix caching removes re-prefill of unchanged tokens and removes
+          neither term.
+      - text: |
+          (a) Attention is $O(n^2)$, so each generated token's forward pass gets
+          quadratically more expensive as context grows - decode. (b) The
+          unembedding to 128,000 logits is repeated per token - decode. Both
+          quadratics live in generation.
+        misconception: M10
+        explain: |
+          Attention's $n^2$ is real, but it is the cost of $n$ queries against
+          $n$ keys - during decode there is exactly one query, so per-token
+          attention is linear in $n$. The quadratic appears when that linear cost
+          is summed over a growing session, or in prefill. The unembedding is a
+          fixed $d_{model} \times V$ product, independent of $n$.
+      - text: |
+          (a) The context is fuller, so the model has more material to weigh
+          before each token - decode. (b) It must re-read and re-understand the
+          earlier tool results each turn to keep track of the plan - prefill.
+        misconception: M17
+        explain: |
+          This reads the cache as the model's working memory and the slowdown as
+          cognitive effort. Latency here is bytes over bandwidth: the same weights
+          plus a cache of $n \times 256$ KB, moved regardless of how hard the
+          question is. Nothing is re-understood; the cache is a memo table.
+      - text: |
+          (a) Each turn is a single inference that carries all prior tool calls
+          inside it, so cost grows with the number of tools invoked - prefill.
+          (b) Tool schemas are re-serialized per call - decode.
+        misconception: U9-M4
+        explain: |
+          The product presents a turn as one response, but five tool calls means
+          six generation sessions: emit call, hard stop, harness executes, append
+          result, new forward pass over a longer sequence. The growing quantity
+          is context length, not tool count, and schema text is a fixed prefix.
+    check: choice
   - id: u9-q2
     concept: c-full-trace
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     spans: [u3, u6]
     difficulty: core
     prompt: |
       Measured on one box: an 8,192-token prompt yields its first output token
-      after 960 ms. Subsequent tokens arrive every 5.5 ms.
+      after 960 ms, and subsequent tokens arrive every 5.5 ms. Prefill therefore
+      handled 8,192 tokens in 960 ms - about 0.12 ms per token - against decode's
+      5.5 ms per token. Same weights, same hardware, ~47x.
 
-      Prefill therefore handled 8,192 tokens in 960 ms - about 0.12 ms per token
-      - while decode spends 5.5 ms per token. Same weights, same hardware, ~47x
-      difference.
-
-      Account for the 47x quantitatively. Name the limiting resource in each
-      phase and give the quantity that determines it.
-    answer: |
-      Prefill is compute-bound, decode is memory-bandwidth-bound, and the ratio
-      is the gap between the two limits.
-
-      Decode: one token requires streaming all active weights from memory
-      (22B params at 4 bits = 11 GB) and performs 2 x 22e9 = 44 GFLOPs with
-      them: 4 FLOPs per byte read. Hardware balance is ~225 FLOPs per byte, so
-      arithmetic units sit idle and time = bytes / bandwidth =
-      11 GB / 2 TB/s = 5.5 ms. That is the weight term, and it accounts for the
-      bulk of the observed latency; the KV-cache read for an 8,192-token context
-      (2.15 GB) adds roughly another millisecond on top.
-
-      Prefill: the same single weight read services 8,192 positions, so
-      arithmetic intensity is ~8,192 x 4 = ~33,000 FLOPs per byte, far above
-      225. Time = FLOPs / rate = 430 TFLOPs / 450 TFLOP/s = 0.96 s. The 430
-      TFLOPs is 2 x 22e9 x 8192 = 360 TFLOPs of parameter work plus ~70 TFLOPs
-      of attention.
-
-      Consequence: a faster accelerator with the same memory bandwidth speeds up
-      prefill and leaves decode essentially unchanged.
-    check: llm
-    rubric: |
-      MUST contain: (1) prefill amortizes one weight read across thousands of
-      positions, decode amortizes it across one; (2) explicit identification of
-      decode as memory-bandwidth-bound and prefill as compute-bound; (3) at
-      least one quantitative anchor (11 GB / 2 TB/s = 5.5 ms, or the
-      FLOPs-per-byte comparison against machine balance).
-      Pass = (1) and (2). Full = all three.
-      Characteristic errors: "prefill is parallel, decode is sequential" alone =
-      fail; that is the observation restated and is the M9 residue - parallelism
-      is the enabling condition, not the cause of the cost difference.
-      "Decode recomputes the prompt each time" = M17.
-      "Decode is slower because generation needs more FLOPs" = U9-M3, latency
-      attributed to arithmetic rather than bandwidth.
+      Which account of the 47x is correct?
+    options:
+      - text: |
+          Decode streams all 22B active parameters (11 GB at 4 bits) to produce
+          one token while doing $2 \times 22 \times 10^9 = 44$ GFLOPs with them -
+          4 FLOPs per byte against a machine balance of 225, so it is memory-
+          bandwidth-bound and 11 GB / 2 TB/s = 5.5 ms. Prefill's identical read
+          services 8,192 positions, ~33,000 FLOPs per byte, so it is compute-
+          bound: 430 TFLOPs / 450 TFLOP/s = 0.96 s.
+        correct: true
+        explain: |
+          The 47x is the gap between the two limits. The testable consequence: a
+          faster accelerator with the same memory bandwidth speeds up prefill and
+          leaves decode essentially unchanged.
+      - text: |
+          Prefill is parallel across all 8,192 positions and decode is inherently
+          sequential, one token at a time; the 47x is the parallel speedup.
+        misconception: M9
+        explain: |
+          This restates the observation and treats parallelism as the cause
+          rather than the enabling condition. Parallelism sets the wall clock
+          only once you know which resource is saturated - here the units are
+          idle ~98% of the time during decode, waiting on bytes.
+      - text: |
+          Each generated token requires the model to re-process the 8,192-token
+          prompt before it can predict, so decode repeats prefill's work per
+          token, discounted by caching.
+        misconception: M17
+        explain: |
+          If decode re-processed the prompt it would cost ~960 ms per token, not
+          5.5 ms. The KV cache exists precisely so old positions are never
+          re-processed: their keys and values are a pure function of an unchanged
+          prefix.
+      - text: |
+          Generation does more arithmetic per token than prompt processing - a
+          full softmax over 128,000 logits and a sampling step per token - so the
+          higher FLOP count per token sets the higher latency.
+        misconception: U9-M3
+        explain: |
+          Latency tracking FLOPs is right for prefill and for training, and wrong
+          here. The unembedding and softmax are a rounding error beside 44
+          GFLOPs, and the same 44 GFLOPs is 4 FLOPs per byte moved - the bus, not
+          the arithmetic, sets 5.5 ms. Quantizing weights to 4 bits leaves the
+          arithmetic unchanged and still cuts latency ~4x.
+    check: choice
   - id: u9-q3
     concept: c-full-trace
     kind: mcq
@@ -234,61 +313,69 @@ check:
           Position 3 is exactly as recoverable as position 8,000.
   - id: u9-q4
     concept: c-full-trace
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     spans: [u6, u7]
     difficulty: core
     prompt: |
       A model is 235B total parameters, 22B active per token, 128 experts per
-      layer with top-8 routing.
+      layer with top-8 routing. During prefill of an 8,192-token prompt all 235B
+      parameters are read from memory; during decode of each reply token only
+      about 22B are. Yet prefill is compute-bound and decode is memory-bound.
 
-      During prefill of an 8,192-token prompt, all 235B parameters get read from
-      memory. During decode of each reply token, only about 22B do. Yet prefill
-      is compute-bound and decode is memory-bound.
-
-      Explain why the phase that reads 10x more weight data is the one NOT
-      limited by memory. Then state what MoE buys and what it costs, phase by
-      phase.
-    answer: |
-      Absolute bytes read is the wrong quantity; the bound is set by arithmetic
-      intensity, FLOPs per byte moved. Prefill reads ~118 GB once and does ~430
-      TFLOPs with it (~3,600 FLOPs/byte). Decode reads ~11 GB and does ~44
-      GFLOPs (~4 FLOPs/byte). Machine balance is ~225 FLOPs/byte: prefill sits 16x
-      above it, decode 56x below.
-
-      Prefill reads all 235B because 8,192 different tokens each pick their own
-      top-8, so collectively they select every expert in every layer - but that
-      read is amortized over 8,192 positions.
-
-      What MoE buys: in decode, per-token latency tracks the 22B active
-      parameters, not the 235B total. A dense 235B model would stream ~118 GB per
-      token and decode roughly 10x slower. MoE gives large-model capability at
-      small-model decode bandwidth - a win concentrated in the bandwidth-bound
-      phase.
-
-      What it costs: memory footprint is set by TOTAL parameters, since every
-      expert must be resident (prefill and batched serving touch all of them);
-      plus router overhead, load imbalance stalling the batch on the hottest
-      expert, and all-to-all communication when experts are sharded across
-      devices.
-    check: llm
-    rubric: |
-      MUST contain: (1) arithmetic intensity (FLOPs per byte), not absolute
-      bytes, decides the bound, and prefill amortizes its read over thousands of
-      positions; (2) MoE's benefit is concentrated in decode where per-token
-      bandwidth tracks active params; (3) the cost is footprint set by total
-      params and/or routing and communication overhead.
-      Pass = (1) and (2). Full = all three.
-      Characteristic errors: "only the relevant experts need to be loaded" = M12,
-      the specialist model - routing is per-token, so over a prompt every expert
-      fires. "MoE makes the model smaller" = the total-vs-active confusion; only
-      the per-token read shrinks, never the footprint. "Prefill is compute-bound
-      because it does more work" is circular and does not pass; the answer must
-      compare work to bytes.
+      Which account of that, and of what MoE buys and costs, is correct?
+    options:
+      - text: |
+          Arithmetic intensity decides the bound, not absolute bytes: prefill
+          reads ~118 GB once and does ~430 TFLOPs with it (~3,600 FLOPs/byte,
+          16x above the machine's 225), decode reads ~11 GB and does ~44 GFLOPs
+          (~4 FLOPs/byte). MoE buys decode: per-token latency tracks 22B active,
+          so a dense 235B would decode ~10x slower. It costs footprint - every
+          expert must be resident because 8,192 tokens collectively select all of
+          them - plus router overhead, load imbalance and all-to-all traffic.
+        correct: true
+        explain: |
+          The win is concentrated in the bandwidth-bound phase, and the bill is
+          paid in the memory the total parameter count occupies.
+      - text: |
+          Prefill spans many topics, so every domain expert must be loaded;
+          decode stays on one topic, so the router keeps selecting the same
+          relevant specialists and only their weights move. MoE buys you topical
+          capacity and costs you router accuracy.
+        misconception: M12
+        explain: |
+          The word "expert" invites this, but routing is per-token and largely
+          syntactic: consecutive tokens on one line of code often route to
+          disjoint expert sets, and the same expert fires across unrelated
+          domains. Nothing in the router sees a topic.
+      - text: |
+          Prefill is compute-bound because it performs vastly more total FLOPs
+          (430 TFLOPs versus 44 GFLOPs per token), and decode is memory-bound
+          because it performs so few; the absolute FLOP count is what decides.
+          MoE cuts FLOPs, so it helps both phases equally.
+        misconception: U9-M3
+        explain: |
+          Absolute FLOPs cannot decide a bound - only work compared to bytes
+          moved can. Prefill also reads 10x more data than decode; it is
+          compute-bound anyway because that read is amortized across 8,192
+          positions. And MoE's benefit is asymmetric: it is a bytes-per-token
+          win, so it lands on decode.
+      - text: |
+          Prefill must read all 235B because the answer could be stored anywhere
+          in the weights and the whole table has to be scanned; decode has
+          already located the relevant rows, so it reads only those 22B. MoE buys
+          a smaller model, since only 22B ever needs to be held.
+        misconception: M4
+        explain: |
+          Two errors from the lookup-table picture. Nothing is scanned or
+          located: 8,192 tokens each pick their own top-8, and collectively they
+          cover every expert. And the model is not smaller - all 235B stay
+          resident; only the per-token read shrinks.
+    check: choice
   - id: u9-q5
     concept: c-full-trace
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     spans: [u5, u6]
@@ -299,51 +386,53 @@ check:
       isn't the problem - the model just doesn't know the library well enough.
       We should fine-tune it on our codebase so it learns the API."
 
-      Evaluate both halves. What is the mechanism that produced the hallucinated
-      function, at what stage of the trace did it become inevitable, and will
-      fine-tuning on their codebase fix it? Be specific about what fine-tuning
-      does and does not change.
-    answer: |
-      First half is right for the wrong reason, second half is half right.
-
-      Mechanism: the hallucination was fixed before sampling ran. The forward
-      pass produced logits in which the tokens spelling the nonexistent function
-      scored highest. Temperature 0 is argmax over that same logit vector, so it
-      removes sampling noise and nothing else - all "knowledge" is upstream of
-      the sampler. Setting T=0 makes hallucination MORE deterministic, not less
-      likely.
-
-      Why the logits looked that way: the model composes features rather than
-      retrieving rows. A plausible-looking method name is the natural
-      interpolation of thousands of similar APIs. Generalization and hallucination
-      are the same mechanism, so there is no "missing row" to add.
-
-      Will fine-tuning fix it: partly, and not for the reason stated. Post-training
-      compute is a rounding error against pretraining, and post-training reliably
-      shapes format, style, and refusal behavior rather than installing knowledge.
-      Fine-tuning on their codebase can genuinely raise the probability of their
-      actual API surface, since those exact token sequences become frequent - but
-      it does not create a lookup guarantee, and the model will still interpolate
-      confidently at the edges.
-
-      Better fix for the stated problem: put the API surface in the context
-      (retrieval or a tool that reads the real header), which changes the logits
-      by conditioning rather than by hoping the weights absorbed it, plus a
-      verification step in the harness loop.
-    check: llm
-    rubric: |
-      MUST contain: (1) temperature operates on frozen logits, so T=0 cannot
-      prevent hallucination - it only removes sampling variance (M6); (2) the
-      hallucination originated in the forward pass, and generalization and
-      hallucination share a mechanism, so there is no missing lookup entry (M4);
-      (3) post-training shapes behavior far more than it installs knowledge, with
-      the honest qualification that domain fine-tuning does shift token
-      statistics (M15).
-      Pass = (1) and (2). Full = all three, plus proposing context/tooling as the
-      higher-leverage fix.
-      Characteristic errors: "T=0 shows what the model really knows" = M6.
-      "Fine-tuning teaches it the library" stated flatly = M15. "The model needs
-      more parameters to store the API" = M4 plus M11.
+      Which assessment is correct?
+    options:
+      - text: |
+          $T = 0$ could not have helped: it is argmax over the same frozen logit
+          vector the forward pass produced, so it removes sampling variance only.
+          The plausible method name is interpolation across thousands of similar
+          APIs - generalization and hallucination are one mechanism, so there is
+          no missing entry to install. Fine-tuning shifts token statistics toward
+          their API and mostly shapes behavior; putting the real API surface in
+          the context, plus a verification step in the harness loop, changes the
+          logits by conditioning and is the higher-leverage fix.
+        correct: true
+        explain: |
+          The first half of the colleague's claim is right for the wrong reason
+          and the second half is only half right. Everything the model "knows" is
+          upstream of the sampler.
+      - text: |
+          $T = 0$ is the model's honest setting - it shows what the model really
+          believes - so the output proves the knowledge is genuinely absent, and
+          fine-tuning is the right response.
+        misconception: M6
+        explain: |
+          $T = 0$ reveals the mode of the same distribution, nothing more; the
+          logits are identical at every temperature. It makes hallucination more
+          deterministic, not less likely, so it cannot serve as evidence about
+          what is or is not in the weights.
+      - text: |
+          The library's API is a missing row in the weights - the model had no
+          entry to retrieve, so it returned the nearest one. Fine-tuning writes
+          the missing rows in and retrieval then succeeds.
+        misconception: M4
+        explain: |
+          A lookup table with a missing row fails or returns nothing; this model
+          confidently produced a name that was never anywhere in the data. Facts
+          are distributed soft regularities across the weights, and the same
+          machinery that generalizes is the machinery that invented the function.
+      - text: |
+          Fine-tuning is where a model acquires domain knowledge - pretraining
+          gives general language, post-training gives the specifics - so training
+          on the codebase is the standard and reliable way to install the API.
+        misconception: M15
+        explain: |
+          The base-to-chat transformation is dramatic enough to make this feel
+          true, but post-training compute is a rounding error beside pretraining
+          and benchmark knowledge scores barely move across it. Post-training
+          selects among behaviors the base model could already produce.
+    check: choice
   - id: u9-q6
     concept: c-full-trace
     kind: mcq
@@ -407,108 +496,93 @@ check:
           purely on the conditional distribution over next tokens.
   - id: u9-q7
     concept: c-full-trace
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     spans: [u6, u8]
     difficulty: core
     prompt: |
-      Trace, in order, everything that happens between the moment the model emits
-      the last token of a `Read` tool call and the moment it emits the first
-      token of its response to the file contents. Include what the GPU is doing
-      at each step and where the boundary between model and harness falls.
-      Then give the approximate cost of the resume relative to the original
-      prefill, and justify it.
-    answer: |
-      1. The model emits the closing tokens of the tool-call block and a stop
-      token. Generation halts. The GPU has no work queued for this request.
-      2. The harness - ordinary code, no model involved - parses the emitted text
-      as JSON, validates it against the tool schema, and calls the real
-      filesystem. This is where the model/harness boundary falls: the model's
-      entire contribution was emitting a string.
-      3. The harness formats the file contents as a tool-result block and appends
-      the tokens to the sequence. Say 3,400 tokens.
-      4. A NEW forward pass begins. The KV cache entries for the existing
-      ~8,232 positions remain valid, because causal masking makes every entry a
-      function only of tokens at or before its own position, and nothing before
-      position 8,232 changed.
-      5. So only the 3,400 appended tokens are prefilled, with their queries
-      attending to all ~11,632 keys. The GPU is compute-bound again for this
-      partial prefill.
-      6. Final-position logits, sampler, first token of the response.
+      The model emits the last token of a `Read` tool call on `src/auth/middleware.ts`.
+      The original prompt was 8,192 tokens; 40 tokens of tool call have been
+      generated; the file plus its tool-result framing is 3,400 tokens.
 
-      Cost: roughly 3,400/8,192 of the parameter work of the original prefill
-      (~0.4 s vs ~0.96 s), with the attention term somewhat larger per token than
-      before because each new query attends over a longer key set. Total well
-      under half the original (~0.42 s vs ~0.96 s), and under a third of the
-      ~1.45 s a full re-prefill of all 11,632 tokens would cost. This is what a
-      prompt-caching "cache hit" bills.
-    check: llm
-    rubric: |
-      MUST contain: (1) generation STOPS and the model is not running while the
-      tool executes; (2) the harness, not the model, performs the I/O; (3) the
-      result becomes appended tokens and a new forward pass begins - nothing is
-      handed to the model out of band; (4) only the new tokens are prefilled
-      because the existing KV cache stays valid under append, justified by causal
-      masking / prefix dependence.
-      Pass = (1), (2), (3). Full = all four with the cost estimate.
-      Characteristic errors: any description in which the model reads the file or
-      the result arrives mid-generation = M14, fail outright. "The model resumes
-      where it left off with its state intact" = there is no preserved state; the
-      only continuity is a longer token sequence. Claiming a full re-prefill is
-      required = has not connected causal masking to cache validity.
+      Which sequence describes what happens between that last emitted token and
+      the first token of the response to the file contents?
+    options:
+      - text: |
+          Generation stops at the stop token and the GPU has no work queued for this
+          request; the harness parses the JSON and calls the filesystem itself; the
+          3,400 result tokens are appended to the sequence; a new forward pass
+          prefills only those 3,400 tokens, since the KV entries for the first ~8,232
+          positions are still valid under causal masking; then logits, sampler, first
+          token. Cost is roughly 3,400/8,192 of the original parameter work, ~0.4 s
+          against ~0.96 s.
+        correct: true
+        explain: "Right. Generation halts at a hard boundary, the harness (ordinary code) does the I/O, the result re-enters only as appended tokens, and append leaves every prior key and value valid because position p's K and V depend only on tokens at or before p."
+      - text: |
+          The model keeps running through the tool call: it issues the read itself,
+          the 3,400 tokens of file contents arrive mid-generation, and it continues
+          the same forward pass into its response with no break. Cost is just the
+          extra attention over the longer sequence.
+        misconception: M14
+        explain: "This is the model-executes-tools picture. If it were right, tool output could arrive mid-token with no boundary. In fact the GPU goes idle, the harness calls open(), and only a new forward pass sees the result - the agent is the loop, not the model."
+      - text: |
+          Generation stops, the harness reads the file, and the model resumes from its
+          preserved internal state with the file contents handed to it out of band, so
+          no re-prefill of any kind is needed and the resume is essentially free.
+        misconception: U9-M2
+        explain: "There is no preserved state to resume from. The model is a pure function of a token sequence; the only continuity across the break is that the sequence is now longer, and the 3,400 new tokens must still be prefilled."
+      - text: |
+          Generation stops and the harness reads the file, but because the sequence has
+          changed the whole KV cache is stale, so all 11,632 tokens are prefilled again
+          at roughly 1.45 s before the first response token.
+        misconception: M17
+        explain: "Appending does not invalidate anything. Causal masking makes each cached entry a function only of its own prefix, and nothing before position 8,232 changed - only editing an earlier position forces the full re-prefill. This is exactly what prompt caching bills as a hit."
+    check: choice
   - id: u9-q8
     concept: c-full-trace
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     spans: [u1, u4, u5]
     difficulty: core
     prompt: |
       An engineer asks: "If the model knows that the capital of France is Paris,
-      which parameters hold that fact? Could we find them and edit them?"
+      which parameters hold that fact, and could we find them and edit them?"
 
-      Answer both parts using the trace. Say where in the forward pass the fact
-      exerts its influence, in what form, and what that implies about the
-      edit-a-fact proposal. Note where the honest answer is "partly yes."
-    answer: |
-      Where it exerts influence: not in one place. The token "France" enters as an
-      embedding - a position in a learned geometry with no stored content. Across
-      64 blocks, attention heads move information about the entity into the
-      residual stream at the relevant position, and MLP blocks apply
-      key-value-like transformations that push the residual stream in directions
-      that raise the logit for "Paris". Because the residual stream is additive,
-      each block's contribution to that logit is separately measurable, and
-      empirically the contribution is spread across many mid-to-late MLP blocks,
-      in superposition with unrelated features sharing the same directions.
-
-      What that implies: parameters are not rows in a table. They define a
-      function; facts are soft statistical regularities distributed across
-      weights, and the same machinery that composes features to answer novel
-      questions is what produces confident false answers. There is no cell to
-      overwrite.
-
-      Partly yes: model-editing methods (ROME, MEMIT and successors) do locate a
-      small set of mid-layer MLP weights whose targeted modification changes the
-      specific completion, so the fact is not uniformly smeared - it is
-      concentrated enough to be nudged. But such edits are brittle: they often
-      fail to propagate to paraphrases and downstream inferences, and they damage
-      unrelated behavior at scale, precisely because the edited directions are
-      shared.
-    check: llm
-    rubric: |
-      MUST contain: (1) the influence is distributed across many blocks and
-      arrives as additive contributions to the residual stream, not stored in a
-      location; (2) parameters define a function - generalization and
-      hallucination are the same mechanism, so "missing/incorrect row" is the
-      wrong frame (M4); (3) the qualified concession that targeted editing partly
-      works while being brittle.
-      Pass = (1) and (2). Full = all three. An answer that is confidently
-      absolutist in either direction ("it is one neuron" or "it is impossible to
-      localize at all") does not get full credit - the honest answer is bounded.
-      Characteristic errors: "bigger models store more facts so it would be in a
-      different place" = M11 plus M4. "The embedding for France contains Paris" =
-      M3.
+      Which answer is correct about where the fact exerts its influence in the
+      forward pass and what that implies for editing it?
+    options:
+      - text: |
+          No single location holds it. The token enters as an embedding with no stored
+          content; across the 64 blocks, attention moves entity information into the
+          residual stream and mid-to-late MLP blocks add contributions that raise the
+          logit for `Paris`, in superposition with unrelated features sharing the same
+          directions. Parameters define a function, so there is no cell to overwrite -
+          though methods like ROME and MEMIT do change the completion by modifying a
+          small set of mid-layer MLP weights, and such edits are brittle under
+          paraphrase and damage unrelated behaviour.
+        correct: true
+        explain: "Right, including the bounded concession. The influence is additive and distributed across blocks, yet concentrated enough that targeted editing partly works - and it is brittle precisely because the edited directions are shared."
+      - text: |
+          The fact is stored as a row in the weights, the way a key-value store holds a
+          record. Locate the row that maps `France` to `Paris` and overwrite it, and the
+          model's answer changes cleanly everywhere the fact appears.
+        misconception: M4
+        explain: "The lookup-table frame. A table cannot answer about items it never stored, yet the model composes features to answer novel questions and to produce confident false ones - generalization and hallucination are the same mechanism, which no row-overwrite view predicts."
+      - text: |
+          The 4096-dimensional embedding for `France` carries the fact as part of its
+          semantic content, so the edit is done in the embedding matrix - change that
+          row's meaning and the completion follows.
+        misconception: M3
+        explain: "Embeddings hold no content. Paste this model's `France` row into another model at the same index and you get garbage, not a slight accent: only relative geometry, shaped by the objective, does any work."
+      - text: |
+          Larger models memorize more facts, so in a 235B model the fact sits in a
+          dedicated region of the extra parameters that a smaller model lacks; find that
+          region and it can be edited there.
+        misconception: M11
+        explain: "Scale buys richer feature composition, not more stored rows - which is why held-out loss improves smoothly with size instead of overfitting. There is no fact region that appears only above some parameter count."
+    check: choice
   - id: u9-q9
     concept: c-full-trace
     kind: mcq
@@ -561,60 +635,47 @@ check:
           bandwidth-bound and gains almost the full factor.
   - id: u9-q10
     concept: c-full-trace
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     spans: [u3, u6]
     difficulty: core
     prompt: |
-      "Causal masking means the model processes tokens one at a time, which is
-      why generation is sequential."
+      "Causal masking means the model processes tokens one at a time, which is why
+      generation is sequential."
 
-      Two claims are welded together here, one false and one true. Separate them.
-      Say precisely what causal masking is as an operation, why prompt processing
-      is nonetheless a single parallel pass, and what actually makes generation
-      sequential.
-    answer: |
-      False claim: that masking implies sequential processing. True claim: that
-      generation is sequential. They are unrelated.
-
-      What masking is: before the softmax, a matrix of 0 on and below the
-      diagonal and $-\infty$ above it is added to the attention scores. After
-      exponentiation, $-\infty$ becomes 0, so every future position receives
-      exactly zero weight in the similarity-weighted average. Definitionally it
-      is an additive term on a score matrix computed for all pairs. Fused
-      kernels do skip tiles that are entirely above the diagonal, which saves
-      roughly half the score work as a constant factor, but the scaling stays
-      quadratic in $n$ and the mask is not what makes execution ordered.
-
-      Why prefill is parallel: a dependency structure is not an execution order.
-      Position 7,000 depends on position 3's key and value, and both are computed
-      in the same batched matrix multiply within the same block. All positions
-      pass through all 64 blocks together. An 8,192-token prompt takes one
-      forward pass, not 8,192.
-
-      What actually makes generation sequential: token n+1's input embedding is
-      the token that was SAMPLED at step n. That token does not exist until the
-      draw happens, so there is nothing to feed forward. The dependency is on the
-      sampling outcome, not on the mask. This is precisely why speculative
-      decoding works - guess the tokens and the sequential barrier dissolves into
-      a parallel verification.
-    check: llm
-    rubric: |
-      MUST contain: (1) the mask is an additive $-\infty$ triangular term applied
-      to the score matrix before softmax; (2) prefill processes all
-      positions in one parallel pass - a dependency is not a schedule (M9);
-      (3) generation is sequential because each step's input is the previous
-      step's sampled output, which does not exist in advance.
-      Pass = (2) and (3). Full = all three. Bonus recognition: citing speculative
-      decoding as evidence that the barrier is about token availability rather
-      than about masking.
-      Characteristic errors: accepting the premise = M9 uncorrected. Saying
-      masking "skips" future scores is acceptable only if the learner keeps the
-      cost scaling quadratic - fused kernels do skip fully-masked tiles for about
-      a 2x constant-factor saving. Treating that skipping as making attention
-      linear in $n$, or as evidence that positions are visited in order, is the
-      error to catch.
+      Two claims are welded together, one false and one true. Which option separates
+      them correctly?
+    options:
+      - text: |
+          The mask is an additive triangular term - 0 on and below the diagonal,
+          $-\infty$ above - applied to the score matrix before the softmax, so future
+          positions get exactly zero weight. It constrains dependencies, not the
+          schedule: all 8,192 positions pass through all 64 blocks in one batched
+          parallel pass. Generation is sequential because token $n{+}1$'s input
+          embedding is the token *sampled* at step $n$, which does not exist until the
+          draw happens - which is why speculative decoding dissolves the barrier.
+        correct: true
+        explain: "Right on all three counts. A dependency structure is not an execution order, and the sequential barrier is about token availability, not about the mask."
+      - text: |
+          The claim is right as stated: the mask forces each position to wait for the
+          one before it, so both prompt processing and generation step through the
+          sequence one token at a time.
+        misconception: M9
+        explain: "Accepting the premise. If prefill were sequential, an 8,192-token prompt would take 8,192 steps at ~5.5 ms - 45 seconds to first token. Measured time-to-first-token is under a second."
+      - text: |
+          The mask is real but generation is sequential for a different reason: each new
+          token must attend to a longer key set, and attention is $O(n^2)$, so positions
+          have to be computed in order for the score matrix to grow correctly.
+        misconception: M10
+        explain: "Conflates cost with ordering. Per-token decode attention is linear in $n$ (one query against $n$ keys), and no complexity claim implies an execution order - the ordering comes from needing the sampled token."
+      - text: |
+          Because fused kernels skip the tiles above the diagonal, masking makes
+          attention linear in $n$ and makes the model visit positions in order; the
+          sequential feel of generation is that same skipping showing through.
+        misconception: M10
+        explain: "Skipping fully-masked tiles is a roughly 2x constant-factor saving; halving a quadratic leaves a quadratic. It also says nothing about visitation order - the tiles that are computed are computed together."
+    check: choice
   - id: u9-q11
     concept: c-full-trace
     kind: constructed
@@ -665,212 +726,158 @@ check:
       25.77 answered in decimal GB rather than GiB.
   - id: u9-q13
     concept: c-full-trace
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     transfer: true
     spans: [u5, u6, u8]
     difficulty: stretch
     prompt: |
-      A team needs to convert messy free-text incident reports into a strict JSON
-      schema, at high volume. They benchmark two options:
+      A team converts messy free-text incident reports into a strict JSON schema at
+      high volume. A 70B general model prompted with the schema plus 12 few-shot
+      examples (~4,000 instruction tokens per call) loses on schema validity and
+      field accuracy, and costs far more per call, than a 7B fine-tuned on 40,000 of
+      their own (report, JSON) pairs and prompted with just the report.
 
-      - A 70B general model, prompted with the schema plus 12 few-shot examples
-        (~4,000 tokens of instruction per call).
-      - A 7B model fine-tuned on 40,000 of their own (report, JSON) pairs,
-        prompted with just the report.
-
-      The 7B beats the 70B on schema validity and field accuracy, and costs
-      dramatically less per call.
-
-      Explain why, using the trace. Address: what fine-tuning changed and what it
-      did not, why the prompt-length difference matters in two separate ways, and
-      what task property makes this result NOT generalize to, say, debugging an
-      unfamiliar distributed system.
-    answer: |
-      What fine-tuning changed: the task is format conformance, which is exactly
-      what post-training shapes. Forty thousand in-domain examples make the exact
-      token sequences of their schema overwhelmingly likely continuations of a
-      report - it is reshaping the conditional distribution over output tokens,
-      not installing new capability. The 7B already had the linguistic competence
-      to read an incident report; what it lacked was the prior that THIS output
-      shape follows THAT input shape. That is cheap to install and it is where
-      post-training's leverage lives.
-
-      What fine-tuning did not change: the 7B's underlying reasoning and world
-      knowledge, which remain far below the 70B's. Pretraining set that and 40k
-      examples cannot move it.
-
-      Why prompt length matters twice: (1) prefill cost is roughly proportional to
-      2 x active params x tokens, so 4,000 instruction tokens against a 70B is
-      about 5.6e14 FLOPs before any output, versus a few hundred tokens against a
-      7B - two orders of magnitude apart, and it recurs on every single call.
-      (2) The 12 few-shot examples must be attended to from the output positions
-      every step; the fine-tuned model has the same information baked into weights
-      that are read as part of the fixed 3.5 GB (at 4-bit) weight stream it was
-      going to read anyway. In-context instruction is paid per call; in-weight
-      instruction is free at inference.
-
-      The task property: narrow, high-volume, stable output distribution, with the
-      difficulty concentrated in FORM rather than in reasoning depth. Reverse each
-      of those and the result inverts. Debugging an unfamiliar distributed system
-      is open-ended, low-volume, has no stable output distribution to learn, and
-      the difficulty is entirely in reasoning over novel combinations - which is
-      pretraining-scale capability, exactly the thing the 7B does not have and
-      fine-tuning cannot supply.
-    check: llm
-    rubric: |
-      MUST contain: (1) the task is format/behavior shaping, which is what
-      post-training does well, versus capability, which comes from pretraining
-      (M15 applied correctly and in the direction that is genuinely true);
-      (2) the prefill cost of long instruction prompts is paid on every call and
-      scales with active params x tokens; (3) an explicit statement of the
-      boundary condition - narrow, stable, form-dominated tasks only.
-      Pass = (1) and (3). Full = all three, ideally with the in-context vs
-      in-weight cost framing.
-      Characteristic errors: "the 7B knows their domain better" as an unqualified
-      knowledge claim = M15 inverted; the 7B does not know more, it is shaped
-      better. "Smaller models are more accurate" = overgeneralizing the result,
-      which the third part of the question exists to catch. An answer that gets
-      the cost argument but not the boundary condition is exactly the answer that
-      leads a team to fine-tune a 7B for their agent framework and fail.
+      Which account explains the result and correctly bounds it?
+    options:
+      - text: |
+          Fine-tuning reshaped the conditional distribution over output tokens so the
+          schema's exact token sequences follow a report - form, which is what
+          post-training shapes - while leaving the 7B's pretraining-set reasoning and
+          world knowledge far below the 70B's. The prompt length costs twice: prefill is
+          ~$2 \times P_a \times n$, so 4,000 tokens against 22B active is ~5.6e14 FLOPs
+          before any output and recurs every call, and the few-shot examples must be
+          attended to from every output position, whereas in-weight instruction rides
+          along in the weight stream already being read. It generalizes only to narrow,
+          high-volume tasks with a stable output distribution whose difficulty is in
+          form - not to debugging an unfamiliar distributed system, which is open-ended,
+          low-volume, and needs pretraining-scale capability.
+        correct: true
+        explain: "Right, and the boundary condition is the part that matters: reverse narrow, stable and form-dominated and the result inverts."
+      - text: |
+          The 40,000 examples taught the 7B their domain, so it now knows more about
+          incident handling than the 70B does. Fine-tuning on enough in-domain data is
+          how a small model acquires knowledge a large one lacks, and it would win at
+          debugging their systems too.
+        misconception: M15
+        explain: "Post-training shapes behaviour, it does not add knowledge - benchmark knowledge scores barely move after it, and its compute is a rounding error against pretraining. The 7B does not know more; it is shaped better for one output form."
+      - text: |
+          Smaller models are simply more accurate on structured extraction because there
+          is less capacity to hallucinate with, so the team should standardize on the
+          fine-tuned 7B across all their LLM workloads, agents included.
+        misconception: M11
+        explain: "Overgeneralizes a narrow result and inverts scaling: capacity buys richer feature composition and held-out loss improves with scale. The win here is format conformance on one stable distribution, not a general accuracy law."
+      - text: |
+          The 4,000 instruction tokens are the whole story: they are the same cost as
+          4,000 generated tokens, so the 70B's per-call bill is dominated by them. Cut
+          the few-shot examples and the 70B matches the 7B on both cost and accuracy.
+        misconception: U9-M1
+        explain: "Prompt tokens and generated tokens do not cost the same - prefill amortizes one weight read across all positions and is compute-bound, decode reads the weights per token and is bandwidth-bound. And cutting the examples removes the only thing supplying the output format."
+    check: choice
   - id: u9-q14
     concept: c-full-trace
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     transfer: true
     spans: [u6, u7]
     difficulty: stretch
     prompt: |
-      A team deploys speculative decoding: a 1B draft model proposes 4 tokens,
-      the 200B MoE target verifies all 5 positions in one pass. They measure a
-      2.8x speedup on customer-support chat.
+      Speculative decoding with a 1B draft proposing $\gamma = 4$ tokens and a 200B
+      MoE target verifying 5 positions per pass gives 2.8x on customer-support chat.
+      The identical setup then gives (a) under 5% end-to-end improvement on bulk
+      summarization with ~60,000-token prompts and ~200-token outputs, and (b) 1.1x
+      on code generation in an unusual internal DSL, with per-token latency slightly
+      *worse* than baseline during rejection-heavy stretches.
 
-      They then apply the identical setup to two new workloads and are surprised
-      both times:
-
-      (a) Bulk document summarization, where prompts average 60,000 tokens and
-          outputs average 200 tokens. End-to-end throughput improves by under 5%.
-      (b) Highly technical code generation in an unusual internal DSL. Speedup
-          drops to 1.1x, and per-token latency during rejection-heavy stretches is
-          slightly WORSE than without speculation.
-
-      Explain both, mechanistically. For (b), state the quantity that collapsed
-      and why this workload collapses it.
-    answer: |
-      (a) Speculative decoding only accelerates decode. On this workload, 60,000
-      tokens of prefill dominate end-to-end time: prefill is compute-bound and
-      costs on the order of 2 x active params x 60,000 FLOPs plus a quadratic
-      attention term, while decode is only 200 tokens. Speeding up a phase that
-      was already a small fraction of wall clock yields a small fraction of a
-      speedup - Amdahl, with the twist that the two phases are limited by
-      different resources. There is nothing to amortize in prefill: it is already
-      compute-saturated, which is precisely the condition under which verifying
-      extra tokens is NOT free.
-
-      (b) The quantity that collapsed is the acceptance rate. Expected tokens per
-      target pass is $(1 - \alpha^{\gamma+1})/(1 - \alpha)$; at $\alpha = 0.8,
-      \gamma = 4$ that is 3.36, at $\alpha = 0.3$ it is about 1.43. An unusual
-      internal DSL is exactly the distribution where a 1B general draft model
-      disagrees with a 200B target most: the target's next-token distribution is
-      shaped by subtle in-context conventions the draft has neither the capacity
-      nor the exposure to reproduce. Every rejected token still cost draft-model
-      compute, so at low acceptance you pay the draft's latency for almost no
-      extra accepted tokens - hence slightly worse than baseline.
-
-      Fixes worth naming: for (b), fine-tune the draft on the DSL, or use
-      self-speculation (early-exit layers of the target) so draft and target
-      distributions are correlated by construction; also reduce $\gamma$, since
-      long speculative runs waste more on rejection. For (a), speculative decoding
-      is simply the wrong tool - attack prefill with prefix caching, chunked
-      prefill, or a cheaper attention kernel.
-    check: llm
-    rubric: |
-      MUST contain: (a) speculative decoding helps only decode, and prefill
-      dominates a 60k-token/200-token workload; bonus for noting prefill is
-      already compute-bound so extra verified positions are not free there.
-      (b) acceptance rate is the collapsed quantity, with the reason being
-      distributional mismatch between a small general draft and the target on an
-      unusual distribution; and the observation that rejected drafts still cost
-      draft compute, so low acceptance can go below baseline.
-      Pass = correct mechanism for both, even without the formula. Full = includes
-      the acceptance-rate reasoning quantitatively or names a concrete remedy.
-      Characteristic errors: "the target model is slower on hard tokens" - the
-      target's per-token cost is fixed by weight bytes, not by difficulty; this is
-      U9-M3 wearing a disguise. "Speculation loses accuracy on hard tasks" -
-      standard speculative decoding is distribution-preserving; quality is
-      unchanged, only speed varies. Marking that correct would install a serious
-      false belief.
+      Which explanation is mechanistically correct for both?
+    options:
+      - text: |
+          (a) Speculation accelerates only decode, and at 60,000 prompt tokens against
+          200 output tokens the compute-bound prefill dominates wall clock; prefill is
+          already compute-saturated, so extra verified positions are not free there.
+          (b) The acceptance rate $\alpha$ collapsed: expected tokens per target pass is
+          $(1 - \alpha^{\gamma+1})/(1 - \alpha)$, which falls from 3.36 at $\alpha = 0.8$
+          to about 1.43 at $\alpha = 0.3$, because a small general draft cannot reproduce
+          the target's distribution over an unusual DSL - and every rejected token still
+          cost draft compute, so low acceptance can land below baseline.
+        correct: true
+        explain: "Right. Speculation is an attack on the amortization of the weight read during decode, so it helps only where decode dominates and only while drafts are accepted."
+      - text: |
+          (b) happens because the target model does more work per token on hard,
+          unfamiliar DSL tokens than on easy chat tokens, so verification slows down;
+          (a) happens because long prompts make every token harder to predict.
+        misconception: U9-M3
+        explain: "Per-token cost is set by bytes moved - active weight bytes plus KV - not by how hard the question is. A trivial token and a hard one have identical decode latency; what changed in (b) is acceptance, not the target's per-pass cost."
+      - text: |
+          Speculation trades accuracy for speed, so on an unusual DSL the draft's errors
+          leak into the output and the team must lower $\gamma$ to protect quality; in
+          (a) the long prompts leave less signal per token, so the same quality tax shows
+          up as a throughput loss.
+        misconception: M6
+        explain: "Standard speculative decoding is distribution-preserving: rejected drafts are discarded and the accepted stream matches target sampling exactly. Only speed varies, and believing otherwise would install a serious false belief about the sampler."
+      - text: |
+          (a) is a KV cache effect: at 60,000 tokens the cache is so large that
+          verifying 5 positions reads it five times over, erasing the gain; (b) is the
+          same effect at shorter context, since DSL code tokenizes into more tokens per
+          line and grows the cache faster.
+        misconception: M17
+        explain: "A verification pass reads the cache once for all 5 positions, exactly as it reads the weights once - that shared read is the whole mechanism. (a) is prefill dominance and (b) is acceptance collapse; neither is cache size."
+    check: choice
   - id: u9-q15
     concept: c-full-trace
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     transfer: true
     spans: [u3, u6, u7]
     difficulty: stretch
     prompt: |
-      You are sizing a serving cluster. A colleague argues: "Decode is
-      memory-bound at batch size 1, so just raise the batch size. Batching
-      amortizes the weight read across requests, so with batch 64 we get 64x the
-      throughput at the same latency. Memory bandwidth stops being the
-      bottleneck."
+      A colleague argues: "Decode is memory-bound at batch size 1, so raise the batch
+      size. Batching amortizes the weight read across requests, so batch 64 gives 64x
+      throughput at the same latency and bandwidth stops being the bottleneck."
 
-      Assume the model is the one from the unit: 22B active of 235B total, 4-bit
-      weights (11 GB active read per token), KV cache of 256 KB per token per
-      request, 2 TB/s bandwidth, 450 TFLOP/s.
+      Model: 22B active of 235B total, 4-bit weights (11 GB active read per token),
+      KV cache 256 KB per token per request, 2 TB/s, 450 TFLOP/s, 8,192-token
+      contexts.
 
-      Evaluate the argument. Identify the batch size at which the reasoning stops
-      holding for 8,192-token contexts, show the arithmetic, and name one MoE
-      specific effect that batching introduces which a dense model would not have.
-    answer: |
-      The premise is right and the conclusion overreaches in three ways.
-
-      Right: the weight read is shared across the batch, so bytes per token fall
-      from 11 GB to 11 GB / b, and arithmetic intensity rises roughly linearly
-      with b. Throughput does climb steeply at small b.
-
-      Where it stops. Per decode step, bytes read = 11 GB (weights, shared) +
-      b x 8,192 x 256 KB (KV cache, NOT shared - every request has its own).
-      Per request the KV is 8,192 x 262,144 = 2.15 GB. Setting the KV term equal
-      to the weight term: b x 2.15 GB = 11 GB, so b is about 5. Past roughly
-      batch 5 at this context length, the KV cache is the majority of the bytes
-      moved, and since it scales WITH the batch it does not amortize at all.
-      Beyond that point throughput gains flatten hard - you are back to
-      bandwidth-bound, just against a different array.
-
-      Second limit: latency is not preserved. Batched requests share a forward
-      pass, so per-token latency for any individual user is set by the whole
-      batch's step time, and queueing to assemble batches adds more. Throughput
-      and latency are being traded, not both won.
-
-      Third limit: HBM capacity. At batch 64 and 8k context the KV cache alone is
-      64 x 2.15 GB = 138 GB, on top of ~118 GB of weights. That does not fit on a
-      single accelerator, which is why paged attention and KV quantization exist.
-
-      MoE-specific effect: with batch 1, one token selects 8 of 128 experts and
-      only those weights are read. As the batch grows, the union of experts
-      selected across the batch approaches all 128, so the effective weights read
-      per step climbs from 11 GB toward 118 GB. MoE's decode advantage erodes with
-      batch size - a dense model has no such term. It also creates load imbalance:
-      the step waits on whichever expert received the most tokens, and when
-      experts are sharded across devices it adds an all-to-all exchange per layer.
-    check: llm
-    rubric: |
-      MUST contain: (1) the weight read amortizes across the batch but the KV
-      cache does not, because each request owns its own; (2) the crossover
-      arithmetic - per-request KV of ~2.15 GB at 8k context against 11 GB of
-      weights gives b of about 5 (accept 4-6, or any correct derivation with
-      stated assumptions); (3) the MoE-specific effect that the union of selected
-      experts grows with batch size, eroding the active-parameter advantage.
-      Pass = (1) and (2). Full = all three; extra credit for latency-vs-throughput
-      and for HBM capacity.
-      Characteristic errors: "batching makes it compute-bound so bandwidth stops
-      mattering" without the KV term = the exact error the item targets.
-      "Each request in the batch uses different experts so they can be routed to
-      different GPUs cleanly" = M12, treating routing as stable per request rather
-      than per token.
+      Which evaluation is correct?
+    options:
+      - text: |
+          The premise holds and the conclusion overreaches. Per decode step, bytes read
+          = 11 GB of shared weights + $b \times 8192 \times 256$ KB of KV, and the KV is
+          per request, so it never amortizes: at 2.15 GB per request, $b \times 2.15 =
+          11$ gives $b \approx 5$, past which KV is the majority of bytes moved and
+          gains flatten. Latency is not preserved either (a user waits on the whole
+          batch's step plus queueing), and at batch 64 the KV alone is 138 GB on top of
+          ~118 GB of weights. MoE-specific: as the batch grows, the union of experts
+          selected across it approaches all 128, so effective weights read climbs from
+          11 GB toward 118 GB and the active-parameter advantage erodes - a dense model
+          has no such term.
+        correct: true
+        explain: "Right. The weight read amortizes, the KV read scales with the batch, and MoE's decode win is a batch-1 win that the union of routed experts eats away."
+      - text: |
+          The colleague is right up to capacity limits: batching raises arithmetic
+          intensity past the 225 FLOPs/byte break-even, so the step becomes
+          compute-bound and bandwidth genuinely stops mattering. The only ceiling is how
+          much HBM the weights need.
+        misconception: U9-M3
+        explain: "This is the error the item targets: it counts only the weight bytes. The KV term grows with $b$, so past $b \approx 5$ at 8k context the step is bandwidth-bound again, just against a different array."
+      - text: |
+          Batching works especially well for MoE, because each request in the batch
+          concentrates on its own experts - a code request on the code experts, a support
+          request on the support experts - so requests can be routed to different devices
+          and each device reads only its own slice of the weights.
+        misconception: M12
+        explain: "Routing is per token and largely syntactic, not per request and topical. Consecutive tokens in one line route to disjoint expert sets, so no request owns a slice; batching widens the union of experts rather than partitioning it."
+      - text: |
+          The reasoning fails because each request in the batch needs its own copy of the
+          conversation state inside the model, and those states interfere as the batch
+          grows; the fix is smaller batches so each session keeps its memory intact.
+        misconception: U9-M2
+        explain: "There is no in-model conversation state to keep or to interfere. The per-request cost is the KV cache, a recomputable memo table over that request's tokens - it limits batching by bytes and by HBM capacity, not by interference."
+    check: choice
   - id: u9-q16
     concept: c-full-trace
     kind: mcq
@@ -924,7 +931,7 @@ check:
           positions, which happened at tokenization, long before any masking.
   - id: u9-q17
     concept: c-full-trace
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     transfer: true
@@ -943,56 +950,21 @@ check:
       Someone proposes moving the tool schemas to position 5, "since they are
       rarely relevant and the model reads the recent stuff more carefully."
 
-      Evaluate the proposal, and give the change that would actually help most.
-      Quantify the current waste.
-    answer: |
-      The proposal is wrong on the stated reason and wrong on the effect, but it
-      accidentally points near the real bug.
-
-      Current waste: the timestamp at position 1 changes every single turn. Prefix
-      cache validity requires an unbroken identical prefix from token 0, so a
-      change at position 20 invalidates every cached KV entry from position 20
-      onward - which is the entire prompt. Every turn re-prefills all 5,000+
-      tokens of static content plus the whole history at full price, and bills them
-      as fresh input tokens. Twenty volatile tokens are destroying the cacheability
-      of thousands of static ones, and the cost is paid per turn for the life of
-      the session. Providers also block-align cache boundaries (commonly 128 or
-      256 tokens), so in practice the invalidation starts at the enclosing block.
-
-      Why the proposal fails: moving the schemas to the end does not help
-      cacheability at all - the timestamp still sits at position 1 and still
-      invalidates everything. It also makes things worse structurally, because
-      static content moved later can be invalidated by anything volatile placed
-      before it. And the premise is confused: "reads the recent stuff more
-      carefully" is a recency bias in learned behavior, not an architectural
-      property, and every position in the prompt is attended to by every output
-      position regardless of order.
-
-      The change that helps most: move the timestamp and session ID to the END,
-      immediately before the user message, and order everything by mutation
-      frequency ascending - tool schemas, then CLAUDE.md, then history, then
-      volatile metadata, then the user turn. That makes the first ~5,000 tokens a
-      stable prefix that survives across every turn of every session, and turns
-      most turns into an incremental prefill of only the newly appended tokens.
-      Rough effect: at 5,000 static tokens against 22B active params, each turn
-      currently burns about 2 x 22e9 x 5,000 = 2.2e14 FLOPs (~0.5 s) reproducing
-      identical keys and values, plus billing those tokens at the uncached rate,
-      typically ~10x the cached rate.
-    check: llm
-    rubric: |
-      MUST contain: (1) identification of the volatile timestamp at position 1 as
-      the actual defect, because prefix cache validity requires an identical
-      prefix from token 0; (2) rejection of the proposal - reordering the schemas
-      does nothing while the timestamp leads, and the "reads recent stuff more
-      carefully" premise is a learned bias, not an architectural fact about
-      attention; (3) the correct fix - order by mutation frequency ascending,
-      volatile content last.
-      Pass = (1) and (3). Full = all three with a quantified estimate.
-      Characteristic errors: accepting the proposal's premise that later content is
-      attended to more strongly as an architectural claim = confuses learned
-      behavior with mechanism. Proposing to shorten the schemas as the primary fix
-      = treats the symptom (token count) rather than the cause (cache
-      invalidation); shortening helps linearly, fixing the prefix helps by an
-      order of magnitude. Claiming the cache survives because the timestamp is
-      "semantically unimportant" = M17, the cache is keyed on tokens and
-      positions, not meaning.
+      Which single statement is correct about the proposal and the fix?
+    options:
+      - text: "Reject it: the 20-token timestamp at position 1 invalidates every cached K/V from position 20 on, so all ~5,000 static tokens plus the history re-prefill every turn (~$2 \\times 22\\times10^9 \\times 5000 = 2.2\\times10^{14}$ FLOPs, ~0.5 s) at the uncached rate; move the volatile metadata last and order by mutation frequency ascending."
+        correct: true
+        explain: "Prefix cache validity requires an identical prefix from token 0, so a change at position 20 kills everything after it. Reordering the schemas leaves the timestamp leading and changes nothing; the fix is stable content first, volatile content immediately before the user turn."
+      - text: "Accept it: positions late in the prompt receive more attention weight, so moving the 3,000 schema tokens to the end both reduces wasted attention on them and improves time-to-first-token."
+        misconception: M1
+        explain: "Attractive because models do show recency effects, but that is a learned behavioral regularity from post-training, not an architectural property. Attention is a fixed similarity-weighted average; every prompt position is attended to by the final position regardless of order, and reordering does not reduce prefill FLOPs at all."
+      - text: "Reject it, but the real fix is to trim the 3,000-token tool schemas and the 2,000-token CLAUDE.md down; time-to-first-token is set by how many tokens prefill has to process, so fewer tokens is the only lever."
+        misconception: U9-M4
+        explain: "Trimming helps linearly and is not wrong in itself, but it misses that the same tokens are being re-prefilled every turn of the session because the leading timestamp voids the cache. Fixing the prefix order removes the repeat cost entirely - an order of magnitude, not a percentage."
+      - text: "Reject it: the cached entries survive the timestamp change because a session ID and a clock reading carry no semantic content the later tokens depend on, so the cost must be coming from the append-only history in position 4 instead."
+        misconception: M17
+        explain: "This treats the KV cache as semantic memory. It is a memo table keyed on token IDs and positions - keys and values are a pure function of the token prefix, so any changed token, however meaningless, invalidates everything computed after it."
+      - text: "Reject it: each turn is one inference over the whole conversation, so the schemas are billed once per session no matter where they sit; the input-token bill is dominated by the growing history and prompt ordering is irrelevant to it."
+        misconception: U9-M2
+        explain: "This assumes the model holds the conversation between turns. It does not - the harness re-serializes and re-sends the entire sequence every turn, so the static 5,000 tokens are billed on every turn, and where they sit relative to volatile content decides whether they are billed at the cached or the uncached rate."
+    check: choice

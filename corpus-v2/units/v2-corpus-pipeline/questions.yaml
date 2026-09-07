@@ -6,82 +6,63 @@
 pretest:
   - id: v2-p1
     concept: d-extraction-filtering
+    kind: mcq
     prompt: |
       You have a 15-trillion-token web corpus and a 1.3-trillion-token subset
       of it produced by a quality filter. You are training a 30-million
       parameter model on a fixed compute budget.
 
-      Which corpus produces the better model on knowledge benchmarks, and by
-      what reasoning? Answer before you consider that this is a trick
-      question.
-    answer: |
-      The 1.3T subset, and for small models decisively. This is the
-      FineWeb-Edu versus FineWeb comparison: the filtered subset beats its own
-      superset.
-
-      The reasoning is a capacity argument rather than a data argument. A
-      model has a bounded number of bits it can store (roughly 3.6 per
-      parameter, which v6 makes exact). Every regularity it learns from
-      low-value text consumes capacity that could have held something else.
-      Adding documents with negative value does not dilute an average, it
-      evicts. So the question "is more data better" is really "is this
-      marginal document worth the capacity it will occupy," and past a floor
-      the answer for raw web text is frequently no.
-
-      The effect is strongest for small models, because the capacity budget is
-      tightest exactly where you are working.
-    check: llm
-    rubric: |
-      Pass requires: (1) the subset wins, and (2) a reason grounded in a fixed
-      budget being allocated - capacity, or "the model has limited room and
-      bad tokens take up room" in any wording.
-      (1) with a vague "quality matters" and no budget argument = partial;
-      the learner has the answer without the mechanism.
-      Answering "the 15T corpus, since it is a superset and contains strictly
-      more information" = fail, diagnosing D8 (more-data-beats-better-data).
-      This is the primary calibration item for the filtering half of the unit
-      and is expected to fail.
+      Which corpus produces the better model on knowledge benchmarks, and for
+      what reason?
+    options:
+      - text: "The 1.3T subset - a model stores a bounded amount (roughly 3.6 bits per parameter), so low-value text evicts capacity rather than diluting an average, and the effect is sharpest at small scale."
+        correct: true
+        explain: "This is the FineWeb-Edu versus FineWeb result: the filtered subset beats its own superset, decisively for small models. The mechanism is allocation against a fixed capacity budget, not information volume."
+      - text: "The 15T corpus - it is a strict superset, so it contains everything the subset contains plus more, and more information cannot hurt."
+        misconception: D8
+        explain: "The appealing part is real: scaling-law headlines are all about size. But a superset does not dominate, because training does not choose what to spend capacity on - it minimizes loss over whatever it is given, so the discarded 92% was carrying negative marginal value."
+      - text: "The 15T corpus, because at 30M parameters the model is data-starved and every extra token helps."
+        misconception: D8
+        explain: "There is a real floor effect below which more data helps, but 1.3 trillion tokens is enormously past it for a 30M-parameter model. The binding constraint here is model capacity, not token supply."
+      - text: "The 1.3T subset, but only because it is cheaper to train on - at equal token counts the two corpora are equivalent."
+        misconception: D8
+        explain: "The comparison is at a fixed compute budget, so token cost is already held equal; the subset wins on benchmark scores, not on price. Treating filtering as a cost knob rather than a distribution knob is the same error one step back."
+      - text: "Neither reliably - corpus composition is noise at this scale, and the outcome is decided by seed and architecture."
+        misconception: D16
+        explain: "Training noise is real and matters for per-source contribution measurement, but the FineWeb-Edu gap (MMLU 33 to 37, ARC 46 to 57) is far outside seed variation. Filtering was the single biggest factor in the leading data benchmark."
+    check: choice
 
   - id: v2-p2
     concept: d-dedup-provenance
+    kind: mcq
     prompt: |
       Your deduplication pass finds that a 4,000-word methods section appears
       in two documents from two different sources. Standard practice keeps one
       copy and drops the other; which copy survives is determined by whichever
       document the pipeline encountered first in shard order.
 
-      Name everything of consequence that this step just decided.
-    answer: |
-      It decided which source gets paid for everything that passage teaches
-      the model.
-
-      In the corpus that trains the model, the surviving source contains the
-      passage and the other does not. Every attribution measurement made later
-      is computed against that corpus: the leave-one-source-out delta in v4,
-      the Shapley value in v5, the gradient influence in v8. All of them will
-      credit the passage's effect entirely to the survivor, because that is
-      what the training data says. Reverse the shard order and the money moves.
-
-      Two further consequences. The decision is undetectable after the fact -
-      nothing in the shards or in the trained weights records that a merge
-      happened - so it cannot be audited or corrected without rerunning dedup
-      and everything downstream. And there is no policy anywhere; the credit
-      rule is "whatever the iterator saw first," which in expectation over
-      shuffles is an equal split but on the single run you actually did is a
-      winner-take-all draw.
-    check: llm
-    rubric: |
-      Pass requires an explicit statement that a credit or payment allocation
-      was made, not just that a document was removed.
-      Answering "nothing of consequence - it is deduplication, the content is
-      identical either way" = fail, diagnosing D9 (dedup-is-hygiene). This is
-      the primary calibration item for the unit and is expected to fail.
-      Answering only "the corpus got smaller" or "the model sees the passage
-      once instead of twice" = fail; both are true and both miss the point.
-      Naming the payout consequence but not the undetectability = pass.
+      What of consequence did this step just decide?
+    options:
+      - text: "Which source gets credited - and paid - for everything that passage teaches the model, since every later measurement (v4 leave-one-out, v5 Shapley, v8 influence) is computed against the corpus in which only the survivor contains it."
+        correct: true
+        explain: "Correct, and the deciding factor was shard iteration order. Reverse the order and the money moves. The decision also leaves no trace in the shards or the weights, so it cannot be audited without rerunning dedup."
+      - text: "Nothing of consequence - the content is byte-identical either way, so the corpus and the trained model are the same."
+        misconception: D9
+        explain: "True everywhere except here: duplicate warehouse rows and log lines have no owner. What changed is not the algorithm but the existence of a claimant, and the survivor's source_id is what every attribution method will read."
+      - text: "Only the corpus size - one document's worth of tokens was removed, so the training run is marginally cheaper."
+        misconception: D9
+        explain: "True and beside the point. The removal is a credit-assignment step wearing a maintenance step's clothes; counting only the tokens is exactly the accounting that misses the payout."
+      - text: "Only the passage's effective training weight - the model now sees it once instead of twice, so it is less likely to be memorized."
+        misconception: D9
+        explain: "The memorization effect is real (v6), but it is a property of the surviving single copy, not of which copy survived. The choice between two identical copies changes nothing about the model and everything about who is credited."
+      - text: "Nothing yet - the credit question is settled later by the attribution method, which can recover both sources from the model's behaviour."
+        misconception: D5
+        explain: "No later method can recover it: in the corpus that trained the model, the dropped source does not contain the passage, so there is nothing for influence or entailment search to find. The information was destroyed before any measurement existed."
+    check: choice
 
   - id: v2-p3
     concept: d-mixing-packing
+    kind: mcq
     prompt: |
       A trainer wants fixed-length sequences of 2,048 tokens. Documents are
       variable length, so the standard move is to concatenate every document
@@ -89,45 +70,29 @@ pretest:
       slice the stream every 2,048 tokens.
 
       You intend to measure, later, how much each source contributed to the
-      trained model. Does this packing scheme cause you a problem? If so,
-      state it precisely; if not, say why the separator is sufficient.
-    answer: |
-      Yes, and it is fatal at the input rather than fixable downstream.
-
-      The causal mask does not know about the separator token. A token in the
-      second document attends to every position before it in the sequence,
-      which includes all of the first document. Gradients from the second
-      document's loss flow through attention weights placed on the first
-      document's tokens, so the model is trained to use one source's text as
-      context for predicting another's - in a pairing determined by shard
-      order.
-
-      The attribution consequence: every gradient-based method computes a
-      per-sequence gradient and treats it as "what this training example did
-      to the model." If the sequence blends two sources, that gradient is a
-      sum over both, and the two contributions were added inside a nonlinear
-      function of shared parameters before any quantity you could log existed.
-      There is no post-hoc decomposition.
-
-      The fix is intra-document causal masking: forbid attention across
-      document boundaries within a packed sequence.
-    check: llm
-    rubric: |
-      Pass requires: (1) recognition that the separator token does not stop
-      attention crossing the boundary, and (2) some statement that the
-      training example, and therefore the attribution unit, becomes a blend.
-      (1) alone = partial.
-      Answering "no problem, the separator marks the boundary and the model
-      learns to reset there" = fail, diagnosing V2-M4
-      (packing-is-just-batching). Expected to fail at pretest.
-      Answering "no problem, I will just record which documents are in each
-      sequence" = partial and worth flagging: recording composition is
-      necessary but does not undo the contaminated gradient.
+      trained model. Which statement about this packing scheme is correct?
+    options:
+      - text: "It is fatal at the input: the causal mask ignores the separator, so tokens of document 2 attend to all of document 1 and the per-sequence gradient is a blend of two sources that no later decomposition can split. Intra-document causal masking is the fix."
+        correct: true
+        explain: "Correct. The two contributions are summed inside a nonlinear function of shared parameters before any loggable quantity exists, and every gradient-based method in v8 treats the sequence as the training example."
+      - text: "No problem: the separator token marks the boundary and attention learns to reset there, so a packed sequence is equivalent to the documents it contains."
+        misconception: V2-M4
+        explain: "The separator is right there and looks semantically sufficient, and the loss cost really is mild - which is why people have shipped it for years. But the causal mask is a function of position, not of token identity; it forbids nothing at the separator."
+      - text: "No problem, provided the manifest records which documents are in each sequence - composition data is enough to decompose the gradient afterwards."
+        misconception: V2-M4
+        explain: "Recording composition is necessary and you should do it, but it does not undo the contaminated gradient: knowing a sum has two terms does not give you the terms."
+      - text: "A quality problem only: cross-document attention slightly raises loss, and the attribution unit is the document regardless of how sequences are packed."
+        misconception: V2-M4
+        explain: "The attribution unit is whatever the gradient is computed over, and that is the sequence. Calling it the document is an assumption the packer just falsified."
+      - text: "A problem, but one that shuffling with a recorded seed removes, since random pairing makes the cross-document contamination average out across sources."
+        misconception: D16
+        explain: "Seed recording matters for replay, and data order is the largest source of variation in influence measurements - but averaging over pairings does not recover a per-source split from a blended gradient; it only makes the blend unbiased in expectation, not decomposable on the run you did."
+    check: choice
 
 check:
   - id: v2-q1
     concept: d-extraction-filtering
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
@@ -135,48 +100,25 @@ check:
       every PDF, on the grounds that it is the strongest OCR system available
       as of mid-2026 and human raters prefer it to marker 61.3% of the time.
 
-      There is a better move for a large fraction of these papers. Name it,
-      state what it buys, and state the two caveats that make it a
-      recording requirement rather than a free win.
-    answer: |
-      The better move: read the LaTeX source. arXiv publishes submitted source
-      in an S3 bucket (the src/ prefix, roughly 9.2 TB, requester-pays). For
-      any paper submitted as TeX rather than as a camera-ready PDF, you skip
-      OCR entirely.
-
-      What it buys: the document's actual structure rather than an inference
-      about it. Section hierarchy, equations as LaTeX, citations as \cite{}
-      keys, captions attached to their figures. No reading-order inference, no
-      ligature loss, no math rubble. The extraction problem does not get
-      solved, it stops existing.
-
-      Caveat one, licensing: the default arXiv licence does not permit
-      redistribution. The bulk bucket contains everything, but a
-      redistributable corpus can only be built from the subset whose per-paper
-      licence is Creative Commons or public domain. That is a metadata filter
-      applied before extraction, not after, because a document you cannot
-      redistribute is a document you cannot put in an auditable manifest.
-
-      Caveat two, coverage bias: source is available for a biased subset -
-      newer papers, TeX-submitting communities, arXiv only. Mixing
-      LaTeX-derived and OCR-derived text means the corpus has two extraction
-      qualities that correlate with source identity. When v4 measures
-      per-source contribution by retraining, a source's advantage could be its
-      content or could be its cleaner extraction, and the two are
-      indistinguishable unless the extraction method is recorded per document
-      as an attribute.
-    check: llm
-    rubric: |
-      Must contain: (1) use the LaTeX/TeX source instead of OCR, (2) the
-      licence caveat - the default arXiv licence blocks redistribution, so
-      filter to the CC/public-domain subset, (3) the coverage-bias caveat AND
-      the consequence that extraction method must be recorded per document
-      because it confounds later per-source measurement.
-      (1) plus either caveat = pass. All three = full credit.
-      (1) alone = fail; the point of the item is that the good move carries
-      obligations.
-      An answer that says OCR is fine and the choice does not matter much =
-      fail, diagnosing V2-M1 (extraction-is-a-commodity).
+      Which option names the better move for a large fraction of these papers,
+      together with the obligations it carries?
+    options:
+      - text: "Read the submitted LaTeX source from arXiv's S3 src/ bucket - structure, equations and \\cite{} keys come free with no reading-order inference - but filter to the CC/public-domain subset first, and record extraction method per document because source coverage is biased and correlates with source identity."
+        correct: true
+        explain: "Correct on all three counts: the extraction problem stops existing rather than being solved; the default arXiv licence blocks redistribution, so the metadata filter runs before extraction; and mixing LaTeX-derived with OCR-derived text confounds v4's per-source retraining unless the method is an attribute."
+      - text: "Read the LaTeX source from the arXiv bulk bucket for every paper that has it. It is strictly better output than any OCR, so there is nothing further to decide."
+        misconception: V2-M1
+        explain: "The move is right and the output claim is right, which is what makes this attractive. But it skips the two obligations: the bulk bucket contains papers you may not redistribute, and the available subset is biased in a way that confounds later per-source measurement."
+      - text: "Stay with olmOCR 2 across the board. It is the mid-2026 ceiling for papers, so extractor choice is settled and uniform treatment avoids introducing a second pipeline."
+        misconception: V2-M1
+        explain: "Uniformity is a genuine virtue, but this treats extraction as a solved commodity where only the best library matters. Where the structure still exists upstream, reconstructing it by vision model is strictly worse than reading it."
+      - text: "Use either - extractor choice is a wash. Downstream quality filtering and dedup clean up whatever any reasonable extractor produces."
+        misconception: V2-M1
+        explain: "This is the prediction that fails: the two leading HTML extractors differ by 5 points of content recall and 3x in retained boilerplate, and swapping extraction quality alone moved a 13-benchmark average by 1.08 points at 62B tokens. Interleaving is fluent enough to survive every quality heuristic."
+      - text: "Read the LaTeX source and drop the OCR path entirely, so extraction quality is uniform and no extraction attribute needs recording."
+        misconception: V2-M1
+        explain: "Uniform quality would indeed remove the confound, but source is available only for a biased subset - newer papers, TeX-submitting communities, arXiv only - so dropping the OCR path silently drops sources rather than equalising them."
+    check: choice
     difficulty: core
 
   - id: v2-q2
@@ -205,63 +147,33 @@ check:
 
   - id: v2-q3
     concept: d-extraction-filtering
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
       A 1.3-trillion-token corpus produced by filtering a 15-trillion-token
       corpus outperforms its own superset on knowledge benchmarks.
 
-      Explain why this is not a paradox, using an argument that predicts the
-      effect should be LARGER for a 30-million parameter model than for a
-      70-billion parameter one. Then state what this implies about where
-      engineering effort in the pipeline should go.
-    answer: |
-      Not a paradox once you stop treating data as fuel and start treating it
-      as an allocation against a fixed budget.
-
-      A model of N parameters can store a bounded amount of information -
-      roughly 3.6 bits per parameter, which v6 makes exact. Training does not
-      choose which regularities to spend that capacity on; it minimizes loss
-      over whatever corpus it is given, so a corpus that is 90% low-value text
-      spends capacity representing the regularities of low-value text.
-      Removing that text does not remove information the model wanted; it
-      frees capacity. So a subset can beat its superset whenever the removed
-      material had negative marginal value at the margin of the budget.
-
-      Why the effect is larger for the small model: the budget is tighter.
-      At 30M parameters there is on the order of 10^8 bits to allocate and the
-      competition between regularities is fierce, so eviction is severe. At
-      70B the capacity is roughly three orders of magnitude larger, the
-      pressure is lower, and a marginal bad document costs proportionally
-      less. This is the same reason cache-sizing effects are dramatic on small
-      caches and mild on large ones.
-
-      What it implies about effort: the filter is the highest-leverage
-      component in the pipeline and it is not a machine-learning problem. In
-      FineWeb-Edu the expensive part was 6,000 H100-hours of Llama-3-70B
-      writing educational-value labels for 460,000 documents; the model fit to
-      those labels is a regression head on frozen embeddings reaching 82% F1.
-      A filter that disagrees with its own annotator one time in five moved
-      MMLU from 33 to 37 and ARC from 46 to 57. The leverage is taste applied
-      at scale and then cheaply imitated - a labeling job and a classifier -
-      not an architecture idea.
-    check: llm
-    rubric: |
-      Must contain: (1) a fixed-capacity or fixed-budget argument in which
-      low-value tokens displace rather than dilute, (2) the explicit link from
-      tighter budget to larger effect at small scale, (3) the conclusion that
-      the classifier is the lever and that it is engineering rather than
-      novel math.
-      (1) and (2) = pass. (3) upgrades to full credit.
-      An answer that only says "quality matters more than quantity" with no
-      mechanism = fail; the item is testing the mechanism, and without it the
-      learner cannot predict the scale dependence.
-      An answer arguing that the 15T corpus is better and the result must be a
-      measurement artifact = fail, diagnosing D8.
-      An answer that overcorrects to "corpus size does not matter" = partial;
-      flag it, since v3's data-constrained scaling depends on size mattering
-      a great deal below the floor.
+      Which account both resolves the apparent paradox and predicts that the
+      effect is LARGER for a 30-million parameter model than for a
+      70-billion parameter one?
+    options:
+      - text: "A model stores a bounded number of bits (roughly 3.6 per parameter), so low-value text evicts regularities rather than diluting them; the tighter the budget, the more severe the eviction - hence the effect is largest at 30M, and the highest-leverage pipeline component is the filtering classifier, which is a labeling job plus a regression head."
+        correct: true
+        explain: "Correct. Capacity is the fixed budget being allocated, small models feel the competition hardest, and FineWeb-Edu's lever was 6,000 H100-hours of annotation feeding an 82%-F1 classifier - engineering, not new math."
+      - text: "Filtering raises the average quality of the corpus, so the model's expected per-token learning signal rises; small models train on fewer tokens, so each token matters more."
+        misconception: D8
+        explain: "Averaging is the wrong picture: bad documents do not lower a mean the model is sampling from, they consume capacity that could have held something else. The scale prediction here also comes out backwards under a fixed compute budget, where token count is held equal."
+      - text: "The 15T corpus is better and the reported result is a measurement artifact - benchmark contamination in the filtered subset, or too few seeds."
+        misconception: D8
+        explain: "This is the superset intuition defending itself. The gap (MMLU 33 to 37, ARC 46 to 57) is far outside seed noise, and filtering was the single largest factor in the leading data benchmark, larger than any architecture change tested."
+      - text: "Corpus size does not determine model quality at all; only the filter does, at every scale equally, which is why the subset wins."
+        misconception: D8
+        explain: "An overcorrection. There is a real floor below which you are data-starved and every token helps - v3's data-constrained scaling depends on size mattering a great deal - and a scale-independent claim predicts no difference between 30M and 70B."
+      - text: "Smaller corpora can be repeated for more epochs within the same budget, and repetition is what produces the gain; at 70B the budget covers fresh tokens, so no gain appears."
+        misconception: D17
+        explain: "Repetition up to about 4 epochs really is nearly free, which makes this plausible, but it is not the mechanism here: FineWeb-Edu wins at matched token budgets, and the effect is about which regularities occupy capacity, not how many times they were seen."
+    check: choice
     difficulty: core
 
   - id: v2-q4
@@ -293,64 +205,31 @@ check:
 
   - id: v2-q5
     concept: d-dedup-provenance
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      Specify the cluster table your dedup pass must emit so that the credit
-      policy for duplicated content can be changed later without retraining
-      the model. List the fields, and for each one say which question it
-      answers.
+      Your dedup pass must emit a cluster table such that the credit policy for
+      duplicated content can be changed later WITHOUT retraining the model.
 
-      Then state the property of the design that makes "change the policy
-      without retraining" true, rather than merely convenient.
-    answer: |
-      Fields, one row per duplicate cluster:
-
-      - cluster_id: the join key, assigned by union-find over the LSH
-        candidate graph. Answers "which merge event is this."
-      - representative: the doc_id whose tokens actually entered the corpus.
-        Answers "which text did the model see," and lets an auditor reproduce
-        the corpus.
-      - the representative's (shard_id, offset, length): answers "where are
-        those tokens," joining the cluster to the training data.
-      - members: a list of {doc_id, source_id, publication_date,
-        jaccard_to_representative}. Answers "who held a copy" - and it must
-        carry source_id, because the credit unit is the source, not the
-        document, and one source can appear more than once in a cluster.
-        Publication date is there because one candidate policy is a function
-        of it; the similarity is there because a 1.0 exact duplicate and a
-        0.76 near-match support different policy arguments.
-      - policy: the credit rule in force, recorded so that the number can be
-        reproduced and so that changing it is a visible act.
-
-      The property that makes policy changes free: separability. The trained
-      weights are a function of the representative tokens alone. The payout is
-      a function of the cluster table and the policy alone. Those two
-      functions share no arguments except cluster identity, so the model is
-      invariant to the policy and the policy can be recomputed at any time
-      from a table whose size is proportional to the number of clusters rather
-      than to the corpus.
-
-      That separation is what converts an irreversible pipeline decision into
-      a negotiable one. Three policies can be run and shown to a rightsholder
-      side by side without touching a GPU.
-    check: llm
-    rubric: |
-      Must contain: (1) member list carrying source_id, with the explicit
-      reason that the payment unit is the source and a source can appear
-      multiple times in one cluster, (2) the representative identified and its
-      span recorded, (3) the separability argument - weights depend on the
-      representative tokens, payout depends on the cluster table, so the
-      policy is not baked into the corpus.
-      (1) and (3) = pass. (3) is the load-bearing one.
-      An answer listing fields sufficient for one chosen policy and no others
-      = fail; that welds the policy into the corpus, which is the exact
-      failure the design exists to prevent.
-      An answer that proposes keeping all duplicate copies in the corpus to
-      avoid the problem = fail, diagnosing D9 from the other side: training on
-      n copies multiplies the passage's effective weight and makes it
-      extractable (v6), so it is a different and worse corpus.
+      Which specification does that, and for the right reason?
+    options:
+      - text: "cluster_id; representative doc_id with its (shard_id, offset, length); a members list of {doc_id, source_id, publication_date, jaccard_to_representative}; and the policy in force. It works by separability: the weights are a function of the representative tokens alone, the payout a function of the table and policy alone."
+        correct: true
+        explain: "Correct. source_id on every member is load-bearing because the payment unit is the source and one source can appear twice in a cluster; date and similarity are there because candidate policies are functions of them. Three policies can be shown to a rightsholder without touching a GPU."
+      - text: "cluster_id, representative doc_id and its span, and the count of members. The count is what a per-cluster split needs, and doc_ids can be recovered later by rerunning the similarity search."
+        misconception: D9
+        explain: "A count supports exactly one policy and identifies no claimant. Rerunning the search over a corpus that no longer contains the dropped documents cannot recover who held a copy - the merge left no trace."
+      - text: "cluster_id, representative doc_id and its span, and each member's doc_id. Document identity is the finest granularity available, and source can always be looked up from doc_id later."
+        misconception: D7
+        explain: "Close, and the lookup argument is often fine in practice - but the whole design exists to match the attribution unit to the payment unit. Recording at document granularity and deferring the source join is how a source that appears twice in one cluster gets double-counted under an equal split."
+      - text: "Whatever fields the chosen policy needs - fix earliest-publication-date credit up front, then store cluster_id, representative, and each member's date. Minimal and sufficient."
+        misconception: D9
+        explain: "Sufficient for one policy and no other, which welds the policy into the corpus - precisely the failure the design prevents. Changing your mind then costs a dedup rerun and everything downstream."
+      - text: "No cluster table: keep every duplicate copy in the corpus so each source's contribution is present in the training data and the split falls out of measurement."
+        misconception: D9
+        explain: "This sidesteps the bookkeeping by changing the model. Training on n copies multiplies the passage's effective weight and makes it extractable (v6), so it is a different and worse corpus - and a worse attribution substrate."
+    check: choice
     difficulty: core
 
   - id: v2-q6
@@ -402,65 +281,70 @@ check:
 
   - id: v2-q8
     concept: d-tokenizer-training
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: false
     prompt: |
-      You are training a 30-million parameter model with an internal width of
-      384 on 500 million tokens of a single domain. A colleague proposes
-      reusing Llama-3's 128,256-entry vocabulary, since it compresses text
-      better than any 16K vocabulary could.
+      You are training a 30,000,000-parameter model with an internal width of
+      $d_{model} = 384$ on 500 million tokens of a single domain. A colleague
+      proposes reusing Llama-3's 128,256-entry vocabulary, since it compresses
+      text better than any 16K vocabulary could.
 
-      The compression claim is true. Give two independent quantitative
-      arguments against the proposal, and state the general law that both
-      arguments are instances of.
-    answer: |
-      Argument one, parameter cost. The input embedding table holds
-      V x d_model parameters. At V = 128,256 and d_model = 384 that is
-      49,250,304 parameters, which is 1.64 times the size of the entire
-      30-million-parameter model. The proposal is not an improvement with a
-      cost attached; it is a different model in which the great majority of
-      capacity is a lookup table of starting positions. At V = 16,384 the
-      table is 6,291,456 parameters, about 21% of the model, which is already
-      substantial.
-
-      Argument two, update frequency. Each embedding row is updated only when
-      its token appears in a batch. Token frequencies are approximately
-      Zipfian, so the expected number of updates to the rarest row is roughly
-      D / (V ln V). At D = 5x10^8 and V = 128,256 that is about 330 updates;
-      at V = 16,384 it is about 3,100. A row with a few hundred updates from
-      random initialization has not been trained - it is noise the model has
-      been instructed to treat as a symbol. Larger V spreads a fixed number of
-      token occurrences over more rows, so raising V actively degrades the
-      rare end of the vocabulary.
-
-      The general law both instantiate: compression gain grows logarithmically
-      in V, because BPE merges in frequency order and each doubling of the
-      vocabulary buys a thinner slice of the frequency tail, while cost -
-      parameters, and the dilution of updates per row - grows linearly in V.
-      Logarithmic benefit against linear cost has an interior optimum, and
-      where that optimum sits depends on the compute and data budget. The
-      formal statement is the vocabulary scaling law (Tao et al., NeurIPS
-      2024): optimal vocabulary size grows with compute but SHRINKS when the
-      run is data-bottlenecked. Copying a frontier vocabulary is importing a
-      decision made under a different budget.
-    check: llm
-    rubric: |
-      Must contain: (1) the parameter cost V x d_model computed, with the
-      recognition that 49.25M exceeds the whole 30M model, (2) a second
-      independent argument - update frequency per row, or equivalently that
-      rare rows finish near initialization, (3) the general form: compression
-      gain is sublinear/logarithmic in V while cost is linear, so there is an
-      interior optimum, and it moves with the data budget.
-      (1) and (2) = pass. (3) upgrades to full credit.
-      (1) alone = partial; the parameter count is the easy half and does not
-      by itself explain why a 100K vocabulary is bad even in a model with room
-      for it.
-      An answer that the larger vocabulary is fine because it compresses
-      better and compression is what matters = fail, diagnosing V2-M3.
-      An answer that argues for a very small vocabulary (say 1K) on the same
-      reasoning = flag: the argument is an optimum, not a direction, and the
-      learner has taken it as a direction.
+      The compression claim is true. Which single statement is the correct
+      objection to the proposal?
+    options:
+      - text: |
+          The embedding table is $V \times d_{model} = 128{,}256 \times 384 =
+          49{,}250{,}304$ parameters, 1.64 times the whole model; and with
+          $D = 5 \times 10^{8}$ tokens the rarest rows see on the order of
+          $D / (V \ln V) \approx 330$ updates from random initialization
+          (about 3,100 at $V = 16{,}384$). Compression gain grows only
+          logarithmically in $V$ while both costs grow linearly in it.
+        correct: true
+        explain: |
+          Both arguments are independent and both are arithmetic: the table
+          alone exceeds the model's whole parameter budget, and a fixed number
+          of token occurrences spread over more rows leaves the tail of the
+          vocabulary effectively untrained. Logarithmic benefit against linear
+          cost has an interior optimum, and the vocabulary scaling law (Tao et
+          al., NeurIPS 2024) says that optimum SHRINKS when the run is
+          data-bottlenecked - which is exactly this run.
+      - text: |
+          There is no valid objection: characters per token is the whole value
+          of a tokenizer, the 128,256-entry vocabulary wins on that metric, and
+          its extra embedding parameters are a small fixed overhead of the kind
+          frontier models absorb routinely.
+        misconception: V2-M3
+        explain: |
+          Attractive because compression really does improve monotonically with
+          $V$ and the parameter cost is invisible in a 70B model, where the
+          table is a couple of percent. Here it is 1.64x the entire model, so
+          the "small fixed overhead" is the model. Copying a frontier number is
+          importing a decision made under a completely different budget.
+      - text: |
+          The objection is corpus size, not vocabulary size: 500 million tokens
+          is too few for any model, so keep the 128,256-entry vocabulary and
+          raise the token count until the rare rows are adequately updated.
+        misconception: D8
+        explain: |
+          This reads every data decision as a size knob. It also gets the law
+          backwards: optimal vocabulary size shrinks when you are
+          data-bottlenecked, so the response to a fixed 500M-token corpus is a
+          smaller $V$, not more tokens. And the 49,250,304-parameter table
+          exceeds the model at any corpus size.
+      - text: |
+          Vocabulary size should simply be minimized: a 1,024-entry byte-level
+          vocabulary costs only $1{,}024 \times 384 = 393{,}216$ embedding
+          parameters and every row is updated constantly, so it is the right
+          choice at this scale.
+        misconception: V2-M3
+        explain: |
+          This takes an optimum for a direction. Characters per token collapses
+          toward 1, so the same text becomes several times more tokens, and
+          training cost is proportional to token count - the compute bill rises
+          by far more than the table saves. The defensible range for a 10-30M
+          parameter model on 300M-1B domain tokens is 16K to 32K.
+    check: choice
     difficulty: core
 
   - id: v2-q9
@@ -484,66 +368,74 @@ check:
 
   - id: v2-q10
     concept: d-mixing-packing
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      Intra-document causal masking is described in the literature as a small
-      quality improvement. For this book it is close to mandatory.
+      Packing concatenates documents end to end with a separator token between
+      them and slices the stream every $L$ tokens. Intra-document causal masking
+      (arXiv:2402.13991) forbids attention across document boundaries inside a
+      packed sequence. The literature reports it as a small quality improvement;
+      for this book it is close to mandatory.
 
-      Explain the mechanism it fixes, then explain why the consequence is
-      categorically different for attribution than for language modelling
-      quality. Finally, name one thing masking does NOT fix that still has to
-      be recorded.
-    answer: |
-      The mechanism. Packing concatenates documents into fixed-length
-      sequences with a separator token between them. The causal mask is a
-      function of position, not of content, so it does not know the separator
-      exists: a token in the second document attends to every earlier position
-      in the sequence, including all of the first document. With the first
-      document filling half a sequence of length L, that is L^2/4
-      cross-document attention pairs. Intra-document masking sets exactly
-      those entries to negative infinity before the softmax, so their
-      attention weights and their gradients are zero, and the packed sequence
-      behaves as the concatenation of independent shorter ones.
-
-      Why the consequence differs in kind. For language modelling this is a
-      small quality cost, because the model mostly learns to ignore
-      irrelevant preceding context and the loss penalty is modest - people
-      shipped it this way for years. For attribution it is not a cost, it is a
-      loss of definition. Every gradient-based method computes a per-sequence
-      gradient and calls it "what this training example did to the model." If
-      the sequence spans two sources, that gradient is the sum of two
-      contributions that were added inside a nonlinear function of shared
-      parameters during the forward and backward pass, before any quantity you
-      could log existed. There is no decomposition afterwards. A quality cost
-      is a number that gets worse; this is a question that stops having an
-      answer.
-
-      What masking does not fix: which documents get co-packed. Masking
-      isolates attention within a sequence; it says nothing about sequence
-      composition, and composition is not random if anything about the packing
-      order correlates with source - length-sorted bin packing, shard order,
-      an unshuffled corpus. Any per-sequence statistic computed later
-      therefore carries a source-correlated confound. The manifest must record
-      the ordered (doc_id, source_id, start, length) spans of each training
-      sequence, which makes the confound measurable and conditionable rather
-      than invisible.
-    check: llm
-    rubric: |
-      Must contain: (1) the causal mask is positional and ignores the
-      separator, so attention crosses document boundaries, (2) the categorical
-      difference - for quality it is a small loss penalty, for attribution the
-      per-sequence gradient becomes an unsplittable sum, (3) that masking does
-      not control which documents share a sequence, and that per-sequence
-      composition must be recorded.
-      (1) and (2) = pass. (3) upgrades to full credit and is the part most
-      answers miss.
-      An answer claiming masking makes packing order irrelevant = fail,
-      diagnosing V2-M4 in its subtler form.
-      An answer that proposes one document per sequence instead of masking =
-      partial; it is correct and it wastes a large fraction of the token
-      budget on padding for a corpus of short papers, which should be stated.
+      Which single statement about what masking fixes, and what it leaves
+      unfixed, is correct?
+    options:
+      - text: |
+          The causal mask is a function of position, not content, so without
+          masking a token in document 2 attends to all of document 1 - about
+          $L^2/4$ cross-document pairs when the first document fills half the
+          sequence. Masking zeroes those weights and their gradients, so the
+          packed sequence behaves as the concatenation of independent shorter
+          ones. It does not control WHICH documents get co-packed, so the
+          manifest must still record each sequence's ordered
+          (doc_id, source_id, start, length) spans.
+        correct: true
+        explain: |
+          The right split: masking fixes the input, not the sampling. For
+          language modelling the unmasked version costs a modest loss penalty;
+          for attribution it destroys the definition, because every
+          gradient-based method in v8 treats a per-sequence gradient as "what
+          this training example did" and a mixed sequence yields a sum formed
+          inside a nonlinear function of shared parameters, before any loggable
+          quantity exists.
+      - text: |
+          The separator token already marks the boundary and attention learns to
+          respect it, so masking is a small language-modelling quality tweak
+          with no attribution consequence either way.
+        misconception: V2-M4
+        explain: |
+          Appealing because the separator is right there and looks semantically
+          sufficient, and because people shipped unmasked packing for years with
+          only a mild loss cost. But the mask is positional: it never consults
+          the separator, so gradients from document 2's loss flow through
+          attention placed on document 1's tokens regardless of what the model
+          "learns to respect".
+      - text: |
+          With masking on, a packed sequence behaves exactly as independent
+          documents, so packing order and per-sequence composition no longer
+          carry information worth recording in the manifest.
+        misconception: V2-M4
+        explain: |
+          The subtler form of the same error. Masking isolates attention within
+          a sequence; it says nothing about which documents share one. If
+          anything in the packing order correlates with source - length-sorted
+          bin packing, shard order, an unshuffled corpus - every per-sequence
+          statistic computed later carries a source-correlated confound that is
+          unmeasurable unless composition was recorded.
+      - text: |
+          Masking is optional, because a per-sequence gradient from a mixed
+          sequence can be decomposed into per-document terms after training,
+          given the document-boundary array and the sequence's token spans.
+        misconception: D6
+        explain: |
+          The contributions were summed inside a nonlinear function of shared
+          parameters during the forward and backward pass; the boundary array
+          tells you where the tokens were, not how to split a gradient that no
+          longer has separable parts. This is the general optimism that
+          scalable attribution is solved engineering - which measured against
+          retraining ground truth is exactly what fails.
+    check: choice
     difficulty: core
 
   - id: v2-q11
@@ -573,134 +465,138 @@ check:
 
   - id: v2-q12
     concept: d-dedup-provenance
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
       A duplicate cluster contains doc_417 (source: Northlake Preprints) and
       doc_101 (source: Journal of Text Systems). The pipeline kept doc_101's
-      tokens as the representative.
+      tokens as the representative. In v4 you will retrain with Northlake
+      Preprints removed and measure the change in held-out loss.
 
-      In v4 you will retrain with Northlake Preprints removed and measure the
-      change in held-out loss.
-
-      Show that "remove source k" is ambiguous, define the two experiments
-      precisely, say which question each answers, and state what goes wrong if
-      the cluster table records only the representative.
-    answer: |
-      The ambiguity. Removing a source means removing what that source
-      contributed. doc_101's tokens ARE the content doc_417 contributed, sitting
-      in the corpus under a different owner's label. So the removal set is not
-      determined by filtering on source_id.
-
-      Experiment A - exclusive content. Drop every manifest row whose
-      source_id is Northlake Preprints. doc_101 stays, so the shared passage
-      stays. This measures: what does this source's EXCLUSIVE content add,
-      given that anything it shares with others is available anyway. It is the
-      right experiment if the question is "what would we lose by not licensing
-      Northlake, holding our other licences fixed."
-
-      Experiment B - total content. Additionally drop the representatives of
-      every cluster in which Northlake is a member. The shared passage leaves
-      too. This measures: what does this source's TOTAL content add, including
-      what somebody else also happens to hold. It is the right experiment if
-      the question is "what is this material worth," independent of who else
-      has it.
-
-      Both are legitimate and they give different numbers. The leave-one-out
-      delta is only well defined once you say which one you ran, and the
-      difference between them is exactly the value of the duplicated content -
-      which, notice, is the quantity the credit policy is arguing about. The
-      two experiments are the counterfactual form of the same disagreement.
-
-      What goes wrong with a representative-only cluster table: Experiment B
-      becomes uncomputable, because nothing anywhere records that Northlake
-      ever held that passage. The measurement silently becomes Experiment A
-      while being reported as "the contribution of Northlake Preprints." It is
-      undetectable after the fact - the corpus contains no trace of the merge,
-      and neither do the trained weights - so no audit of the model or the
-      shards recovers it. The only remedy is rerunning dedup, which means
-      rerunning every training run downstream of it.
-    check: llm
-    rubric: |
-      Must contain: (1) the ambiguity stated - the representative's tokens are
-      also the other source's content, so filtering on source_id does not
-      define the removal set, (2) both experiments defined concretely, (3)
-      that they answer different questions and yield different numbers, (4)
-      that a representative-only table makes one of them uncomputable and
-      resolves the ambiguity silently.
-      (1), (2), (4) = pass. (1) is the load-bearing one.
-      An answer treating leave-one-source-out as unambiguous = fail,
-      diagnosing D9: the learner still sees dedup as hygiene, so removing a
-      source looks like a filter predicate.
-      An answer that picks one experiment and defends it without acknowledging
-      the other = partial; the skill being tested is noticing that a
-      definition is required, not choosing well.
-      Note for the grader: an answer that also observes the difference between
-      the two experiments IS the value of the shared passage, and connects it
-      to the credit policy, is above the bar for this item.
+      Which single statement about that experiment is correct?
+    options:
+      - text: |
+          "Remove source k" is ambiguous: experiment A drops only the manifest
+          rows tagged Northlake, leaving doc_101 and so the shared passage, and
+          measures the source's EXCLUSIVE content; experiment B additionally
+          drops the representatives of every cluster in which Northlake is a
+          member, and measures its TOTAL content. They give different numbers,
+          and a cluster table that records only the representative makes B
+          uncomputable while silently reporting A.
+        correct: true
+        explain: |
+          doc_101's tokens ARE the content doc_417 contributed, sitting under
+          another owner's label, so filtering on source_id does not determine
+          the removal set. Both experiments are legitimate and they answer
+          different questions; the delta between them is precisely the value of
+          the duplicated passage, which is the quantity the credit policy is
+          arguing about. With members and their source_ids recorded, the choice
+          is deliberate and auditable.
+      - text: |
+          The experiment is unambiguous: the removal set is every manifest row
+          with source_id = Northlake Preprints. Dedup is upstream hygiene and
+          does not enter the definition of a leave-one-source-out measurement.
+        misconception: D9
+        explain: |
+          Correct in every pipeline where duplicate rows have no owner, and
+          wrong here for one reason: a claimant exists. The passage Northlake
+          contributed is still in the training corpus under the Journal's tag,
+          so this "unambiguous" filter has quietly chosen one of two
+          experiments and named it the contribution of Northlake Preprints.
+      - text: |
+          Recording only the representative is sufficient, because the tokens
+          that trained the model are the Journal's document; whichever copy
+          survived dedup is by definition the one that contributed, so no
+          member list is needed.
+        misconception: D9
+        explain: |
+          This makes survivorship into ownership, and the survivor was chosen by
+          shard iteration order. The consequence is undetectable after the fact:
+          neither the shards nor the weights carry a trace of the merge, so the
+          only remedy is rerunning dedup and everything downstream of it.
+      - text: |
+          Either definition is fine, since a source's marginal contribution to
+          held-out loss is a stable property of the corpus: run it once, and the
+          two variants agree to within measurement error.
+        misconception: D16
+        explain: |
+          Two errors at once. The two variants differ by the entire value of the
+          shared passage, not by measurement error; and a leave-one-out delta is
+          not a stable property anyway - retrain with another seed and a single
+          source's marginal contribution can swing by more than its own
+          magnitude, which is why v4 reports seed error bars.
+    check: choice
     difficulty: stretch
 
   - id: v2-q13
     concept: d-mixing-packing
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      RegMix chooses a data mixture by training hundreds of small models on
-      random mixtures of the sources, regressing final loss on the mixture
-      proportions, and picking the minimizing mixture.
+      RegMix (arXiv:2407.01492) trains hundreds of small models on random
+      mixtures of the sources, fits
 
-      Explain why this methodology is already a per-source attribution method,
-      what the estimated per-source value is in terms of the fitted
-      regression, and name the two limits that stop it from being the whole
-      answer.
-    answer: |
-      Why it is already attribution. The fit is
+      $$\text{loss}_j = b_0 + \sum_k b_k\, p_{kj}$$
 
-        loss_j = b_0 + sum over k of b_k * p_kj
+      where $p_{kj}$ is source $k$'s proportion in the mixture used for run $j$,
+      and picks the minimizing mixture.
 
-      where p_kj is source k's proportion in the mixture used for run j. The
-      fitted coefficient b_k is the estimated change in loss per unit increase
-      in source k's share, holding the others fixed. Negate it and -b_k is
-      source k's marginal value in loss units, estimated from the same runs
-      that produced the mixing weights. The mixing literature computes a
-      per-source value and calls it a mixing coefficient.
-
-      This is the same construction as the datamodels approach v4 builds
-      ground truth from. The only difference is the design matrix: RegMix
-      samples continuous proportions, datamodels sample binary inclusion
-      vectors. Same estimator, two literatures, and the second one is where
-      this book uses it.
-
-      Limit one, linearity. The additive form cannot represent interactions -
-      "source A only helps when source B is present" - because each source
-      contributes a term that does not depend on the others. Capturing
-      interactions means adding pairwise terms, which costs on the order of
-      K-choose-2 more coefficients and correspondingly more runs. Cooperative
-      game theory (v5) exists precisely to handle value functions with
-      arbitrary interactions, and the Shapley value is what a linear
-      coefficient collapses to when interactions vanish.
-
-      Limit two, the noise floor. Two identical mixtures trained with
-      different random seeds produce different losses. Any coefficient smaller
-      than that seed-to-seed spread is unmeasurable regardless of how many
-      runs you do - more runs shrink the sampling error around the estimate,
-      not the noise in the outcome being measured. This is the opposite of the
-      usual A/B testing situation where more traffic always buys resolution,
-      and it is why every measurement in v3 and v4 is reported with seed error
-      bars rather than a point value.
-    check: llm
-    rubric: |
-      Must contain: (1) the regression coefficient on a source's proportion IS
-      the per-source value estimate, (2) at least one of the two limits stated
-      correctly - linearity cannot express interactions, or seed noise sets a
-      floor no amount of extra runs crosses.
-      (1) and one limit = pass. Both limits = full credit.
-      An answer that describes RegMix's mixing use without recognizing the
-      attribution reading = fail; the whole item is the recognition.
-      An answer claiming more runs eventually resolve arbitrarily small
-      effects = fail on the noise-floor half, and diagnose it: this is the
-      belief that attribution noise is a methods problem rather than a
-      property of the measurement (D20 territory, which v5 and v9 return to).
+      Which single statement about reading this fit as per-source attribution is
+      correct?
+    options:
+      - text: |
+          $-b_k$ is source $k$'s estimated marginal value in loss units, from the
+          same runs that produced the mixing weights - the same estimator as the
+          datamodels design in v4, differing only in that RegMix samples
+          continuous proportions rather than binary inclusion. Two limits: the
+          additive form cannot express interactions (pairwise terms cost on the
+          order of $\binom{K}{2}$ more coefficients and runs), and seed-to-seed
+          spread in the outcome sets a floor that more runs do not cross.
+        correct: true
+        explain: |
+          The recognition is the whole point: the mixing literature already
+          computes a per-source value and labels it a mixing coefficient. Both
+          limits matter downstream - v5 exists because cooperative game theory
+          handles value functions with arbitrary interactions, and a linear
+          coefficient is what a Shapley value collapses to when interactions
+          vanish.
+      - text: |
+          $-b_k$ is source $k$'s marginal value in loss units, and because the
+          regression is fit over hundreds of runs the coefficient is a stable
+          property of the corpus: measure it once and bill against it.
+        misconception: D16
+        explain: |
+          The first half is right and the second is the expensive error. Two
+          identical mixtures trained with different seeds give different losses;
+          data order alone is the largest source of variation in influence
+          measurements. A billing-grade number needs seeds averaged and a
+          reported noise floor.
+      - text: |
+          The coefficients are usable but noise-limited today; with enough runs
+          and a better-specified regression, arbitrarily small per-source
+          effects become resolvable, so the noise is a methods problem rather
+          than a property of the measurement.
+        misconception: D20
+        explain: |
+          More runs shrink the sampling error around the estimate, not the noise
+          in the outcome being measured - the opposite of the A/B-testing
+          situation where more traffic always buys resolution. Below a
+          signal-to-noise threshold the welfare-optimal contract is a flat fee,
+          and no better estimator changes that; only more signal does.
+      - text: |
+          The coefficients cannot be read as per-source value at all: they
+          measure what moved the loss, whereas a source's value is which of its
+          documents contain the facts the model emits, so a lexical search over
+          the corpus is the correct attribution method here.
+        misconception: D5
+        explain: |
+          This is right that influence and entailment are different targets -
+          and BM25 really does beat gradient methods at finding the document
+          that CONTAINS a fact. But it draws the wrong conclusion: a royalty
+          system picks a target and defends it, and "what changed the model" is
+          a legitimate one. The coefficient is a value estimate for that target,
+          not a broken estimate of the other.
+    check: choice
     difficulty: stretch

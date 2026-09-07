@@ -141,45 +141,79 @@ concept: d-tracin
 prompt: |
   Before reading on, commit to an answer.
 
-  A training run computes and discards an enormous amount of per-example
-  information. Name the single artifact produced during training that could
-  plausibly stand in for a counterfactual, and state the specific property it
-  would need to have for the substitution to be honest.
+  A training run computes an enormous amount of per-example information and
+  then throws nearly all of it away. Something in there could plausibly stand
+  in for a counterfactual - but only if it has a specific property, and only
+  inside a specific limit.
 
-  Then name one thing that artifact obviously cannot tell you, which the
-  counterfactual can.
-answer: |
-  The artifact: the per-example gradient. At each step, each training example
-  produces a vector the same shape as the parameters, saying how that example
-  wanted the model to change. Training uses the average of those vectors and
-  discards the individuals.
-
-  The property it would need: the dot product between a training example's
-  gradient and a query's gradient would have to predict what actually happens
-  to that query's loss when the model takes a step on that example. That is a
-  first-order claim about a step, and it can be checked directly - take the
-  step, measure the loss change, compare against the prediction.
-
-  What it cannot tell you: the counterfactual is a statement about a model
-  trained WITHOUT the source - a whole different training trajectory, with
-  different weights at every subsequent step. Gradients only ever describe the
-  trajectory that actually happened. Removing an example does not just subtract
-  its own steps; it changes the model that every later example then sees. No
-  quantity computed along one trajectory can observe the other one.
-rubric: |
-  Must name per-example gradients (or "the gradient of the loss for one
-  training example") as the artifact. Naming the loss curve, the checkpoints
-  alone, or the attention weights = fail; none of them is per-example.
-  Must state some version of the required property: gradient alignment has to
-  predict actual loss change. Accept "the dot product would have to correlate
-  with what retraining shows".
-  Full credit requires the limitation: gradients describe the trajectory that
-  happened, and the counterfactual is about a trajectory that did not, so the
-  substitution is an approximation that has to be measured rather than
-  assumed. An answer that treats gradients as simply computing the
-  counterfactual more cheaply = fail, and it is the exact error the rest of
-  this unit exists to prevent - flag D6.
-check: llm
+  Which account names the right artifact, the property the substitution would
+  need, and the thing that artifact can never tell you?
+options:
+  - text: |
+      The artifact is the per-example gradient: at each step every example in
+      the batch produces a vector the shape of the parameters, and training
+      averages them, takes one step, and discards the individuals. The
+      property it needs is that the dot product of a training example's
+      gradient with a query's gradient predicts what actually happens to that
+      query's loss when the model steps on that example - a first-order claim
+      that can be checked by taking the step and measuring. What it cannot
+      tell you is the counterfactual itself: gradients only ever describe the
+      trajectory that happened, and removing a source changes the model every
+      later example then sees.
+    correct: true
+    explain: |
+      Right. The per-example gradient is the discarded artifact, its warrant
+      is the checkable first-order prediction
+      $\Delta\ell(z_q) \approx -\eta\,(g_{z_q} \cdot g_z)$, and its ceiling is
+      that no quantity computed along one trajectory can observe a different
+      one. That gap is why every method in this unit has to be graded rather
+      than trusted.
+  - text: |
+      The artifact is the per-example gradient, and the property it needs is
+      already established by the derivation: since
+      $\Delta\ell(z_q) \approx -\eta\,(g_{z_q} \cdot g_z)$ follows from
+      calculus, the summed dot products simply are the counterfactual computed
+      cheaply, and nothing about the substitution needs measuring. The only
+      thing it cannot tell you is anything at frontier scale, where the
+      gradients are too large to store.
+    misconception: D6
+    explain: |
+      The artifact is right and the licence is not. The expansion is exact
+      only to first order along the trajectory that happened; the
+      counterfactual is about a trajectory that did not. Measured against
+      actual retraining on a 2B model, the methods that scale come out no
+      better than random guessing, and correcting a single assumption in the
+      derivation moved published results by 10 to 300%. Whether the
+      substitution holds is an empirical question with a number attached, not
+      a corollary.
+  - text: |
+      The artifact is the per-example gradient, and the property it needs is
+      that gradients which align belong to examples about the same subject
+      matter - so attribution is retrieval carried out in the model's own
+      representation instead of in token space. What it cannot tell you is
+      anything about a document that never mentions the topic of the output.
+    misconception: V8-M1
+    explain: |
+      The dot product measures whether two examples push the *parameters* the
+      same way, which is a statement about the model's current mechanism, not
+      about meaning. At 52-billion-parameter scale, flipping the word order of
+      a key phrase collapses influence to near zero with the content
+      unchanged, and two documents on unrelated subjects can be strong allies
+      because both push the same numeral format or citation habit.
+  - text: |
+      The artifact is the record of which training text the trained model can
+      reproduce verbatim. The property it needs is that the model emits the
+      passage on prompting, which is directly checkable; what it cannot tell
+      you is how much that passage was worth in dollars.
+    misconception: D3
+    explain: |
+      Verbatim emission is not the discarded per-example quantity - it is a
+      property of the finished weights, computed after the fact. It is also a
+      lower bound: most of what training data contributes is semantic and
+      never resurfaces verbatim, and asking for the same content in a
+      different style defeats any n-gram filter while the knowledge stays
+      intact.
+check: choice
 ```
 
 Those discarded vectors are the ledger this unit is about. They are already
@@ -335,23 +369,42 @@ prompt: |
 
       Verdict (ally / neutral / rival): ____   <- D
 
-  Give A, B, C, D in order, comma-separated. Write vectors like (0, -16).
-answer: |
-  A: -4
-  B: (0, -16)
-  C: -96
-  D: rival
-rubric: |
-  A must be -4 (2 - 6, and the sign is the point). B must be (0, -16): the
-  scalar 2(-4) = -8 multiplies the input (0, 2). C must be -96, from
-  (2)(0) + (6)(-16). D must be "rival" or an equivalent statement that a step
-  on one increases the other's loss.
-  All four = pass. A sign error on A that propagates consistently to a verdict
-  of "ally" = fail; the sign is the entire content of the verdict.
-  Reporting the gradient as (0, 2) or (0, -4) - the input or the residual
-  without both factors - means the chain of two sensitivities has not landed;
-  re-deliver the derivation paragraph.
-check: llm
+  Which filling of A, B, C, D is correct?
+options:
+  - text: |
+      A: -4, B: (0, -16), C: -96, D: rival. The residual is $2 - 6 = -4$, so
+      the scalar $2(-4) = -8$ multiplies the input $(0, 2)$ to give
+      $(0, -16)$; the dot product is $(2)(0) + (6)(-16) = -96$.
+    correct: true
+    explain: |
+      Right, and the sign is the content of the verdict: a negative dot
+      product means a step on P raises Q's loss and a step on Q raises P's.
+      Both factors matter - the residual $2(\hat y - y)$ sets the sign and
+      scale, the input $(x_1, x_2)$ sets the direction.
+  - text: |
+      A: -4, B: (0, 2), C: 12, D: ally. Q's gradient is its input vector
+      $(0, 2)$, and since P and Q both load on the same second feature they
+      push the model the same way, giving $(2)(0) + (6)(2) = 12$.
+    misconception: V8-M1
+    explain: |
+      Dropping the residual factor turns the dot product into a comparison of
+      the examples' *inputs* - which is exactly the content-similarity reading
+      the chapter refutes. The gradient is $2(\hat y - y)(x_1, x_2)$; with
+      $\hat y - y = -4$ the scalar is $-8$, so $g_Q = (0, -16)$ and
+      $g_P \cdot g_Q = -96$. P and Q are rivals despite sharing a feature.
+  - text: |
+      A: -4, B: (0, -16), C: -0.95, D: rival. Divide the dot product by the
+      two vectors' lengths so the number sits on a scale comparable with other
+      pairs, other queries and other models.
+    misconception: V8-M3
+    explain: |
+      The residual and the gradient are right, but $g_P \cdot g_Q$ is $-96$;
+      $-0.95$ is the cosine, a different quantity. Normalizing by the query
+      gradient's length is a legitimate move when you need cross-query
+      comparability, and it still does not make a score portable: there are no
+      units and no shared zero across models or projections. What is
+      comparable is the ranking, after it has been graded.
+check: choice
 ```
 
 ### What the dot product is not
@@ -506,7 +559,8 @@ concept: d-tracin
 # variants: blank the checkpoint-1 dot product instead of checkpoint 2, which
 # tests the larger learning rate; or give the total and blank eta_2.
 prompt: |
-  Fill the blanks. One training example C, one query $z_q$, two checkpoints.
+  Fill the blanks, then read the sentence that comes with them. One training
+  example C, one query $z_q$, two checkpoints.
 
       Checkpoint 1, eta_1 = 0.05
         g_q = (1, 2, -2)
@@ -522,34 +576,62 @@ prompt: |
 
       TracIn(C, z_q) = ____                   <- D
 
-  Give A, B, C, D in order, comma-separated.
-
-  Then answer in one sentence: which checkpoint dominates this score, and is
-  that because the gradients were better aligned there or because of
-  something else?
-answer: |
-  A: 0.30
-  B: 2      (from (0)(2) + (3)(-1) + (1)(5) = 0 - 3 + 5)
-  C: 0.02
-  D: 0.32
-
-  Checkpoint 1 dominates, contributing 0.30 of the 0.32. Not because the
-  alignment was better in any absolute sense but because its learning rate is
-  five times larger, so each unit of alignment there moved the weights five
-  times as far. The raw dot products are 6 and 2, a factor of 3; the weighted
-  contributions are 0.30 and 0.02, a factor of 15.
-rubric: |
-  Required exactly: A = 0.30, B = 2, C = 0.02, D = 0.32.
-  The sentence must attribute checkpoint 1's dominance to the learning-rate
-  weight, not solely to the larger raw dot product. Full credit notes that the
-  raw ratio (3x) and the weighted ratio (15x) differ.
-  All four numbers plus the learning-rate attribution = pass.
-  An answer that says checkpoint 1 dominates "because the gradients aligned
-  better" with no mention of eta = partial, do not pass; dropping the
-  learning-rate weight is one of the two standard implementation bugs and this
-  beat exists to make it visible.
-  A sign error on B (giving -2 or 8) = fail; recheck componentwise pairing.
-check: llm
+  Which filling of A, B, C, D is correct, together with the right account of
+  which checkpoint dominates the score and why?
+options:
+  - text: |
+      A: 0.30, B: 2, C: 0.02, D: 0.32. Checkpoint 1 dominates, contributing
+      0.30 of the 0.32 - not because the alignment is better in any absolute
+      sense but because its learning rate is five times larger, so each unit
+      of alignment moved the weights five times as far. The raw dot products
+      are 6 and 2, a factor of 3; the weighted contributions are 0.30 and
+      0.02, a factor of 15.
+    correct: true
+    explain: |
+      Right, including the arithmetic on B: $(0)(2) + (3)(-1) + (1)(5) = 2$.
+      The gap between the 3x raw ratio and the 15x weighted ratio is the
+      learning rate doing work, which is why $\eta_c$ is not decoration.
+  - text: |
+      A: 6, B: 2, C: 2, D: 8. Sum the dot products across checkpoints;
+      checkpoint 1 dominates because the gradients were better aligned there,
+      6 against 2. The learning rate is a property of the training schedule,
+      not of the alignment being measured, so it drops out of the score.
+    misconception: V8-M3
+    explain: |
+      Dropping $\eta_c$ is one of the two standard implementation bugs, and it
+      changes the ranking: early steps move the weights further, so they
+      matter more per unit of alignment. The schedule is inside the number -
+      change the schedule and every term rescales - which is precisely why a
+      raw score is not a portable quantity. The weighted contributions are
+      0.30 and 0.02, totalling 0.32.
+  - text: |
+      A: 0.30, B: 2, C: 0.02, D: 0.32. Checkpoint 1 dominates only because two
+      checkpoints is too coarse a grid: the sum is approximating a sum over
+      every step, so adding checkpoints between these two would fill in the
+      trajectory and even the contributions out.
+    misconception: V8-M2
+    explain: |
+      The four numbers are right and the account is not. Checkpoint 1's
+      dominance comes from $\eta_1$ being five times $\eta_2$, and that gap
+      does not close by adding checkpoints. Checkpoints are nowhere near
+      independent samples - two a few hundred steps apart in a stable phase
+      give nearly identical gradients, so you pay twice to add the same number
+      twice. What a checkpoint buys is coverage of a distinct phase; spacing
+      matters, count barely does.
+  - text: |
+      A: 0.30, B: 8, C: 0.08, D: 0.38. Checkpoint 2's dot product is
+      $0 + 3 + 5 = 8$: the example and the query are aligned at both
+      checkpoints, so both terms add. Checkpoint 1 dominates because it has
+      both the larger learning rate and the larger alignment.
+    misconception: V8-M1
+    explain: |
+      The middle term is $(3)(-1) = -3$, not $+3$, so B is
+      $0 - 3 + 5 = 2$ and the total is 0.32. Discarding the negative component
+      assumes an example related to a query must align with it - but alignment
+      is a mechanical fact about the current parameters, and signs flip both
+      within a dot product and across checkpoints. In the chapter's worked
+      pair, B is a strong rival early and a mild ally late.
+check: choice
 ```
 
 ## Making it affordable
@@ -838,50 +920,68 @@ prompt: |
   **Corpus B.** 12 sources. Nine of the 12 contributions fell below the noise
   floor. TracIn's rank correlation against the truth table: $\rho = 0.11$.
 
-  In three or four sentences: say which number is usable evidence about the
-  method, explain what the other one is actually measuring, and state what you
-  would have to do to get a usable number on corpus B.
-answer: |
-  Corpus A's 0.71 is evidence about the method. Every entry in its truth table
-  is a resolved measurement, so the ordering TracIn is being graded against is
-  a real ordering, and agreeing with it 0.71 of the way is a fact about
-  TracIn.
-
-  Corpus B's 0.11 is not evidence about the method, because nine of the twelve
-  entries it is correlating against are below the noise floor, which means
-  their relative order is set by the random seed rather than by contribution.
-  Most of the target ranking is a permutation of noise. A perfect attribution
-  method would also score near zero against it, so the measurement cannot
-  distinguish a good method from a bad one - the same failure that makes
-  per-example leave-one-out useless as a metric, one level up.
-
-  To get a usable number on corpus B you have to fix the instrument, not the
-  method: raise the resolution of the ground truth until more sources clear
-  the floor. More seeds per condition (the standard error falls as
-  $1/\sqrt{n}$), or a larger model or token budget so the contributions
-  themselves are larger, or grading against held-out subset outcomes rather
-  than per-source deltas, since subset differences are much larger than the
-  seed noise. Failing all of that, the honest report is that this corpus
-  cannot grade an attribution method, which is itself a finding about the
-  corpus.
-rubric: |
-  Must contain: (1) 0.71 is the usable number because its ground truth is
-  resolved; (2) 0.11 is measuring noise ordering, not the method, because most
-  target entries are below the floor - and specifically that a perfect method
-  would also score near zero there; (3) at least one concrete fix aimed at the
-  ground truth (more seeds, bigger runs, or subset-level grading) rather than
-  at the attribution method.
-  (1) and (2) = pass. All three = full credit.
-  An answer concluding that TracIn works on corpus A and fails on corpus B =
-  fail. That is the exact inference this beat exists to block: 0.11 says
-  nothing about TracIn, and acting on it would mean discarding a method or
-  switching corpora for no reason.
-  An answer that proposes fixing the method (better projection, more
-  checkpoints) in response to 0.11 = fail for the same reason; the instrument
-  is what is broken.
-  Treating "below the noise floor" as "contributed nothing" = flag D16 and do
-  not pass.
-check: llm
+  Which explanation of these two numbers would you put your name to?
+options:
+  - text: |
+      Corpus A's 0.71 is evidence about the method: every entry in its truth
+      table is a resolved measurement, so the ordering TracIn is graded
+      against is a real ordering. Corpus B's 0.11 is not evidence about the
+      method at all - nine of the twelve target entries sit below the noise
+      floor, so their relative order was set by the training seed, and a
+      perfect attribution method would also score near zero against a
+      permutation of noise. To get a usable number on B you fix the
+      instrument, not the estimator: more seeds per condition (the standard
+      error falls as $1/\sqrt{n}$), a larger model or token budget, or grading
+      against held-out subset outcomes, whose differences are large compared
+      with seed noise.
+    correct: true
+    explain: |
+      Right, and the last move is the one that costs discipline: the
+      correlation can only be as good as the ground truth it is measured
+      against, so an unresolved truth table is a finding about the corpus
+      rather than a verdict on the method.
+  - text: |
+      Both numbers are facts about TracIn: it tracks ground truth on corpus A
+      and fails on corpus B. Ship it for A-like corpora and use something else
+      on B. The nine sources below the floor contributed essentially nothing,
+      which is exactly why TracIn cannot rank them - there is nothing there to
+      rank.
+    misconception: D16
+    explain: |
+      Below the noise floor means the measurement did not resolve, not that
+      the contribution was zero. Retrain with a different seed and a source's
+      marginal contribution can swing by more than its own magnitude, so the
+      order of those nine entries is seed noise. Correlating against noise
+      gives near zero for any method, good or bad, so 0.11 says nothing about
+      TracIn - and acting on it would mean discarding a method for no reason.
+  - text: |
+      0.11 says the implementation is under-resolved on corpus B. Save more
+      checkpoints so the trajectory sum is finer, raise the projection
+      dimension $d$ so the dot products are less noisy, and the correlation
+      will come up toward corpus A's.
+    misconception: V8-M2
+    explain: |
+      Both fixes are aimed at the estimator while the broken thing is the
+      instrument: nine of the twelve target ranks are noise, and no estimator
+      correlates with a permutation. The checkpoint move would not help even
+      on a sound target - checkpoints a few hundred steps apart in a stable
+      phase give nearly identical dot products, so spacing matters and count
+      barely does.
+  - text: |
+      The spread between 0.71 and 0.11 is a methods problem. Gradient
+      attribution is young; a better estimator - preconditioned, more
+      checkpoints, a smarter projection - will lift corpus B toward corpus A,
+      and until then report the 0.71 as the method's correlation since it is
+      the measurement taken under favourable conditions.
+    misconception: D20
+    explain: |
+      Two errors. The missing signal on corpus B is in the ground truth, not
+      in the estimator, so no refinement reaches it. And when an estimator's
+      signal-to-noise sits below the proven threshold, the welfare-optimal
+      contract collapses to a flat fee - no better estimator changes that,
+      only more signal does. Reporting the favourable number alone is
+      reporting a scope you did not measure.
+check: choice
 ```
 
 ## Influence is not entailment
@@ -948,54 +1048,83 @@ id: v8-b8
 type: predict
 concept: d-influence-vs-entailment
 prompt: |
-  Before reading on, commit to predictions.
+  Before reading on, commit to a prediction.
 
   Your demo answers a question and displays two ranked lists side by side: the
   top three sources by projected TracIn score, and the top three passages by
   suffix-array verbatim match. A rightsholder from source 7 is watching.
 
-  (1) Predict the most likely way the two lists disagree, in one sentence.
-  (2) Source 7 appears at the top of the TracIn list and nowhere in the
-      lexical list. State what you can honestly tell the rightsholder that
-      claim means, and one thing it does not mean.
-  (3) The reverse case: source 7 appears at the top of the lexical list and
-      nowhere in the TracIn list. Same two statements.
-answer: |
-  (1) The lexical list will surface sources that share wording with the output
-  and the TracIn list will surface sources that shaped the model's behaviour,
-  and those are frequently disjoint sets. Expect the lexical list to look
-  obviously right and the influence list to look arbitrary.
-
-  (2) TracIn at the top, absent lexically: source 7's training gradients were
-  aligned with the gradient of this output, meaning the steps taken on source
-  7's data are estimated to have measurably lowered the loss on this
-  particular output. What it does NOT mean: that source 7 contains this fact,
-  that this text is derived from source 7's text, or that any passage in
-  source 7 resembles the output. It is a claim about what moved the model, and
-  it is worth exactly the rank correlation the implementation has measured
-  against retraining ground truth.
-
-  (3) Lexical at the top, absent from TracIn: source 7 contains text closely
-  matching the output. That is a verbatim-overlap fact, it is exact, and it
-  requires no model and no trust in any estimator. What it does NOT mean: that
-  source 7 caused the model to produce this - the same passage may exist in
-  four other sources, the model may have learned the material from any of
-  them or from a source with no lexical overlap at all, and a match is
-  evidence of correspondence, not of causation.
-rubric: |
-  (1) must predict disagreement rather than agreement, and ideally name the
-  mechanism: lexical resemblance versus loss movement.
-  (2) must state influence as "moved the loss / shaped the model" AND deny
-  containment or derivation. An answer that tells the rightsholder their
-  document is where the answer came from = fail, diagnosing D5, and it is the
-  claim that would be attacked first in any room where money is involved.
-  (3) must state overlap as exact but correlational AND raise either
-  duplication across sources or the absence of causal content. An answer that
-  treats the lexical match as proof of training influence = fail, diagnosing
-  D5 in the other direction.
-  Two of the three parts fully correct, including at least one of (2) or (3)
-  with both halves = pass.
-check: llm
+  Which account gets all three right - how the lists disagree, what you can
+  honestly tell the rightsholder when source 7 tops the TracIn list and is
+  absent lexically, and what you can tell them in the reverse case?
+options:
+  - text: |
+      The lists will frequently be disjoint: the lexical list surfaces sources
+      that share wording with the output, the TracIn list surfaces sources
+      whose gradients moved the loss on it. Top by TracIn, absent lexically:
+      steps taken on source 7's data are estimated to have lowered the loss on
+      this output - a claim about what moved the model, worth exactly the rank
+      correlation the implementation has measured against retraining ground
+      truth. It does not mean source 7 contains the fact or that the text
+      derives from it. Top lexically, absent from TracIn: source 7 contains
+      text closely matching the output, an exact overlap fact needing no model
+      and no estimator. It does not mean source 7 caused the output - the same
+      passage may sit in four other sources, and correspondence is not
+      causation.
+    correct: true
+    explain: |
+      Right, and the contrast is the product: influence is contributive,
+      entailment is corroborative, the rankings systematically disagree, and
+      neither is wrong. The honest demo shows both, labels which is which, and
+      attaches the measured correlation to the influence column.
+  - text: |
+      The lists should largely agree, since both answer "which training data
+      is responsible for this output". Where they disagree the lexical list is
+      the reliable one, and it tells the rightsholder their document is where
+      the answer came from. A source at the top of the TracIn list but absent
+      lexically is a false positive of the estimator, and should be suppressed
+      before anyone outside sees it.
+    misconception: D5
+    explain: |
+      Two different targets, not one question with a reliable and an
+      unreliable answer. Influence is what moved the loss; entailment is what
+      contains the claim. Run properly at 8 billion parameters over a 160
+      billion token corpus, BM25 - a term-overlap function from the 1990s with
+      no idea a model exists - beats gradient influence at finding the
+      document containing the fact, precisely because they answer different
+      questions. Suppressing the disagreement deletes the only informative
+      part of the display.
+  - text: |
+      The TracIn list is the lexical list computed properly, since gradient
+      alignment is semantic similarity measured in the model's own
+      representation, so expect the two to differ only in ordering. Source 7
+      at the top by TracIn and absent lexically means its wording is a
+      paraphrase the string matcher missed, and you can tell the rightsholder
+      the model was reading their text.
+    misconception: V8-M1
+    explain: |
+      Gradient alignment is a claim about the parameters, not about meaning.
+      At 52-billion-parameter scale, flipping the word order of a key phrase
+      collapses influence to near zero with the content untouched, and
+      documents on unrelated subjects score as strong allies when both push
+      the same numeral format or citation convention. A paraphrase is exactly
+      the case where the two lists come apart, in either direction.
+  - text: |
+      Absence from the lexical list settles it. If no passage in source 7
+      matches the output, then source 7's data did not shape this output and
+      the TracIn ranking is picking up style rather than use; tell the
+      rightsholder there is nothing here to claim. When source 7 does top the
+      lexical list, that match is the attribution.
+    misconception: D3
+    explain: |
+      Verbatim match is a lower bound and a measurement artifact. Most of what
+      training data contributes is semantic and never resurfaces verbatim -
+      the documents that taught format, register and reasoning step share no
+      n-grams with the outputs they shaped - which is exactly why attribution
+      is hard. And a match in the other direction is corroborative: the same
+      passage may exist in several sources, so it establishes correspondence,
+      not causation.
+check: choice
 ```
 
 ## The ledger inside the run
@@ -1232,59 +1361,82 @@ type: self-explain
 concept: d-inrun-shapley
 prompt: |
   You are writing down, in advance, what the gradient index must record for
-  its numbers to be interpretable and reproducible later. A colleague proposes
-  recording the projection dimension, the checkpoint step numbers, and the git
-  commit of the scoring code.
+  its numbers to mean anything later. A colleague proposes recording the
+  projection dimension, the checkpoint step numbers, and the git commit of the
+  scoring code.
 
   That list is incomplete in one way that makes the stored index **silently
-  worthless**, and incomplete in two further ways that make its numbers
-  uninterpretable. Name all three and say what goes wrong in each case.
-
-  Answer from this unit's text; do not reference any index you have or have
-  not built.
-answer: |
-  **The silent-corruption omission: the projection seed.** Dot products are
-  preserved only when both vectors pass through the SAME random projection.
-  The matrix is larger than the model, so it is regenerated from a seed rather
-  than stored. Without the seed recorded, a query gradient projected at
-  scoring time goes through a different random map than the source
-  accumulators did, and the dot products between them are meaningless - but
-  they are still finite, ordered numbers that produce a plausible-looking
-  ranking. Nothing errors, nothing is obviously wrong, and every downstream
-  claim is noise. This is the one that has to be in the manifest.
-
-  **The learning rate at each checkpoint.** The score is a sum of
-  learning-rate-weighted dot products, so the weights are part of the number.
-  Step numbers alone do not recover them unless the schedule is also recorded.
-  Without them, a score cannot be recomputed, and two checkpoints from
-  different phases cannot be compared or combined.
-
-  **Whether the dot product was optimizer-preconditioned.** The plain dot
-  product implements the SGD update rule; the model was trained with AdamW,
-  whose update divides each coordinate by its running second-moment estimate.
-  The two forms produce different rankings, and correcting the mismatch moved
-  published results by 10 to 300%. A stored score with no flag saying which
-  form produced it cannot be compared against any other score, including a
-  later one from the same codebase.
-
-  Also acceptable in place of one of the last two: the validation or query set
-  the scores were computed against, since influence is defined relative to
-  what "helped" was measured on, exactly as the counterfactual table is
-  defined relative to its held-out file.
-rubric: |
-  Must identify the projection seed as the silent-corruption item, with the
-  reason: different projections make cross-vector dot products meaningless
-  while still producing plausible numbers. Missing this = fail regardless of
-  the rest; it is the failure mode that ships a confident wrong answer.
-  Must name two of: per-checkpoint learning rate; optimizer preconditioning
-  (SGD versus AdamW form); the validation or query set used.
-  Seed with its reason plus two others with their reasons = pass.
-  Naming an item without saying what goes wrong = half credit for that item.
-  An answer that frames these as reproducibility hygiene rather than as
-  prerequisites for the numbers meaning anything = partial, do not pass. A
-  reproducible pipeline that regenerates a different projection matrix each
-  run is reproducibly wrong.
-check: llm
+  worthless**, and incomplete in further ways that make its numbers
+  uninterpretable. Which account of what is missing, and of what goes wrong in
+  each case, is right?
+options:
+  - text: |
+      The silent-corruption omission is the **projection seed**. Dot products
+      survive projection only when both vectors pass through the same matrix
+      $P$; $P$ is larger than the model, so it is regenerated from a seed
+      rather than stored. Without the seed, a query gradient projected at
+      scoring time goes through a different random map than the source
+      accumulators did, and the dot products are meaningless - yet still
+      finite, ordered, and productive of a plausible ranking. Also missing:
+      the **learning rate at each checkpoint**, since the score is a sum of
+      $\eta_c$-weighted dot products and step numbers alone do not recover the
+      weights; and **whether the dot product was optimizer-preconditioned**,
+      because the plain form implements the SGD update while the model trained
+      with AdamW, and the two produce different rankings.
+    correct: true
+    explain: |
+      Right, and the seed is the dangerous one because nothing errors: the
+      pipeline returns confident numbers that are noise. The other two are
+      what let a score be recomputed and compared at all - correcting the
+      SGD-versus-AdamW mismatch moved published results by 10 to 300%. The
+      validation or query set the scores were computed against belongs in the
+      same manifest, for the same reason.
+  - text: |
+      The critical omission is the **number of checkpoints and their spacing**:
+      the sum over checkpoints approximates a sum over steps, so an index
+      built from too few is a coarse approximation and its scores are
+      systematically wrong. Record the checkpoint count, then add the
+      projection seed and the learning rates as useful extras for anyone
+      wanting to reproduce the run exactly.
+    misconception: V8-M2
+    explain: |
+      Checkpoints are not independent samples of the trajectory - two a few
+      hundred steps apart in a stable phase give nearly identical gradients,
+      so doubling them adds the same number twice. What a checkpoint buys is
+      coverage of a distinct phase; spacing matters, count barely does. And
+      the seed is not an extra: without it the stored accumulators and the
+      query gradient live in different random spaces, and every number the
+      index produces is noise wearing a ranking.
+  - text: |
+      Nothing critical is missing. With the projection dimension, the
+      checkpoint steps and the code commit recorded, the scores are quantities
+      that can be compared against later runs, other queries and other models;
+      the projection seed only affects the exact decimals, and the learning
+      rates are already implied by the schedule in the code.
+    misconception: V8-M3
+    explain: |
+      A TracIn score is a sum of learning-rate-weighted dot products in one
+      model's parameter space - no units, no shared zero. Change the seed and
+      the number moves inside the same model on the same corpus for the same
+      query; change the model and it is a different space of a different
+      dimension. Worse, a different seed at scoring time does not perturb the
+      decimals, it severs the relationship between the two vectors entirely.
+  - text: |
+      The omissions are the projection seed, the per-checkpoint learning rates
+      and the validation set - all three worth recording as reproducibility
+      hygiene. The numbers in the index are already computed and are what they
+      are; the manifest just makes the run easier to repeat and easier to
+      defend if anyone asks later how it was done.
+    misconception: D19
+    explain: |
+      The items are right and their status is wrong, which is the whole point.
+      A pipeline that regenerates a different projection matrix on each run is
+      reproducibly wrong: the stored numbers are not "already computed and
+      correct" without the seed, they are noise. These are preconditions for
+      the numbers meaning anything, in the same way a threshold committed
+      before seeing the model is what turns a statistic into an exhibit and
+      one chosen afterwards proves nothing.
+check: choice
 ```
 
 ## What you can now do

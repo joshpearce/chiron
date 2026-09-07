@@ -69,41 +69,62 @@ id: v5-b1
 type: predict
 concept: d-coop-game
 prompt: |
-  Before reading on, commit to an answer. Using only the eight numbers in the
-  table, split the $100 among A, B and C. Write down three dollar figures that
-  sum to 100.
+  Before reading on, commit to an answer. The table is: none 0; A 50; B 50;
+  C 20; A+B 70; A+C 90; B+C 90; A+B+C 100, and a licensee has agreed to pay
+  $100 for the whole corpus.
 
-  Then write down the rule you used, in one sentence, as if you had to put it
-  in a contract that A, B and C all sign.
-answer: |
-  The dollar figures are not graded and there is no single right answer at this
-  point in the unit - that is the point of asking now. What matters is that you
-  wrote down a rule, because the rest of this section is going to break the
-  three rules people usually reach for.
-
-  The rules people reach for, in order of frequency:
-
-  1. Split it equally: $33.33 each. Ignores the table entirely.
-  2. Split it in proportion to what each source is worth alone (50, 50, 20):
-     $41.67, $41.67, $16.66.
-  3. Split it in proportion to what is lost when each source is removed
-     (100 - 90 = 10 for A, 10 for B, 100 - 70 = 30 for C), renormalized:
-     $20, $20, $60.
-
-  The answer this unit arrives at is $35, $35, $30, and it is the only split
-  that satisfies four requirements you will almost certainly agree to before
-  you see the formula.
-rubric: |
-  Grade only the second half - whether a stated rule exists and is a function
-  of the table rather than of the story. Any of the three rules above, or a
-  hybrid, passes.
-  An answer with dollar figures and no stated rule = fail, and re-deliver the
-  prompt: the whole unit is about the rule, and a split you cannot write down
-  as a rule cannot go in a contract.
-  An answer that refuses to commit ("not enough information") = fail. There is
-  enough information; there are too MANY defensible answers, which is a
-  different problem and the one being set up.
-check: llm
+  Which rule would you write into a contract that A, B and C all sign, and
+  what does it pay? Commit now, before the section breaks the rules people
+  usually reach for.
+options:
+  - text: |
+      Pay each source the average of what it adds when the sources are
+      imagined arriving one at a time, averaged over every arrival order:
+      $35 to A, $35 to B, $30 to C.
+    correct: true
+    explain: |
+      This is the split the unit arrives at, and the only one of these that
+      neither bills the overlap twice nor leaves part of the pool unassigned.
+      A and B behave identically in every coalition, so they are paid equally;
+      C is worth only 20 alone but takes A from 50 to 90, so it is paid close
+      to them. Four requirements you are about to read force this rule and no
+      other.
+  - text: |
+      Split it equally: $33.33 each. The measurements cannot settle a
+      division, and equal pooling is what deployed schemes already do.
+    misconception: D10
+    explain: |
+      An equal split is not a function of the table at all. Add a fourth
+      source of 500,000 words of press-release boilerplate that changes no
+      model in any combination and it collects $25 of the pool. Pooling by
+      share imports exactly the cross-subsidy and farming incentives the
+      incumbent music model is criticized for, and here the padding that farms
+      it costs nothing to generate.
+  - text: |
+      Pay in proportion to what each source is worth alone - 50, 50, 20 -
+      giving $41.67, $41.67 and $16.66.
+    misconception: D9
+    explain: |
+      A and B share 30 units of content, and this rule bills those 30 units
+      inside A's 50 and again inside B's 50. The solo values sum to 120
+      against a pool of 100, and the rule disposes of the excess by scaling
+      everything down, which charges C for an overlap it has no part in.
+      Which source is credited for content two sources both supply is a payout
+      decision, and this rule makes it silently, and makes it twice.
+  - text: |
+      Pay in proportion to what is lost when each source is removed:
+      $100 - 90 = 10$ for A, 10 for B, $100 - 70 = 30$ for C, renormalized to
+      $20, $20 and $60.
+    misconception: V5-M4
+    explain: |
+      Leave-one-out measures replaceability, and here its values sum to 50
+      against a pool of 100. Half the pool is unassigned, and the
+      renormalization that patches that is where the money moves: it doubles
+      C's measured 30 into a paid 60 for a reason that appears nowhere in the
+      data. Push it to two sources holding byte-identical corpora and both
+      values are 0, so the renormalization divides by zero and there is no
+      split at all.
+check: choice
 ```
 
 Here is what those three rules pay, side by side.
@@ -369,34 +390,61 @@ prompt: |
   paid its share of the corpus's total tokens. They point out, correctly, that
   this is cheap to compute, fully transparent, and impossible to dispute.
 
-  Using the null player requirement, explain in two or three sentences what
-  goes wrong, and name the specific thing the partner can do that a
-  measurement-based split would catch and this one will not.
-answer: |
-  Token count is a property the source controls and the model does not respond
-  to. A source can generate half a million words of boilerplate, press
-  releases, or templated filler, add it to its submission, and raise its payout
-  in exact proportion, while every coalition's measured value is unchanged -
-  formally, it is a null player, since v(S union {D}) = v(S) for every S, and
-  the null player requirement says its share must be zero. A measurement-based
-  split assigns it zero automatically because the padding moves no held-out
-  loss; a volume-based split assigns it whatever fraction of the corpus the
-  padding represents. Transparency is not the problem with the proposal - it is
-  perfectly transparent, and perfectly gameable, which are unrelated
-  properties.
-rubric: |
-  Must contain: (1) the padded content is a null player - adding it leaves
-  every coalition's value unchanged, (2) token count is under the source's
-  unilateral control, so payout can be inflated at will, (3) the null player
-  requirement forces a zero share for such content.
-  (1) and (2) = pass. All three = full credit.
-  An answer objecting only that token count "does not measure quality", with no
-  reference to the manipulation or to the null player condition, = partial; the
-  learner has the sentiment and not the argument.
-  An answer defending token count as fair because it is transparent and
-  auditable = fail. Auditability and incentive-compatibility are different
-  properties, and this is the confusion the section exists to break.
-check: llm
+  Which explanation of what goes wrong is the one the null player requirement
+  supports?
+options:
+  - text: |
+      Token count is under the source's unilateral control and the model does
+      not respond to it. A source can add half a million words of boilerplate,
+      raising its payout in exact proportion while every coalition's measured
+      value is unchanged - formally $v(S \cup \{D\}) = v(S)$ for every $S$, so
+      the null player requirement says its share must be zero. A
+      measurement-based split pays it nothing automatically; a volume-based
+      split pays it whatever fraction of the corpus the padding represents.
+    correct: true
+    explain: |
+      Right, and note which of the partner's three claims survives: the scheme
+      really is transparent and really is undisputable, and it is still
+      gameable for the price of a text generator. Transparency and
+      incentive-compatibility are unrelated properties, and the null player
+      requirement is the one that buys the second.
+  - text: |
+      Nothing goes wrong that matters. The scheme is transparent and auditable,
+      every party can check the token counts, and a rule nobody can dispute is
+      exactly what a contract needs; padding is a commercial problem for the
+      negotiators, not a defect in the rule.
+    misconception: D10
+    explain: |
+      This is the incumbent pooling argument, and it is what makes stream
+      farming profitable. Auditability tells you the arithmetic was done
+      correctly; it says nothing about whether the input is under the paid
+      party's control. Here it is: the padding is cheap, undetectable from the
+      token counts themselves, and it moves real money from the sources that
+      changed the model to the source that generated filler.
+  - text: |
+      Nothing goes wrong, because the null player requirement already covers
+      it: a padded source contributes nothing, so it is a null player, so it
+      is paid nothing - and that is true of any rule, token count included.
+    misconception: V5-M3
+    explain: |
+      The requirement is a property a rule may or may not have, not a fact
+      about the world that binds every rule. Token-count billing plainly does
+      not have it: the padding source has $v(S \cup \{D\}) = v(S)$ for every
+      $S$ and still collects its token share. The four requirements are
+      properties a contract adopts, and adopting them is what rules the
+      proposal out.
+  - text: |
+      The failure is efficiency: once a source pads, the token shares no longer
+      correspond to the value of the corpus, so the payments stop summing to
+      $v(N)$ and the split is no longer fair.
+    misconception: V5-M2
+    explain: |
+      Token shares are fractions of the corpus, so they sum to the pool no
+      matter how much padding is added - efficiency holds throughout, and the
+      padding is paid out of the honest sources' pockets. That is the point:
+      efficiency is an accounting constraint with no fairness content. The
+      requirement being violated is the null player condition.
+check: choice
 ```
 
 **Requirement 4: additivity. Splitting two payments separately gives the same
@@ -616,9 +664,8 @@ prompt: |
   A different three-source corpus. The value table is: none 0; A 40; B 30;
   C 30; A+B 60; A+C 80; B+C 50; A+B+C 90.
 
-  Fill the four blanks in the arrival-order table. Each entry is the value of
-  everything up to and including that source, minus the value of everything
-  before it.
+  Each entry below is the value of everything up to and including that source,
+  minus the value of everything before it in that row's order.
 
       Order        A gets        B gets        C gets
       A, B, C      40 - 0 = 40   60 - 40 = 20  90 - 60 = 30
@@ -629,30 +676,43 @@ prompt: |
       C, B, A      90 - 50 = 40  50 - 30 = 20  30 - 0 = 30
       Sum          240           ____          ____            <- C, D
 
-  Then give the three averages and confirm they sum to 90.
-
-  Answer with the four blanks in order (A, B, C, D), comma-separated, then the
-  three averages.
-answer: |
-  A = 30 (that is 90 - 60, C arriving last into {A,B})
-  B = 10 (that is 90 - 80, B arriving last into {A,C})
-  C = 120 (the B column: 20 + 10 + 30 + 30 + 10 + 20)
-  D = 180 (the C column: 30 + 40 + 30 + 20 + 30 + 30)
-
-  Averages: A = 240/6 = 40, B = 120/6 = 20, C = 180/6 = 30.
-  They sum to 90, which equals v(A,B,C). Efficiency holds.
-rubric: |
-  All four blanks must be exactly 30, 10, 120, 180, and the three averages
-  exactly 40, 20, 30.
-  The sum check to 90 must be stated. An answer with correct blanks whose
-  averages do not sum to v(N) has an arithmetic error somewhere and should be
-  failed rather than partially credited - the sum check is the built-in
-  verification and the reason to run it.
-  A learner who computes blank A as 90 - 50 = 40 has taken the marginal against
-  the wrong predecessor set (they used {B,C} rather than {A,B}); re-deliver the
-  paragraph explaining that the predecessor set is everything EARLIER in that
-  row's order.
-check: llm
+  Which filling of the four blanks, with the three averages, is correct?
+options:
+  - text: |
+      A = 30, B = 10, C = 120, D = 180. Averages: A = 240/6 = 40,
+      B = 120/6 = 20, C = 180/6 = 30, and $40 + 20 + 30 = 90 = v(\{A,B,C\})$.
+    correct: true
+    explain: |
+      Blank A is C arriving last into $\{A,B\}$: $90 - 60 = 30$. Blank B is B
+      arriving last into $\{A,C\}$: $90 - 80 = 10$. The columns then sum to
+      240, 120 and 180, and the averages sum to $v(N) = 90$. That sum check is
+      the built-in verification: every row sums to 90 by telescoping, so the
+      averages must too.
+  - text: |
+      A = 40, B = 10, C = 120, D = 190. Averages: A = 40, B = 20,
+      C = 190/6 = 31.67, summing to 91.67 - close enough to 90 to be rounding.
+    misconception: V5-M1
+    explain: |
+      Blank A took the marginal against $\{B,C\}$, giving $90 - 50 = 40$, but
+      the row is B, A, C - the sources arriving before C in it are A and B, so
+      the predecessor set is $\{A,B\}$ and the marginal is $90 - 60 = 30$. The
+      marginal contribution depends only on the set that arrived first, and
+      reading that set off the wrong row is the same confusion as thinking the
+      count of orders is what has to be computed. Nothing here rounds: an
+      average that misses $v(N)$ is an arithmetic error.
+  - text: |
+      A = 30, B = 30, C = 140, D = 180. Averages: A = 40, B = 140/6 = 23.33,
+      C = 30, summing to 93.33 - the shares are still well distributed, so the
+      split is fair.
+    misconception: V5-M2
+    explain: |
+      Blank B is B arriving last into $\{A,C\}$, so it is $90 - 80 = 10$, not
+      $60 - 30 = 30$, which is B's marginal in a different row. And the failed
+      sum is not cosmetic: efficiency is an accounting identity, not a
+      description of how evenly the money landed, so averages that miss
+      $v(N) = 90$ mean a subtraction went wrong somewhere and the whole column
+      has to be rechecked.
+check: choice
 # fade: v5-shapley-by-hand, stage 2 of 3. The blanked cells are the two
 # last-arrival marginals, which are the ones that require reading the
 # predecessor set off the order rather than off the table.
@@ -985,42 +1045,64 @@ prompt: |
   once with a single seed, arguing that with 4,096 measurements averaging into
   each source's share, the individual runs' noise will wash out.
 
-  Explain in three or four sentences whether the argument holds, using the
-  weight structure from section 5 and the propagation formula from this
-  section. Then say which of the two errors - seed noise or combinatorial
-  approximation - is already zero in this plan, and what that implies about
-  where the budget should go.
-answer: |
-  The argument is partly right and wrong where it counts. Averaging does
-  suppress noise - a Shapley value carries about 0.745 times the per-table-entry
-  standard deviation, less than a single leave-one-out difference does - but
-  the suppression is bounded by the weight structure and it does not fall with
-  the number of coalitions the way the colleague expects. The weights are
-  extremely uneven: at 12 sources the empty coalition carries weight 1/12 while
-  each of the 462 size-5 coalitions carries 1.8e-4, so one unlucky run on one
-  extreme coalition moves a source's share by 462 times what an unlucky
-  mid-size run does. There is no law of large numbers protecting the terms that
-  carry the most weight, because there are only a handful of them.
-
-  The combinatorial approximation error in this plan is already exactly zero -
-  all 4,096 coalitions are enumerated, nothing is sampled, nothing is estimated.
-  So the entire remaining error is seed noise, and the only lever that reduces
-  it is more seeds per coalition, which shrinks every term at once as
-  1/sqrt(k). The budget goes to seeds.
-rubric: |
-  Must contain: (1) the Shapley weights are extremely uneven, so a few
-  coalitions dominate and noise on them is not averaged away, (2) with full
-  enumeration the approximation error is already zero, so all remaining error
-  is seed noise, (3) therefore additional budget buys seeds, not coalitions.
-  (2) and (3) = pass. All three = full credit.
-  Crediting the averaging with reducing noise, without the weight-structure
-  caveat, = partial; the learner has half the mechanism and will under-budget
-  seeds.
-  An answer asserting that seed noise is a defect to be removed by a longer
-  run, a bigger model, or a better estimator = fail, diagnosing D16. Contribution
-  is a random variable at every scale; the remedy is seeds and a reported error
-  bar, never a cleaner run.
-check: llm
+  Which assessment holds, given the weight structure and the propagation
+  formula $\text{SD}(\phi_i) = \sigma\sqrt{\sum_S c_S^2}$?
+options:
+  - text: |
+      Averaging suppresses noise only as far as the weights allow, and the
+      weights are extremely uneven: at 12 sources the empty coalition carries
+      $1/12$ while each of the 462 size-5 coalitions carries $1.8 \times
+      10^{-4}$, so one unlucky run on an extreme coalition moves a share by 462
+      times what an unlucky mid-size run does, and there is no law of large
+      numbers protecting a handful of dominant terms. With all 4,096 enumerated
+      the combinatorial approximation error is already exactly zero, so every
+      remaining unit of error is seed noise - and the budget buys seeds, which
+      shrink every term at once as $1/\sqrt{k}$.
+    correct: true
+    explain: |
+      Right on both halves. A Shapley value does carry about $0.745\sigma$,
+      less noise than the single leave-one-out difference underneath it, so the
+      colleague's instinct is not baseless - it is bounded by the weight
+      structure, and it stops there. With nothing sampled there is no second
+      error to spend against, so a fixed budget of runs goes to $k$.
+  - text: |
+      The argument holds. With 4,096 independent measurements feeding each
+      share, per-run noise cancels to a negligible level, and the resulting
+      shares are stable enough to put in a schedule and bill against until
+      renewal.
+    misconception: D16
+    explain: |
+      Contribution is a random variable, not a property waiting to be measured
+      precisely. The shares are built entirely out of differences between
+      models, which is exactly what is noisy: a source's marginal contribution
+      can swing by more than its own magnitude across seeds, and data order
+      alone introduces the largest variation in an influence measurement. The
+      count of coalitions does not rescue this, because the weight on the terms
+      that dominate is not shrinking with it.
+  - text: |
+      The argument fails, and the fix is to make the runs themselves cleaner -
+      train longer, use a larger model, or move to a better estimator - so that
+      each table entry is precise enough that seed averaging is unnecessary.
+    misconception: D20
+    explain: |
+      No cleaner run and no better estimator removes this. The noise is in the
+      quantity being measured, and the only levers are more seeds, which shrink
+      $\sigma$ as $1/\sqrt{k}$, and reporting the resulting error bar. Below a
+      signal-to-noise threshold, better processing of the same signal cannot
+      change the welfare-optimal contract; only more signal can.
+  - text: |
+      The argument fails because 4,096 coalitions is itself an approximation to
+      the $12! = 479{,}001{,}600$ arrival orders the rule averages over, so the
+      remaining error is combinatorial and the budget should buy more sampled
+      orders.
+    misconception: V5-M1
+    explain: |
+      Enumerating all $2^{12} = 4{,}096$ coalitions is exact, not an
+      approximation: every one of the 479 million orders is answered by lookup,
+      because a source's marginal contribution depends only on the set that
+      arrived before it. The combinatorial error in this plan is zero, which is
+      precisely why the entire remaining error is seed noise.
+check: choice
 ```
 
 ## Gaming the split
@@ -1160,10 +1242,8 @@ prompt: |
   Source C - allocated $30 in the honest split - tries the same attack,
   registering as two shells C1 and C2 that both offer the identical journal
   archive. The value table is read off the cached three-source one exactly as
-  before: none 0; A 50; B 50; C 20; A+B 70; A+C 90; B+C 90; A+B+C 100.
-
-  Fill the blanks in C1's marginal contributions. C1 adds nothing to any
-  coalition already containing C2.
+  before: none 0; A 50; B 50; C 20; A+B 70; A+C 90; B+C 90; A+B+C 100. C1 adds
+  nothing to any coalition already containing C2.
 
       S            |S|   weight   C1's marginal contribution
       {}            0     1/4     20 - 0 = 20
@@ -1178,30 +1258,60 @@ prompt: |
       phi_C1 = (1/4)(20) + (1/12)(0 + ____ + 40 + 0 + 0 + ____) + (1/4)(0)
              = ____                                     <- C, D, E
 
-  Give the five blanks in order, then state whether C's total across the two
-  shells is higher or lower than the $30 it was allocated honestly, and by how
-  much.
-answer: |
-  A = 40
-  B = 30
-  C = 40 (the same value as blank A, re-entered in the sum)
-  D = 30 (the same value as blank B)
-  E = phi_C1 = 5 + (1/12)(110) = 5 + 9.167 = 14.167
-
-  Two shells collect 2 x 14.167 = 28.33, which is LOWER than the honest $30 by
-  1.67. Fragmenting C loses money.
-rubric: |
-  Blanks must be exactly 40, 30, 40, 30, and 14.167 (accept 14.17 or 85/6).
-  The verdict must be that C's total FALLS, to 28.33, a loss of about 1.67.
-  All five blanks plus the correct direction = pass.
-  Getting the arithmetic right but predicting a gain because "the attack
-  inflates payouts" = fail. The attack does not always pay: it unwinds a
-  redundancy discount, and C has no redundancy with anyone to unwind - it is
-  the complementary source. Splitting a complement gives away the very
-  scarcity that made it valuable. A learner who cannot say WHICH sources
-  profit from fragmenting has not understood why the attack works and will not
-  be able to design the defence.
-check: llm
+  Which filling of the five blanks, with the verdict on C's total, is correct?
+options:
+  - text: |
+      A = 40, B = 30, C = 40, D = 30, and
+      $\phi_{C1} = 5 + \tfrac{1}{12}(110) = 5 + 9.167 = 14.167$. The two shells
+      collect $28.33 together, which is $1.67 LOWER than the $30 C was
+      allocated honestly - fragmenting C loses money.
+    correct: true
+    explain: |
+      Right, and the direction is the lesson. The attack works by unwinding a
+      redundancy discount, and C has no redundancy with anyone to unwind - it
+      is the complementary source, worth 20 alone and 40 in company. Splitting
+      a complement gives away the scarcity that made it valuable, so the
+      sources that profit from fragmenting are the ones with substitutes, which
+      is what tells you where to point the defence.
+  - text: |
+      A = 40, B = 10, C = 40, D = 10, and
+      $\phi_{C1} = 5 + \tfrac{1}{12}(90) = 5 + 7.5 = 12.5$. The two shells
+      collect $25.00, which is $5.00 lower than the honest $30.
+    misconception: V5-M1
+    explain: |
+      Blank B took the marginal against $\{A,B,C2\}$, giving $100 - 100 = 10$
+      by way of a slip, but the row's coalition is $\{A,B\}$ with value 70, so
+      the marginal is $100 - 70 = 30$. Each row's marginal is fixed by the set
+      named in it and nothing else; reading it off a neighbouring set is the
+      same error as believing the arrival order rather than the predecessor set
+      determines the number.
+  - text: |
+      A = 40, B = 30, C = 40, D = 30, and $\phi_{C1} = 20.833$ by the same
+      computation that gave A1 its share. The two shells collect $41.67, the
+      same 19% raise A got, since the mechanism is identical.
+    misconception: D9
+    explain: |
+      Transplanting A1's number skips the arithmetic that decides the case: put
+      the four surviving marginals through the weights and $\phi_{C1} = 5 +
+      \tfrac{1}{12}(110) = 14.167$, so C's shells collect $28.33 and C loses
+      $1.67. A gained because a second copy of A made B - the source carrying
+      30 units of the same content - more replaceable, and the raise came out
+      of B's share. Who is credited for content two sources both supply is the
+      whole mechanism, and C supplies content nobody else has.
+  - text: |
+      A = 40, B = 30, C = 40, D = 30, but $\phi_{C1} = 0$ and $\phi_{C2} = 0$:
+      removing either shell leaves the other, so each adds nothing and the null
+      player condition pays each of them zero. C collects nothing.
+    misconception: V5-M4
+    explain: |
+      That is the leave-one-out number, and leave-one-out is not the
+      allocation - this is exactly the byte-identical P and Q case, where both
+      sources are individually worthless by the counterfactual test, both are
+      individually sufficient by inspection, and the sum is 0. The null player
+      condition requires $v(S \cup \{i\}) = v(S)$ for EVERY coalition $S$, and
+      C1 adds 20 to the empty coalition and 30 to $\{A,B\}$, so it is not a
+      null player. Averaging the marginals gives 14.167 each.
+check: choice
 # fade: v5-shell-recompute, stage 2 of 3. The blanked cells are the two
 # nonzero marginals and the final weighted sum; the zeros are given because
 # recognizing them is taught, not tested, at this stage.
@@ -1323,49 +1433,68 @@ type: self-explain
 concept: d-split-gaming
 prompt: |
   You have run the full sweep. The shares across sources have a spread
-  (standard deviation across sources) of 3.10 units, and each individual
-  share has a standard deviation of 2.05 units from seed noise.
+  (standard deviation across sources) of 3.10 units, and each individual share
+  has a standard deviation of 2.05 units from seed noise.
 
-  Compute the signal-to-noise ratio, state which side of a bar of 2 it falls
-  on, and say what you would put in front of a prospective data partner as the
-  headline. Then say what changes if the spread had been 3.10 and the
-  per-share standard deviation 1.20.
-
-  Answer from the unit's text. Do not reference any sweep you have or have not
-  run.
-answer: |
-  SNR = 3.10 / 2.05 = 1.51, which is below 2. At this seed count the corpus
-  does not support a contribution-proportional split: the differences between
-  sources are not resolvable against seed noise, and paying sources different
-  amounts on this evidence pays out a difference that cannot be demonstrated.
-
-  The headline is the measurement itself: "we measured our attribution
-  signal-to-noise at 1.5, below the threshold at which contribution-proportional
-  payment beats a flat fee, so the correct contract for this corpus at this
-  scale is a flat fee." That is a result, not a failure - the threshold theorem
-  says no better estimator changes it, only more signal does, and the honest
-  options are more seeds or a corpus with more differentiated sources. Quoting
-  the number required to reach SNR 2 - a seed count and its GPU-hour cost -
-  turns the negative result into a priced decision.
-
-  With per-share SD of 1.20 the SNR is 3.10/1.20 = 2.58, above the bar. Now the
-  split itself is the headline, reported with its error bars, and the SNR is
-  the credential that says the error bars were checked.
-rubric: |
-  Required: SNR = 1.51 (accept 1.5), identified as below the bar; and
-  SNR = 2.58 (accept 2.6), identified as above it.
-  Must also contain: the below-bar verdict is a reportable result and points at
-  a flat fee, not a hidden failure.
-  Both numbers plus the flat-fee verdict = pass. Naming the remedy as more
-  seeds or more signal (never a better estimator) upgrades to full credit.
-  An answer proposing to fix a below-threshold SNR with a better attribution
-  method = fail, diagnosing D20. The threshold is a property of the signal
-  available in the measurement; processing it more cleverly does not create
-  signal.
-  An answer that reports the split anyway with a caveat = fail. A caveat under
-  a pie chart is not the same claim as a flat-fee recommendation, and this is
-  the specific error the section exists to prevent.
-check: llm
+  Using $\text{SNR} = \text{spread} / \text{SD}(\phi_i)$ and the customary bar
+  of 2, which reading would you put in front of a prospective data partner -
+  and which stays right if the per-share standard deviation had been 1.20
+  instead?
+options:
+  - text: |
+      $\text{SNR} = 3.10 / 2.05 = 1.51$, below the bar: at this seed count the
+      differences between sources are not resolvable against seed noise, so the
+      headline is the measured SNR itself and the recommendation is a flat fee,
+      quoted alongside the seed count and GPU-hours needed to reach 2. With a
+      per-share SD of 1.20, $\text{SNR} = 3.10 / 1.20 = 2.58$, above the bar,
+      and the split itself becomes the headline, reported with its error bars.
+    correct: true
+    explain: |
+      Both numbers, and the right thing done with each. A below-bar result is a
+      product, not a failure: the threshold theorem says the welfare-optimal
+      contract at that signal-to-noise is a flat fee, and pricing the seeds
+      that would cross the bar turns the negative result into a decision the
+      partner can make. Above the bar, the SNR is the credential that says the
+      error bars were checked.
+  - text: |
+      $\text{SNR} = 1.51$, below the bar, which means the estimator is not good
+      enough yet: present the split as provisional and commit to replacing the
+      attribution method with a stronger one, after which the same corpus will
+      clear the bar. At 1.20 the better method has effectively already arrived,
+      giving 2.58.
+    misconception: D20
+    explain: |
+      The threshold is a property of how much signal is in the measurement, not
+      of how cleverly it is processed - below it the welfare-optimal contract
+      collapses to a flat fee, and no estimator improvement crosses it. The
+      honest remedies are more seeds, larger effects, or a corpus with more
+      differentiated sources. Promising a better method is the claim the person
+      across the table is most likely to know is unavailable.
+  - text: |
+      $\text{SNR} = 1.51$ and $2.58$. Report the split either way, with a
+      footnote that the shares carry seed noise: the numbers are the best
+      current estimate of each source's contribution, and a caveat under the
+      chart discloses the uncertainty honestly.
+    misconception: D16
+    explain: |
+      A caveat under a pie chart is a different claim from a flat-fee
+      recommendation, and at $\text{SNR} = 1.51$ paying A and C differently
+      pays out a difference the measurement cannot demonstrate. The share is a
+      random variable, not a best estimate of a fixed property, and the
+      disclosure that matters is which side of the threshold the measurement
+      falls on.
+  - text: |
+      $\text{SNR} = 1.51$ and $2.58$, and both are fine to bill on: the shares
+      sum exactly to the pool in either case, so the allocation is efficient
+      and therefore defensible whatever the noise level is.
+    misconception: V5-M2
+    explain: |
+      Efficiency holds for any split that adds up, including one that hands the
+      whole pool to a single source; it is an accounting constraint with no
+      fairness content and no bearing on whether the differences between shares
+      are real. At 1.51 the shares sum to the pool and are still 1.51 noise
+      units apart, which is what the bar of 2 exists to catch.
+check: choice
 ```
 
 ## The honest position
@@ -1481,47 +1610,24 @@ prompt: |
   the shell company attack to be demonstrable afterwards without buying any
   additional GPU time.
 
-  State what the cached artifact has to contain, explain why the
-  duplicate-shell version of the attack needs no new training runs while a
-  version where the attacker genuinely partitions its catalogue into two
-  disjoint halves does, and say how many coalitions that second version would
-  require at 12 original sources.
-
-  Answer from the unit's text; do not reference any sweep you have or have not
-  performed.
-answer: |
-  The cached artifact is the full value table: one seed-averaged value per
-  coalition for all 4,096 subsets of the 12 sources, keyed by the exact source
-  set, together with the per-run seed noise used to average them.
-
-  Duplicate shells need no new runs because the shells carry identical content.
-  Any coalition of the expanded player set has the same content as the
-  coalition you get by collapsing duplicate shells to one, so its value is
-  already in the cache - the expanded table is a relabelling of the cached one,
-  not a new measurement. That is what makes the attack cheap for the attacker
-  as well as cheap to demonstrate.
-
-  A genuine partition is different: half a catalogue is content the model has
-  never been trained on in isolation, so v(half) and every coalition containing
-  exactly one half is a value that was never measured. Splitting one source
-  into two disjoint halves gives 13 players, so the exact table needs
-  2^13 = 8,192 coalitions - double the original sweep, and only 4,096 of them
-  are already cached.
-rubric: |
-  Must contain: (1) the cached artifact is the seed-averaged value for every
-  coalition, keyed by source set; (2) duplicate shells map onto existing
-  coalitions because the content is identical, so the expanded table is a
-  relabelling and needs no training; (3) a genuine partition creates content
-  combinations never trained, and at 13 players requires 2^13 = 8,192
-  coalitions.
-  (2) and (3) = pass, with 8,192 stated exactly. All three = full credit.
-  Answering 2^12 = 4,096 for the partition case = fail; the partition adds a
-  player and the count doubles, and getting this wrong is getting the
-  economics of the defence wrong.
-  An answer that cannot say why the duplicate case is free = fail; that
-  property is the reason the attack is cheap in the field and the reason it
-  must be defended against procedurally rather than by making it expensive.
-check: llm
+  Which account correctly states what the cached artifact must contain, why
+  the duplicate-shell attack needs no new training runs, and what a genuine
+  partition of one catalogue into two disjoint halves would cost at 12
+  original sources?
+options:
+  - text: "Cache one seed-averaged $v(S)$ for all 4,096 subsets, keyed by the exact source set, plus the per-run seed noise it was averaged from. Duplicate shells carry identical content, so every coalition of the expanded player set collapses to a coalition already in the cache - the expanded table is a relabelling, not a new measurement. A genuine partition creates content combinations never trained in isolation, and at 13 players the exact table needs $2^{13} = 8{,}192$ coalitions, of which only the original 4,096 are cached."
+    correct: true
+    explain: "Right on all three. The cache is keyed by source set so a relabelled coalition is a lookup; identical content is what makes the duplicate case free for the attacker and for you; and adding a player doubles the sweep, so the partition costs another 4,096 runs."
+  - text: "Cache the 4,096 seed-averaged values keyed by source set. Duplicate shells are free because the expanded table is a relabelling of the cached one. A genuine partition is also free: the two halves together are the same catalogue, so every coalition still maps back onto one of the $2^{12} = 4{,}096$ cached rows."
+    misconception: V5-M1
+    explain: "The lookup argument is being applied where it does not hold. A relabelling works only when the shells carry identical content; two disjoint halves are new content sets, and $v(\\text{half}_1)$ or $v(\\text{half}_1 \\cup B)$ was never trained. The partition adds a player, so the coalition count doubles to $2^{13} = 8{,}192$ - the cost is a count of coalitions, not of relabellings."
+  - text: "Cache only the three allocations - Shapley, Banzhaf and leave-one-out - since the attack is about how the shares move. Duplicate shells need no new runs because efficiency holds in both games, so the shares still sum to 100 and can be recomputed from the honest split. A genuine partition needs 13 more runs, one per player in the expanded game."
+    misconception: V5-M2
+    explain: "Efficiency is an accounting constraint - it says the shares sum to $v(N)$ and nothing about how they are distributed - so it cannot regenerate a share. Recomputing $\\phi_{A1}$ needs marginal contributions, which need the underlying $v(S)$ entries; allocations alone are not a sufficient cache. And the partition needs $2^{13} = 8{,}192$ coalition values, not one run per player."
+  - text: "Cache the leave-one-out value for each of the 12 sources - that is the counterfactual the shells are exploiting. Duplicate shells need no new runs because each shell's leave-one-out is zero by inspection, which is enough to recompute both shares. A genuine partition needs 13 leave-one-out runs, one for each new player."
+    misconception: V5-M4
+    explain: "Twelve leave-one-out numbers cannot reconstruct a split: on the running table they are 10, 10 and 30 against a pool of 100, and they discard every intermediate coalition the weighted sum needs. The shells' leave-one-out being zero is true and useless - $\\phi_{A1} = 20.833$, not 0. The artifact has to be the full $2^n$ table, and the partition needs $2^{13} = 8{,}192$ entries."
+check: choice
 ```
 
 ## What you can now do

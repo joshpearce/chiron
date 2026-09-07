@@ -39,28 +39,21 @@ id: u1-b9
 type: predict
 concept: c-lm-objective
 prompt: |
-  Fill each blank above yourself - all four are easy for you. Then, before
-  reading on: for each one, state in a phrase what a system would have to be
-  able to DO to fill it reliably. Are the four demands the same kind of
-  thing, or four different kinds?
-answer: |
-  Barack Obama; 9; angle ACB (base angles of an isosceles triangle); the
-  drawer (Alice never saw the move).
-
-  The demands: recall a stored fact about the world; execute a sorting
-  algorithm; apply a geometric theorem; track two agents' divergent beliefs
-  about the same object. Four different kinds of capability - a fact store,
-  an algorithm, deductive rule application, and a theory of other minds -
-  hiding behind one uniform interface: predict the next token.
-rubric: |
-  Pass requires: (1) at least three blanks filled correctly, and (2) an
-  explicit recognition that the blanks demand different KINDS of capability
-  (fact recall vs computation vs deduction vs belief tracking), in any
-  wording. The exact taxonomy does not matter.
-  Fail if the answer says all four are "just pattern completion" with no
-  differentiation - that is the misconception the section dismantles, so
-  deliver the section slowly rather than skipping.
-check: llm
+  Fill each of the four blanks above yourself - all four are easy for you.
+  Then, before reading on, commit: what would a system have to be able to DO
+  to fill them reliably? Are the four demands the same kind of thing, or
+  different kinds?
+options:
+  - text: "Four different kinds of capability behind one uniform interface: recall a stored fact about the world (Barack Obama), run a sorting algorithm to completion (9), apply a geometric theorem (angle ACB), and track two agents' divergent beliefs about the same object (the drawer, since Alice never saw the move)."
+    correct: true
+    explain: "Right. Nothing on the surface tells the four apart - each arrives as the same question, what token comes next - yet a fact store, an algorithm, deductive rule application and a theory of other minds are what the blanks demand. That is the whole argument for why prediction pressures toward world modeling."
+  - text: "One kind: retrieval. Each of these continuations occurred somewhere in the corpus, so all four are rows fetched from a large store of remembered text; a bigger store covers more blanks."
+    misconception: M4
+    explain: "A store can only answer for what it holds. Ask for the sorted form of a list nobody ever wrote down, or for what Alice believes in a scene composed on the spot, and both are answered anyway. Parameters define a function over token streams, not rows; generalization and confident hallucination are the same mechanism."
+  - text: "Three demands and one impossibility: the first three are fillable, but the keys-in-the-drawer blank needs a belief held across several sentences, and a loss that scores each position only on its own next token cannot reward carrying state that far."
+    misconception: U1-M2
+    explain: "The loss terms are additive; the computations producing them share parameters. Gradient from a late position flows back into whatever produced the earlier hidden state, so encoding Alice's belief early is directly rewarded by the later term. The objective decomposes per position; credit assignment does not."
+check: choice
 ```
 
 Each blank asks for something different. The first needs a fact about the
@@ -123,40 +116,26 @@ id: u1-b2
 type: self-explain
 concept: c-lm-objective
 prompt: |
-  In your own words, and without re-reading: explain why "a model that predicts
-  text well must model the world that generated the text" is an argument about
-  a limit, and name one concrete observation about current LLM behavior that
-  shows the limit has not been reached.
-answer: |
-  The compression framing says loss equals bits per token, and you can only
-  spend few bits on a continuation by exploiting real structure in the
-  generating process. Taken to its endpoint - loss at the entropy floor - the
-  system must have captured whatever structure produces the text, including
-  facts, algorithms, and agents' mental states. That is a statement about what
-  a hypothetically optimal predictor must contain.
+  A colleague asks you to explain, without re-reading, why 'a model that
+  predicts text well must model the world that generated the text' is an
+  argument about a limit - and to name one concrete observation about current
+  LLM behavior showing the limit has not been reached.
 
-  It does not say that a specific architecture trained with a specific
-  optimizer for a specific budget reaches that endpoint. A shallow heuristic
-  that covers 95% of a pattern lowers loss substantially while implementing
-  nothing like the real mechanism. Concrete evidence the limit is unreached:
-  multi-digit arithmetic that is correct on common operands and wrong on rare
-  ones, or a reasoning chain that works on the textbook phrasing and fails when
-  the variable names are swapped. A system with the mechanism would not care
-  about the names.
-rubric: |
-  Must contain: (1) the link from loss to bits/compression to "must exploit
-  real structure", (2) an explicit acknowledgement that the conclusion holds
-  at or near the entropy floor and not at arbitrary loss, (3) a concrete
-  behavioral example of heuristic-not-mechanism (arithmetic on rare operands,
-  brittleness under renaming/rephrasing, or equivalent).
-  Pass = all three, in any wording.
-  Partial (flag for review, do not pass) = (1) and (3) but the answer treats
-  the world-modeling claim as established for current models rather than as
-  a limit statement.
-  Fail = the answer asserts the model "just does statistics" with no engagement
-  with why compression pressures toward mechanism. That is the opposite
-  overcorrection and is equally wrong.
-check: llm
+  Which explanation gets both halves right?
+options:
+  - text: "Loss is bits per token, and you can only spend few bits on a continuation by exploiting real structure in the process that generated it. Taken to its endpoint - loss at the entropy floor - the predictor must have captured that structure, including facts, algorithms and agents' mental states. Nothing says a given architecture, optimizer and budget reaches that endpoint: a shallow heuristic covering most of a pattern lowers loss a lot while implementing none of the mechanism. Evidence the limit is unreached: multi-digit arithmetic correct on common operands and wrong on rare ones, and reasoning chains that hold on the textbook phrasing and collapse when the variable names are swapped."
+    correct: true
+    explain: "Both halves held at once. The compression bound is a theorem about codes in the limit; what a particular model at a particular scale contains is an empirical question, and brittleness under renaming is what heuristics standing in for mechanisms look like from outside."
+  - text: "The limit has already been reached for facts, not for mechanisms: a large model has effectively stored the corpus, so the remaining failures are gaps in what got stored, and the fix is more data covering the missing cases."
+    misconception: M4
+    explain: "This reads the parameters as a store with missing rows. But the arithmetic failures are on operand pairs no corpus could contain, and the model answers them anyway - wrongly and confidently. The same distributed function produces correct generalization and hallucination; there is no row that went missing."
+  - text: "It is a limit argument in the sense that the loss has a target of zero: until training drives it there the model is deficient, and the brittle reasoning is simply leftover loss that more training will remove."
+    misconception: M18
+    explain: "Cross-entropy has an irreducible floor, the entropy of language itself, because the next token is genuinely uncertain. Near-zero loss on training text means memorization, not mastery. The gap that matters is the one to the floor, not the one to zero."
+  - text: "It is a limit argument about optimization: gradient descent has not yet reached THE minimum of the loss, and at that minimum the mechanisms are guaranteed to be present. The renaming failures show only that training stopped early."
+    misconception: M5
+    explain: "There is no single minimum to reach. SGD lands in one of astronomically many good-enough low-loss regions, and two seeds land in different ones while both work. The limit in the compression argument is a loss value approaching the entropy floor, not a distinguished point in weight space."
+check: choice
 ```
 
 ## Tokens: BPE from scratch
@@ -291,24 +270,19 @@ prompt: |
   Merge 4 (l+o -> lo):     `lo w est_`
   Merge 5 (lo+w -> low):   `____ est_`
 
-  Fill the three blanks, then state how many tokens `lowest` costs.
-answer: |
-  Merge 1 blank: `es`   giving `l o w es t _`
-  Merge 3 blank: `est_` giving `l o w est_`
-  Merge 5 blank: `low`  giving `low est_`
-
-  `lowest` costs 2 tokens: [`low`, `est_`].
-
-  The point: a word absent from the tokenizer's corpus still encodes compactly,
-  because the merges compose. This is why BPE has no unknown-token problem.
-rubric: |
-  Required fills, exactly: blank 1 = `es`, blank 2 = `est_`, blank 3 = `low`.
-  Required token count = 2.
-  All four correct = pass. Any wrong fill = fail, and diagnose:
-  applying merges out of order indicates the learner missed that the merge
-  list is ordered; answering 6 tokens indicates they did not apply merges at
-  all; answering 3 indicates they dropped the end-of-word marker from `est_`.
-check: llm
+  Which filling of the three blanks, and which token count for `lowest`, is
+  right?
+options:
+  - text: "Blanks `es`, `est_`, `low`; the sequence runs `l o w es t _`, then `l o w est_`, then `low est_`. `lowest` costs 2 tokens: [`low`, `est_`]."
+    correct: true
+    explain: "Right, and the point of the exercise: a word absent from the tokenizer's corpus still encodes compactly, because the learned merges compose. This is why BPE has no unknown-token problem."
+  - text: "Blanks `es`, `est`, `low`; the end-of-word marker is bookkeeping for the training procedure and is dropped when tokenizing real text, so `lowest` costs 2 tokens: [`low`, `est`]."
+    misconception: U1-M1
+    explain: "The `_` is a byte in the sequence like any other, and merge 3 was learned as est + _ -> est_, one symbol. Dropping it would make word-final `est` indistinguishable from word-internal `est`, which is exactly the distinction the marker exists to keep. Token boundaries are artifacts of byte frequency, not word structure you may tidy up."
+  - text: "No blank can be filled: `lowest` was never in the tokenizer's corpus, so no learned merge applies and the word falls back to its base units - 7 tokens, one per character including the marker."
+    misconception: U1-M3
+    explain: "Encoding is deterministic replay of the merge list over whatever string arrives; the list does not know or care which words it was learned from. Base units are the fallback for byte sequences no merge covers, not the normal case. Nothing is unrepresentable, and rare strings merely cost more tokens."
+check: choice
 ```
 
 The same picture at real scale looks like this. These are actual outputs from
@@ -355,35 +329,22 @@ concept: c-tokens
 prompt: |
   A colleague proposes fixing character-level failures by adding a
   character-count tool the model can call. Separately, a second colleague
-  proposes retraining with a character-level tokenizer ($V \approx 256$
-  bytes, no merges).
+  proposes retraining with a character-level tokenizer ($V$ about 256 bytes,
+  no merges).
 
-  Before reading on: state the main cost of the second proposal, in terms of
-  something you already know about sequence length. Roughly what factor
-  longer do sequences get for English text, and where does that cost land?
-answer: |
-  English text under a BPE vocabulary of ~100k averages roughly 4 characters
-  per token, so a byte-level tokenizer makes sequences about 4x longer.
-
-  Where it lands: attention cost grows with the square of sequence length
-  (u3), so 4x tokens is roughly 16x attention compute for the same document.
-  The KV cache grows about 4x. Effective context window, measured in actual
-  text, shrinks by ~4x for a fixed token budget. And every fact the model
-  must learn now has to be composed across 4x more positions, so depth is
-  under more pressure too.
-
-  The tool proposal is the correct engineering answer, and it is a preview of
-  u8: the fix for a tokenization limitation is a harness that hands the model
-  a different representation, not a different model.
-rubric: |
-  Must identify: (1) sequences get several times longer (accept 3x-5x for
-  English), (2) the cost is superlinear because attention is quadratic in
-  sequence length, or at minimum that compute/context cost rises sharply.
-  Both = pass. Only (1) = partial, do not pass.
-  An answer claiming byte-level models cannot represent words, or that
-  vocabulary size limits what the model can express, indicates U1-M3
-  (vocab-size-is-word-knowledge) - fail and route to that correction.
-check: llm
+  Before reading on, commit: what is the main cost of the second proposal,
+  in terms of something you already know about sequence length?
+options:
+  - text: "Sequences get about 4x longer for English (a ~100k BPE vocabulary averages roughly 4 characters per token), and the cost is superlinear: attention compute grows with the square of sequence length, so about 16x for the same document, while the KV cache grows about 4x and the effective context measured in actual text shrinks about 4x."
+    correct: true
+    explain: "Right, and it is why the tool is the correct engineering answer: the fix for a tokenization limitation is a harness that hands the model a different representation, not a different model. The quadratic term is developed in u3."
+  - text: "Sequences get about 4x longer, and the cost is about 4x with it: attention is computed for all positions in parallel, so its cost is linear in sequence length and the extra positions are absorbed by the hardware."
+    misconception: M10
+    explain: "Parallel hardware hides the cost at small $n$; it does not change the asymptotics. Every query dots every key, so attention is quadratic in sequence length - 4x the tokens is roughly 16x the attention compute, and it is exactly why long context is expensive."
+  - text: "The main cost is expressiveness: with $V$ about 256 the model has only a few hundred vocabulary entries, so most English words fall outside it and arrive as unknown tokens."
+    misconception: U1-M3
+    explain: "256 byte values represent every string that exists, including every word, identifier and non-English fragment - each simply costs more positions. $V$ is a budget trading embedding and output-layer cost against tokens-per-character; it constrains sequence length and parameter count, never what can be expressed."
+check: choice
 ```
 
 ## The objective, stated exactly
@@ -457,31 +418,19 @@ prompt: |
   (b) `>>> add(2847, 1913)\n`
 
   A model that has driven $\mathcal{L}$ low must put high probability on `b`
-  for (a) and on `4760` for (b). Before reading on: state, in one sentence
-  each, what kind of thing the model must have internalized to succeed at
-  (a) versus at (b). What separates the two cases?
-answer: |
-  (a) requires only a local surface regularity: inside a function whose
-  parameters are named a and b, the token after "a + " is overwhelmingly "b".
-  A frequency table over short contexts gets this.
-
-  (b) requires the model to actually perform the addition. No surface statistic
-  of the prefix contains 4760 - that exact string may never appear near "2847"
-  anywhere in the training data. The only way to drive loss down on the general
-  case of this pattern is to implement an algorithm that computes sums.
-
-  The separator: (a) can be solved by memorizing co-occurrence, (b) cannot,
-  because the space of (operand, operand) pairs is far larger than any corpus.
-  Compression of case (b) forces the acquisition of a mechanism.
-rubric: |
-  Must identify: (1) case (a) is solvable by local co-occurrence statistics
-  or pattern matching, (2) case (b) requires computing/implementing addition
-  rather than recalling it, (3) some version of "the space of possible operand
-  pairs exceeds what could be memorized". Any 2 of 3 = pass.
-  Answering that (b) is also just memorization from seeing many arithmetic
-  examples, with no acknowledgement that the operand space is too large,
-  = M4-style lookup-table thinking, fail.
-check: llm
+  for (a) and on `4760` for (b). Before reading on, commit: what must the
+  model have internalized for (a) versus (b), and what separates the cases?
+options:
+  - text: "(a) needs only a local surface regularity - inside a function whose parameters are named a and b, the token after `a + ` is overwhelmingly `b`, and a frequency table over short contexts gets it. (b) needs the addition actually performed: no surface statistic of the prefix contains 4760, and the space of operand pairs is far larger than any corpus, so the only way to drive the loss down on the general pattern is to implement an algorithm."
+    correct: true
+    explain: "Right. (a) is solvable by memorizing co-occurrence; (b) cannot be, which is the compression argument made concrete - paying few bits for case (b) forces the acquisition of a mechanism."
+  - text: "Both are the same kind of thing: arithmetic appears constantly in the training data, so the model has the result of 2847 + 1913 stored the same way it has `b` after `a + `, and it looks the pair up."
+    misconception: M4
+    explain: "Count the pairs: four-digit by four-digit is tens of millions of combinations, and that exact string may appear nowhere near `2847` in the data. What the model has is a function over token streams, which is also why it produces confident wrong sums rather than reporting a miss."
+  - text: "(b) is easier than it looks: the digits reach the model one character at a time, so it only needs the column-by-column carrying procedure it has seen written out in text - the same kind of surface pattern that solves (a)."
+    misconception: U1-M1
+    explain: "The digits do not arrive as characters. `2847 + 1913` tokenizes as `284`, `7`, ` +`, ` `, `191`, `3` - digits grouped in threes from the left, so the units column sits at no fixed position and the place-value alignment between operands is scrambled differently for every pair. The inputs to that procedure arrive pre-shredded."
+check: choice
 ```
 
 ## The average is a stand-in
@@ -621,47 +570,23 @@ id: u1-b5
 type: self-explain
 concept: c-embeddings
 prompt: |
-  A teammate says: "Embeddings are how the model stores what words mean.
-  That's why similar words have similar vectors."
+  A teammate says: 'Embeddings are how the model stores what words mean.
+  That's why similar words have similar vectors.'
 
-  The second sentence is true and the first is false. Explain, in your own
-  words, how both can hold - and state one experiment that would distinguish
-  the two claims.
-answer: |
-  Similar words do land near each other, but that is a consequence, not a
-  storage mechanism. Training only ever rewards lower prediction loss. Two
-  tokens that are interchangeable in context (`cat`/`dog`) produce similar
-  downstream predictions, so gradient descent has no reason to separate them
-  and every reason to let the layers above treat them alike. Proximity is the
-  residue of shared predictive role.
-
-  "Stores meaning" additionally claims the vector holds the content, portably
-  and intrinsically. It does not. Three distinguishing experiments, any one
-  is enough:
-
-  1. Permute all d_model coordinates of E consistently, permute the input side
-     of every matrix that reads the stream and the output side of every matrix
-     that writes into it, and permute the normalization gains and biases.
-     Outputs are identical. A store whose fields can be arbitrarily relabeled
-     with no effect is not storing anything in those fields.
-  2. Transplant one model's embedding row into another model. If meaning were
-     in the vector it would transfer. It produces noise.
-  3. Feed `bank` in two disambiguating contexts. The input vector is the same
-     both times, yet the model's behavior differs, so the disambiguating
-     content is not in the embedding.
-rubric: |
-  Must contain: (1) similarity-as-consequence - near vectors arise because the
-  tokens play similar predictive roles, not because meaning was written there,
-  (2) at least one concrete distinguishing experiment from {coordinate
-  permutation invariance, cross-model transplant fails, identical vector for
-  polysemous token in two contexts}, (3) some statement that the geometry is
-  relational and model-internal.
-  (1) and (2) = pass. Missing (2) = fail; an answer with no falsifiable
-  experiment has not actually separated the claims.
-  Explicitly diagnose: an answer that says the vector holds meaning "in
-  compressed form" or "distributed across dimensions" is M3 surviving in
-  disguise - fail, and point at the permutation argument.
-check: llm
+  The second sentence is true and the first is false. Which explanation of how
+  both can hold - with an experiment that would distinguish the two claims -
+  is right?
+options:
+  - text: "Proximity is a consequence of shared predictive role, not a storage mechanism: tokens interchangeable in context produce similar downstream predictions, so gradient descent has no reason to separate them. The distinguishing experiment: permute the $d_{model}$ coordinates of $E$ and consistently permute the input side of every matrix that reads the residual stream, the output side of every matrix that writes into it, and the normalization gains and biases - the logits are identical on every input, so nothing measurable is stored in those coordinates."
+    correct: true
+    explain: "Right, and two cheaper checks agree: an embedding row transplanted into another model is noise, and `bank` gets one identical row in `the river bank` and `the bank approved the loan`, so whatever disambiguates them is downstream. An embedding is a learned position in a space the rest of the model is simultaneously learning to read."
+  - text: "Both hold because the meaning is stored in compressed, distributed form rather than one field per dimension: no single coordinate is formality or animacy, but the content is still in the vector, spread across all $d_{model}$ of them."
+    misconception: M3
+    explain: "Spreading the fields does not survive the permutation argument: there are $d_{model}$ factorial equally valid relabelings and every one produces identical logits, so no arrangement of coordinates is a fact about the model. And a single row serves both senses of `bank`, so it cannot be holding the content of either. What exists is relational geometry, meaningful only inside this model."
+  - text: "Both hold because the vectors come from a separate, earlier semantic training stage - word2vec-style - whose own objective put similar words close together. The language model loads that table as fixed input, which is exactly why the table itself does not store anything the model learned."
+    misconception: U1-M4
+    explain: "There is no separate semantic stage. $E$ is a parameter matrix, randomly initialized and updated by the same backward pass as every other weight, on the language modeling objective alone; freeze it and final loss is measurably worse. A row only gets gradient when its token appears in a batch, which is the mechanism behind glitch tokens."
+check: choice
 ```
 
 ## Counting the embedding matrix
@@ -709,8 +634,6 @@ the thing: 4% table, 96% function.
 id: u1-b6
 type: completion
 concept: c-embeddings
-# variants: blank the vocab and d_model instead, giving the product and the
-# percentage; or supply GPT-2 medium (V=50257, d=1024) and blank the product.
 prompt: |
   GPT-2 small has $V = 50{,}257$, $d_{model} = 768$, and 124 million total
   parameters. Unlike Llama-2, it *ties* its input and output embedding
@@ -720,31 +643,66 @@ prompt: |
   Step 2. Parameters in $E$:       $50{,}257 \times 768 =$ ____
   Step 3. Fraction of the model:   ____ $/\ 124{,}000{,}000 \approx$ ____ %
 
-  Fill the blanks, then answer in one sentence: why is this percentage so
-  much larger than Llama-2-7B's 2% (input side only), given that GPT-2's
-  vocabulary is *larger*?
-answer: |
-  Step 1: 768
-  Step 2: 38,597,376
-  Step 3: 38,597,376 / 124,000,000 = 31%
-
-  Why: the embedding matrix scales as V x d_model, which is linear in the
-  model's width, while the transformer stack scales roughly as
-  n_layers x d_model^2, which is quadratic in width. As models get wider and
-  deeper the stack outgrows the embedding table fast. GPT-2 small is narrow
-  (d=768) and shallow (12 layers), so its table dominates. Vocabulary size
-  barely matters to this comparison - width does.
-rubric: |
-  Required: blank 1 = 768; blank 2 = 38,597,376 (accept 38.6 million or
-  38,597,376 exactly; reject anything off by more than 0.1%); blank 3 result
-  = 31% (accept 30-32%).
-  The one-sentence answer must contain the scaling contrast: embeddings grow
-  linearly in d_model, the transformer stack grows quadratically in d_model
-  (times depth). Accept "the rest of the model grows faster with width."
-  All three numbers correct AND the scaling contrast = pass.
-  Numbers correct but the explanation cites vocabulary size as the driver
-  = fail; that misses that width, not V, is what changed.
-check: llm
+  Which filling of the three blanks is right, together with the right reason
+  that this fraction is so much larger than Llama-2-7B's 2% (input side
+  only), given that GPT-2's vocabulary is *larger*?
+options:
+  - text: |
+      Step 1: 768. Step 2: $50{,}257 \times 768 = 38{,}597{,}376$.
+      Step 3: $38{,}597{,}376 / 124{,}000{,}000 \approx 31\%$.
+      Reason: the table grows linearly in $d_{model}$ while the stack grows
+      roughly as $n_{layers} \times d_{model}^2$, and GPT-2 small is narrow
+      ($d_{model} = 768$) and shallow (12 layers), so the stack has not yet
+      outgrown the table.
+    correct: true
+    explain: |
+      Right. $50{,}257 \times 768 = 38{,}597{,}376$, about 31% of 124 million.
+      Width, not vocabulary, is what changed between the two models:
+      Llama-2-7B is $d_{model} = 4096$ against GPT-2 small's 768, and the
+      transformer stack is quadratic in that number where the embedding
+      table is only linear in it.
+  - text: |
+      Step 1: 768. Step 2: $50{,}257 \times 768 = 38{,}597{,}376$.
+      Step 3: $38{,}597{,}376 / 124{,}000{,}000 \approx 31\%$.
+      Reason: the fraction is larger because the vocabulary is larger -
+      50,257 words is more word knowledge to hold than Llama-2's 32,000, so
+      a bigger share of the model goes into holding it.
+    misconception: U1-M3
+    explain: |
+      The three numbers are right and the reason is not. Llama-2 has the
+      smaller vocabulary *and* the smaller embedding share, so $V$ cannot be
+      what drives the fraction up. $V$ is a budget traded against
+      tokens-per-character, not a count of words the model knows; a model
+      with $V = 32{,}000$ emits novel identifiers and rare names by
+      composing pieces. What changed here is $d_{model}$: 4096 against 768,
+      with the stack quadratic in it.
+  - text: |
+      Step 1: 768. Step 2: $2 \times 38{,}597{,}376 = 77{,}194{,}752$, since
+      the model needs one table to look tokens up on the way in and a second
+      to look them up on the way out.
+      Step 3: $77{,}194{,}752 / 124{,}000{,}000 \approx 62\%$.
+    misconception: M4
+    explain: |
+      Tying means there is exactly one matrix, used at both ends and counted
+      once: 38,597,376 parameters, about 31%. The doubling comes from
+      picturing $E$ as a key-value store that has to be read in one
+      direction and written in the other. It is one table of 50,257
+      positions, and it holds no facts in either direction - the facts, such
+      as they are, live in the 96% that has no rows at all.
+  - text: |
+      Step 1: 768. Step 2: $50{,}257 \times 768 = 38{,}597{,}376$, but those
+      sit outside the 124 million - the table is pretrained word vectors
+      loaded before the run, not parameters the run learns.
+      Step 3: $\approx 0\%$ of the trained model.
+    misconception: U1-M4
+    explain: |
+      $E$ is initialized randomly and updated by the same backward pass as
+      every other weight, and the 124 million counts it. There is no
+      separate semantic training stage to load from: freeze $E$ and final
+      loss is measurably worse. Inspect gradients and rows for tokens in the
+      batch have nonzero gradient while absent rows have exactly zero -
+      which is why very rare tokens end training near their initialization.
+check: choice
 ```
 
 ## The output end: hidden state to logits
@@ -844,7 +802,6 @@ a tradeoff, not a law.
 id: u1-b7
 type: completion
 concept: c-logits
-# variants: blank rows 0 and 3 instead; or give z and blank one entry of h.
 prompt: |
   Same $W_U$ as above:
 
@@ -860,27 +817,45 @@ prompt: |
   $z_2 = (0)(0) + (1)(1) + (-1)(1) =$ ____
   $z_3 = (-1)(0) + (2)(1) + (0)(1) =$ ____
 
-  Fill the blanks. Then: which token wins, and what is the logit gap between
-  the winner and `" the"`?
-answer: |
-  z_0 = 0
-  z_1 = 3
-  z_2 = 0
-  z_3 = 2
-
-  z = [0, 3, 0, 2]. The winner is `" a"` at 3. The gap to `" the"` (logit 0)
-  is 3.
-
-  Note that the same W_U now ranks `" a"` first where the previous hidden
-  state ranked `" the"` first. The unembedding matrix is fixed; the ranking
-  is entirely a function of h.
-rubric: |
-  Required, exactly: z_0 = 0, z_1 = 3, z_2 = 0, z_3 = 2. Winner = `" a"`.
-  Gap = 3.
-  All six correct = pass. Arithmetic slips = fail (this is mechanical).
-  If the learner reports the gap as a probability or a percentage, that is
-  M2 leaking early - logits are not probabilities. Fail and flag M2.
-check: llm
+  Which filling of the four blanks is right, together with the right winning
+  token and the right gap between the winner and `" the"`?
+options:
+  - text: |
+      $z_0 = 0$, $z_1 = 3$, $z_2 = 0$, $z_3 = 2$, so $z = [0, 3, 0, 2]$.
+      `" a"` wins at 3, and the gap to `" the"` at 0 is 3 logits.
+    correct: true
+    explain: |
+      Right. The same fixed $W_U$ with a new $h$ gives a new ranking: the
+      earlier hidden state $h = [2, -1, 0.5]$ put `" the"` first, this one
+      puts `" a"` first. The gap of 3 is in logit units, so the probability
+      ratio is $e^{3} \approx 20$.
+  - text: |
+      $z_0 = 0$, $z_1 = 3$, $z_2 = 0$, $z_3 = 2$, so $z = [0, 3, 0, 2]$.
+      `" a"` wins, and the gap is about 95%: a score of 3 against 0 means
+      `" a"` holds roughly 95% of the probability while `" the"`, at 0, has
+      none.
+    misconception: M2
+    explain: |
+      The four fills are right and the gap is not a probability. Logits are
+      unnormalized real numbers; only their differences carry information,
+      and what a difference gives is a ratio: $e^{3} \approx 20$, not a
+      percentage. A logit of 0 is not zero probability either - add 100 to
+      every entry of $z$ and the distribution after softmax is unchanged.
+      Turning $z$ into probabilities is softmax's job, in u2.
+  - text: |
+      The scores come off $W_U$ itself: summing each row gives
+      $z = [1, 3.5, 0, 1]$, so `" a"` wins by 2.5 over `" the"` - and it
+      wins in every context, since $W_U$ is the model's fixed table of token
+      scores.
+    misconception: M4
+    explain: |
+      $W_U$ stores one *direction* per token, not one score. The logit is
+      $z_j = \langle W_U[j,:],\ h \rangle$, a dot product with the hidden
+      state, so the ranking is a function of $h$ and changes from context to
+      context - which is precisely what the earlier $h = [2, -1, 0.5]$
+      versus this $h = [0, 1, 1]$ demonstrates. Carrying out the dot
+      products gives $z = [0, 3, 0, 2]$ and a gap of 3.
+check: choice
 ```
 
 ```beat

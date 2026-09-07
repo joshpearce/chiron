@@ -65,59 +65,67 @@ id: v4-b1
 type: predict
 concept: d-counterfactual
 prompt: |
-  Before reading on. You are about to send that table to a rightsholder as
-  the basis for a payment.
+  Before reading on, commit to a reading. You are about to send that table -
+  F at 1.043 bpb, F\7 at 1.061 bpb, a gap of 0.018 - to a rightsholder as the
+  basis for a payment.
 
-  (1) State, in one sentence, what claim the 0.018 licenses.
-  (2) Now attack it. Name at least two distinct things that could be true
-      about how those two runs were produced that would make 0.018 the wrong
-      number to bill on - not "the model is small" or "bpb is a weird metric",
-      but specific properties of the experiment itself.
-answer: |
-  (1) It licenses: a model of this size and token budget, trained on this
-  corpus without source 7, is 0.018 bpb worse on this held-out set than the
-  same model trained with it. That is a statement about two runs, and it is
-  exact for those two runs.
-
-  Attacks, any two of these count:
-
-  - **One seed.** Both numbers come from a single training run each. Training
-    is stochastic - different initialization, different shuffle order - so
-    each number is one draw from a distribution. If that distribution is wide
-    relative to 0.018, the gap is noise wearing a result's clothes.
-
-  - **The token budget moved.** Removing source 7 removed its tokens too, so
-    F\7 trained on less data than F. Some of the 0.018 is "source 7's
-    content" and some is "8% fewer tokens", and the experiment as described
-    cannot separate them.
-
-  - **Redundancy.** If another source in the corpus carries substantially the
-    same material - a mirror, a preprint server, a duplicate cluster the v2
-    pipeline recorded - then 0.018 understates source 7 badly, because the
-    survivor covered for it. Remove both and the loss might jump by ten times
-    this.
-
-  - **One eval set.** The held-out papers define what "worse" means. A source
-    that matters enormously for a topic absent from the held-out set scores
-    zero here.
-
-  - **The number is not additive.** Nothing yet says the twelve per-source
-    gaps add up to anything, so "source 7's share" is undefined even if
-    0.018 is exactly right.
-rubric: |
-  Part (1) must restrict the claim to these two runs, this model
-  configuration, and this held-out set - any answer that phrases it as a
-  property of source 7 in general has already made the mistake this unit
-  spends its length on.
-  Part (2) must name at least two distinct mechanisms. Accept any two of:
-  single seed / training stochasticity; token budget confounded with content;
-  redundancy with another source; eval-set dependence; non-additivity.
-  (1) restricted + two valid attacks = pass.
-  Attacks that are only "the model is too small to matter" or "bpb is not a
-  real benchmark" = fail; both are true and neither is an attack on the
-  measurement's validity. The counterfactual is exact at any scale; the
-  question is what it is exact ABOUT.
-check: llm
+  Which of these correctly states what the 0.018 licenses, together with
+  properties of the experiment itself that make it the wrong number to bill
+  on?
+options:
+  - text: |
+      It licenses only this: a model of this size and token budget, trained on
+      this corpus without source 7, is 0.018 bpb worse on this held-out set
+      than the same model trained with it. Two features of the experiment
+      already undercut billing on it - each figure is a single draw from a
+      stochastic training process, and removing source 7 also removed its
+      tokens, so content and volume are confounded in the same 0.018.
+    correct: true
+    explain: |
+      Right. The counterfactual is exact for the two runs that produced it and
+      says nothing beyond them. One seed per condition leaves the gap with no
+      error bar, and $v(\text{all} \setminus 7)$ was trained on about 8% fewer
+      tokens, so part of the gap is a shorter training run. Redundancy with
+      another source and the choice of held-out set are two more attacks of
+      the same kind.
+  - text: |
+      It licenses "source 7 contributed 0.018 bpb" as a property of source 7.
+      The counterfactual was computed by actually retraining rather than
+      estimated, so the only caveat worth stating is that the model is small,
+      and that caveat disappears once the same sweep is run at 8B parameters.
+    misconception: V4-M4
+    explain: |
+      Retraining makes the number exact for its configuration - this
+      architecture, parameter count, token budget, protocol, held-out set and
+      source list - which is a scope statement, not a caveat that scale
+      removes. Influence patterns themselves change with scale, and the real
+      attacks here (one seed, tokens confounded with content) apply at every
+      size.
+  - text: |
+      It licenses source 7's contribution as measured, because both runs used
+      the same random seed. Whatever randomness training has is identical on
+      both sides, so it cancels in the subtraction, and the remaining question
+      is only how many decimal places of bpb to report.
+    misconception: D16
+    explain: |
+      Sharing a seed does not make the difference deterministic: seeds 2 and 3
+      give gaps of 0.012 and 0.015 for the same two conditions. The
+      full-corpus runs agree to within 0.3% while their differences from the
+      leave-one-out runs disagree by 50% - a difference of two nearly equal
+      noisy numbers is exactly where variance concentrates.
+  - text: |
+      It licenses source 7's share of the model: run the other eleven
+      leave-one-out conditions, sum the twelve gaps, and pay source 7
+      $0.018$ divided by that sum. The gap is the wrong number to bill on only
+      until the other eleven gaps exist to normalise it against.
+    misconception: V4-M1
+    explain: |
+      $\Delta_i$ is a marginal contribution to the full corpus, and marginal
+      contributions do not sum to the total whenever sources interact. Two
+      near-duplicate sources can each show $\Delta \approx 0.002$ while
+      removing both costs 0.020 - the slices miss the pie by a factor of five,
+      so the denominator in that division is not a total of anything.
+check: choice
 ```
 
 Now the observation that makes this unit necessary. Run both conditions again
@@ -218,48 +226,67 @@ prompt: |
   rather than 0.004%, so the effect is 25 times bigger and the noise is the
   same. Problem solved."
 
-  In your own words: what is right about this, what is wrong about it, and
-  what would you actually have measured if you did it?
-answer: |
-  What is right: the ratio argument is the correct thing to attack, and
-  shrinking the corpus really does raise each document's share, which really
-  does raise the per-document effect size. The colleague has understood that
-  the obstacle is signal-to-noise and not instrumentation.
-
-  What is wrong: the effect grows by 25x, so the required seed count - which
-  goes as the inverse SQUARE of the effect size - falls by 625x. From roughly
-  1.3 million seeds per condition that lands around 2,000 seeds per condition,
-  per document, and there are 1,000 documents. It is 625 times more feasible
-  and still not feasible. Shrinking the corpus buys a factor, and the gap is
-  orders of magnitude.
-
-  The deeper problem is what the number would mean. In a 1,000-document
-  corpus each document carries a tenth of a percent of everything the model
-  knows, so its measured contribution is a fact about a model that no longer
-  resembles the one being billed for. You would have measured document
-  influence in a regime where documents are individually load-bearing, which
-  is exactly the regime real pretraining is not in. The measurement got easier
-  by changing the thing measured.
-
-  What to do instead: keep the corpus real and raise the unit. A source is
-  large by construction, so it moves the loss by construction, and it is also
-  the entity that receives the payment.
-rubric: |
-  Must contain: (1) acknowledgement that the effect-size argument is correct
-  as far as it goes, (2) the quantitative point that required seeds scale as
-  1/effect^2 so a 25x effect is a 625x reduction and still leaves an
-  infeasible number, (3) the validity point - a 1,000-document corpus is a
-  different model, so the number does not transfer to the corpus you are
-  billing for.
-  (2) and (3) = pass. (1) alone or (3) alone = fail.
-  An answer that says the plan works = fail, and diagnose the missing square:
-  the seed formula has the effect size squared in the denominator, so effect
-  size is worth more than any other lever, but "worth more" is not "worth
-  enough".
-  An answer that rejects the plan only because "small corpora are not
-  realistic" without the arithmetic = partial, do not pass; the learner has
-  the conclusion without the instrument that produced it.
-check: llm
+  Which explanation of what is right and wrong with this would you give?
+options:
+  - text: |
+      The colleague has correctly identified signal-to-noise as the obstacle,
+      and shrinking the corpus really does raise the effect. But required
+      seeds go as $n \geq 8\sigma^2/\Delta^2$, so a 25x effect cuts the seed
+      count by 625x - from roughly 1.3 million seeds per condition to about
+      2,000, per document, across 1,000 documents. And in a corpus that small
+      each document is individually load-bearing, which is not the regime the
+      billed model is in, so the measurement got easier by changing what is
+      being measured.
+    correct: true
+    explain: |
+      Both halves matter. The effect size enters squared, so it is the
+      strongest available lever and still leaves the sweep orders of magnitude
+      out of reach. And the number that came back would describe a model no
+      longer resembling the one under discussion. The fix is to raise the
+      unit, not shrink the corpus: a source is large by construction, so it
+      moves the loss by construction, and it is what receives the payment.
+  - text: |
+      The plan works. A 25x effect needs 25x fewer seeds, which brings 1.3
+      million down to about 52,000 per condition - large but parallelisable
+      across a rented cluster. Per-document attribution was never impossible
+      in principle; it was waiting on somebody designing the experiment
+      properly.
+    misconception: D20
+    explain: |
+      The seed requirement is $8\sigma^2/\Delta^2$, with the effect squared,
+      so 25x buys 625x rather than 25x - and 2,000 seeds per condition per
+      document over 1,000 documents is still out of reach. Treating the noise
+      as a design problem that refinement dissolves is the belief this unit
+      exists to price: the floor is a measurable quantity, not a temporary
+      state of the art.
+  - text: |
+      The plan works and the resulting numbers transfer. A counterfactual is a
+      counterfactual: retraining on 1,000 documents measures true per-document
+      contribution, and corpus size is a detail of how the number was obtained
+      rather than part of what it means, so the table can be applied to the
+      25,000-document corpus.
+    misconception: V4-M4
+    explain: |
+      A counterfactual is exact for the configuration that produced it, and
+      corpus composition is part of that configuration. In a 1,000-document
+      corpus each document carries a tenth of a percent of everything the
+      model knows; at 25,000 it carries 0.004%, where per-document effects
+      round into the noise. The arithmetic also still fails: 2,000 seeds per
+      condition per document.
+  - text: |
+      Reject the subcorpus, and spend the compute on random-subset runs
+      instead - a few thousand runs over document subsets averages the seed
+      noise down, which shrinks the error bar on each document's leave-one-out
+      value without any change to the corpus.
+    misconception: V4-M2
+    explain: |
+      $\text{SE}_{\Delta} = \sigma\sqrt{2/n}$ contains no run count $M$: a
+      leave-one-out delta is a difference between two condition means, so only
+      seeds on those two conditions tighten it. Subset runs give a different
+      estimator of a different quantity - an average marginal effect across
+      the subsets sampled - which coincides with $\Delta_i$ only under
+      additivity.
+check: choice
 ```
 
 ### The two symbols this unit needs
@@ -342,45 +369,63 @@ prompt: |
   what is left) and fixed token budget (backfill by repetition to the same
   token count).
 
-  Before reading on: predict how $\Delta_3$ and $\Delta_{11}$ each change
-  between the two protocols. Which source's number moves more, in absolute
-  terms and in relative terms, and why?
-answer: |
-  Both fixed-corpus numbers are larger, because in the fixed-corpus protocol
-  the leave-one-out model is handicapped twice: it lacks the content AND it
-  trained on fewer tokens. Backfilling removes the second handicap, so every
-  contribution shrinks.
-
-  Source 3 moves more in absolute terms, by a lot. Removing 22% of the tokens
-  and not replacing them is a substantial cut to the training run itself, and
-  that shortfall shows up in held-out bpb regardless of what the removed text
-  said. Under fixed budget that entire component disappears.
-
-  Source 11 moves less in absolute terms - a 1.5% token shortfall is nearly
-  nothing - so almost all of its fixed-corpus number was already content.
-
-  In relative terms the same ordering holds: source 3's number can easily be
-  cut by more than half, while source 11's barely moves. So the two protocols
-  do not merely shift every number by a constant; they reorder the table,
-  systematically favoring large sources under fixed corpus.
-
-  That is the reason the protocol has to be pre-registered. A rightsholder who
-  learns that their 22% share was scored under fixed corpus has a real
-  argument that they were paid for volume rather than content, and the
-  argument is correct.
-rubric: |
-  Must contain: (1) fixed-corpus contributions are systematically larger
-  because volume loss is bundled in, (2) the large source moves more in
-  absolute terms because its token shortfall is larger, (3) the crucial
-  consequence - the two protocols do not just shift the table, they REORDER
-  it in favor of large sources.
-  (1) and (3) = pass. (1) and (2) without (3) = partial, do not pass; a
-  constant offset would be harmless and the whole point is that it is not
-  constant.
-  An answer predicting the protocol makes no difference = fail; that is the
-  belief that the leave-one-out delta measures content by definition, when it
-  measures whatever differed between the two runs.
-check: llm
+  Before reading on, commit to a prediction: which of these describes how
+  $\Delta_3$ and $\Delta_{11}$ change between the two protocols?
+options:
+  - text: |
+      Every fixed-corpus number is larger, because that model is handicapped
+      twice - missing content and missing tokens. $\Delta_3$ falls sharply
+      when the 22% token shortfall is backfilled, possibly by more than half;
+      $\Delta_{11}$ barely moves, since a 1.5% shortfall was nearly nothing
+      and its number was already almost all content. So the protocols do not
+      offset each other by a constant - they reorder the table in favour of
+      large sources.
+    correct: true
+    explain: |
+      Right, and this is why the protocol is pre-registered and reported
+      beside the table. A rightsholder scored under fixed corpus on a 22%
+      share has a correct argument that they were paid for volume rather than
+      content, and the size of that effect exceeds most of the contributions
+      you are trying to detect.
+  - text: |
+      Neither number changes appreciably. $\Delta_i$ is defined as the
+      counterfactual effect of removing source $i$, so it measures that
+      source's content; how the surviving corpus was assembled afterwards is
+      an implementation detail of running the experiment, not part of what the
+      number means.
+    misconception: V4-M4
+    explain: |
+      The counterfactual measures whatever differed between the two runs, and
+      under fixed corpus what differed was the content and about a fifth of
+      the training tokens. Exactness is exactness within a stated scope, and
+      the protocol is part of that scope - which is precisely why it goes in
+      the header block.
+  - text: |
+      Fixed corpus gives larger numbers, but by roughly the same offset for
+      every source, since each leave-one-out model simply trained a bit short.
+      The ranking of sources is therefore stable across protocols, so either
+      one can be used as long as the choice is applied consistently.
+    misconception: D16
+    explain: |
+      The shortfall is proportional to each source's token share, so it is
+      0.22 of the run for source 3 and 0.015 for source 11 - not a constant.
+      A constant offset would indeed be harmless; this one systematically
+      inflates large sources, and an inflation that varies by row is a
+      reordering.
+  - text: |
+      Fixed token budget is the flawed protocol, and both numbers come out
+      identical under it anyway. Backfilling by repeating surviving sources
+      adds no new information - repeated tokens teach the model nothing - so
+      the backfilled run is effectively the short run with wasted steps.
+    misconception: D17
+    explain: |
+      Repetition in the data-constrained regime is close to free: up to about
+      four epochs costs almost nothing against fresh tokens, with returns
+      diminishing out to roughly sixteen. Adding an eighth of an epoch to the
+      survivors genuinely restores the compute, which is exactly what makes
+      the fixed-budget protocol affordable and what makes the two protocols
+      differ.
+check: choice
 ```
 
 ### How many seeds, and the arithmetic that decides
@@ -485,8 +530,6 @@ seeds and more anything else, seeds win.
 id: v4-b4
 type: completion
 concept: d-noise-floor
-# variants: give delta and z, blank sigma; or blank only the seed count in
-# step 5; or supply a four-seed table and blank the two means.
 prompt: |
   A different source, source 9, from the same sweep. Seed noise for this
   configuration is $\sigma = 0.003$ bpb, measured earlier.
@@ -500,47 +543,64 @@ prompt: |
   Step 1. $\bar v(\text{all}) = 3.129 / 3 =$ ____
   Step 2. $\bar v(\text{all} \setminus 9) = $ ____ $/\ 3 =$ ____
   Step 3. $\Delta_9 =$ ____
-  Step 4. $\text{SE}_{\Delta} = 0.003 \times \sqrt{2/3} =$ ____
+  Step 4. $\text{SE}_{\Delta} =$ ____
   Step 5. $z = \Delta_9 / \text{SE}_{\Delta} =$ ____
 
-  Fill the blanks. Then answer in two sentences: is this a result, and what
-  does its sign say about source 9?
-answer: |
-  Step 1: 1.043
-  Step 2: 3.111 / 3 = 1.037
-  Step 3: 1.037 - 1.043 = -0.006 bpb
-  Step 4: 0.00245
-  Step 5: -0.006 / 0.00245 = -2.45
-
-  It is a result. |z| = 2.45 clears the bar, so the negative sign is not
-  noise: removing source 9 made the model BETTER by 0.006 bpb, six
-  thousandths of a bit per byte, with an error bar of 0.0025.
-
-  What the sign says: source 9's tokens, at this fixed token budget, were
-  worth less than the tokens that replaced them. That is a statement about
-  this corpus and this held-out set, not a verdict on the source's quality -
-  the leading candidates are that source 9 duplicates material another source
-  already covers, or that its subject matter is absent from the held-out
-  papers. Either way it is displacing tokens that would otherwise have taught
-  something the evaluation rewards.
-rubric: |
-  Required, exactly: step 1 = 1.043; step 2 = 3.111 and 1.037; step 3 =
-  -0.006; step 4 = 0.00245 (accept 0.0024-0.0025); step 5 = -2.45 (accept
-  -2.4 to -2.5).
-  The verdict must be that |z| clears 2, so the negative contribution is
-  real rather than noise.
-  The interpretation must NOT be "source 9 is bad data". Accept redundancy
-  with another source, mismatch with the held-out set, or token displacement
-  at fixed budget. Any of the three = pass.
-  All five numbers plus a non-"bad data" interpretation = pass.
-  Reading the negative delta as an arithmetic mistake and flipping the sign =
-  fail; negative contributions are ordinary and the table must be able to
-  express them.
-  Concluding "source 9 should be dropped from the corpus" = pass on the
-  arithmetic, flag V4-M3; at fixed budget a negative delta is a statement
-  about the marginal token, and if the duplicate partner were also removed
-  the sign could reverse.
-check: llm
+  Which filling of the blanks, and which reading of the result, is correct?
+options:
+  - text: |
+      1.043; 3.111 / 3 = 1.037; $\Delta_9 = 1.037 - 1.043 = -0.006$;
+      $\text{SE}_{\Delta} = 0.003\sqrt{2/3} = 0.00245$; $z = -2.45$. It is a
+      result: $|z|$ clears 2, so removing source 9 made the model better by
+      0.006 bpb. At this fixed token budget its tokens were worth less than
+      the tokens that replaced them - most likely it duplicates material
+      another source carries, or its subject matter is absent from the
+      held-out papers.
+    correct: true
+    explain: |
+      Right on all five, and right that the sign is a statement about the
+      marginal token in this corpus against this held-out set. Average within
+      condition, subtract, then apply $\sigma\sqrt{2/n}$ - and report the pair
+      $-0.006 \pm 0.0025$ rather than the bare number.
+  - text: |
+      1.043; 3.111 / 3 = 1.037; $\Delta_9 = -0.006$;
+      $\text{SE}_{\Delta} = 0.00245$; $z = -2.45$. It is a result, and what it
+      found is bad data: source 9 is noisy or corrupted, which is why training
+      on it hurt. Drop it from the corpus and re-run the sweep.
+    misconception: V4-M3
+    explain: |
+      The arithmetic is right and the verdict is not. A negative delta says
+      the source's marginal token was worth less than the token that replaced
+      it, in this corpus, at this budget, against this held-out set - and a
+      clean mirror of material another source already carries produces exactly
+      this sign with nothing wrong in it. Remove the duplicate partner too and
+      the sign can flip positive, which no property of source 9's own data
+      could do.
+  - text: |
+      1.043; 3.111 / 3 = 1.037; $\Delta_9 = -0.006$;
+      $\text{SE}_{\Delta} = \sigma/\sqrt{n} = 0.0017$; $z = -3.5$. A $|z|$ of
+      3.5 puts this three and a half standard errors from zero, well clear of
+      the bar, so source 9's negative contribution is firmly established.
+    misconception: D19
+    explain: |
+      $\sigma/\sqrt{n}$ is the error on one condition's mean; $\Delta_9$ is a
+      difference of two independent means, so the variances add and
+      $\text{SE}_{\Delta} = \sigma\sqrt{2/n} = 0.00245$. Understating the
+      error bar by $\sqrt{2}$ manufactures confidence, and it is the procedure
+      rather than the arithmetic that an opposing reader will attack.
+  - text: |
+      1.043; 3.111 / 3 = 1.037; $\Delta_9 = 1.043 - 1.037 = +0.006$;
+      $\text{SE}_{\Delta} = 0.00245$; $z = +2.45$. Source 9 helped by 0.006
+      bpb - the subtraction has to run this way round, since a source's share
+      of the model cannot be negative.
+    misconception: V4-M1
+    explain: |
+      $\Delta_i = v(\text{all except } i) - v(\text{all})$ puts the removal
+      first precisely so that positive means helpful, and here that gives
+      $-0.006$. Negative contributions are ordinary; a table that cannot
+      express one cannot express redundancy or displacement at a fixed budget,
+      which is most of what a real sweep finds.
+check: choice
 ```
 
 ## What the sweep costs
@@ -722,58 +782,65 @@ prompt: |
       note, since the ordering of the sources is probably right even if the
       individual numbers are not.
 
-  Take each in turn. State whether it reduces the number of sources below the
-  floor, and why or why not.
-answer: |
-  (a) Bigger model: does not fix it, and misdiagnoses the problem. Seed noise
-  is not an artifact of small models that anneals away with scale -
-  contribution is a random variable at every scale, and a 300M model has its
-  own sigma. What a bigger model does change is the invoice: cost is linear in
-  N, so a 30x larger model makes every seed 30x more expensive, which means
-  you can afford 30x FEWER seeds. Since seeds are the only thing that shrinks
-  SE_delta, scaling up moves you AWAY from resolving the floor. This is the
-  most expensive available way to make the problem worse.
-
-  (b) More subset runs instead of more seeds: does not fix the leave-one-out
-  table, though it is not a stupid idea. Each Delta_i is a difference between
-  exactly two condition means and nothing else enters it; no quantity of
-  subset runs appears anywhere in SE_delta = sigma*sqrt(2/n). Only n moves it.
-  What the subset runs DO give is a different estimator with its own, tighter
-  error bar - the regression coefficient pools across all M runs - but it
-  estimates an average marginal effect across many coalitions, not the
-  leave-one-out counterfactual, and the two coincide only if contributions are
-  additive. You may report both. You may not use one to tighten the other.
-
-  (c) Drop the error bars: does not fix it and is the only one of the three
-  that is dishonest. The claim smuggled in is that the ORDERING survives even
-  if the magnitudes do not, and for the eight sources below the floor the
-  ordering is precisely what does not survive - their relative positions are
-  determined by noise, so a reseeded sweep permutes them. Publishing the order
-  as though it were information is the failure mode that ends a pitch.
-
-  What actually works: more seeds on the conditions that matter. The
-  requirement is n >= 8*sigma^2/Delta^2, so to resolve a 0.002 bpb effect at
-  sigma = 0.003 needs n >= 18 seeds per condition. At 225 seconds per run that
-  is about 2.3 GPU-hours for one source. Buy seeds.
-rubric: |
-  Must contain, one judgment per option:
-  (a) rejected, with the reason that noise is intrinsic rather than a
-  small-model artifact, and ideally the cost inversion - bigger models buy
-  fewer seeds, so scaling up makes it worse.
-  (b) rejected FOR THE LOO TABLE specifically, with the reason that SE_delta
-  depends only on sigma and n. Credit an answer that also notes subset
-  regression is a separate estimator with its own tighter error bar; do not
-  require it.
-  (c) rejected, with the reason that ordering below the floor is exactly what
-  is unstable.
-  All three correctly rejected with (a)'s and (b)'s reasons = pass.
-  Accepting (a) = fail, diagnosing D16 in its most durable form: the belief
-  that noise is a defect that better engineering removes.
-  Accepting (b) = fail, diagnosing V4-M2.
-  Accepting (c) = fail; this is the one that is not a technical error.
-  An answer that rejects all three but offers no remedy = partial, do not
-  pass; the point of the seed formula is that the remedy is purchasable.
-check: llm
+  Which verdict on the three would you give?
+options:
+  - text: |
+      None of them reduces the count. Seed noise is intrinsic at every scale,
+      and since cost is linear in $N$ a 30x model buys 30x fewer seeds, so (a)
+      moves away from the floor. No run count $M$ appears in
+      $\text{SE}_{\Delta} = \sigma\sqrt{2/n}$, so (b) leaves the
+      leave-one-out table untouched, however useful the regression is in its
+      own right. And below the floor the ordering is exactly what noise
+      determines, so (c) publishes a permutation. The remedy is purchasable:
+      $n \geq 8\sigma^2/\Delta^2$ means resolving 0.002 bpb at
+      $\sigma = 0.003$ takes 18 seeds per condition, about 2.3 GPU-hours.
+    correct: true
+    explain: |
+      Right, and the last clause is the point of the seed formula - the floor
+      is a price rather than a verdict. Where the price is not worth paying,
+      "these eight sources are not distinguishable from zero, and the smallest
+      effect this sweep could resolve is 0.005 bpb" is itself the deliverable.
+  - text: |
+      (a) is the right call. Contribution is a stable quantity and the wobble
+      at 10M parameters is small-model instability - a 300M model has smoother
+      training dynamics, so its seed-to-seed spread is far tighter and the
+      same sources clear the bar. (b) and (c) are both shortcuts around a
+      problem that scale removes.
+    misconception: D16
+    explain: |
+      Contribution is a random variable at every scale and a 300M model has
+      its own $\sigma$; what changes with scale is the invoice. Since
+      $C \approx 6ND$, each seed costs 30x more, and seeds are the only thing
+      in $\sigma\sqrt{2/n}$ that you can move - so this is the most expensive
+      available way to make the floor worse.
+  - text: |
+      (b) is the right call. Doubling to 600 subset runs doubles the amount of
+      averaging behind every source, and averaging is the stated remedy for
+      seed noise, so the error bars on the leave-one-out contributions tighten
+      by $\sqrt{2}$ for the same compute - and the regression comes free with
+      it. (a) and (c) are then unnecessary.
+    misconception: V4-M2
+    explain: |
+      Averaging shrinks the error of the estimator doing the averaging.
+      $\Delta_i$ reads two condition means and nothing else, so
+      $\text{SE}_{\Delta} = \sigma\sqrt{2/n}$ is unchanged by ten thousand
+      subset runs. The regression coefficient $c_i$ does tighten as
+      $2\sigma/\sqrt{M}$, but it estimates an average marginal effect across
+      sampled subsets, and it coincides with $\Delta_i$ only under additivity.
+  - text: |
+      (c) is the right call as an interim measure. The point estimates are the
+      best available estimates, ranking is a weaker claim than magnitude, and
+      a methodology note discloses the uncertainty honestly - so the table can
+      ship now, with (a) and (b) as later refinements.
+    misconception: D19
+    explain: |
+      For the eight sources under the floor the ordering is the part noise
+      determines: reseed the sweep and they permute, so the ranking carries no
+      information to disclose a caveat about. A number becomes evidence
+      through the procedure reported with it, and a table whose second column
+      is missing cannot be read at all - which is why the deliverable is
+      contributions and standard errors together.
+check: choice
 ```
 
 ## Subset regression
@@ -879,8 +946,6 @@ $1.070 = \beta_0 + \tfrac{1}{2}(-0.030 - 0.020 - 0.010 + 0.000) = \beta_0 -
 id: v4-b7
 type: completion
 concept: d-subset-regression
-# variants: blank the "out" average instead of the "in" average; or blank two
-# different sources' coefficients; or give all four c_i and blank beta_0.
 prompt: |
   Same balanced design - each source in four of eight runs - different corpus,
   so different outcomes.
@@ -896,53 +961,74 @@ prompt: |
   | 7 | 0 | 1 | 1 | 1 | 1.180 |
   | 8 | 1 | 1 | 1 | 0 | 1.130 |
 
-  Step 1. A in (runs 2,4,6,8): $(1.160 + 1.140 + 1.170 + 1.130)/4 =$ ____
-  Step 2. A out (runs 1,3,5,7): $(1.210 + 1.170 + 1.200 + 1.180)/4 =$ ____
-  Step 3. $\beta_A =$ ____ , so $c_A =$ ____
-  Step 4. C in (runs 5,6,7,8) $=$ ____ ; C out (runs 1,2,3,4) $=$ ____ ;
+  Step 1. A in (runs 2,4,6,8) $=$ ____ ; A out (runs 1,3,5,7) $=$ ____
+  Step 2. $\beta_A =$ ____ , so $c_A =$ ____
+  Step 3. C in (runs 5,6,7,8) $=$ ____ ; C out (runs 1,2,3,4) $=$ ____ ;
           $c_C =$ ____
-  Step 5. D in (runs 1,4,6,7) $=$ ____ ; D out (runs 2,3,5,8) $=$ ____ ;
+  Step 4. D in (runs 1,4,6,7) $=$ ____ ; D out (runs 2,3,5,8) $=$ ____ ;
           $c_D =$ ____
 
-  Fill the blanks. Then state in one sentence what is unusual about $c_D$ and
-  give the two explanations that a leave-one-out sweep alone could not
-  distinguish between.
-answer: |
-  Step 1: 4.600 / 4 = 1.150
-  Step 2: 4.760 / 4 = 1.190
-  Step 3: beta_A = 1.150 - 1.190 = -0.040, so c_A = 0.040
-  Step 4: C in = 4.680 / 4 = 1.170; C out = 4.680 / 4 = 1.170; beta_C = 0.000,
-          so c_C = 0.000
-  Step 5: D in = 4.700 / 4 = 1.175; D out = 4.660 / 4 = 1.165;
-          beta_D = +0.010, so c_D = -0.010
-
-  What is unusual: c_D is negative. Averaged across this design, including
-  source D made the model WORSE by 0.010 bpb, and unlike C - which is simply
-  worth nothing here - D is actively costing something.
-
-  The two explanations a leave-one-out sweep cannot separate: (i) D's content
-  is off-distribution for the held-out set, so training on it moves the model
-  away from what is being scored; or (ii) at a fixed token budget D's tokens
-  displaced tokens from A, B, or C that would have taught something the
-  evaluation rewards, which is what redundancy looks like from the outside.
-  Distinguishing them needs the interaction terms - does D's coefficient
-  change depending on which other sources are present - and that is what v5's
-  coalition machinery is for.
-rubric: |
-  Required, exactly: step 1 = 1.150; step 2 = 1.190; step 3 = -0.040 and
-  0.040; step 4 = 1.170, 1.170, 0.000; step 5 = 1.175, 1.165, -0.010.
-  Sign discipline is the graded part: c = -beta must be applied, so c_A is
-  POSITIVE 0.040 and c_D is NEGATIVE 0.010. Reversing either sign = fail.
-  The final sentence must identify c_D as negative and offer at least one of
-  {off-distribution content, token displacement / redundancy at fixed budget}.
-  All numbers with correct signs plus one valid explanation = pass.
-  An answer that reads c_D = -0.010 as "source D contains bad or corrupted
-  data" as the only explanation = partial, do not pass, and flag V4-M3.
-  An answer that reads c_C = 0 as "source C was not used" = fail; a zero
-  coefficient means the model was no better with it than without it on this
-  evaluation, which is a measurement about the held-out set, not about
-  whether the tokens went through the optimizer.
-check: llm
+  Which filling of the blanks, and which reading of $c_D$, is correct?
+options:
+  - text: |
+      A in $= 4.600/4 = 1.150$, A out $= 4.760/4 = 1.190$, so
+      $\beta_A = -0.040$ and $c_A = 0.040$. C in $= 4.680/4 = 1.170$, C out
+      $= 4.680/4 = 1.170$, so $c_C = 0.000$. D in $= 4.700/4 = 1.175$, D out
+      $= 4.660/4 = 1.165$, so $\beta_D = +0.010$ and $c_D = -0.010$. What is
+      unusual is that $c_D$ is negative: averaged across this design,
+      including D made the model worse. Either D's content is off-distribution
+      for the held-out set, or at a fixed token budget its tokens displaced
+      tokens from A, B or C - and these runs cannot tell the two apart.
+    correct: true
+    explain: |
+      Right, including the sign discipline: $c_i = -\beta_i$, so a helpful
+      source has negative $\beta$ and positive $c$. Separating displacement
+      from off-distribution content needs the interaction terms - whether D's
+      coefficient shifts with which other sources are present - which is what
+      v5's coalition machinery supplies.
+  - text: |
+      A in $= 1.150$, A out $= 1.190$, $\beta_A = -0.040$, $c_A = 0.040$; C in
+      $= 1.170$, C out $= 1.170$, $c_C = 0.000$; D in $= 1.175$, D out
+      $= 1.165$, $\beta_D = +0.010$, $c_D = -0.010$. What is unusual is that
+      $c_D$ is negative, which means source D is noisy or corrupted data - the
+      regression has found the junk in the corpus, and D should be dropped.
+    misconception: V4-M3
+    explain: |
+      Every number is right and the diagnosis is not. A negative coefficient
+      says D's marginal token was worth less than the token that replaced it
+      on this evaluation; a clean mirror of material A already carries scores
+      exactly this way, and reading a hundred of its documents finds nothing
+      wrong. Check the duplicate-cluster record and whether D's subject matter
+      appears in the held-out set before touching the corpus.
+  - text: |
+      A in $= 1.150$, A out $= 1.190$, $\beta_A = -0.040$, $c_A = 0.040$; C in
+      $= 1.170$, C out $= 1.170$, $c_C = 0.000$; D in $= 1.175$, D out
+      $= 1.165$, $\beta_D = +0.010$, $c_D = -0.010$. What is unusual is that
+      $c_D$ is negative, and since $c_D$ is D's leave-one-out contribution
+      computed cheaply, it predicts that removing D from the full four-source
+      corpus will improve held-out bpb by exactly 0.010.
+    misconception: V4-M2
+    explain: |
+      $c_i$ and $\Delta_i$ are not estimates of the same quantity. $c_D$ is an
+      average marginal effect across the subsets this design sampled, most
+      containing about half the sources; $\Delta_D$ is the marginal effect at
+      full density with A, B and C all present. They coincide only under
+      additivity, and the disagreement between them is the interaction
+      diagnostic - report both.
+  - text: |
+      A in $= 1.150$, A out $= 1.190$, $\beta_A = -0.040$, $c_A = 0.040$; C in
+      $= 1.170$, C out $= 1.170$, $c_C = 0.000$; D in $= 1.175$, D out
+      $= 1.165$, and since a contribution is a share of the model's value it
+      must be non-negative, so $c_D = 1.175 - 1.165 = +0.010$. Nothing is
+      unusual: A, C and D take 0.040, 0.000 and 0.010 of the total.
+    misconception: V4-M1
+    explain: |
+      The coefficient is in-minus-out, $\beta_D = 1.175 - 1.165 = +0.010$, and
+      $c_D = -\beta_D = -0.010$; reversing the subtraction to avoid a negative
+      is the pie-chart instinct, not the arithmetic. Coefficients need not be
+      non-negative and need not sum to anything, which is why a payout
+      proportional to them is a choice that has to be defended.
+check: choice
 ```
 
 ### Why this design beats the leave-one-out sweep, and where it does not
@@ -1073,8 +1159,6 @@ sources, which is the regime the leave-one-out table lives in.
 id: v4-b8
 type: completion
 concept: d-subset-regression
-# variants: blank the actual ranks instead of d^2; or give rho and blank the
-# sum of d^2; or extend to J = 6 and blank the denominator.
 prompt: |
   You are scoring a cheap attribution method - it produces per-source numbers
   in seconds without retraining anything - against your ground truth on six
@@ -1089,55 +1173,72 @@ prompt: |
   | $S_5$ | 1.075 | 1.088 | 5 | ____ | ____ | ____ |
   | $S_6$ | 1.090 | 1.079 | 6 | ____ | ____ | ____ |
 
-  Step 1. Fill the four missing actual ranks (1 = lowest actual bpb).
+  Step 1. The four missing actual ranks (1 = lowest actual bpb).
   Step 2. $\sum d_j^2 =$ ____
   Step 3. $J(J^2 - 1) = 6 \times$ ____ $=$ ____
   Step 4. $\rho = 1 - 6(\text{step 2}) / (\text{step 3}) =$ ____
 
-  Fill the blanks. Then answer in two sentences: the same method, scored
-  instead by correlating its per-document scores against per-document
-  leave-one-out values, comes out at 0.02. Explain why those two numbers are
-  not in conflict, and say which one you would put in a pitch deck.
-answer: |
-  Step 1. Sorting the actuals: 1.043, 1.055, 1.058, 1.071, 1.079, 1.088.
-  So S_2 (1.058) is rank 3, S_3 (1.055) is rank 2, S_5 (1.088) is rank 6,
-  S_6 (1.079) is rank 5.
-  d values: S_2 = 2-3 = -1 (d^2 = 1); S_3 = 3-2 = +1 (d^2 = 1);
-  S_5 = 5-6 = -1 (d^2 = 1); S_6 = 6-5 = +1 (d^2 = 1).
+  The same method, scored instead by correlating its per-document scores
+  against per-document leave-one-out values, comes out at 0.02.
 
-  Step 2. sum d^2 = 0 + 1 + 1 + 0 + 1 + 1 = 4
-  Step 3. 6 x 35 = 210
-  Step 4. rho = 1 - 24/210 = 1 - 0.1143 = 0.886
-
-  Why 0.886 and 0.02 are not in conflict: they are measured against different
-  ground truths, and one of the two ground truths is noise. The per-document
-  leave-one-out values are individually a few hundred times smaller than the
-  seed noise, so the vector being correlated against is essentially random;
-  any method scored that way lands near zero, including a perfect one. The LDS
-  is measured against subset outcomes that are ten times LARGER than the seed
-  noise, so it is measuring the method.
-
-  Which one goes in the deck: the LDS, with the design stated - how many
-  subsets, what size, held out how. The 0.02 is not a fact about the method
-  and reporting it as one would be an error in the method's disfavor, but a
-  reviewer who has read the literature will ask why you did not report a
-  per-document number, and the answer is the noise argument, not silence.
-rubric: |
-  Required, exactly: actual ranks 3, 2, 6, 5 for S_2, S_3, S_5, S_6; each
-  d^2 = 1; step 2 = 4; step 3 = 35 and 210; step 4 = 0.886 (accept
-  0.88-0.89).
-  The explanation must contain: (1) the per-document ground truth is buried
-  under seed noise so the 0.02 measures noise rather than the method, (2) the
-  subset-level ground truth is large relative to sigma so LDS measures the
-  method.
-  All arithmetic plus (1) and (2) = pass.
-  An answer that treats 0.02 as evidence the method is bad = fail; that is
-  precisely the inference LDS exists to prevent, and it would have you discard
-  a working method.
-  An answer that reports the LDS without stating the design it was measured on
-  = pass, but flag: an LDS on half-size subsets does not transfer to the
-  near-full subsets a leave-one-out table lives in.
-check: llm
+  Which filling of the blanks, and which reading of the two numbers, is right?
+options:
+  - text: |
+      Actual ranks: $S_2 = 3$, $S_3 = 2$, $S_5 = 6$, $S_6 = 5$, so each of the
+      four contributes $d^2 = 1$. Step 2: $\sum d_j^2 = 4$. Step 3:
+      $6 \times 35 = 210$. Step 4: $\rho = 1 - 24/210 = 0.886$. The 0.886 and
+      the 0.02 are measured against different ground truths and one of those
+      ground truths is noise: per-document leave-one-out values sit a few
+      hundred-fold below $\sigma$, so that correlation is near zero for any
+      method, including a correct one. Put the LDS in the deck, with its
+      design stated - how many subsets, of what size, held out how.
+    correct: true
+    explain: |
+      Right. Sorting the actual column gives 1.043, 1.055, 1.058, 1.071,
+      1.079, 1.088, so two adjacent pairs swap against the predicted order and
+      $\sum d_j^2 = 4$; $J^2 - 1 = 35$ at $J = 6$. And the two scores are not
+      in conflict because LDS moved the ground truth to subsets, where the
+      spread is ten times $\sigma$ instead of a few hundredths of it.
+  - text: |
+      Actual ranks: $S_2 = 3$, $S_3 = 2$, $S_5 = 6$, $S_6 = 5$; $\sum d_j^2 = 4$;
+      $6 \times 35 = 210$; $\rho = 0.886$. But the per-document correlation of
+      0.02 is the stricter and more honest measurement, since per-document
+      leave-one-out values are the finest-grained ground truth available: the
+      method is weak and 0.02 is the number to report.
+    misconception: D16
+    explain: |
+      The arithmetic is right and the conclusion inverts the unit. A single
+      paper is about 0.004% of the corpus, so its leave-one-out effect is
+      around $7.5 \times 10^{-6}$ bpb against $\sigma = 0.003$ - the vector
+      being correlated against is a measurement of the random seed. A metric
+      whose ground truth is noise scores a good method and a bad method alike
+      near zero, which is exactly why LDS exists.
+  - text: |
+      The actual column rises in the same order as the predicted column, so
+      every actual rank matches its predicted rank, each $d = 0$, and
+      $\sum d_j^2 = 0$; $6 \times 35 = 210$; $\rho = 1 - 0 = 1.0$. A perfect
+      LDS means the cheap method reproduces the counterfactual, so it can be
+      run at 8B parameters and its rankings trusted there.
+    misconception: D6
+    explain: |
+      The actual column is not monotone in the predictions: 1.055 sits below
+      1.058 and 1.079 below 1.088, so two pairs swap and $\sum d_j^2 = 4$,
+      giving 0.886. And even a perfect LDS would be a statement about this
+      scale and this design - measured against retraining on a 2B model, the
+      methods that scale come out at chance.
+  - text: |
+      Actual ranks: $S_2 = 3$, $S_3 = 2$, $S_5 = 6$, $S_6 = 5$; $\sum d_j^2 = 4$;
+      $J(J^2 - 1) = 6 \times 36 = 216$; $\rho = 1 - 24/216 = 0.889$. At that
+      score the method's per-source numbers are individually validated, so
+      they can be summed straight into payout shares.
+    misconception: V4-M1
+    explain: |
+      Two errors. $J^2 - 1 = 35$ at $J = 6$, not 36, so the denominator is 210
+      and $\rho = 0.886$. And a high LDS licenses only aggregate predictions
+      about unseen subsets: many different per-source vectors produce nearly
+      the same subset sums, and two sources that always co-occur in the design
+      can trade value freely without changing a single prediction.
+check: choice
 ```
 
 ## What ground truth buys
@@ -1265,55 +1366,66 @@ prompt: |
   Fact 2. Your finished table reads $\Delta_4 = 0.028$ and
   $\Delta_9 = -0.006$, both clearing the noise floor.
 
-  Explain, in your own words, what fact 1 predicts about fact 2, what would
-  have happened to both numbers if the pipeline had kept source 9's copies
-  instead, and what this implies about presenting the table as a basis for
-  payment.
-answer: |
-  What fact 1 predicts: dedup chose which source gets credit for everything
-  the shared passages teach. Source 4 kept the copies, so the model learned
-  that material from source 4's tokens. Removing source 4 therefore loses it,
-  which inflates Delta_4. Removing source 9 loses only its unique material,
-  and at a fixed token budget its remaining tokens are partly redundant with
-  what source 4 already carries - so Delta_9 is small, and can be negative
-  once those tokens are displacing more useful ones.
-
-  What a different dedup decision would have done: keep source 9's copies
-  instead and the two numbers largely swap. Source 9 becomes the source that
-  carries the shared material and its delta rises; source 4 loses it and its
-  delta falls, possibly below zero by the same displacement argument. Nothing
-  about the corpus, the sources, the model, or the eval set changed. A choice
-  made in a pipeline stage that every engineer regards as hygiene moved a
-  large fraction of the measured value from one rightsholder to another.
-
-  What this implies for the table: the contribution numbers are conditional on
-  the deduplication policy, and the policy must ship alongside them. The v2
-  manifest makes this auditable rather than invisible - the duplicate cluster
-  was recorded, so anyone can see that 4,100 passages were assigned to source
-  4 by rule rather than by measurement. Without that record the table looks
-  like a measurement of two sources and is in part a measurement of a sort
-  order. Credit assignment for shared content has to be an explicit, stated
-  policy, and the honest framing of Delta_4 is "source 4's contribution UNDER
-  this dedup policy," not "source 4's contribution."
-rubric: |
-  Must contain: (1) the mechanism - whichever source keeps the shared copies
-  is the source the model learns the material from, so it absorbs that
-  material's contribution, (2) the counterfactual - swapping the dedup
-  survivor largely swaps the two deltas, with nothing about the underlying
-  data having changed, (3) the consequence - the deduplication policy is part
-  of the result and must be reported with the table.
-  (1) and (2) = pass. All three = full credit.
-  An answer that treats Delta_9's negative sign as evidence that source 9 is
-  low quality = fail, diagnosing V4-M3; the sign here is manufactured by a
-  pipeline decision.
-  An answer that proposes to fix this by deduplicating more aggressively =
-  fail; more dedup makes MORE of these decisions, not fewer. The fix is
-  recording the clusters and stating the policy, which the pipeline already
-  does.
-  An answer that says the two sources should split the shared material's
-  credit = pass, and note it is the right instinct: that is a coalition
-  question and v5 gives it a principled answer.
-check: llm
+  Which explanation connects fact 1 to fact 2 correctly, and draws the right
+  consequence for presenting the table as a basis for payment?
+options:
+  - text: |
+      Dedup chose which source the model learns the shared material from.
+      Source 4 kept the copies, so removing it loses that material and
+      $\Delta_4$ absorbs it; removing source 9 loses only its unique material,
+      and at fixed token budget its surviving tokens partly displace more
+      useful ones, which is how $\Delta_9$ goes negative. Had the pipeline
+      kept source 9's copies the two numbers would largely swap, with nothing
+      about the corpus, the sources, the model or the eval set changed. So the
+      deduplication policy is part of the result and must ship with the table:
+      the honest framing is source 4's contribution UNDER this policy.
+    correct: true
+    explain: |
+      Right. A choice every engineer treats as hygiene moved a large fraction
+      of measured value between two rightsholders, and the recorded cluster is
+      what makes that auditable rather than invisible - without it the table
+      looks like a measurement of two sources and is in part a measurement of
+      a sort order.
+  - text: |
+      The measurement found the weaker source. A negative $\Delta_9$ clearing
+      the noise floor is the sweep telling you source 9 is low-quality or
+      corrupted material that actively damages the model, so the right
+      response is to inspect a sample of its documents and drop it from the
+      corpus, after which $\Delta_4$ stands as source 4's true contribution.
+    misconception: V4-M3
+    explain: |
+      Read a hundred of source 9's documents and you will find nothing wrong -
+      it is a clean journal mirror. A property of the data cannot depend on
+      which other source is present, and remove source 4 as well and source
+      9's sign flips positive. The negative delta says its marginal token was
+      worth less than the token that replaced it, in this corpus, at this
+      budget.
+  - text: |
+      Dedup is upstream cleanup, so it cannot affect what the counterfactual
+      measures: the model was trained on whatever the pipeline emitted, and
+      the two deltas are exact differences between actual runs. The real fix
+      is to dedup harder - collapse the cluster more aggressively so no shared
+      passage survives twice - and then the table needs no policy footnote.
+    misconception: D9
+    explain: |
+      Deduplication is a payout decision, not hygiene. Keeping one copy of a
+      shared passage assigns credit for everything it teaches, and more
+      aggressive dedup makes more of those assignments, not fewer. The deltas
+      are exact for the runs performed and those runs were built on the
+      policy, which is why the policy is part of the result.
+  - text: |
+      The pair's joint value is fixed and dedup only moved value inside it:
+      $\Delta_4 + \Delta_9 = 0.028 - 0.006 = 0.022$ is what sources 4 and 9
+      contributed together, so pay out against that total and the dedup
+      decision washes out of the settlement.
+    misconception: V4-M1
+    explain: |
+      Leave-one-out deltas do not sum to a joint effect whenever sources
+      interact, and near-duplicates are the case where they fail hardest -
+      remove both and the loss can jump several times the sum of the two
+      individual deltas. The instinct to split the shared material's credit is
+      right; the arithmetic that does it fairly is v5's coalition machinery.
+check: choice
 ```
 
 ## At the bench: the leave-one-out sweep
@@ -1369,60 +1481,65 @@ prompt: |
   total training tokens, the date of the run, and the git commit of the
   training code.
 
-  That list is reproducibility metadata and it is missing every item that is
-  needed to INTERPRET the numbers. State at least four things that must also
-  be recorded, and for each one, name the specific misreading of the table
-  that its absence permits. Answer from this unit's text; do not reference any
-  run you have or have not performed.
-answer: |
-  Four required items, each with the misreading it prevents:
-
-  1. **sigma and the seed count n.** Without them there is no SE_delta =
-  sigma*sqrt(2/n), so no reader can tell which rows are signal. A source at
-  0.001 bpb and a source at 0.031 bpb look like a small contributor and a
-  large one, when in fact one of them is indistinguishable from zero. This is
-  the misreading that turns a table into a liability, because it is the one
-  that assigns money to noise.
-
-  2. **The leave-one-out protocol - fixed corpus or fixed token budget.**
-  Without it, a reader cannot tell whether a large source's large number is
-  its content or its volume. The two protocols do not offset each other by a
-  constant; they systematically favor large sources, so the protocol changes
-  the ORDER of the table and not just its scale.
-
-  3. **The held-out evaluation set, chosen and decontaminated before the
-  runs.** Contribution is defined relative to a measurement of "worse," and
-  that measurement is this file. A source whose subject matter is absent from
-  the held-out papers scores zero regardless of its value, and without the
-  eval set named, a zero reads as "contributed nothing" rather than
-  "contributed nothing measurable by this yardstick."
-
-  4. **The deduplication policy and the duplicate-cluster record.** Where two
-  sources shared material, the pipeline chose which one keeps it, and that
-  choice moves contribution between them. Without the policy stated, a delta
-  inflated by having won a dedup tiebreak reads as a measured property of the
-  source.
-
-  Also acceptable in place of any of these: the model scale as a scope
-  statement (this is a 10M-parameter result and influence patterns change with
-  scale), and the source list itself with each source's token share, since a
-  contribution is relative to which other sources were present.
-rubric: |
-  Must name at least four items with the misreading each prevents. The four
-  canonical ones are: sigma and n / the error bar; the fixed-corpus vs
-  fixed-budget protocol; the held-out eval set; the dedup policy. Accept
-  model-scale scope statement or the source list with token shares as
-  substitutes for at most one.
-  Naming an item without the misreading it permits earns half credit for that
-  item; three fully-explained items = pass.
-  Omitting sigma and n = fail regardless of the rest. That is the load-bearing
-  item and its absence is the failure this whole unit exists to prevent.
-  An answer that lists items but frames them as "good practice" or
-  "reproducibility" rather than as interpretation prerequisites = partial, do
-  not pass; the distinction matters because reproducibility metadata lets
-  someone rerun your experiment while interpretation metadata lets them read
-  your result, and only one of those is needed to send an invoice.
-check: llm
+  That list is reproducibility metadata. Which set of additions supplies what
+  is needed to INTERPRET the numbers, with the misreading each one prevents?
+options:
+  - text: |
+      Add four things. $\sigma$ and the seed count $n$, without which there is
+      no $\text{SE}_\Delta = \sigma\sqrt{2/n}$ and a 0.001 row reads as a small
+      contributor rather than as indistinguishable from zero. The protocol -
+      fixed corpus or fixed token budget - without which a large source's
+      large number cannot be told from its volume, and which reorders the
+      table rather than shifting it. The held-out set, chosen and
+      decontaminated first, without which a zero reads as contributed nothing
+      rather than nothing this yardstick can see. The dedup policy and cluster
+      record, without which a delta inflated by winning a tiebreak reads as a
+      property of the source.
+    correct: true
+    explain: |
+      Right, and note what each addition is for: reproducibility metadata lets
+      someone rerun the experiment, interpretation metadata lets them read the
+      result, and only the second is needed to send an invoice.
+  - text: |
+      Add the per-source point estimates in rank order and a methodology note
+      saying training is stochastic. The error bars themselves are a
+      scientific courtesy that clutters a payment document - the ordering of
+      the sources survives the noise even where the magnitudes do not, so the
+      ranking is the interpretable part.
+    misconception: D16
+    explain: |
+      For the rows below the floor the ordering is precisely what does not
+      survive: their relative positions are set by noise, so a reseeded sweep
+      permutes them. Publishing that order as information is the failure this
+      unit exists to prevent, and it is the one that assigns money to noise.
+  - text: |
+      Add $\sigma$, $n$, and the held-out set. The protocol and the dedup
+      policy are implementation detail rather than interpretation: the
+      counterfactual was computed by actually retraining, not estimated, so
+      $\Delta_i$ is a property of the source that holds however the corpus was
+      assembled and at whatever scale it was measured.
+    misconception: V4-M4
+    explain: |
+      The counterfactual is exact for the configuration that produced it -
+      this architecture, parameter count, token budget, protocol, held-out set
+      and source list - and that scope statement is the strongest thing the
+      method has, not a weakness. Fixed corpus versus fixed budget reorders
+      the table in favour of large sources, and the dedup survivor decision
+      moves value between rightsholders.
+  - text: |
+      Add the $z$ column and the threshold used. Rows with $|z| > 2$ are
+      established at $p < 0.05$ and can be reported as measured contributions;
+      rows below the bar failed the test, so drop them from the table
+      entirely, which keeps the header block short and the document clean.
+    misconception: D19
+    explain: |
+      Two problems. Clearing a threshold across twelve rows is not proof - the
+      test, the threshold and the multiple-comparison correction have to be
+      committed before the sweep for the $z$ to mean anything. And the dropped
+      rows carry the most valuable sentence in the document: these sources are
+      not distinguishable from zero, and the smallest effect this sweep could
+      resolve is $2\sigma\sqrt{2/n} = 0.005$ bpb.
+check: choice
 ```
 
 ## What you can now do

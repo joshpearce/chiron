@@ -76,24 +76,23 @@ type: predict
 concept: c-xent
 prompt: |
   Two models are scored on the same token. Model A puts probability $0.5$ on
-  the correct token. Model B puts probability $0.25$ on it. Before computing:
-  is B's loss twice A's, or something else? Predict the relationship, then
-  the two actual values.
-answer: |
-  Not twice. Loss is $-\log p$, so halving the probability ADDS a constant,
-  it does not multiply the loss. $L_A = -\ln 0.5 = 0.693$,
-  $L_B = -\ln 0.25 = 1.386$. Here that constant ($\ln 2 = 0.693$) happens to
-  equal $L_A$, so B's loss is coincidentally twice A's. Check the general
-  claim: going from $0.9$ to $0.45$ also halves the probability, but the loss
-  goes $0.105 \to 0.799$, which is 7.6x, not 2x. The invariant is that each
-  halving of $p$ adds $\ln 2 = 0.693$ to the loss.
-rubric: |
-  Must identify that cross-entropy is additive in log-probability, so halving
-  $p$ adds $\ln 2 \approx 0.693$ rather than doubling the loss. Getting
-  $0.693$ and $1.386$ but concluding "so it is always 2x" = partial credit
-  (right arithmetic, wrong invariant) - this is the multiplicative-loss error.
-  Answering "twice, because probability halved" with no log reasoning = fail.
-check: llm
+  the correct token. Model B puts probability $0.25$ on it. Before reading on,
+  commit: what is the relationship between the two losses, and what are the
+  two values?
+options:
+  - text: "$L_A = -\\ln 0.5 = 0.693$ and $L_B = -\\ln 0.25 = 1.386$. Halving $p$ ADDS $\\ln 2 = 0.693$ to the loss; the doubling here is a coincidence of starting at $0.5$."
+    correct: true
+    explain: "Right. Cross-entropy is additive in log-probability, so each halving of $p$ costs a fixed $\\ln 2$. Check it away from $0.5$: going $0.9 \\to 0.45$ also halves $p$, but the loss goes $0.105 \\to 0.799$, a factor of 7.6, while the difference is still $0.693$."
+  - text: "$L_A = 0.693$ and $L_B = 1.386$, so the rule is that halving the probability doubles the loss."
+    misconception: M2
+    explain: "The arithmetic is right and the invariant is wrong. The doubling holds only because $-\\ln 0.5$ happens to equal $\\ln 2$. From $0.9$ to $0.45$ the loss multiplies by 7.6, not 2; what is constant is the added $\\ln 2$, because the loss reads $\\log p$, not $p$."
+  - text: "B's loss is twice A's, because B assigned half the probability and loss tracks the probability the model got wrong."
+    misconception: M2
+    explain: "This treats $p$ as a score that the loss passes through linearly. It does not: $L = -\\log p_t$, so ratios of probability become differences of loss. That log is exactly why confidently wrong ($p \\to 0$) is punished without bound."
+  - text: "The losses are $0.5$ and $0.75$: loss is the probability mass the model failed to put on the correct token, $1 - p_t$."
+    misconception: M18
+    explain: "That is a linear error measure, and it is bounded at 1 - so an arbitrarily confident wrong prediction would cost at most 1. Cross-entropy is $-\\log p_t$, unbounded above, which is what makes a model calibrated rather than merely accurate."
+check: choice
 ```
 
 ### Worked: three candidate tokens
@@ -223,27 +222,22 @@ type: self-explain
 concept: c-xent
 prompt: |
   A colleague reports: "I trained our model for another week and the training
-  loss dropped from $1.9$ to $0.4$. Big win." In your own words, explain what
-  you would check before agreeing, and what the number $0.4$ most likely means.
-answer: |
-  A training loss of $0.4$ nats means perplexity $e^{0.4} = 1.49$, i.e. the
-  model is behaving as though there are about 1.5 plausible next tokens at
-  every position. Natural language is nowhere near that predictable; the
-  irreducible entropy of text is roughly 1.7 nats on standard corpora. So the
-  model is not modeling language, it is reproducing the training set. The check
-  is held-out loss: if training loss fell to $0.4$ while validation loss rose
-  or flattened well above it, that is memorization. The correct target is
-  approaching the entropy floor on unseen data, not approaching zero on seen
-  data.
-rubric: |
-  Must contain (1) the observation that $0.4$ is implausibly far below the
-  entropy floor of language, and (2) the proposed check is held-out/validation
-  loss, and (3) the diagnosis of memorization/overfitting. Any 2 of 3 = pass.
-  An answer that treats the drop as unambiguously good = fail, cites M18.
-  An answer saying "loss can never be that low" as a hard mathematical
-  impossibility is also wrong - it is achievable on the training set, which is
-  precisely the problem; mark partial and correct it.
-check: llm
+  loss dropped from $1.9$ to $0.4$. Big win." Which explanation would you give
+  back to them?
+options:
+  - text: "$0.4$ nats is perplexity $e^{0.4} = 1.49$, about 1.5 plausible next tokens everywhere - far below the roughly $1.7$ nat entropy of text. That is memorization of the training set, so check held-out loss: it has almost certainly flattened or risen."
+    correct: true
+    explain: "Right. The floor $H$ is a property of the data, not the architecture, so a training loss well under it means the model is reproducing specific documents. The diagnostic is the training/validation gap, and the target is approaching $H$ on unseen data."
+  - text: "Good news without qualification: loss is the objective and its minimum is zero, so $0.4$ is much closer to a correct model than $1.9$ was."
+    misconception: M18
+    explain: "This reads the floor as zero. A loss-0 model puts probability $1.0$ on one continuation of every prefix - a lookup table, not a language model. Language is genuinely stochastic, so the gap that matters is $L - H$, not $L - 0$."
+  - text: "Impossible: cross-entropy on language cannot go below the entropy floor of about $1.7$ nats, so the number is a bug in the logging or the loss reduction."
+    misconception: M18
+    explain: "The floor bounds expected loss on the true distribution, not loss on a finite corpus the model has seen repeatedly. $0.4$ on training data is entirely achievable - that achievability is the problem, and it is why held-out loss is the check rather than a sanity bound on the number."
+  - text: "Expected: the extra week gave the model more capacity to store the corpus, and more stored data is what lower loss measures."
+    misconception: M11
+    explain: "Extra steps add no parameters, and capacity is not storage in any case. What the extra week did was drive the model deeper into fitting the specific tokens it was shown, which is precisely the regime where held-out loss stops following training loss."
+check: choice
 ```
 
 ## Backprop as blame assignment
@@ -304,25 +298,22 @@ prompt: |
   A network has a ReLU unit whose pre-activation was $a = -0.3$ on this
   example, so its output after $\text{ReLU}(a) = \max(0, a)$ was $0$.
   Some blame $\partial L / \partial h = 4.2$ arrives at that unit's output from
-  downstream. Predict the gradient that reaches the weights feeding into this
-  unit, and say what that implies if it keeps happening across examples.
-answer: |
-  Zero. The local derivative of $\text{ReLU}$ at $a = -0.3$ is $0$, so
-  $\partial L / \partial a = 4.2 \times 0 = 0$, and every weight feeding this
-  unit gets gradient $0 \times x = 0$ regardless of how large the incoming
-  blame or the input was. If the unit is negative for every example in the
-  batch, those weights receive no gradient at all and never update: the unit is
-  dead, and nothing in the update rule can revive it, because the only path
-  back to it is multiplied by zero.
-rubric: |
-  Must state the gradient is exactly zero AND attribute it to the ReLU local
-  derivative being zero for negative pre-activation. Must connect to the dead
-  unit consequence (no updates, permanently stuck) for full credit. Answering
-  "small but nonzero" or "4.2 scaled down" = fail; that is the smooth-gate
-  error. Answering zero but attributing it to the activation output being zero
-  rather than the derivative being zero = partial (right answer, wrong
-  mechanism - the output value is not what gates the gradient).
-check: llm
+  downstream. Commit before reading on: what gradient reaches the weights
+  feeding this unit, and what follows if it keeps happening?
+options:
+  - text: "Exactly $0$: the local derivative of $\\text{ReLU}$ at $a = -0.3$ is $0$, so $\\partial L / \\partial a = 4.2 \\times 0 = 0$ and every incoming weight gets $0 \\times x$. If the unit is negative across the batch it never updates - a dead unit."
+    correct: true
+    explain: "Right. Blame arriving times local sensitivity equals blame departing, and here the local sensitivity is exactly zero. Nothing in the update rule can revive the unit, because the only path back to it is multiplied by zero."
+  - text: "A small nonzero gradient: the incoming blame $4.2$ is attenuated by the shut gate but some fraction survives, so the weights drift slowly back toward the active region."
+    misconception: U5M1
+    explain: "This imagines the gate as a soft attenuator, which is what a finite-difference estimate of the derivative would suggest. Backprop uses the exact analytic derivative of $\\max(0,a)$, which is $0$ for $a < 0$ - not small, zero. Nothing survives, and nothing drifts back."
+  - text: "$4.2$ times the input, unchanged: the blame passes through because $\\text{ReLU}$ has no parameters of its own to absorb any of it."
+    misconception: U5M1
+    explain: "Having no parameters is not the same as having derivative $1$. The gate multiplies the incoming blame by $\\mathbb{1}[a > 0]$, which is $0$ here. This is the one place where a forward activation changes the structure of the backward pass rather than merely scaling it."
+  - text: "Zero, because the unit's output was $0$ and a gradient is the loss change per unit change in that output, so a zero output can carry no blame."
+    misconception: U5M6
+    explain: "Right answer, wrong mechanism, and the mechanism matters. It is $\\partial h / \\partial a$ that is zero, not $h$ that gates anything - a unit whose output happened to be $0$ under a different activation (say $\\tanh$ at $a=0$) has local derivative $1$ and passes full blame."
+check: choice
 ```
 
 ## Backprop worked: two layers, real numbers
@@ -513,13 +504,8 @@ that is pretraining. There is no other trick.
 id: u5-b6
 type: completion
 concept: c-backprop
-# Variants: blank different steps to shift what is being tested.
-# Blanking (1) and (3) tests the chain-rule structure (default, below).
-# Blanking (2) and (4) tests the outer-product / transpose mechanics.
-# Blanking (5) alone is the warmup variant.
 prompt: |
-  Here is the same backward pass with three steps removed. Fill in each blank
-  with the expression AND the numeric value.
+  Here is the same backward pass with three steps removed.
 
   Given (forward pass, already computed):
   $x = [1.0,\ 2.0]$, $a_1 = [0.4,\ 1.2]$, $h = [0.4,\ 1.2]$,
@@ -534,25 +520,22 @@ prompt: |
   4. $\partial L / \partial a_1 = (\partial L / \partial h) \odot
      \mathbb{1}[a_1 > 0] = [-0.955179,\ 0.651516]$
   5. $\partial L / \partial W_1$ = ____
-answer: |
-  1. $\partial L / \partial z = p - y = [-0.752737,\ 0.550295,\ 0.202442]$,
-     where $y = [1, 0, 0]$ is the one-hot target.
-  3. $\partial L / \partial h = W_2^{\top} (\partial L / \partial z)
-     = [-0.955179,\ 0.651516]$. Each hidden unit collects blame from all three
-     logits it feeds.
-  5. $\partial L / \partial W_1 = (\partial L / \partial a_1)\, x^{\top}
-     = \begin{bmatrix} -0.955179 & -1.910358 \\ 0.651516 & 1.303031
-     \end{bmatrix}$.
-rubric: |
-  Blank 1 must be $p - y$ with the target subtracted from the correct index,
-  giving a negative first entry. Blank 3 must use $W_2$ TRANSPOSED - producing
-  a 3-vector instead of a 2-vector means the transpose was dropped, which is
-  the single most common mechanical error here. Blank 5 must be the outer
-  product with $x$, so column 1 is twice column 0. All three expressions
-  correct with arithmetic slips = pass. Any blank with the wrong structure
-  (missing transpose, wrong operand, gradient of the loss w.r.t. the wrong
-  variable) = fail.
-check: llm
+
+  Which set of fillings is correct?
+options:
+  - text: "1: $p - y = [-0.752737,\\ 0.550295,\\ 0.202442]$. 3: $W_2^{\\top}(\\partial L/\\partial z) = [-0.955179,\\ 0.651516]$. 5: $(\\partial L/\\partial a_1)\\,x^{\\top} = \\begin{bmatrix} -0.955179 & -1.910358 \\\\ 0.651516 & 1.303031 \\end{bmatrix}$."
+    correct: true
+    explain: "Right. Blank 1 is the softmax-plus-cross-entropy joint derivative $p - y$ with $y = [1,0,0]$, so the target entry goes negative. Blank 3 transposes $W_2$ to map 3 logit-blames back to 2 hidden-blames. Blank 5 is the outer product with $x$, which is why column 1 is exactly twice column 0."
+  - text: "1: $p - y = [-0.752737,\\ 0.550295,\\ 0.202442]$. 3: $W_2(\\partial L/\\partial z)$ is undefined at these shapes, so use the elementwise product with the first two entries of the blame, $[-0.752737,\\ 0.550295]$. 5: $(\\partial L/\\partial a_1)\\,x^{\\top}$ as above."
+    misconception: U5M1
+    explain: "Dropping the transpose is the classic mechanical error here, and patching the shape mismatch by truncating the blame vector discards the contribution of logit 2 entirely. $h_0$ feeds all three logits, so its blame is $\\sum_i (\\partial L/\\partial z_i)(W_2)_{i0} = -0.955179$, which uses every row."
+  - text: "1: $y - p = [0.752737,\\ -0.550295,\\ -0.202442]$, since the loss should decrease along the target. 3: $W_2^{\\top}(\\partial L/\\partial z) = [0.955179,\\ -0.651516]$. 5: the same outer product with every sign flipped."
+    misconception: U5M6
+    explain: "This bakes the descent direction into the gradient. $\\partial L / \\partial z$ is $p - y$: increasing $z_0$ decreases the loss, so its entry is negative, and the update flips the sign later via $w \\leftarrow w - \\eta g$. Flipping it here and again in the update moves every weight uphill."
+  - text: "1: $-\\log p = [1.397301,\\ 0.597301,\\ 1.597301]$, the per-class loss. 3: $W_2^{\\top}$ times that vector. 5: the outer product of the result with $x$."
+    misconception: U5M2
+    explain: "This propagates loss values rather than derivatives. Blame is $\\partial L/\\partial z_i$ - how much the loss changes per unit change in each logit - and only one entry of $p$ enters the loss at all. The clean result $p - y$ says the blame on each wrong class equals the probability mass wasted on it."
+check: choice
 ```
 
 ## Optimizers: four update rules, one loop
@@ -671,10 +654,10 @@ id: u5-b7
 type: completion
 concept: c-optimizers
 prompt: |
-  Same procedure, new numbers. Fill the blanks with expression AND value.
-  A weight $w = -0.3$ receives gradient $g = -0.05$. Learning rate
-  $\eta = 0.001$, weight decay $\lambda = 0.1$, $\beta_1 = 0.9$,
-  $\beta_2 = 0.999$, $\epsilon = 10^{-8}$, optimizer state fresh at $t = 1$.
+  Same procedure, new numbers. A weight $w = -0.3$ receives gradient
+  $g = -0.05$. Learning rate $\eta = 0.001$, weight decay $\lambda = 0.1$,
+  $\beta_1 = 0.9$, $\beta_2 = 0.999$, $\epsilon = 10^{-8}$, optimizer state
+  fresh at $t = 1$.
 
   1. $m = (1 - \beta_1) g = (0.1)(-0.05) = -0.005$
   2. $v = (1 - \beta_2) g^2 = (0.001)(0.0025) = 2.5 \times 10^{-6}$
@@ -682,36 +665,22 @@ prompt: |
   4. adaptive step $= \eta \, \hat m / (\sqrt{\hat v} + \epsilon) =$ ____
   5. decoupled decay $= \eta \lambda w =$ ____
   6. $w \leftarrow w - (\text{step}) - (\text{decay}) =$ ____
-  7. One sentence: the ratio $\hat m / \sqrt{\hat v}$ came out to exactly
-     $-1$ here. State why that is guaranteed at $t = 1$ for any $g$, and what
-     it implies about the size of Adam's first step. ____
-answer: |
-  3. $\hat m = -0.005 / 0.1 = -0.05$; $\hat v = 2.5\times10^{-6} / 0.001
-     = 0.0025$, so $\sqrt{\hat v} = 0.05$.
-  4. $0.001 \times (-0.05 / 0.05) = -0.001$
-  5. $(0.001)(0.1)(-0.3) = -0.00003$
-  6. $w = -0.3 - (-0.001) - (-0.00003) = -0.29897$
-  7. At $t = 1$ bias correction divides $m$ by $(1-\beta_1)$ and $v$ by
-     $(1-\beta_2)$, which exactly undoes the factors applied when they were
-     formed, so $\hat m = g$ and $\hat v = g^2$. The ratio is therefore
-     $g / |g| = \mathrm{sign}(g)$ and the first step is exactly $\eta$ in
-     magnitude regardless of how large or small the gradient was.
-# Variant blanks: blank 4+6 for a fast arithmetic pass; blank 3+7 to isolate
-# bias correction; blank 5+7 for the mastery pass, since the decoupled decay
-# and the sign(g) property are the two ideas that separate AdamW from SGD.
-rubric: |
-  3 must give -0.05 and 0.0025. 4 must be -0.001, NOT -0.00005: an answer that
-  scales with the gradient magnitude skipped the normalization and is the SGD
-  update in disguise. 5 must be -0.00003 and must be subtracted separately -
-  folding $\lambda w$ into $g$ before step 1 is Adam-with-L2, not AdamW, and
-  fails the beat. 6 must be -0.29897; -0.29900 means the decay was dropped,
-  -0.30103 means the step was added rather than subtracted (a negative gradient
-  must move the weight UP).
-  7 is mandatory: the answer must say the corrected ratio is sign(g) and the
-  first step is exactly $\eta$. An answer that says Adam "picks its own
-  learning rate" is U5M3 and fails - $\eta$ still sets the scale, which is
-  precisely what step 7 shows.
-check: llm
+
+  Which set of fillings is correct, and what does the run of numbers show?
+options:
+  - text: "3: $\\hat m = -0.05$, $\\hat v = 0.0025$ so $\\sqrt{\\hat v} = 0.05$. 4: $0.001 \\times (-0.05/0.05) = -0.001$. 5: $(0.001)(0.1)(-0.3) = -0.00003$. 6: $w = -0.3 + 0.001 + 0.00003 = -0.29897$. Bias correction undoes the forming factors exactly, so $\\hat m / \\sqrt{\\hat v} = \\mathrm{sign}(g)$ and the first step is $\\eta$ in magnitude whatever $g$ was."
+    correct: true
+    explain: "Right. At $t=1$, $\\hat m = g$ and $\\hat v = g^2$, so the ratio is $g/|g|$ and the step is exactly $\\eta$. The negative gradient moves the weight up, and the decay is subtracted separately from the adaptive step - that separation is the whole of AdamW."
+  - text: "3: $\\hat m = -0.05$, $\\hat v = 0.0025$. 4: $0.001 \\times (-0.05) = -0.00005$, since the step should scale with the size of the gradient. 5: $-0.00003$. 6: $w = -0.3 + 0.00005 + 0.00003 = -0.29992$."
+    misconception: U5M3
+    explain: "That is the SGD update wearing Adam's notation: the division by $\\sqrt{\\hat v}$ has been dropped. Adam's step is $\\hat m/\\sqrt{\\hat v}$, which is scale-free - shrink $g$ by 100x and the step barely changes. Adam cares about the gradient's sign and consistency, not its magnitude."
+  - text: "Fold the decay in first: $g' = g + \\lambda w = -0.05 + (0.1)(-0.3) = -0.08$, then 3: $\\hat m = -0.08$, $\\sqrt{\\hat v} = 0.08$. 4: step $= -0.001$. 6: $w = -0.3 + 0.001 = -0.299$, with no separate decay term."
+    misconception: U5M3
+    explain: "This is Adam-with-L2, not AdamW, and the beat's own numbers show why it breaks: the decay entered the ratio and was normalized away with everything else, so $\\lambda$ no longer means the same thing across parameters. Decoupling computes the step from $g$ alone and subtracts $\\eta \\lambda w$ afterward."
+  - text: "3: $\\hat m = -0.05$, $\\hat v = 0.0025$. 4: $-0.001$. 5: $-0.00003$. 6: $w = -0.3 - 0.001 - 0.00003 = -0.30103$, moving the weight further negative in the direction the gradient points."
+    misconception: U5M6
+    explain: "The signs cancelled once too few. The update is $w \\leftarrow w - \\eta u$, so a negative step subtracted from $w$ raises it: $-0.3 - (-0.001) - (-0.00003) = -0.29897$. Descent moves against the gradient, which for $g < 0$ means up."
+check: choice
 ```
 
 ## What gradient descent actually finds
@@ -778,27 +747,21 @@ prompt: |
   Your team trains the same model twice with different seeds. Both reach loss
   $2.14$. A teammate proposes averaging the two weight tensors elementwise to
   get "the best of both", the way you would average two estimates of a
-  quantity. Explain in your own words what will actually happen and why.
-answer: |
-  The averaged model will be far worse than either, likely near-random. The two
-  runs did not converge to nearby points in weight space; they landed in
-  different low-loss regions, and the loss surface between two such regions is
-  not low. Concretely, hidden units are permutation-symmetric: run A's unit 7
-  may compute what run B's unit 200 computes, so averaging adds together
-  features that have nothing to do with each other. Averaging is valid for
-  estimates of one quantity; these are two different parameterizations of
-  similar functions, not two noisy measurements of one parameter vector. It
-  works only when the checkpoints share a training trajectory (weight
-  averaging along one run, or model soups from a common fine-tuning ancestor).
-rubric: |
-  Must contain (1) the averaged model performs badly, and (2) a reason grounded
-  in there being many distinct low-loss regions rather than one minimum -
-  permutation symmetry, or "the midpoint of two basins is not in a basin", both
-  count. Mentioning that averaging DOES work for checkpoints sharing a
-  trajectory = full credit. An answer predicting the average is fine or
-  slightly better = fail, cites M5. An answer saying "it fails because of local
-  minima" without the multiplicity/symmetry argument = partial.
-check: llm
+  quantity. Which explanation of what will happen is the right one?
+options:
+  - text: "It will produce a near-random model. The runs landed in different low-loss regions, and the path between them is not low; hidden units are permutation-symmetric, so run A's unit 7 may compute what run B's unit 200 does and the average adds unrelated features. Averaging works only for checkpoints sharing a trajectory."
+    correct: true
+    explain: "Right. These are two parameterizations of similar functions, not two noisy measurements of one parameter vector. Weight averaging along a single run, or soups from a common fine-tuning ancestor, works precisely because those checkpoints do share a basin."
+  - text: "It will land somewhere between the two, probably slightly better than either: both are near the minimum of the same loss surface, so the midpoint is near it too and the seed noise partly cancels."
+    misconception: M5
+    explain: "This assumes one minimum that both runs approximately found. There is no 'the' minimum - permuting a width-$d$ layer's units gives $d!$ equivalent settings per layer, and SGD finds one low-loss region among astronomically many. The midpoint of two basins is not in a basin."
+  - text: "It will be slightly worse than either, because one run is stuck in a local minimum and averaging drags the good run partway into that inferior valley."
+    misconception: M5
+    explain: "Both runs reached $2.14$, so neither is 'stuck' anywhere inferior - and in $10^{11}$ dimensions local minima are rare, since a critical point needs upward curvature in every direction at once; saddles dominate and gradient noise escapes them. The damage from averaging is not mild, and its cause is multiplicity, not entrapment."
+  - text: "It will roughly double the stored knowledge: each run memorized a different slice of the corpus, and summing the weights combines both sets of facts before the halving rescales them."
+    misconception: M4
+    explain: "Weights are not rows of facts to be unioned; they define a function, with each fact distributed across the whole tensor. Adding two unrelated functions' parameters does not compose their behavior, it destroys both."
+check: choice
 ```
 
 ## Scaling laws: what more parameters buy
@@ -913,25 +876,23 @@ concept: c-scaling
 prompt: |
   Using $L(N, D) = 1.69 + 406.4/N^{0.34} + 410.7/D^{0.28}$: you have a model
   with $N = 10^{10}$ and $D = 2 \times 10^{11}$, at $L = 2.133$. Your budget
-  allows exactly one of: (a) 10x the parameters at the same data, or (b) 10x
-  the data at the same parameters. Predict which gives the larger loss
-  reduction and by roughly how much, then say what limits how far this can go.
-answer: |
-  (a) 10x parameters: the $N$ term goes from $0.162$ to $0.074$, saving
-  $0.088$. (b) 10x data: the $D$ term goes from $0.281$ to $0.148$, saving
-  $0.133$. Option (b) wins, because at $D/N = 20$ the data term is the larger
-  of the two and the one with more room to shrink. What limits it: both terms
-  approach zero but the total approaches $E = 1.69$, the irreducible entropy
-  floor, and never goes below it. Also note (a) and (b) do not cost the same -
-  $C \approx 6ND$ makes both a 10x compute increase here, so the comparison is
-  fair on compute but (a) additionally costs 10x more to serve.
-rubric: |
-  Must (1) identify option (b) as the larger reduction, (2) justify it by
-  comparing the two shrinking terms rather than by intuition, and (3) name the
-  irreducible floor $E = 1.69$ as the limit. Any 2 of 3 = pass. Predicting that
-  loss can be driven arbitrarily low with enough scale = fail, cites M18.
-  Predicting (a) because "parameters matter more" = fail, cites M11.
-check: llm
+  allows exactly one of: 10x the parameters at the same data, or 10x the data
+  at the same parameters. Before reading on: which gives the larger loss
+  reduction, and what limits how far the reduction can go?
+options:
+  - text: "10x the data wins. The $D$ term goes $0.281 \to 0.148$, saving $0.133$, while 10x the parameters takes the $N$ term $0.162 \to 0.074$, saving only $0.088$. Both terms shrink toward zero but the total approaches $E = 1.69$, the irreducible floor, and never goes below it."
+    correct: true
+    explain: "Right. At $D/N = 20$ the data term is the larger of the two shrinking terms, so it has more room; and the fitted $E$ is the entropy of the data, not a deficiency any amount of scale removes."
+  - text: "10x the parameters wins: capacity is what a model learns from, so the $N$ term dominates the improvement, and with enough parameters the loss keeps falling without a floor."
+    misconception: M11
+    explain: "Evaluate the fit rather than the intuition: $406.4/N^{0.34}$ falls from $0.162$ to $0.074$, a smaller saving than the data term's $0.133$. And more parameters buy richer feature composition, not more stored rows, so 'capacity is what it learns from' is the wrong picture of what $N$ does."
+  - text: "10x the data wins by about $0.133$, and since each 10x halves the excess, enough repetitions of this drive $L$ arbitrarily close to $0$."
+    misconception: M18
+    explain: "The first half is right, the limit is not. The excess halves toward zero, but it is excess over $E = 1.69$: $L \to 1.69$, not $L \to 0$. A model at $L = 0$ would put probability $1$ on one continuation of every prefix."
+  - text: "Neither: both are a 10x compute increase under $C \approx 6ND$, and the fit depends only on $C$, so the two allocations land on the same loss."
+    misconception: M11
+    explain: "The fit has separate $N$ and $D$ terms precisely because allocation matters at fixed compute - that is the whole Chinchilla result. Two allocations of the same $C$ gave $L = 2.388$ and $L = 2.318$ earlier in this section."
+check: choice
 ```
 
 ## Post-training: SFT, RLHF, RLAIF, DPO
@@ -1045,30 +1006,22 @@ concept: c-posttrain
 prompt: |
   A product manager asks: "Our model does not know about our internal API. Can
   we fix that with RLHF? We can generate a few thousand preference pairs
-  showing good API answers preferred over bad ones." Explain in your own words
-  what will happen if you do this, and what the right intervention is.
-answer: |
-  It will not install the API knowledge. Preference optimization changes which
-  of the model's existing continuations get probability mass; it cannot create
-  a mapping from endpoint names to behavior that was never in the weights. The
-  likely outcome is worse than nothing: the pairs teach the model that
-  confident, well-formatted API answers are preferred, so it produces
-  confident, well-formatted, invented endpoints. You have optimized the style
-  of the hallucination. The right interventions are ones that put the
-  information in front of the model as capability or as context: continued
-  pretraining or SFT on the actual API documentation (many tokens of real
-  content, not preference pairs), or retrieval that places the docs in the
-  context window at inference time, which is usually the cheaper and more
-  maintainable option since the API will change.
-rubric: |
-  Must contain (1) preference optimization shapes behavior/selection, not
-  knowledge, and (2) the specific failure mode that it will produce
-  confident-sounding fabrications, and (3) at least one correct alternative
-  (SFT/continued pretraining on the real docs, or retrieval/in-context). Any 2
-  of 3 = pass, but (2) alone without (1) = partial. Answering that RLHF will
-  work given enough pairs = fail, cites M15. Answering that nothing can teach
-  the model the API = fail; pretraining-scale data and retrieval both work.
-check: llm
+  showing good API answers preferred over bad ones." Which explanation of what
+  will happen, and what to do instead, would you give?
+options:
+  - text: "It will not install the knowledge. Preference optimization moves probability among continuations the model can already produce; it cannot create a mapping from endpoint names to behavior that was never in the weights. Worse, the pairs teach that confident, well-formatted API answers are preferred, so you get confident, well-formatted, invented endpoints - the style of the hallucination optimized. Put the information in as capability or as context instead: continued pretraining or SFT on the actual API docs, or retrieval that places the docs in the context window."
+    correct: true
+    explain: "Right on both halves. Post-training selects among existing behaviors, and rewarding good-looking answers when the capability is absent rewards confident-sounding ones. Real documentation tokens or retrieval are the interventions that supply what is missing; retrieval usually wins because the API will change."
+  - text: "It will work if the pairs are good enough. A few thousand preference pairs is the same order as a normal SFT set, and RLHF is where a model learns the specialized knowledge that pretraining did not cover - that is why the chat model knows so much more than the base model."
+    misconception: M15
+    explain: "The knowledge benchmarks say otherwise: they barely move across post-training, and sometimes dip. The dramatic base-to-chat difference is instruction following and formatting. $10^5$ examples is around 0.0003% of the pretraining token budget - too small a perturbation to install a world model."
+  - text: "It will work, but only because the reward score reaches the model: it sees that its API answers were rated poorly and learns from that feedback which endpoints are wrong, the way a person would."
+    misconception: U5M5
+    explain: "The model has no channel to receive the reward. A separate reward model computes a scalar outside it, which weights a policy gradient on the weights; nothing about the score is represented or reasoned about. What changes is the probability of the tokens it produced."
+  - text: "Nothing can teach the model the API. Facts are fixed at pretraining, so once a corpus is chosen the only option is to tell users the model does not cover internal systems."
+    misconception: M4
+    explain: "Too strong, and it rests on treating weights as a frozen store of rows. Continued pretraining or SFT on real documentation genuinely adds capability, and retrieval sidesteps the weights entirely by putting the docs in the context window."
+check: choice
 ```
 
 ## What you now have

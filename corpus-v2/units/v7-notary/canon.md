@@ -97,44 +97,29 @@ id: v7-b1
 type: predict
 concept: d-audit-landscape
 prompt: |
-  Before reading on, commit to an answer in writing.
+  Before reading on, commit to an answer.
 
   You are the journal publisher. You want a third party - a court, a
   regulator, a counterparty in a negotiation - to be able to answer "was this
   archive used to train that model" with a stated chance of being wrong.
 
-  Name the one piece of information that would make that possible from
-  outside the lab, with no access to the training data, the weights, or the
-  developer's cooperation. Then state the harder half: what has to be true
-  about WHEN that information came into existence.
-answer: |
-  The information is a matched pair: something you published, and something
-  generated the same way that you deliberately did not publish. The
-  unpublished twin is what makes the test work, because it tells you how the
-  measurement behaves on content the model provably never saw.
-
-  The timing requirement is the half almost nobody states, and it is fatal if
-  you get it wrong. The pair has to exist, and the choice of which half to
-  publish has to be fixed, BEFORE the model was trained - and, separately, the
-  test you are going to run on them has to be fixed before you look at the
-  model. Evidence manufactured after seeing the defendant is not evidence, and
-  an opposing expert's first question is when each item in your protocol came
-  into existence.
-rubric: |
-  Grade generously on the first half and strictly on the second.
-  Pass requires: (1) some notion of a control, comparison set, or secret held
-  back - any wording that involves content the model definitely did not see,
-  generated the same way as content it might have; AND (2) an explicit timing
-  constraint, either that the material must predate the training run or that
-  the test must predate seeing the model. Both halves = pass.
-  (1) alone = fail, and deliver sections 2 and 7 in full; the learner has the
-  statistical idea and not the evidentiary one, which is the half that is the
-  product.
-  An answer proposing to measure the model's loss on the archive and compare
-  it to something = fail, diagnosing D2; that is the retrospective method the
-  previous unit ruled out, and the correction must be re-delivered.
-  An answer that says it is impossible = fail; this unit is the construction.
-check: llm
+  Which of these puts a stated error rate within reach from outside the lab,
+  with no access to the training data, the weights, or the developer's
+  cooperation?
+options:
+  - text: "A matched pair generated the same way: items you published into the archive, and twin items you deliberately never published - with the pair created, and the split between published and withheld fixed, before the training run, and the test itself fixed before you look at the model."
+    correct: true
+    explain: "Right, and the timing half is the part almost nobody states. The unpublished twins tell you how the measurement behaves on content the model provably never saw, which is what turns a number into a false-positive rate. But evidence manufactured after seeing the defendant is not evidence: an opposing expert's first question is when each item in your protocol came into existence."
+  - text: "The model's loss on a hundred articles from the archive, compared against its loss on a hundred similar articles from a journal you know was not in the training set. The archive scoring lower is the measurement, and the comparison journal supplies the baseline."
+    misconception: D2
+    explain: "This is the retrospective method the previous unit ruled out. To turn 'scores lower' into 'was trained on' you need the spread of that measurement when the model has NOT seen the articles, and the only honest way to get it is a model identical except for your data. The comparison journal differs in period, topic, style and length, any of which moves the loss on its own - which is why classifiers that never query the model at all beat these attacks on matched benchmarks."
+  - text: "A demonstration that the model reproduces an article verbatim when prompted with its first line. When it fires it needs no statistics at all, and the exhibit is a screenshot."
+    misconception: D3
+    explain: "When it fires it is the best evidence in the field - but it fires on heavily duplicated text, and a journal with four hundred subscribers that nobody quotes will not trigger it. Its silence carries no information, because it is equally silent for content that is definitely in the corpus. A test that cannot produce a negative result cannot produce an error rate."
+  - text: "Nothing does. Without access to the training data or the weights, membership is unknowable from outside, so the honest answer is that no stated error rate is available to the publisher."
+    misconception: D2
+    explain: "This concedes exactly one step too early. The null is unsamplable only when you try to draw it from the world after the fact; you can instead manufacture it, by generating content from a key and withholding half of it. This unit is that construction."
+check: choice
 ```
 
 Three ways to try to answer the publisher's question. They are worth laying
@@ -283,48 +268,26 @@ type: self-explain
 concept: d-canary-design
 prompt: |
   A colleague proposes this: rather than keeping unpublished twins, generate
-  the control items now, at detection time, from the same key. The generator is
+  the control items at detection time, from the same key. The generator is
   deterministic, so the items are drawn from the same distribution either way,
-  and it saves you having to store anything for a year.
+  and it saves storing anything for a year.
 
-  The statistics are fine. Say precisely what breaks, and what the fix costs.
-answer: |
-  The statistics are indeed fine, in the narrow sense that the items really are
-  draws from the same distribution and the null they define is the right one.
-  What breaks is that nobody has to believe you.
-
-  Two failures, and the second is worse. First, if the controls are generated
-  at detection time you can generate many batches and use whichever produces
-  the largest gap; nothing in the artifact distinguishes "the controls" from
-  "the best of forty control batches." Second, and fatally, generating at
-  detection time means the KEY is in your hands, unconstrained, at a moment
-  when you have already seen the model. A key that is chosen after you can test
-  keys is a key you can search: try candidate keys until one produces a
-  published/control split whose gap is large, then present that key as the one
-  you have had all along.
-
-  The fix is not to store the file. It is to commit publicly to the key before
-  the training run, by publishing a timestamped hash of it. Then generation at
-  detection time is fine, because the key is pinned and the derivation is
-  deterministic, so anyone can regenerate both sets and check that they are the
-  ones the commitment covers. The cost is that the commitment has to be
-  published somewhere append-only and third-party visible, and it has to happen
-  before the model exists.
-rubric: |
-  Must contain: (1) the objection is evidentiary, not statistical - the sampling
-  is valid and the problem is that the analyst had freedom after seeing the
-  model; (2) a concrete description of the freedom, either selecting among
-  control batches or searching over keys; (3) the fix is a public timestamped
-  commitment to the key (a hash), not necessarily storage of the items.
-  (1) and (2) = pass. All three = full credit.
-  An answer that says the statistics break, or that the regenerated controls
-  are not really from the same distribution, = fail; that misses the point,
-  which is that a valid statistic computed with post-hoc freedom is still not
-  evidence. Deliver section 7 before continuing.
-  An answer that proposes keeping the key secret forever = fail; the key must
-  be revealed at detection time or nobody can reproduce the derivation, and the
-  commitment is what makes revealing it safe.
-check: llm
+  The statistics really are fine. Which explanation says precisely what breaks,
+  and what the fix costs?
+options:
+  - text: "The objection is evidentiary, not statistical. Generating at detection time means the key is unconstrained in your hands at a moment when you have already seen the model - so you can search key space until a split produces a large gap, or run forty control batches and present the best one. The fix is not storage: publish a timestamped hash of the key and protocol before the training run. Generation at detection time is then fine, because the derivation is deterministic and anyone can regenerate both sets and check them against the commitment. The cost is that the commitment must be append-only, third-party visible, and predate the model."
+    correct: true
+    explain: "Right. The items are valid draws and the null they define is the right one; what breaks is that nobody has to believe you. A valid statistic computed with post-hoc freedom is still not evidence, and the commitment removes the freedom without disclosing the key."
+  - text: "The statistics are what break, on inspection. Items generated a year later are not really draws from the same distribution: the generator's behaviour, the prompt conventions and the surrounding corpus have all drifted, so the controls are no longer matched to the published items and the null they define is the wrong one."
+    misconception: D19
+    explain: "This misses the point by attacking the arithmetic, which is exactly where an opposing expert will not attack. The derivation is deterministic, so the items genuinely are the same draws. The problem is the analyst's freedom after seeing the model, and no amount of distributional matching answers it."
+  - text: "What breaks is secrecy. Committing to the key in advance means putting it where a trainer can find it, regenerate the watermarks and filter them out of the corpus. So the key must stay in your hands until the test is run, and generating the controls at detection time is the right call precisely because it keeps everything private until the moment of use."
+    misconception: V7-M4
+    explain: "This treats commitment and disclosure as one act. A published hash of a 32-byte key is not invertible, so the adversary learns nothing usable, while the key, the split, the statistic and the threshold are irrevocably fixed. Secrecy is not the alternative to commitment - it is what commitment protects while still binding you."
+  - text: "Nothing meaningful breaks. The controls are draws from the same distribution however they are produced, the resulting p-value is computed correctly, and the saving on storage is real - the design is a straightforward improvement."
+    misconception: D19
+    explain: "A small p-value is not the deliverable. This procedure lets the analyst choose the key, the split and therefore the null after seeing the model, and a threshold chosen with hindsight has a false-positive rate of one. The stated rate is a property of a protocol executed blind."
+check: choice
 ```
 
 ## The test, end to end
@@ -492,46 +455,28 @@ prompt: |
 
   Step 2. Published detection questions: $n = 4 \times 36 =$ ____
 
-  Step 3. Null mean: $\mu_0 = n\,p_0 = 144 \times 0.20 =$ ____
+  Step 3. Null mean: $\mu_0 = n\,p_0 =$ ____
 
-  Step 4. Null standard deviation:
-          $\sigma_0 = \sqrt{144 \times 0.20 \times 0.80} = \sqrt{23.04} =$ ____
+  Step 4. Null standard deviation: $\sigma_0 = \sqrt{n\,p_0(1-p_0)} =$ ____
 
-  Step 5. Observed hits on the published set: $k = 48$.
-          $z = (48 - 28.8) / 4.8 =$ ____
+  Step 5. Observed hits on the published set: $k = 48$. So $z =$ ____
 
-  Fill the five blanks. Then read the p-value off the table in this section and
-  state, in one sentence, what the result licenses you to say.
-answer: |
-  Step 1: $p_0 = 0.20$
-  Step 2: $n = 144$
-  Step 3: $\mu_0 = 28.8$
-  Step 4: $\sigma_0 = 4.8$
-  Step 5: $z = 19.2 / 4.8 = 4.00$
-
-  From the table, $z = 4.00$ gives a one-sided $p$ of $3.2 \times 10^{-5}$,
-  about three in a hundred thousand.
-
-  What it licenses: the model answers questions about the published invented
-  entities at a rate that a model which had never seen them would exceed about
-  three times in a hundred thousand. It licenses a statement about the
-  published documents having reached the training data. It does not by itself
-  license anything about which copy of them was scraped, from which
-  intermediary, or when.
-rubric: |
-  Required, exactly: 0.20, 144, 28.8, 4.8, 4.00. All five = pass.
-  Diagnose specific errors. Computing $\sigma_0$ as $\sqrt{144 \times 0.20}$
-  = 5.37 means the learner dropped the $(1 - p_0)$ factor; re-deliver the
-  variance paragraph, because the same error inflates every z they compute.
-  Dividing by $n$ instead of $\sigma_0$ means they have standardized by the
-  wrong quantity. Using $p_0 = 0.5$ or any assumed rate rather than the
-  measured 0.20 means they have not internalized that the controls SUPPLY the
-  null; that is the central idea of the unit and the section must be
-  re-delivered.
-  The one-sentence statement must not claim more than membership of the
-  published documents. An answer asserting the result proves a particular
-  source, licence breach, or intent = fail.
-check: llm
+  Which filling of the five blanks is correct, and what does the result
+  license you to say?
+options:
+  - text: "$p_0 = 0.20$; $n = 144$; $\\mu_0 = 28.8$; $\\sigma_0 = \\sqrt{23.04} = 4.8$; $z = 19.2 / 4.8 = 4.00$. From the table, one-sided $p = 3.2 \\times 10^{-5}$: it licenses the statement that the published documents reached the training data, and nothing about which copy was scraped, from which intermediary, or when."
+    correct: true
+    explain: "Right on all five, and right on the limit of the claim. The controls supplied $p_0$; the hits are 4 standard deviations above what a model that never saw the entities would produce. The result speaks to membership of those documents, not to a source, a licence breach, or intent."
+  - text: "$p_0 = 0.20$; $n = 144$; $\\mu_0 = 28.8$; $\\sigma_0 = \\sqrt{144 \\times 0.20} = 5.37$; $z = 19.2 / 5.37 = 3.58$. From the table that is a one-sided $p$ near 0.00025, and it licenses the statement that the published documents reached the training data."
+    misconception: D19
+    explain: "The $(1-p_0)$ factor has been dropped from the variance. Each flip contributes $p_0(1-p_0)$, which is zero when the outcome is certain and largest at $p_0 = 0.5$; without it $\\sigma_0$ is wrong here and in every $z$ computed the same way. The correct $\\sigma_0$ is $\\sqrt{144 \\times 0.20 \\times 0.80} = 4.8$."
+  - text: "$p_0 = 0.50$ (a question is either answered with the generator's value or not); $n = 144$; $\\mu_0 = 72$; $\\sigma_0 = \\sqrt{144 \\times 0.25} = 6$; $z = (48 - 72)/6 = -4.00$, so the published set is answered no better than chance."
+    misconception: D18
+    explain: "The coincidence rate is measured, not assumed. That is the whole reason the 1,440 control questions exist: they say that a model which never saw these entities produces the generator's value 20% of the time, because the generator picks from a plausible range and a plausible guess sometimes lands on it. Substituting 0.5 discards the constructed null the unit is built on."
+  - text: "$p_0 = 0.20$; $n = 144$; $\\mu_0 = 28.8$; $\\sigma_0 = 4.8$; $z = 19.2 / 144 = 0.13$, standardizing the excess by the number of questions asked."
+    misconception: D19
+    explain: "Standardizing means dividing by the null standard deviation, not by $n$. Noise grows like $\\sqrt{n}$ while signal grows like $n$, which is why more questions help - dividing by $n$ throws that away and would make every design look like nothing."
+check: choice
 ```
 
 ## Canary design is the whole game
@@ -665,9 +610,8 @@ type: predict
 concept: d-canary-design
 prompt: |
   Four proposals for protecting the same specialist journal. Before reading
-  the next section, rank them by how much evidence each would produce if the
-  journal were scraped, and for each of the three losers name the specific
-  stage of a data pipeline or the specific statistical property that kills it.
+  the next section, commit to which produces evidence if the journal is
+  scraped - and to the mechanism that kills the others.
 
   (a) Append a unique 48-character random identifier as a footer to every
       article, the same one throughout the archive.
@@ -677,46 +621,20 @@ prompt: |
       were replicated the following spring." - into forty articles.
   (d) Publish twenty-five articles about instruments that do not exist, each
       with four specific attributes, in the journal's normal house style.
-answer: |
-  (d) is the only one that produces evidence. The ranking of the others is
-  close to meaningless because all three produce none, but the failure modes
-  differ and the differences are the lesson.
-
-  (a) dies twice. First at quality filtering: a high-entropy blob appended to
-  running prose is what a quality classifier is built to score as junk.
-  Second, if it survives, at deduplication: the same footer on every article
-  is a duplicated span across the archive, and near-duplicate detection
-  collapses exactly that, destroying the repetition count the detection needs.
-  Its conspicuousness is the reason it is deleted.
-
-  (b) dies at Unicode normalization, which runs in the first stage of
-  extraction, before the document is even a document. This is the design that
-  feels cleverest and has the shortest life.
-
-  (c) survives the pipeline and fails at detection. A sentence built out of
-  ordinary language produces an ordinary loss; there is nothing measurable to
-  measure. Measured versions of this - medium-length traps repeated a hundred
-  times - were undetectable outright.
-
-  (d) clears both constraints at once. It reads as ordinary domain prose, so
-  filters keep it and normalizers leave it alone; the twenty-five documents
-  are distinct passages, so the deduplicator has nothing to collapse; and the
-  content is false, so a model that answers questions about it correctly can
-  only have read it. Detection is a factoid question through the plain API.
-rubric: |
-  Pass requires (d) ranked first AND at least two of the three losers killed
-  by the correct mechanism: (a) quality filter or dedup, (b) Unicode
-  normalization, (c) no measurable signal / regression to typical loss.
-  Ranking (a) first = fail, diagnosing D18 directly; the failure catalogue
-  must be delivered in full rather than summarized.
-  An answer that gets the ranking right by reasoning "(d) is the one the unit
-  is about" with no mechanism = fail; the mechanisms are the transferable
-  content and the ranking is not.
-  An answer that kills (d) on the grounds that publishing false content is
-  unacceptable = do not fail, and flag: that is a real and separate objection,
-  answered in the honest-position section, and a learner raising it early is
-  reading correctly.
-check: llm
+options:
+  - text: "(d) alone produces evidence. (a) dies at quality filtering, and at deduplication if it survives, since one footer repeated across the archive is a duplicated span. (b) dies at Unicode normalization, in the first stage of extraction. (c) survives the pipeline and fails at detection, because ordinary language produces an ordinary loss and there is nothing to measure."
+    correct: true
+    explain: "Right, and the mechanisms are the transferable part. (d) clears both constraints at once: it reads as ordinary domain prose so filters keep it, the twenty-five documents are distinct passages so the deduplicator has nothing to collapse, and the content is false, so a model answering correctly can only have read it."
+  - text: "(a) is strongest, because a 48-character random identifier is unforgeable: no model could emit that string by chance, so a single appearance in an output is conclusive. (d) is weakest, since invented facts about instruments are the kind of thing a model might plausibly confabulate on its own."
+    misconception: D18
+    explain: "This is honeypot intuition, and it inverts the real ordering. A high-entropy blob in running prose scores like machine-generated junk to a quality classifier, which is what those classifiers are built to delete; conspicuousness is the reason it never reaches the model. And the confabulation rate for (d) is not a worry, it is the measured $p_0$ from the control entities."
+  - text: "(b) is strongest, because a homoglyph substitution is invisible to readers, costs the journal nothing editorially, and rides along with every copy of every article. (d) is a distant second given the editorial cost of publishing false content."
+    misconception: D18
+    explain: "Homoglyph and zero-width tricks are the cleverest-feeling design and the most reliably dead: Unicode normalization runs in the first hundred lines of every extraction pipeline, so the signal is gone before the document is a document. The editorial cost of (d) is a real objection, taken up in the honest-position section, but it is not what decides this ranking."
+  - text: "(c) is strongest, because it is the only design that survives every pipeline stage intact - no filter flags it, no normalizer touches it, and forty repetitions across the archive give the model ample exposure to memorize it."
+    misconception: D18
+    explain: "It does survive, and that is the trap: a sentence built out of ordinary language produces a loss like the rest of the corpus, so there is nothing measurable afterwards. This was tested - medium-length traps injected a hundred times each were flat out undetectable. Surviving the pipeline and being detectable are opposite ends of one axis, and naive designs sit at one end or the other."
+check: choice
 ```
 
 ## How many watermarks, and how often
@@ -816,11 +734,9 @@ prompt: |
   Step 1. Tokens at the 0.1% density floor:
           $0.001 \times 120{,}000{,}000 =$ ____ tokens
 
-  Step 2. Document instances at 120 tokens each:
-          $120{,}000 / 120 =$ ____ instances
+  Step 2. Document instances at 120 tokens each: ____ instances
 
-  Step 3. Occurrences per distinct watermark:
-          $1{,}000 / 30 =$ ____ (round down)
+  Step 3. Occurrences per distinct watermark: ____ (round down)
 
   Step 4. Against a detector floor of 90 occurrences, this design ____
           (passes / fails).
@@ -828,38 +744,22 @@ prompt: |
   Step 5. Instances needed to reach 90 occurrences on all 30 watermarks:
           $30 \times 90 =$ ____ instances
 
-  Fill the five blanks. Then state the density that step 5 implies, as a
-  percentage of the archive, and say in one sentence what the publisher's
-  three options are.
-answer: |
-  Step 1: 120,000 tokens
-  Step 2: 1,000 instances
-  Step 3: 33 occurrences each
-  Step 4: fails
-  Step 5: 2,700 instances
-
-  Density implied by step 5: $2{,}700 \times 120 = 324{,}000$ tokens, and
-  $324{,}000 / 120{,}000{,}000 = 0.27\%$ of the archive - between two and
-  three times the 0.1% floor.
-
-  The three options: accept 0.27% of the archive being documents about
-  instruments that do not exist; cut the number of distinct watermarks, which
-  buys occurrences at the cost of the count statistic and is capped by the
-  floor of 25; or pool with other publishers under one shared key so that the
-  effective corpus behind the watermark is larger than any one archive.
-rubric: |
-  Required, exactly: 120,000; 1,000; 33; fails; 2,700. And the implied density
-  must be 0.27% (accept 0.27 to 0.28).
-  All five blanks plus the density = pass.
-  Answering step 3 as 33.3 and then calling the design a pass = fail; the
-  comparison against 90 is the point of the computation.
-  Computing step 5 as $30 \times 90 \times 120$ and reporting 324,000 as the
-  instance count confuses tokens with instances; partial credit, re-deliver the
-  worked example's step 2.
-  The three options do not all have to appear, but an answer that offers only
-  "publish more watermark documents" without noticing that this IS raising the
-  density = fail; the tension between the two constraints is the content.
-check: llm
+  Which filling of the five blanks is correct, together with the density step 5
+  implies and the publisher's options?
+options:
+  - text: "120,000 tokens; 1,000 instances; 33 occurrences each; fails; 2,700 instances. Those 2,700 instances are $2{,}700 \\times 120 = 324{,}000$ tokens, or $0.27\\%$ of the archive - two to three times the floor. The options are to accept 0.27% of the archive being fictitious, to cut the number of distinct watermarks (capped by the floor of 25, and paid for in the count statistic), or to pool with other publishers under one shared key."
+    correct: true
+    explain: "Right, and the tension between the two constraints is the content. The density floor and the per-watermark occurrence floor pull against each other for a small archive, and no arithmetic makes it cheaper - which is why watermark strength scales with the size of the corpus you control."
+  - text: "120,000 tokens; 1,000 instances; 33 occurrences each; passes; 2,700 instances. The design meets the 0.1% density floor exactly as planned, so it is sound; step 5 is the optional upgrade path if the publisher wants extra margin."
+    misconception: D18
+    explain: "33 is below 90, so it fails - the comparison against the detector floor is the whole point of the computation. Meeting the density target while starving each watermark of occurrences means nothing is memorized well enough to answer questions about, and the count statistic has nothing to count."
+  - text: "120,000 tokens; 1,000 instances; 33 occurrences each; fails; 324,000 instances (that is, $30 \\times 90 \\times 120$). The publisher's answer is simply to publish more watermark documents until the floor is met."
+    misconception: D18
+    explain: "324,000 is a token count, not an instance count: $30 \\times 90 = 2{,}700$ instances, which at 120 tokens each is 324,000 tokens. And 'publish more documents' IS raising the density - naming it that way is what surfaces the 0.27% cost and the choice between fabrication, fewer watermarks, and pooling."
+  - text: "120,000 tokens; 1,000 instances; 33 occurrences each; fails; 2,700 instances. Since the archive is fixed, the fix is to publish the same 30 watermark documents 90 times each verbatim, which reaches the occurrence floor without adding any new fictitious content."
+    misconception: D9
+    explain: "Verbatim repetition of one passage is precisely what near-duplicate detection collapses to a single copy, destroying the occurrence count the detection depends on. The 2,700 instances have to be distinct passages carrying the same entities, which is why the token cost - and the 0.27% density - is unavoidable."
+check: choice
 ```
 
 ## Your own private control
@@ -1142,49 +1042,31 @@ prompt: |
 
   Step 2. Corrected per-test threshold: $\alpha' = 0.05 / 25 =$ ____
 
-  Step 3. From the table in section 3, the $z$ corresponding to a one-sided
-          $p$ of 0.0020 is approximately ____
+  Step 3. From the table in section 3, the $z$ for a one-sided $p$ of 0.0020
+          is approximately ____
 
-  Step 4. One collection returns $z = 2.40$, which is a one-sided $p$ of about
-          0.0082. Against the corrected threshold this result ____
-          (fires / does not fire).
+  Step 4. One collection returns $z = 2.40$, a one-sided $p$ of about 0.0082.
+          Against the corrected threshold this result ____ (fires / does not
+          fire).
 
   Step 5. Its Bonferroni-adjusted p-value is $25 \times 0.0082 =$ ____
 
-  Fill the five blanks. Then state, in one sentence, what you report to that
-  client - and what you must not say.
-answer: |
-  Step 1: $m = 25$
-  Step 2: $\alpha' = 0.0020$
-  Step 3: $z \approx 2.88$
-  Step 4: does not fire (2.40 is below 2.88)
-  Step 5: $0.205$
-
-  What you report: the pre-registered test did not reach its committed
-  threshold, the observed statistic was $z = 2.40$ against a required 2.88, and
-  the family-adjusted p-value is 0.21 - a result you would expect to see about
-  once in five quarters by chance alone across a family this size.
-
-  What you must not say: that the result is "suggestive", "trending", or
-  "significant before correction". The threshold was committed before the model
-  was seen precisely so that this sentence cannot be written, and writing it
-  destroys the value of every other report the ledger has ever issued. You also
-  must not go back and enlarge the watermark set for this client and re-run
-  against the same model; that is a new commitment against a new model release,
-  or it is nothing.
-rubric: |
-  Required, exactly: 25; 0.0020 (accept 0.002); 2.88 (accept 2.85 to 2.90);
-  does not fire; 0.205 (accept 0.20 to 0.21).
-  All five = pass.
-  Answering step 4 as "fires" = fail; the learner is comparing against 0.05
-  and has not applied the correction they just computed.
-  The second half must contain a refusal to report the uncorrected result as
-  meaningful. An answer that offers to report it as "suggestive evidence"
-  = fail, diagnosing D19, and section 7 must be re-delivered; that phrase is
-  the exact failure the pre-commitment exists to prevent.
-  An answer proposing to re-run against the same model with a larger watermark
-  set = fail; that is optional stopping and it invalidates the family size.
-check: llm
+  Which filling of the five blanks is correct, and what goes in the client
+  report?
+options:
+  - text: "$m = 25$; $\\alpha' = 0.0020$; $z \\approx 2.88$; does not fire; $0.205$. The report states that the pre-registered test did not reach its committed threshold - $z = 2.40$ against a required 2.88, family-adjusted $p = 0.21$ - and does not describe the result as suggestive, trending, or significant before correction."
+    correct: true
+    explain: "Right. A result you would expect about once in five quarters by chance across a family this size is not a finding, and the threshold was committed before the model was seen precisely so that the softening sentence cannot be written."
+  - text: "$m = 25$; $\\alpha' = 0.0020$; $z \\approx 2.88$; fires; $0.205$. At $p = 0.0082$ the result clears the conventional 0.05 threshold comfortably, so the report states a positive detection while noting the correction as a caveat."
+    misconception: D19
+    explain: "The correction was just computed and then not applied: 0.0082 is larger than 0.0020, so the result does not fire. Comparing against 0.05 while running 25 tests is the procedure that produces false accusations by construction - which is the reason the family-wide correction exists."
+  - text: "$m = 25$; $\\alpha' = 0.0020$; $z \\approx 2.88$; does not fire; $0.205$. The report states that the committed threshold was not reached but that the uncorrected $p$ of 0.0082 is suggestive evidence worth pursuing in a negotiation."
+    misconception: D19
+    explain: "That sentence is the exact failure pre-commitment exists to prevent. Reporting the uncorrected result as meaningful discards the family correction after the fact and devalues every report the ledger has ever issued; a result that does not survive correction was never evidence, and the correction only made that visible."
+  - text: "$m = 25$; $\\alpha' = 0.0020$; $z \\approx 2.88$; does not fire; $0.205$. The report says the test did not reach its threshold, and the service enlarges this client's watermark set and re-runs the detection against the same model release to see whether the result firms up."
+    misconception: D19
+    explain: "The blanks are right and the response is optional stopping. Re-running against the same model after seeing a near miss invalidates the family size the correction was computed from; an enlarged watermark set is a new commitment against a future model release, or it is nothing."
+check: choice
 ```
 
 ```beat
@@ -1192,62 +1074,26 @@ id: v7-b8
 type: self-explain
 concept: d-precommitment
 prompt: |
-  List everything that must be fixed and committed BEFORE you look at the
-  model, and for each item state the specific manipulation that becomes
-  available if it is fixed afterwards instead.
+  You are drafting the pre-commitment ledger's rule about what has to be fixed
+  before anyone looks at a model, and what may still be decided afterwards.
 
-  Then name one thing that may legitimately be decided after the result is in.
-answer: |
-  Six items, each with the freedom it closes.
-
-  1. The key. Fixed afterwards, you can search key space: try candidate keys
-     until one produces a published/control split whose gap is large, then
-     present that key as the one you always had.
-
-  2. Which generated items were published and which were controls. Fixed
-     afterwards, you choose the split that maximizes the difference - which is
-     choosing your own null, the exact failure the construction exists to
-     prevent.
-
-  3. The test statistic and its exact computation. Fixed afterwards, you
-     compute several and report the one that fires. Hit counts, mean surprise,
-     paired differences and attribute recall are all defensible statistics, and
-     that is precisely the problem.
-
-  4. The threshold, the family size, and the correction. Fixed afterwards,
-     alpha is not a false-positive rate at all, because a threshold chosen to
-     sit just below the observed value has a false-positive rate of one.
-
-  5. The detection prompts and decoding settings. Fixed afterwards, you
-     prompt-engineer until the model produces the planted attribute, which
-     converts a memorization test into a test of your own persistence.
-
-  6. The stopping rule - which models, which versions, how many, over what
-     window. Fixed afterwards, you keep testing releases until one fires and
-     report that one. This is a multiple-testing violation wearing a different
-     coat, and it is invisible in the final report unless the rule was
-     committed.
-
-  What may legitimately be decided afterwards: everything that does not touch
-  the test. How to present the report, whether to gather corroborating evidence
-  such as an extraction attempt, whether to open a negotiation, whether to
-  litigate, and whether to commission a fresh protocol against a future
-  release. The rule is that the test is frozen and the response to it is not.
-rubric: |
-  Must contain at least four of the six items WITH the corresponding
-  manipulation - the item alone is not credit, since the transferable content
-  is the freedom each one closes. Items 1, 2 and 4 are the load-bearing ones;
-  missing all three = fail regardless of how many others appear.
-  Must also contain a legitimate after-the-fact decision that does not touch
-  the test.
-  An answer that includes "which model to test" in the after-the-fact list =
-  fail; that is the stopping rule, and choosing the model after seeing results
-  is the most common real-world version of this failure.
-  An answer that says everything must be fixed including the decision to
-  litigate = pass but flag: over-restriction here suggests the learner has
-  memorized the rule without the reason, which is that freedom matters only
-  where it can move the statistic.
-check: llm
+  Four candidate rules. Choose the one that closes the manipulations the
+  ledger exists to close, without closing things that cannot move the
+  statistic.
+options:
+  - text: "Fix the key, the published/control split, the statistic and its computation, the threshold with its family size and correction, the detection prompts and decoding settings, and the stopping rule - because each of those, chosen after seeing the model, buys a specific manipulation: searching key space for a flattering split, choosing your own null, computing several statistics and reporting the one that fires, setting $\\alpha$ just below the observed value, prompt-engineering until the attribute appears, and testing releases until one fires. What may be decided afterwards is everything that does not touch the test: how to present the report, whether to gather corroborating extraction evidence, whether to negotiate or litigate, whether to commission a fresh protocol against a future release."
+    correct: true
+    explain: "Right, and the shape of the rule is the reason: freedom matters exactly where it can move the statistic. The six fixed items are the six knobs that change the number; the response to the number changes nothing about it, so it stays free."
+  - text: "Fix the statistic and the threshold, since those are what the p-value is computed from, but leave the key, the split and the detection prompts flexible - they are generation details, and the deterministic derivation from the key means any split is a valid sample from the same distribution either way."
+    misconception: D19
+    explain: "The sampling really is valid, and that is not the question an opposing expert asks. A key chosen after you can test keys is a key you can search until one produces a large published/control gap; prompts chosen after you can test prompts turn a memorization test into a test of your own persistence. The stated false-positive rate is a property of a protocol executed blind."
+  - text: "Fix everything in the protocol, including the decision to litigate, whether to publish the report, and what settlement figure to open at - once a p-value below the threshold is in hand, any later choice is a post-hoc choice and contaminates the evidence."
+    misconception: D19
+    explain: "Over-restriction, and it suggests the rule was memorized without its reason. Litigating or negotiating cannot change $z$, $\\mu_0$ or $\\alpha'$; nothing downstream of the computed statistic feeds back into it. Freezing those buys no validity and only makes the protocol unusable."
+  - text: "Fix the key, the split and the statistic before the training run, and leave which models get tested - and how many releases, over what window - to be decided as the results come in, since you cannot know in advance which models will exist."
+    misconception: D19
+    explain: "That is the stopping rule, and leaving it open is the most common real-world version of the failure: test releases until one fires, report that one, and the family size in the denominator of $\\alpha' = \\alpha/m$ is a fiction. It is a multiple-testing violation wearing a different coat, and it is invisible in the final report unless the rule was committed."
+check: choice
 ```
 
 ## What a court will actually credit
@@ -1458,42 +1304,23 @@ prompt: |
   computing, and they will publish the attestation showing which dataset hash
   was consumed by which binary to produce which weights.
 
-  Before reading on: state precisely what a rightsholder can conclude from
-  that attestation, and what they cannot. Then say which of the four audit
-  products in this section that client is actually a buyer for.
-answer: |
-  What it establishes: that a binary with a stated hash consumed a dataset with
-  a stated hash and produced weights with a stated hash. Given the dataset
-  itself, it also establishes that the published summary of it is accurate,
-  which is a real compliance benefit.
-
-  What it does not establish: anything about the CONTENTS of that dataset. The
-  hash commits to bytes; it does not certify that those bytes exclude any
-  particular work, and a rightsholder cannot check without being given the
-  dataset, which is the thing that will not happen. It also says nothing about
-  any developer who declines to enroll, which is every adversarial case - the
-  mechanism only ever describes cooperating parties.
-
-  Which product: this client is a strong buyer for exclusion certification and
-  for disclosure conformance checking. They want to demonstrate absence and
-  they want their mandatory summary to be correct, and they are cooperative by
-  construction, which is exactly the sales motion those two products need. They
-  are not a buyer for the rightsholder-side notary; in that product they are
-  the counterparty, not the customer.
-rubric: |
-  Must contain: (1) the attestation binds binary, dataset and weights by hash
-  and says nothing about dataset contents; (2) it applies only to a trainer who
-  volunteers; (3) the client is a buyer for exclusion certification and/or
-  conformance checking, not for the adversarial notary.
-  (1) and (3) = pass. All three = full credit.
-  An answer that treats the attestation as proof the data was clean = fail,
-  diagnosing V7-M3, and the section must be re-delivered; this is the most
-  common confusion in the hardware-provenance conversation and it is one an
-  informed counterparty will correct in public.
-  An answer that dismisses attestation as useless = fail, and flag the
-  overcorrection: it is a real licensing-integrity feature with a real buyer,
-  and calling it worthless costs you the friendliest sale in the section.
-check: llm
+  Before reading on, commit to an answer: what can a rightsholder conclude
+  from that attestation, and which of this section's four audit products is
+  this client actually a buyer for?
+options:
+  - text: "It establishes that a binary with a stated hash consumed a dataset with a stated hash and produced weights with a stated hash - and nothing whatever about what is IN that dataset, since a rightsholder cannot check for their catalogue without being handed the dataset, and a trainer who never enrolls is untouched by the mechanism. The client is a strong buyer for exclusion certification and disclosure conformance checking, both of which sell to a cooperating developer; they are not a buyer for the rightsholder-side notary, where they are the counterparty rather than the customer."
+    correct: true
+    explain: "Right. The guarantee is real and narrow, and the narrowness sorts the sale: attestation sits beside exclusion certification because both require a willing developer."
+  - text: "It establishes that the training data was what the developer says it was, so a rightsholder whose work is absent from the disclosed dataset now has cryptographic assurance of non-use. The client is a buyer for the rightsholder-side notary, since the attestation supplies the provenance layer the notary's reports were missing."
+    misconception: V7-M3
+    explain: "Read the guarantee literally: a binary with hash X consumed a dataset with hash Y and produced weights with hash Z. Nothing there says what is in dataset Y. The hash commits to bytes; it does not certify those bytes exclude any particular work, and this is the confusion an informed counterparty corrects in public."
+  - text: "It establishes nothing of value to anyone. Attestation only ever describes a trainer who volunteered, which is never the adversarial case, so it is theatre with a hardware bill attached and the client should be told so. They are not a buyer for any of the four products."
+    misconception: V7-M3
+    explain: "The overcorrection, and it costs you the friendliest sale in the section. Attestation is a genuine licensing-integrity feature running at roughly compute parity, with a real buyer who has a compliance budget and pays again at every six-month refresh."
+  - text: "It establishes that the developer's training computation can be verified end to end, which is the same guarantee a zero-knowledge proof of training would give at lower cost. The client is a buyer for procurement provenance, since verified computation is what rights clearance in the supply chain actually needs."
+    misconception: D14
+    explain: "These are not the same guarantee and the cost comparison runs the other way. Proved throughput of about $4 \\times 10^{8}$ FLOP/s against $C = 6ND = 1.2 \\times 10^{20}$ FLOP for a 1B model is roughly 9,500 years; attestation runs at compute parity precisely because it proves something much weaker - and neither says what is in the dataset, which is what rights clearance needs."
+check: choice
 ```
 
 ## The strongest case against the notary
@@ -1623,56 +1450,27 @@ id: v7-b10
 type: self-explain
 concept: d-precommitment
 prompt: |
-  You are writing the protocol document for the build above, before generating
-  the key.
+  You are writing the protocol document for the bench build above, before
+  generating the key, and you must justify the second training run - the model
+  trained on the identical corpus without watermarks.
 
-  State what the negative-control model establishes and what it does not, and
-  explain why a real engagement cannot have one. Then say what the protocol
-  must specify in advance so that the negative-control run is meaningful rather
-  than decorative.
-
-  Answer from the unit's text; do not reference any run you have or have not
-  performed.
-answer: |
-  What it establishes: that the pre-registered test does not fire on a model
-  that provably never saw the watermarks. That is a direct empirical check on
-  the false-positive side of the claim, and it validates the null the controls
-  are supposed to define - if the test fires here, the null is wrong and the
-  stated p-value is meaningless.
-
-  What it does not establish: anything about the false-positive rate at
-  frontier scale, on a different architecture, or on a corpus with different
-  content. It is one draw from the null, at one scale, not a measured rate. Nor
-  does it validate the watermark's survival through a real pipeline, since both
-  models were trained on a corpus you built.
-
-  Why a real engagement cannot have one: it requires training a second model
-  identical except for your data, which is the unsamplable null from the
-  previous unit. The entire prospective construction exists because that
-  experiment is unavailable. Owning both training runs is what makes the bench
-  version possible and what makes it a rehearsal rather than an audit.
-
-  What the protocol must fix in advance for it to mean anything: that both
-  models will be trained and both will be tested, before either is trained -
-  otherwise the negative control is a run you can quietly discard if it
-  embarrasses you. It must also fix the identical detection prompts, decoding
-  settings, statistic and threshold for both runs, and state that both results
-  will be published regardless of outcome. A negative control that is only
-  reported when it agrees with you is not a control.
-rubric: |
-  Must contain: (1) it checks the false-positive side by running the committed
-  test against a model that never saw the watermarks, and a fire there
-  invalidates the null; (2) a real engagement cannot have one because it
-  requires a model trained identically minus your data, which is the
-  unsamplable null; (3) the protocol must commit in advance to running AND
-  publishing both, with identical prompts, statistic and threshold.
-  (1) and (2) = pass. All three = full credit.
-  Missing (3) = pass but flag: the learner has the science and not the
-  evidentiary discipline, which is the half that is the product.
-  An answer claiming the negative control measures the false-positive RATE =
-  fail; one run is one draw, and treating it as a rate is the same error as
-  treating a single p-value as proof.
-check: llm
+  Choose the justification that states correctly what that run establishes,
+  what it does not, and what the protocol has to fix in advance for it to mean
+  anything. Answer from the unit's text.
+options:
+  - text: "It checks the false-positive side: the committed test is run against a model that provably never saw the watermarks, and if it fires there the null is wrong and every number in the report is decoration. It does not establish a false-positive rate - one run is one draw, at one scale, on a corpus you built. A real engagement cannot have one, because it requires a model trained identically minus your data, which is the unsamplable null the whole prospective construction exists to work around. The protocol must commit, before either model is trained, that both will be trained, both tested with identical prompts, decoding, statistic and threshold, and both results published regardless of outcome."
+    correct: true
+    explain: "Right on all three, and the third is the half that is the product: a negative control reported only when it agrees with you is not a control."
+  - text: "It measures the false-positive rate of the scheme empirically - the test is run against a model that never saw the watermarks, and its outcome is the rate you quote in the report in place of the theoretical $\\alpha$. A real engagement cannot have one, so bench-measured rates are what real reports must cite."
+    misconception: D19
+    explain: "One run is one draw from the null, not a rate. Treating it as a measured false-positive rate is the same error as treating a single p-value as proof, and quoting a bench draw as the rate in a live report is a claim an opposing expert dismantles in a sentence."
+  - text: "It validates the watermark end to end: because the second model is identical except for the injected documents, a fired test on the first and a silent test on the second demonstrates that the design survives real quality filtering, deduplication and normalization at web scale."
+    misconception: D18
+    explain: "Both models were trained on a corpus you built and injected into yourself, so nothing in the pair tests survival through somebody else's pipeline - the stage where random strings get filtered, repeated spans get collapsed and homoglyphs get normalized away. The pair checks the null, not the trip."
+  - text: "It is the same thing a real engagement gets by comparing the target model against a similar model from another lab known not to have trained on the archive, so the bench run is a rehearsal of an ordinary audit step rather than a luxury of owning the training run."
+    misconception: D2
+    explain: "Another lab's model differs in architecture, corpus, scale and schedule, so it is the unmatched comparison the previous unit ruled out - the one that detects publication date rather than membership. A negative control means identical except for your data, and nobody outside your own bench can build one."
+check: choice
 ```
 
 ## What you can now do

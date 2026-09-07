@@ -127,35 +127,24 @@ prompt: |
   Three turns ago you told Claude "actually skip the linter today." Both are in
   the context. The model complies with the second.
 
-  Do not answer "it followed the more recent instruction." Answer mechanically:
-  where does each of those two instructions physically live at the moment of the
-  forward pass, what makes one of them win, and what would it take for the model
-  to be *unable* to see the first one?
-answer: |
-  Both live in the same flat token sequence, at different positions - the
-  CLAUDE.md text early (low position indices), the user override late (high
-  indices). There is no priority field distinguishing them; the only differences
-  available to the model are position, surrounding delimiter tokens (system vs
-  user framing), and phrasing. "Recency wins" is a learned behavioral regularity
-  from post-training over such conflicts, implemented through attention weights
-  at the final position favoring nearer, more imperative-looking tokens - not a
-  rule the harness enforces.
-
-  The model becomes unable to see the CLAUDE.md instruction only if those tokens
-  are not in the stream: the harness dropped them, or compaction summarized them
-  away, or they fell outside the context window. Nothing else can hide them.
-rubric: |
-  Must contain: (1) both instructions are tokens in one sequence, distinguished
-  only by position and delimiter tokens; (2) precedence is a learned behavior
-  from post-training, not enforced structure; (3) the only way to remove an
-  instruction's influence is to remove its tokens (harness truncation,
-  compaction, window overflow).
-  Pass = (1) plus either (2) or (3).
-  Fail patterns: "the system prompt has higher priority in the API" = M13,
-  the structure-is-native error. "The model remembers the newer one" = M17-style
-  confusion of tokens with memory. Answering only "recency bias" with no
-  mechanism = fail, that is a restatement of the observation.
-check: llm
+  "It followed the more recent instruction" only restates what you saw. Pick the
+  account that says where each instruction physically lives at the moment of the
+  forward pass, what makes one of them win, and what it would take for the model
+  to be *unable* to see the first one.
+options:
+  - text: "Both instructions are tokens in one flat sequence, differing only in position and in the delimiter tokens around them; there is no priority field. Preference for the later one is a behavioural regularity learned in post-training over such conflicts, expressed as attention weight at the final position. The only way the model cannot see the CLAUDE.md line is if those tokens are absent - harness truncation, compaction, or window overflow."
+    correct: true
+    explain: "Right. Position and delimiters are the only distinctions available, precedence is learned rather than enforced, and an instruction loses all influence exactly when its tokens leave the stream."
+  - text: "The two instructions arrive in different fields - one in the system-prompt slot, one in a user message - and the API's precedence rules resolve the conflict before the model runs, so the model never sees a conflict at all."
+    misconception: M13
+    explain: "There are no fields at the model. The harness's message objects are serialized into one byte string with delimiter tokens; that is also why text inside user content can forge an assistant turn. Nothing resolves the conflict before the forward pass."
+  - text: "The model holds the running conversation as internal state and overwrites the older instruction with the newer one when it updates that state, so the first instruction is no longer present to be consulted."
+    misconception: U9-M2
+    explain: "The model carries no state between calls. The harness re-sends every prior token each turn, so both instructions are present in full at every forward pass; nothing is overwritten."
+  - text: "The KV cache stores the meaning of each earlier instruction, and the newer instruction updates that cached entry, which is why the model can no longer act on the CLAUDE.md rule."
+    misconception: M17
+    explain: "The cache holds key and value projections that are a pure function of the tokens - recompute it from the same sequence and you get bit-identical entries. It stores no meanings and nothing edits it in place."
+check: choice
 ```
 
 ## Stage 2: bytes to token IDs to vectors
@@ -314,40 +303,22 @@ prompt: |
   per token - while decode spends 5.5 ms per token. Prefill is about 47x more
   efficient per token on identical hardware running identical weights.
 
-  Explain the 47x. Not "prefill is parallel" - say what quantity is being
-  divided by what, and name the resource each phase is limited by.
-answer: |
-  Both phases read the same weights from memory; prefill amortizes that read
-  across 8,192 tokens while decode amortizes it across one.
-
-  Decode: to produce one token the accelerator must stream the active weights
-  (22B params at 4 bits = 11 GB) from memory, and does 2 x 22e9 = 44 GFLOPs of
-  arithmetic with them. That is 4 FLOPs per byte read. The hardware can do 225
-  FLOPs per byte. So the compute units idle ~98% of the time waiting on memory:
-  decode is memory-bandwidth-bound. 11 GB / 2 TB/s = 5.5 ms, which is the weight
-  term and the bulk of the observed per-token latency. Stage 6 adds the
-  KV-cache read on top of it.
-
-  Prefill: the same weight read services 8,192 tokens at once, so the ratio is
-  8,192 x 4 = ~33,000 FLOPs per byte, far above 225. The bottleneck moves to the
-  arithmetic units: 430 TFLOPs / 450 TFLOP/s = 0.96 s. Compute-bound.
-
-  The 47x is the ratio of the two limits, which is why buying a faster GPU with
-  the same memory bandwidth speeds up prefill and does almost nothing for
-  decode.
-rubric: |
-  Must contain: (1) decode reads the full set of active weights per single
-  token, prefill reads them once for the whole batch of positions; (2) the
-  explicit naming of decode as memory-bandwidth-bound and prefill as
-  compute-bound; (3) some form of the arithmetic-intensity argument (FLOPs per
-  byte, or "the matmul becomes a matrix-vector product with no reuse").
-  Pass = (1) and (2). Full credit = all three.
-  Fail patterns: "prefill is parallel and decode is sequential" with nothing
-  further = fail, that is the observation restated, and it is the M9 residue
-  (treating parallelism as the cause rather than the enabling condition).
-  "Decode is slow because it recomputes the whole prompt each time" = M17,
-  the KV cache exists precisely to prevent that.
-check: llm
+  Which account explains the 47x? Look for one that says what quantity is
+  divided by what, and names the resource limiting each phase.
+options:
+  - text: "One read of the active weights (22B at 4 bits = 11 GB) is amortized over 8,192 positions in prefill and over a single position in decode. Decode does $2 \\times 22 \\times 10^9 = 44$ GFLOPs against 11 GB, about 4 FLOPs per byte, far under the hardware's 225, so it is memory-bandwidth-bound: 11 GB / 2 TB/s = 5.5 ms. Prefill gets $8192 \\times 4 \\approx 33{,}000$ FLOPs per byte and is compute-bound: 430 TFLOPs / 450 TFLOP/s = 0.96 s."
+    correct: true
+    explain: "Right. The ratio is arithmetic intensity against the machine's 225 FLOPs-per-byte break-even, and the 47x is the gap between the two limits - which is why a faster GPU with the same bandwidth speeds up prefill and barely touches decode."
+  - text: "Prefill runs all 8,192 positions at once on parallel hardware while decode must produce tokens one after another; the 47x is simply the speedup parallel execution gives over sequential execution."
+    misconception: M9
+    explain: "Parallelism is the enabling condition, not the cause. Both phases run on the same parallel units; what differs is how many tokens share one weight read. Stated this way it also carries the older error of treating decode's sequencing as an execution property rather than a data dependency."
+  - text: "Decode is slower because each new token requires re-running the whole 8,192-token prompt through the network again, so it repeats most of prefill's work for every token."
+    misconception: M17
+    explain: "That is precisely what the KV cache prevents. Prior keys and values are already stored, so a decode step processes one new position; if it re-ran the prompt each token, decode would cost ~960 ms per token, not 5.5 ms."
+  - text: "Decode does far more arithmetic per token than prefill does, because generating requires the full depth of the model while prompt processing can shortcut through it, so the 47x is a FLOP-count ratio."
+    misconception: U9-M3
+    explain: "Both phases run all 64 blocks and decode does *less* arithmetic per step, 44 GFLOPs against prefill's 430 TFLOPs. Latency here is set by bytes crossing the memory bus, not by FLOPs."
+check: choice
 ```
 
 ## Stage 4: inside one block - residual stream, heads, and the router
@@ -422,37 +393,24 @@ prompt: |
   During prefill of your 8,192-token prompt, all 235B parameters get read from
   memory. During decode of each reply token, about 22B get read.
 
-  Yet prefill is compute-bound and decode is memory-bound. Explain why the phase
-  that reads 10x more weight data is the one that is *not* limited by memory.
-  Then state what MoE buys you and what it costs you, in terms of these two
-  phases.
-answer: |
-  Because "bytes read" is the wrong quantity on its own - what matters is bytes
-  read per unit of arithmetic. Prefill reads 118 GB once and does 430 TFLOPs
-  with it (~3,600 FLOPs/byte). Decode reads 11 GB and does 44 GFLOPs with it
-  (4 FLOPs/byte). The hardware's break-even is 225 FLOPs/byte, so prefill sits
-  far above it and decode far below.
-
-  What MoE buys: decode reads only the k=8 selected experts per token, so
-  per-token decode latency tracks 22B active parameters, not 235B. A dense 235B
-  model would read ~118 GB per token and decode ~10x slower. MoE gives you the
-  capability of a large parameter count at the memory-bandwidth cost of a small
-  one, in the phase that is bandwidth-bound.
-
-  What it costs: all 235B must be resident (or paged) because prefill and
-  batched serving touch every expert, so VRAM/HBM footprint is set by total
-  params, not active. Plus routing overhead, load-imbalance stalls, and
-  all-to-all communication when experts are sharded across devices.
-rubric: |
-  Must contain: (1) arithmetic intensity, not absolute bytes, decides the
-  bound - prefill amortizes its read over thousands of tokens; (2) MoE's win is
-  specifically in decode, where per-token bandwidth tracks active params; (3) the
-  cost is memory footprint set by total params (and/or routing/comms overhead).
-  Pass = (1) and (2).
-  Fail patterns: "experts are specialists so only the relevant ones load" = M12.
-  "MoE makes the model smaller" = the total-vs-active confusion; the model is
-  not smaller, only the per-token read is.
-check: llm
+  Yet prefill is compute-bound and decode is memory-bound. Which account
+  explains why the phase that reads 10x more weight data is the one that is
+  *not* limited by memory - and gets right what MoE buys and costs across the
+  two phases?
+options:
+  - text: "Absolute bytes decide nothing; bytes per unit of arithmetic does. Prefill reads 118 GB once and does 430 TFLOPs with it, ~3,600 FLOPs/byte, above the 225 break-even; decode reads 11 GB and does 44 GFLOPs, 4 FLOPs/byte, far below it. MoE's win lands in decode, where per-token latency tracks the 22B active rather than 235B; its cost is that all 235B must still be resident, since prefill and batched serving touch every expert, plus routing and all-to-all overhead."
+    correct: true
+    explain: "Right. Arithmetic intensity sets the bound, and MoE is an attack on bytes moved in the bandwidth-bound phase, paid for in footprint set by total parameters."
+  - text: "The router sends each token to the experts that match its subject matter, so during decode only the experts relevant to the topic need to be read from memory, while prefill's mixed content forces every specialist to load."
+    misconception: M12
+    explain: "The router is a $4096 \\times 128$ linear layer scoring this token's residual vector; selection is token-granular and largely syntactic, with load-balancing pressure shaping it. Nothing in the mechanism knows a topic. Decode reads 8 experts because $k = 8$, not because 8 were relevant."
+  - text: "MoE makes the model smaller: only 22B parameters exist in any meaningful sense during serving, so both the memory footprint and the read shrink, and decode is memory-bound only because that small model has little arithmetic left to do."
+    misconception: M4
+    explain: "The model is not smaller - all 235B must be held, and prefill touches all of them. Only the per-token read shrinks. Treating parameters as rows that are present or absent per query is the lookup-table picture."
+  - text: "Prefill's 118 GB is read once and then cached in fast on-chip memory, so the bus is idle for the rest of the pass; decode misses that cache every token, which is what makes it bandwidth-bound."
+    misconception: U9-M3
+    explain: "The weights do not fit on chip in either phase; both stream from HBM. The difference is that prefill's single stream serves 8,192 positions of arithmetic while decode's serves one."
+check: choice
 ```
 
 ## Stage 5: the last position becomes a distribution
@@ -528,9 +486,6 @@ the mode of the same distribution.
 id: u9-b5
 type: completion
 concept: c-full-trace
-# variants: blank steps 2 and 4 (exp / normalize) for a learner who missed the
-# softmax mechanics; blank steps 1 and 5 for one who missed the
-# temperature-is-post-processing point; blank 3 only as a warmup.
 prompt: |
   Checkpoint 5. Fill the blanks. Final-position logits over a 3-token
   vocabulary are $z = [3.0,\ 1.0,\ 0.0]$ and the sampler is set to
@@ -545,30 +500,22 @@ prompt: |
   renormalized distribution is ____
   Step 6, draw one sample.
 
-  Then answer in one sentence: which of these six steps, if any, changed what
-  the model knows?
-answer: |
-  Step 1: $z/T = [1.5,\ 0.5,\ 0.0]$
-  Step 3: $4.482 + 1.649 + 1.000 = 7.130$
-  Step 4: $p = [4.482/7.130,\ 1.649/7.130,\ 1.000/7.130] = [0.629,\ 0.231,\ 0.140]$
-  Step 5: cumulative $0.629 \rightarrow 0.860 \rightarrow 1.000$; 0.95 is not
-  reached until the third token, so all three tokens stay in the nucleus and the
-  distribution is unchanged: $[0.629,\ 0.231,\ 0.140]$.
-  Step 6: sample.
-
-  None of them. The logits were fixed when the forward pass ended; steps 1-6 are
-  arithmetic on a frozen vector.
-rubric: |
-  Step 1 must show division by T (not multiplication) giving [1.5, 0.5, 0.0].
-  Step 3 must be 7.130 +/- 0.01. Step 4 must be [0.629, 0.231, 0.140] +/- 0.01.
-  Step 5 must conclude that top-p = 0.95 truncates nothing here, because the
-  first two tokens hold only 0.860 of the mass - a learner who drops the third
-  token has applied the threshold to the wrong quantity.
-  The final sentence must say no step changed the model's knowledge. Answering
-  "temperature made it more/less creative, so step 1 did" = M6, fail regardless
-  of arithmetic.
-  Pass = correct steps 1, 3, 4 plus the correct final sentence.
-check: llm
+  Which filling of the blanks is right, and what does it say about the last
+  question - did any of these six steps change what the model knows?
+options:
+  - text: "Step 1: $z/T = [1.5,\\ 0.5,\\ 0.0]$. Step 3: $4.482 + 1.649 + 1.000 = 7.130$. Step 4: $p = [0.629,\\ 0.231,\\ 0.140]$. Step 5: 0.95 is not reached until the third entry, so the nucleus is all three tokens and the distribution is unchanged at $[0.629,\\ 0.231,\\ 0.140]$. No step changed what the model knows - the logits were fixed when the forward pass ended."
+    correct: true
+    explain: "Right on all four blanks, and right that top-p truncates nothing here: the top two tokens hold only 0.860 of the mass, so the threshold is not met until the third is included."
+  - text: "Step 1: $z/T = [1.5,\\ 0.5,\\ 0.0]$. Step 3: $7.130$. Step 4: $p = [0.629,\\ 0.231,\\ 0.140]$. Step 5: the nucleus is the top two tokens, since two entries are enough to pass a 0.95 threshold, so the renormalized distribution is $[0.731,\\ 0.269]$. No step changed what the model knows."
+    misconception: M2
+    explain: "The arithmetic through step 4 is right, but the threshold was applied to the wrong quantity: cumulative mass over the first two is 0.860, short of 0.95, so the third token survives. Reading the nucleus as 'the entries that look probable enough' rather than a cumulative-mass cut treats the numbers as correctness scores rather than a normalized weighting."
+  - text: "Step 1: $z \\times T = [6.0,\\ 2.0,\\ 0.0]$, since $T = 2.0$ raises the scores. Step 3: exponentiating and summing gives $\\approx 411.9$. Step 4: $p \\approx [0.980,\\ 0.018,\\ 0.002]$. Step 5: the nucleus is the first token alone, so the distribution is $[1.000]$. Step 1 changed what the model knows, because raising the temperature made it more creative."
+    misconception: M6
+    explain: "Temperature divides the logits, so $T = 2.0$ gives $[1.5,\\ 0.5,\\ 0.0]$ and flattens rather than sharpens. And the final claim inverts the point of the checkpoint: $z$ is frozen the instant the forward pass ends; the sampler is post-processing on it."
+  - text: "Step 1: $z/T = [1.5,\\ 0.5,\\ 0.0]$. Step 3: $7.130$. Step 4: $p = [0.629,\\ 0.231,\\ 0.140]$. Step 5: the nucleus is all three tokens, distribution unchanged. Step 6 changed what the model knows, because the drawn token is appended and becomes part of what the model has committed to."
+    misconception: U9-M2
+    explain: "The arithmetic is right but the last sentence is not. Appending the token changes the harness's sequence, not the model - which held no knowledge across the call to begin with. Steps 1-6 are all arithmetic on a frozen vector."
+check: choice
 ```
 
 The sampler picks a token. Say it picks `I`. That token ID is appended to the
@@ -637,9 +584,6 @@ form of KV sharing.
 id: u9-b6
 type: completion
 concept: c-full-trace
-# variants: blank the "x 2 for K and V" and the "x L" steps for a learner who
-# under-sizes caches; blank the final multiply for one who has the per-token
-# figure but does not connect it to context length.
 prompt: |
   Checkpoint 6. Size the KV cache for a different model: $L = 80$ blocks,
   $h_{kv} = 8$ KV heads, $d_{head} = 128$, cache stored in fp16 (2 bytes),
@@ -652,28 +596,22 @@ prompt: |
   Then: this model is dense, not MoE, with 70B parameters at 4 bits. During
   decode at full context, how many bytes does one token's forward pass read, and
   which term dominates?
-answer: |
-  Per token per block: 2 x 8 x 128 x 2 = 4096 bytes = 4 KB.
-  Per token, all blocks: 4 KB x 80 = 320 KB.
-  Full context: 320 KB x 32,768 = 10,485,760 KB = 10,240 MiB = 10 GiB.
 
-  Decode read: 70e9 params x 0.5 bytes = 35 GB of weights, plus 10 GiB
-  (~10.7 GB) of KV cache = ~45.7 GB per token. Weights dominate at roughly
-  3.3x the cache, but the cache is no longer a rounding error - it is adding
-  ~30% to per-token latency, and it is the term that keeps growing while the
-  weights term is fixed.
-rubric: |
-  Per-token-per-block must be 4096 bytes with the leading factor of 2 explicitly
-  attributed to storing both K and V. Per-token must be 320 KB. Full context
-  must be 10 GiB (accept 10.7 GB decimal if labeled).
-  The final part must (a) compute weights as 35 GB from 4-bit x 70B, and
-  (b) identify weights as dominant while noting the cache is the growing term.
-  Pass = all three cache figures correct plus (a).
-  Fail patterns: omitting the factor of 2 for K and V (gives 5 GiB) = the most
-  common sizing error. Multiplying by $h_q$ instead of $h_{kv}$ = has not
-  internalized why GQA exists. Claiming the cache must be recomputed each token
-  = M17.
-check: llm
+  Pick the filling that is right at every blank.
+options:
+  - text: "Per token per block: $2 \\times 8 \\times 128 \\times 2 = 4096$ bytes = 4 KB, the leading 2 being K and V. Per token, all blocks: $4\\ \\text{KB} \\times 80 = 320$ KB. Full context: $320\\ \\text{KB} \\times 32768 = 10$ GiB. Decode reads $70 \\times 10^9 \\times 0.5 = 35$ GB of weights plus ~10.7 GB of cache, ~45.7 GB per token; weights dominate at ~3.3x, but the cache is the term that grows."
+    correct: true
+    explain: "Right throughout, including the factor of 2 for storing both K and V, and the observation that the weight term is fixed while the cache term keeps climbing with context."
+  - text: "Per token per block: $8 \\times 128 \\times 2 = 2048$ bytes = 2 KB. Per token, all blocks: $2\\ \\text{KB} \\times 80 = 160$ KB. Full context: 5 GiB. Decode reads 35 GB of weights plus ~5.4 GB of cache, ~40.4 GB per token, dominated by weights."
+    misconception: M17
+    explain: "The leading factor of 2 was dropped: every position stores a key vector *and* a value vector, which halves this answer. Losing that factor usually goes with thinking of the cache as one summary per token rather than the two projections a later query needs."
+  - text: "Per token per block: $2 \\times 32 \\times 128 \\times 2 = 16384$ bytes = 16 KB, using the 32 query heads. Per token, all blocks: $16\\ \\text{KB} \\times 80 = 1280$ KB. Full context: 40 GiB. Decode reads 35 GB of weights plus ~42.9 GB of cache, ~77.9 GB per token, dominated by the cache."
+    misconception: M10
+    explain: "Cache size is set by $h_{kv} = 8$, not by the query heads - the whole point of GQA is that several query heads share one stored K/V pair, cutting the cache 4x. Sizing by $h_q$ treats every head's work as needing its own stored state."
+  - text: "Per token per block: $2 \\times 8 \\times 128 \\times 2 = 4096$ bytes = 4 KB. Per token, all blocks: 320 KB. Full context: 10 GiB. But the cache is invalidated and rebuilt each step, so decode reads 35 GB of weights plus a full recomputation of the 10 GiB cache every token, and the recompute dominates."
+    misconception: M17
+    explain: "The sizing is right and the last part is not. Cached entries stay valid because each depends only on an unchanged prefix; decode reads them, appends one new K/V pair, and recomputes nothing."
+check: choice
 ```
 
 Two more decode-stage mechanisms worth placing in the trace. **Quantization**:
@@ -736,52 +674,30 @@ id: u9-b7
 type: predict
 concept: c-full-trace
 prompt: |
-  Checkpoint 7. Predict, before reading on.
+  Checkpoint 7. Commit to a prediction before reading on.
 
   A colleague wants to reduce token costs in a long agentic session. Their plan:
   after every tool result arrives, run a small summarizer over the *entire*
   conversation so far and replace it with a compact 2,000-token summary, keeping
   the context small.
 
-  Assume the summarizer is free and its summaries are perfect. Predict what
-  happens to (a) tokens billed per turn, (b) wall-clock latency per turn, and
-  (c) the total cost of a 30-turn session versus plain appending. Give the
-  mechanism for each, not just the direction.
-answer: |
-  (a) Tokens billed per turn drop - the context really is smaller, so the
-  per-turn input token count is ~2,000 + new material instead of a growing
-  history. This is the part the colleague is right about.
-
-  (b) Wall-clock latency per turn gets *worse*, potentially much worse. Rewriting
-  the history changes tokens at position ~0, which invalidates the entire KV
-  cache. Every turn now pays a full prefill of its whole context from scratch
-  instead of prefilling only the newly appended tokens. Plain appending prefills
-  ~3,400 new tokens per turn; this plan prefills ~2,000+ every turn with zero
-  cache reuse.
-
-  (c) Total cost depends entirely on whether the provider prices cached input
-  tokens cheaply. Under cache-aware pricing (cached reads typically ~10% of
-  fresh input), plain appending bills nearly all of its large context at the
-  discounted rate, while the summarize-every-turn plan bills a smaller context
-  at full rate every single turn - and can easily come out more expensive
-  despite processing fewer tokens. Under flat per-token pricing the plan wins on
-  cost and still loses on latency.
-
-  The correct version of the idea: compact rarely and only at a stable
-  boundary, never per-turn, and always append rather than rewrite when possible.
-rubric: |
-  Must contain: (1) the recognition that rewriting history invalidates the KV
-  cache from the first changed position onward, so cache reuse goes to zero;
-  (2) the resulting latency regression - full prefill every turn instead of
-  incremental prefill; (3) the cost answer conditioned on cache-aware pricing
-  rather than asserted unconditionally.
-  Pass = (1) and (2). Full credit adds (3).
-  Fail patterns: "smaller context is always cheaper and faster" = has not
-  connected caching to prefix immutability. "The model will forget things" -
-  true but not the asked mechanism, and the prompt stipulated perfect summaries.
-  Claiming the cache survives because the summary "means the same thing" = M17,
-  treating the cache as semantic rather than positional/token-derived.
-check: llm
+  Assume the summarizer is free and its summaries are perfect. What happens to
+  (a) tokens billed per turn, (b) wall-clock latency per turn, and (c) the total
+  cost of a 30-turn session against plain appending?
+options:
+  - text: "(a) Tokens per turn drop - the context genuinely is smaller. (b) Latency per turn gets worse: rewriting the history changes tokens near position 0, so every cached key and value from there on is invalid and each turn pays a full prefill of its whole context instead of prefilling only newly appended tokens. (c) Total cost hinges on pricing: under cache-aware pricing, plain appending bills most of its large context at the discounted cached rate while this plan bills a small context at full rate every turn, and can come out more expensive; under flat pricing the plan wins on cost and still loses on latency."
+    correct: true
+    explain: "Right. The mechanism is prefix immutability: cached entries survive appends and die on edits. Compact rarely, at a stable boundary, and append rather than rewrite."
+  - text: "All three improve. A smaller context means fewer tokens billed, fewer tokens to prefill, and a smaller KV cache to read during decode, so the 30-turn session is strictly cheaper and strictly faster than plain appending."
+    misconception: M17
+    explain: "Smaller is not free when you get it by rewriting. Cached keys and values are a function of the exact preceding tokens; edit position 40 and everything from 40 onward must be recomputed, so each turn pays a full prefill that plain appending avoids."
+  - text: "(a) and (c) improve, and (b) is unchanged - the cache survives the rewrite because a perfect summary carries the same information as the text it replaced, so the stored keys and values still represent the same conversation state."
+    misconception: M17
+    explain: "The cache is indexed by position and derived from token identity, not from meaning. A summary that means the same thing is a different token sequence at those positions, so every entry after the first change is invalid."
+  - text: "Latency per turn is roughly unchanged either way, because a turn's time is dominated by the arithmetic of generating the reply, and the reply is the same length under both plans; only the billed token count moves."
+    misconception: U9-M3
+    explain: "Prefill is a large share of turn latency at these context lengths - about 0.4 s for an incremental 3,400 tokens against ~1.4 s for a full re-prefill - and it is exactly the part this plan destroys. Turn time is not set by generation arithmetic alone."
+check: choice
 ```
 
 The loop continues: more decode, possibly another tool call, another append,
@@ -834,41 +750,22 @@ prompt: |
   18.6 ms. Nothing about the request got harder - it is the same kind of small
   edit.
 
-  Give the full causal chain from "turn 25" to "18.6 ms." Then state the one
-  architectural change that would most reduce this specific degradation, and say
-  which term in the cost model it touches.
-answer: |
-  Chain: each turn appends the model's output plus a tool result to the token
-  sequence, so context length n grows monotonically - by turn 25 it might be
-  ~100k tokens instead of ~10k. Every generated token's forward pass must attend
-  to all n prior positions, which means reading the entire KV cache: n x 256 KB.
-  At n = 10k that is ~2.6 GB on top of 11 GB of weights (13.6 GB, ~6.8 ms); at
-  n = 100k it is ~26.2 GB on top of 11 GB (37.2 GB, ~18.6 ms). Decode is
-  memory-bandwidth-bound, so per-token latency tracks bytes read almost exactly,
-  and bytes read now has a term linear in n that has overtaken the fixed weight
-  term.
-
-  Most effective architectural change: reduce bytes of KV per token - fewer KV
-  heads (GQA/MQA), KV cache quantization to 8-bit or 4-bit, or an architecture
-  with sliding-window or latent-compressed attention. That touches b_kv in the
-  decode term, the only term that scales with n during decode. Note that
-  speculative decoding and weight quantization do NOT help here: they shrink or
-  amortize B_w, the fixed term, while the growing term is untouched.
-rubric: |
-  Must contain: (1) context grows every turn because tool results and model
-  output are appended - it is accumulation, not the task getting harder;
-  (2) per-token decode reads the whole KV cache, which is linear in n, so decode
-  bytes-read = B_w + n x b_kv; (3) decode is memory-bound so latency tracks that
-  sum; (4) the fix targets b_kv (KV quantization, fewer KV heads, windowed or
-  compressed attention) rather than the weight term.
-  Pass = (1), (2), and (3). Full credit adds (4) with the explicit observation
-  that weight-side optimizations do not address a growing KV term.
-  Fail patterns: "attention is O(n^2) so decode gets quadratically slower" -
-  per-token decode attention is linear in n; the quadratic shows up in prefill
-  and in the sum across the session. Accepting this without correction rewards
-  a real confusion. "The model is thinking about more things" = M17 plus
-  anthropomorphism.
-check: llm
+  Which explanation gives the causal chain from "turn 25" to "18.6 ms", and
+  names the change that would most reduce this specific degradation?
+options:
+  - text: "Every turn appends model output and tool results, so $n$ grows monotonically - roughly 10k tokens by turn 2 and 100k by turn 25. Each decode step reads $B_w + n \\cdot b_{kv}$: 11 GB of weights plus $n \\times 256$ KB of cache, so 13.6 GB at 10k and 37.2 GB at 100k, which at 2 TB/s is 6.8 ms and 18.6 ms. Decode is memory-bandwidth-bound, so latency tracks bytes read. The fix targets $b_{kv}$ - fewer KV heads, KV-cache quantization, windowed or compressed attention - because weight-side tricks only shrink the fixed $B_w$ term."
+    correct: true
+    explain: "Right. The growing term is $n \\cdot b_{kv}$; it has overtaken the fixed weight term, so only optimizations on bytes of KV per token attack the degradation."
+  - text: "Attention is $O(n^2)$ in sequence length, so as the session grows each generated token costs quadratically more arithmetic; at 100k tokens the score matrix is a hundred times larger than at 10k. The fix is a faster accelerator with more FLOP/s, which shortens the dominant $QK^\\top$ computation."
+    misconception: M10
+    explain: "The quadratic is real in prefill and in the session sum, but per-token decode has exactly one query attending to $n$ keys - linear in $n$. And decode runs its arithmetic units at about 2% utilization, so more FLOP/s buys almost nothing."
+  - text: "By turn 25 the KV cache holds far more accumulated conversational state, and the model has to search that richer memory to decide what is relevant, which takes longer than searching the sparse state of turn 2."
+    misconception: M17
+    explain: "The cache is a memo table of key/value projections, recomputable bit-identically from the tokens; it holds no state to search. Reading it is a fixed bandwidth cost of $n \\times 256$ KB, not a lookup whose difficulty depends on content."
+  - text: "Latency tracks the arithmetic the model performs, so the slowdown means turn 25's forward passes are doing more work per token; quantizing the weights further or adding speculative decoding would cut that work and restore 6.8 ms."
+    misconception: U9-M3
+    explain: "The arithmetic per generated token is identical at both turns - $2 P_a$ FLOPs either way. Quantization and speculative decoding both attack $B_w$, the term that is not growing, so they leave the $n \\cdot b_{kv}$ climb untouched."
+check: choice
 ```
 
 You now have the whole trace: keystroke, harness concatenation, BPE, embedding

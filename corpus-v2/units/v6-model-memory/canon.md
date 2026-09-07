@@ -62,42 +62,52 @@ id: v6-b1
 type: predict
 concept: d-memorization
 prompt: |
-  Before reading on, commit to an answer in writing.
+  Before reading on, commit to an answer.
 
   Both documents were in the training corpus. One comes back near-verbatim and
-  one does not come back at all. Name the property of the two DOCUMENTS that
-  best explains the difference, and then say what transcript two licenses you
-  to conclude about whether the workshop paper was used in training.
+  one does not come back at all. Which statement names the property of the two
+  DOCUMENTS that explains the difference, and draws the right conclusion from
+  transcript two about whether the workshop paper was used in training?
 
-  Two sentences. Guessing is the point; you are supposed to be wrong here.
-answer: |
-  The property is **how many times near-identical copies of the text passed
-  through training**, measured relative to the size of the corpus. The novel
-  exists in the corpus in hundreds or thousands of near-duplicate copies -
-  reviews, excerpts, study guides, pirated scans, quotation-heavy blog posts.
-  The workshop paper exists twice. Everything else you might have named -
-  fame, literary quality, being "creative work," length, recency, importance -
-  is either irrelevant or is a proxy for duplication.
-
-  What transcript two licenses you to conclude: **nothing.** Failure to
-  extract is not evidence of absence. The paper was in the training set. The
-  attack found no trace of it. That is the ordinary case, not the anomaly:
-  the overwhelming majority of a training corpus leaves no extractable
-  residue, and this unit exists because that fact eliminates most of the
-  claims people want to make.
-rubric: |
-  Pass requires: (1) duplication / number of copies named as the driver, in
-  any wording, and (2) an explicit statement that transcript two establishes
-  nothing about membership.
-  (1) alone = partial, do not pass; the second half is the load-bearing one
-  and it is the misconception the unit spends a section dismantling.
-  Answering that the novel is memorized "because it is famous" or "because it
-  is creative writing" without reaching duplication = partial; deliver
-  section 3 slowly.
-  Answering that transcript two shows the paper was not used, or was used but
-  "did not matter," = fail, diagnosing D3 (verbatim-is-the-test). This is the
-  expected failure and the whole unit is built to correct it.
-check: llm
+  Commit now; being wrong here is the point.
+options:
+  - text: |
+      The difference is how many near-identical copies of the text passed
+      through training, relative to the size of the corpus - the novel exists
+      in hundreds or thousands of copies, the paper in two - and transcript two
+      licenses no conclusion at all about whether the paper was used.
+    correct: true
+    explain: |
+      Right on both halves. Duplication relative to corpus size is the dominant
+      dial, which is why reviews, excerpts, study guides and pirated scans put
+      the novel in a different regime from a paper with two copies. And the
+      second half is the load-bearing one: the paper WAS in the corpus and the
+      attack found nothing, because the overwhelming majority of any corpus
+      leaves no extractable residue.
+  - text: |
+      The difference is that the novel is creative prose and the paper is
+      technical writing, and transcript two shows the paper either was not used
+      or was used without contributing anything.
+    misconception: D3
+    explain: |
+      Genre is not the dial, and the conclusion is the error this whole unit
+      exists to correct. You know the paper was in the corpus - the corpus is
+      public and you searched it. Extractable content is under about one
+      percent of tokens and is skewed toward duplicated and high-entropy
+      material, so a null result is exactly what you would predict whether or
+      not a document was used. Failure to extract is not evidence of absence.
+  - text: |
+      The difference is that famous literary works are worth storing, so the
+      weights keep a compressed copy of the novel, while the paper survives
+      only as statistics - which is why nothing of it comes back.
+    misconception: D4
+    explain: |
+      Both halves of that picture fail. At about 3.6 bits per parameter the
+      weights cannot be an archive: the corpus carries far more information
+      than the model can hold. And "only statistics" cannot explain transcript
+      one, where a page comes back word for word. What separates the two
+      documents is duplication, not the value or the genre of the work.
+check: choice
 ```
 
 Two facts have to be held at once, and almost nobody holds both.
@@ -229,46 +239,54 @@ prompt: |
   are the journal's standard copyright footer, its author-affiliation
   formatting block, and its reference-style boilerplate.
 
-  Explain, in your own words, why those matches are not evidence that the
-  model trained on those documents - and state what would have to be true of
-  a matched span for it to be evidence. Do not use the word "overfitting."
-answer: |
-  The matched spans are text that is near-identical across every document the
-  journal ever published, and formatted the same way by thousands of other
-  journals. A model that had never seen one of these 4,200 documents would
-  still emit that footer, because it saw the same footer attached to
-  everything else. So the match tells you the model learned the journal's
-  template, which is a fact about the template and not about the document.
-
-  Stated as a counterfactual: memorization means the model recalls the
-  document better than it would have if the document had been absent. For
-  boilerplate that difference is zero - present or absent, the output is the
-  same - so the counterfactual memorization is zero even though the verbatim
-  match is total. The tool is measuring the wrong quantity, and its 4,200 is
-  an upper bound made almost entirely of false positives.
-
-  For a matched span to be evidence it has to be text a model without this
-  document could not have produced: high-entropy, specific to this document,
-  not reconstructible from the genre. Length alone does not buy that - a
-  500-token licence is worse evidence than a 20-token unusual string. The
-  operational question is always "what would a model that never saw this
-  emit here," and for boilerplate the answer is "the same thing."
-rubric: |
-  Must contain: (1) the boilerplate is reconstructible from other documents,
-  so its emission does not depend on these documents being present, (2) the
-  counterfactual framing - memorization is a difference between with and
-  without, and that difference is zero here, (3) the criterion for a real
-  match: content a model lacking the document could not have produced,
-  i.e. document-specific and high-entropy, not genre-templatic.
-  (1) and (2) = pass. All three = full credit.
-  An answer that says the tool needs a longer match threshold = fail; length
-  is orthogonal, and a longer boilerplate match is still zero evidence. Point
-  at the licence-header example.
-  An answer that concludes verbatim extraction is worthless = fail in the
-  other direction, diagnosing an overcorrection. Section 4 shows extraction is
-  the strongest legal evidence available; what is worthless is extraction
-  without a counterfactual filter on what got matched.
-check: llm
+  Which explanation of what the tool has and has not shown is correct?
+options:
+  - text: |
+      A model that never saw any of these 4,200 documents would emit that
+      footer anyway, having seen it attached to everything else the journal and
+      a thousand other journals published, so the counterfactual difference -
+      recall with the document minus recall without it - is zero even though
+      the verbatim match is total. For a match to be evidence the span has to
+      be document-specific, high-entropy text that a model lacking the document
+      could not have produced.
+    correct: true
+    explain: |
+      That is the counterfactual test, stated in the form the rest of the unit
+      uses: could a model that never saw this document have produced this
+      output? For templatic text the answer is yes, so the 4,200 is an upper
+      bound made almost entirely of false positives.
+  - text: |
+      The threshold is too permissive. Raise the required match from 50 tokens
+      to 200 and the boilerplate drops out, leaving matches long enough that
+      they can only have come from the documents themselves.
+    misconception: D3
+    explain: |
+      Length is orthogonal to the problem. A 500-token licence header is
+      reconstructible without your document just as completely as a 50-token
+      footer, so a longer boilerplate match is still zero evidence. The filter
+      you need is on what kind of content matched, not on how much of it.
+  - text: |
+      Any verbatim match is a fact about genre statistics rather than about a
+      document, since the weights contain nothing of the training data, so
+      extraction can never be evidence and the tool's whole category is empty.
+    misconception: D4
+    explain: |
+      That is the correction overshooting into the "just statistics" position,
+      which the extraction results refute directly - some heavily duplicated
+      books come out of open models close to complete, and extraction is the
+      strongest evidence available in this space. What is worthless is
+      extraction with no counterfactual filter on what got matched.
+  - text: |
+      A 50-token exact match is astronomically improbable by chance, so each of
+      the 4,200 clears any reasonable significance bar and the tool has found
+      4,200 memorized documents.
+    misconception: D19
+    explain: |
+      "Improbable by chance" is a claim about a null you never built. The right
+      baseline is not random tokens; it is a model trained without these
+      documents, and that model emits the footer with probability near one.
+      Against the correct null the match is unremarkable.
+check: choice
 ```
 
 
@@ -383,8 +401,6 @@ is under one percent.
 id: v6-b3
 type: completion
 concept: d-memorization
-# variants: blank the corpus token count and give the ratio; or hold the corpus
-# fixed and blank the parameter count needed for a ratio of 1.
 prompt: |
   A different run: a 100-million-parameter model trained on a 1-billion-token
   corpus. Use 3.6 bits of memorization capacity per parameter, 4 bytes per
@@ -395,33 +411,44 @@ prompt: |
   Step 3. Corpus in bits:      (step 2) $\times\ 0.9 =$ ____ bits
   Step 4. Ratio corpus:capacity: (step 3) / (step 1) = ____
 
-  Fill the four blanks. Then answer in one sentence: does this arithmetic
-  establish that no document in the corpus is recoverable from the model?
-answer: |
-  Step 1: 3.6e8 bits (360,000,000)
-  Step 2: 4e9 bytes (4,000,000,000)
-  Step 3: 3.6e9 bits (3,600,000,000)
-  Step 4: 10
-
-  The one sentence: no. The ratio establishes that the corpus as a whole
-  cannot be stored - at least nine tenths of it is unrecoverable in principle
-  - but it says nothing about how the surviving budget is allocated, and it
-  is entirely consistent with a small number of heavily duplicated documents
-  being stored nearly completely while everything else leaves no trace.
-rubric: |
-  Required, exactly: blank 1 = 3.6 x 10^8; blank 2 = 4 x 10^9; blank 3 =
-  3.6 x 10^9; blank 4 = 10. Accept equivalent notations.
-  The one-sentence answer must say NO and must give the reason: a bound on the
-  total says nothing about the distribution across documents.
-  All four blanks plus the correct NO with reason = pass.
-  An answer that says yes, no document is recoverable = fail, diagnosing D4 in
-  its "just statistics" form. The capacity bound is an aggregate constraint,
-  not a per-document guarantee, and the 200-book extraction results sit
-  entirely inside a ratio of 10.
-  An answer that computes the blanks and then claims the model therefore
-  contains 10% of each document = fail; capacity is not distributed evenly and
-  nothing in the argument says it is.
-check: llm
+  Which filling of the four blanks is right, and what does the arithmetic then
+  establish about whether any document in the corpus is recoverable?
+options:
+  - text: |
+      $3.6 \times 10^8$ bits; $4 \times 10^9$ bytes; $3.6 \times 10^9$ bits;
+      ratio 10. No - the ratio establishes only that the corpus as a whole
+      cannot be stored, and says nothing about how the surviving budget is
+      allocated across documents.
+    correct: true
+    explain: |
+      The arithmetic and the conclusion both hold. A bound on the total is an
+      aggregate constraint: it is entirely consistent with a handful of heavily
+      duplicated documents being stored almost completely while everything else
+      leaves no trace. The 200-book extraction results sit comfortably inside a
+      ratio of 10.
+  - text: |
+      $3.6 \times 10^8$ bits; $4 \times 10^9$ bytes; $3.6 \times 10^9$ bits;
+      ratio 10. Yes - the corpus is ten times too large to fit, so nothing in
+      it is recoverable and the weights hold only statistics about the data.
+    misconception: D4
+    explain: |
+      The four numbers are right and the conclusion is the "just statistics"
+      half of the copies misconception. Capacity is not spread evenly over the
+      corpus; it concentrates on duplicated and high-entropy content. A ratio
+      of 10 forbids storing the corpus, not storing a particular novel.
+  - text: |
+      $3.6 \times 10^8$ bits; $4 \times 10^9$ bytes; $3.6 \times 10^9$ bits;
+      ratio 0.1. Yes, in the other direction - capacity exceeds what the corpus
+      needs, so the model holds the corpus outright and any document can be
+      recovered with the right prompt.
+    misconception: D4
+    explain: |
+      The ratio asked for is corpus over capacity, $3.6 \times 10^9$ divided by
+      $3.6 \times 10^8$, which is 10 - the corpus is the larger object. This is
+      the archive position, and the counting argument rules it out: with fewer
+      distinguishable weight states than corpora, two different corpora must
+      map to the same weights.
+check: choice
 ```
 
 **Three dials set where the surviving budget goes.** All three have been measured
@@ -582,48 +609,63 @@ prompt: |
   A rightsholder hands you 300 documents from their catalogue and asks whether
   a particular open model was trained on them. You run a full extraction
   battery: greedy and sampled continuations, prompt lengths from 20 to 500
-  tokens, a divergence attack, and probabilistic extraction over 100 samples
-  per document. Nothing comes back on any of the 300.
+  tokens, a divergence attack (the model declined outright on a handful of
+  those prompts), and probabilistic extraction over 100 samples per document.
+  Nothing comes back on any of the 300.
 
-  Before reading on: write down what you now know, and what you are able to
-  put in a report. Be specific about the difference between the two.
-answer: |
-  What you know: this model does not extractably memorize these 300 documents
-  under these attacks. That is a fact about extractability, and it is a
-  genuine finding - it means the exhibit route is closed for this engagement.
-
-  What you do NOT know: whether the documents were in the training corpus.
-  Failure to extract is expected for almost every document in any corpus. The
-  base rate of extractable content is under one percent of tokens and is
-  concentrated on heavily duplicated and high-entropy material, so 300
-  ordinary documents producing nothing is the outcome you would predict
-  whether or not they were used. The test has essentially no power to detect
-  membership for typical documents, so a negative result carries essentially
-  no information about membership.
-
-  What goes in the report: "extraction did not fire," stated as a property of
-  the method rather than a finding about the corpus, together with the base
-  rate that makes it uninformative. What must not go in the report: any
-  sentence of the form "the model does not appear to have been trained on this
-  material." That sentence will be quoted back at you, and it is not supported.
-
-  What to do next: change the unit of evidence from the document to the
-  collection - section 6 - or, for anything published from here on, plant
-  evidence in advance, which is v7.
-rubric: |
-  Must contain: (1) the negative result is about extractability, not about
-  membership, (2) the reason - the base rate of extractable content is under
-  ~1% and skewed, so a null result is uninformative about membership, i.e. the
-  test has no power for typical documents, (3) an explicit refusal to write
-  the "not trained on" sentence.
-  (1) and (2) = pass. All three = full credit.
-  An answer concluding the documents probably were not used = fail, diagnosing
-  D3, and re-deliver transcript two from section 1: that paper WAS in the
-  corpus and produced exactly this result.
-  An answer proposing to run a loss-based membership attack next and treat its
-  output as an answer = pass on this beat but flag D2; section 6 is the
-  correction and should be delivered slowly.
-check: llm
+  Before reading on, commit: which statement is what you now know, and what may
+  go in the report?
+options:
+  - text: |
+      You know this model does not extractably memorize these 300 documents
+      under these attacks - a fact about extractability, not about membership -
+      and because the base rate of extractable content is under about one
+      percent of tokens and skewed toward duplicated material, the test has
+      essentially no power for ordinary documents. The report says "extraction
+      did not fire" as a property of the method, and never says the model does
+      not appear to have been trained on this material.
+    correct: true
+    explain: |
+      Exactly the distinction the engagement turns on. The exhibit route is
+      closed and that is a genuine finding; the membership question is
+      untouched. Next moves: change the unit of evidence to the collection, or
+      plant evidence in advance for anything published from here on.
+  - text: |
+      The battery was thorough and every one of the 300 came back empty, so you
+      have good evidence the catalogue was not in the training corpus, and the
+      report should say so while noting the method's limits.
+    misconception: D3
+    explain: |
+      Re-read transcript two from the opening: that workshop paper WAS in the
+      corpus and produced exactly this result. A test with no power for typical
+      documents produces the same null whether or not the documents were used,
+      so 300 for 300 is uninformative. That sentence will be quoted back at you
+      and it is not supported.
+  - text: |
+      The refusals on the divergence prompts are the informative part: the
+      content has been scrubbed by alignment, so it is no longer in the
+      weights, and the report should say the material is not present in the
+      model.
+    misconception: V6-M2
+    explain: |
+      A refusal is evidence about the safety layer and nothing else. Alignment
+      reshapes the output distribution over anticipated prompts; it does not
+      edit weights toward forgetting. Divergence attacks have raised emission
+      of training data by two orders of magnitude against models that refused
+      politely, and one frontier model reproduced over three quarters of a
+      memorized novel with no jailbreak at all.
+  - text: |
+      Extraction is the weak instrument here, so run a loss-based membership
+      attack on the 300 and report its per-document $p$-values as establishing
+      membership at a stated confidence.
+    misconception: D2
+    explain: |
+      Aggregating to the collection is the right next move; reporting a
+      per-document membership $p$-value as a confidence statement is not. That
+      claim needs a false-positive rate, which needs the distribution of the
+      statistic over models trained without the document - and you cannot
+      sample it without retraining. That argument is the next section.
+check: choice
 ```
 
 
@@ -829,59 +871,66 @@ prompt: |
   and cleaner benchmark, train a far better membership classifier on it,
   validate carefully, and publish an attack with an AUC of 0.95.
 
-  Suppose they succeed at everything they set out to do. Explain, in your own
-  words and without using the word "overfitting," why the resulting system
-  still cannot tell a rightsholder that a particular model was trained on
-  their book at a stated confidence. Then name the one thing they could
-  change about the PLAN, not about the method, that would fix it.
-answer: |
-  A confidence statement is a statement about the false-positive rate: how
-  often this procedure says "trained on it" when applied to a model that was
-  not. That rate is defined against the null distribution - the spread of the
-  test statistic across models that did not train on the book. Their AUC of
-  0.95 was measured on a benchmark, so it describes how well the classifier
-  separates the benchmark's two labelled groups. It says nothing about the
-  false-positive rate on the target model unless the benchmark's non-members
-  are a valid sample of "models like this one, trained without this book,"
-  and they are not: they are documents, not models. The null they need is
-  over training runs, and the only way to sample it is to retrain the target
-  model without the book, several times, which requires the corpus, the
-  recipe, the compute and multiple seeds. Nobody outside the lab has any of
-  the four.
-
-  A better benchmark makes the number more reliable as a description of the
-  benchmark. It does not convert it into a statement about a model whose
-  counterfactual twin does not exist. And two further facts survive any
-  improvement in the attack: the per-document verdict flips with the training
-  seed alone, and an adversary can fine-tune on paraphrases of its own data
-  and collapse the attack without losing anything.
-
-  The change to the plan: stop trying to reconstruct the null after the fact
-  and construct it in advance. Generate content under a secret key, publish
-  part of it, keep matched siblings unpublished, and commit the key with a
-  timestamp before anyone sees the model. The unpublished siblings are drawn
-  from the same distribution by the same procedure and were certainly never
-  trained on, so they ARE the null and can be sampled without limit. That is
-  a change in when you act, not in how good the classifier is.
-rubric: |
-  Must contain: (1) confidence = a false-positive rate, which is defined
-  against a null distribution, (2) the null here is over MODELS trained
-  without the document, and sampling it requires retraining - corpus, recipe,
-  compute, seeds - so it is unavailable, (3) attack quality is orthogonal:
-  a better statistic against an unavailable null has the same status, (4) the
-  fix is prospective - construct the null in advance with keyed content and
-  never-published controls.
-  (1), (2) and (4) = pass. All four = full credit.
-  An answer that says the problem is the benchmark being unrealistic, and
-  proposes a more realistic benchmark = fail, diagnosing D2. The argument is
-  not about benchmark quality; it is that the required object is a
-  counterfactual model, and no dataset is one.
-  An answer that says AUC 0.95 would in fact be sufficient = fail, and route
-  to the AUC-versus-TPR-at-low-FPR correction below.
-  An answer that reaches the right conclusion via "you can never prove
-  anything statistically" = fail; the whole point is that v7's construction
-  does yield a defensible false-positive rate.
-check: llm
+  Suppose they succeed at everything they set out to do. Which account
+  correctly explains what the resulting system can tell a rightsholder about a
+  particular model and their book, and names the change that would fix it?
+options:
+  - text: |
+      A confidence statement is a statement about the false-positive rate,
+      which is defined against the null - the spread of the statistic across
+      models that did not train on the book - and sampling that null means
+      retraining the target model without the book several times, which needs
+      the corpus, the recipe, the compute and multiple seeds. A better
+      classifier scored against an unavailable null has the same status as a
+      worse one. The fix is to the plan, not the method: generate content under
+      a secret key, publish part of it, keep matched siblings unpublished, and
+      commit the key with a timestamp before anyone sees the model.
+    correct: true
+    explain: |
+      That is the four-step argument and its exit. The benchmark's non-members
+      are documents; the null they need is over training runs. The unpublished
+      siblings are drawn from the same distribution by the same procedure and
+      were certainly never trained on, so they are the null rather than a proxy
+      for it, and can be sampled without limit.
+  - text: |
+      The trouble is that existing benchmarks are unrealistic; a large, clean,
+      carefully validated one fixes the labels, and an attack that reaches AUC
+      0.95 on it does support a stated confidence for a particular model and
+      book.
+    misconception: D2
+    explain: |
+      No dataset is a counterfactual model. Even with perfect labels the
+      benchmark tells you how well the classifier separates two groups of
+      documents; the required object is the behaviour of the procedure on
+      models trained without the book. Two further facts survive any benchmark
+      improvement: the per-document verdict flips with the training seed alone,
+      and paraphrase fine-tuning collapses the attack while the model keeps
+      everything it knew.
+  - text: |
+      An AUC of 0.95 means the detector is right about 95% of the time, so the
+      confidence attaches directly and the rightsholder can be told there is
+      roughly a 95% chance their book was used; the plan needs more validation,
+      not redesign.
+    misconception: V6-M1
+    explain: |
+      AUC is the probability that a randomly chosen member outscores a randomly
+      chosen non-member, averaged over every threshold including ones nobody
+      would operate at. It is not accuracy and it is not a posterior
+      probability that a claim is true. The operational number is TPR at a low
+      fixed FPR, and it is routinely far worse than the AUC suggests.
+  - text: |
+      No statistical procedure can ever establish what a model was trained on,
+      so the plan is unfixable in principle; the only real evidence is a
+      verbatim extraction transcript.
+    misconception: D3
+    explain: |
+      The obstacle is specific, not universal: this null cannot be sampled
+      because the counterfactual model does not exist. Construct the null in
+      advance with keyed content and never-published controls and you get a
+      defensible false-positive rate - which is exactly what v7 builds. And
+      extraction fires on well under one percent of any corpus, so it cannot
+      carry the work alone.
+check: choice
 ```
 
 **One reading skill before the next section.** You will be handed AUC numbers,
@@ -970,46 +1019,48 @@ prompt: |
 
   (a) How many documents do you need to reach $z = 4$?
 
-  (b) Now suppose your 10,000 "documents" are the individual chapters of 250
-  books, and a book's chapters share an author, a topic, a formatting
-  template, and a publication date - so within a book the statistic barely
-  varies. Roughly what $z$ should you actually claim, and why?
+  (b) Your 10,000 "documents" turn out to be the individual chapters of 250
+  books, and a book's chapters share an author, a topic, a formatting template
+  and a publication date - so within a book the statistic barely varies.
 
-  Answer both before reading on.
-answer: |
-  (a) z = d*sqrt(n), so sqrt(n) = 4 / 0.04 = 100, and n = 10,000 documents.
-
-  (b) The sqrt(n) shrinkage assumes n INDEPENDENT draws. Chapters of the same
-  book are not independent draws; they are close to one draw repeated. If the
-  within-book variation is negligible, the effective sample size is the number
-  of books, 250, not the number of chapters, 10,000.
-
-  z = 0.04 * sqrt(250) = 0.04 * 15.8 = 0.63.
-
-  So the honest claim is z = 0.63, not z = 4. The p-value moves from about
-  3 in 100,000 to nothing at all. Counting chapters instead of books does not
-  strengthen the evidence; it inflates the reported significance by a factor
-  of sqrt(10000/250) = sqrt(40) = 6.3, which is manufactured, not measured.
-
-  The general rule: n in that formula is the number of independent units, and
-  determining what the independent unit IS is a judgment about the data that
-  an opposing expert will attack first, because it is the cheapest place to
-  find a factor of six.
-rubric: |
-  Required: (a) n = 10,000 exactly.
-  (b) must contain: (1) the independence assumption is violated, (2) the
-  effective n is the number of books (250) or an argument to that effect,
-  (3) the recomputed z of about 0.63 or a stated collapse toward
-  non-significance, (4) the inflation factor sqrt(40) ~ 6.3 or equivalent
-  language about how much significance was manufactured.
-  (a) plus (b)(1) and (b)(2) = pass. All of it = full credit.
-  An answer that gives z = 4 for part (b) because "more data is more data" =
-  fail, diagnosing D19; this is exactly the error an opposing expert opens
-  with.
-  An answer that fixes it by removing chapters until 250 remain = pass, and
-  note that discarding data is a valid but wasteful fix; the standard remedy
-  is to aggregate within book first and test at the book level.
-check: llm
+  Commit to an answer for both before reading on.
+options:
+  - text: |
+      (a) $\sqrt{n} = 4/0.04 = 100$, so $n = 10{,}000$. (b) The $\sqrt{n}$
+      shrinkage assumes independent draws, and chapters of one book are close
+      to one draw repeated, so the effective sample size is 250 books:
+      $z = 0.04 \times \sqrt{250} = 0.63$. Counting chapters inflated the
+      reported $z$ by $\sqrt{10000/250} = \sqrt{40} \approx 6.3$.
+    correct: true
+    explain: |
+      Right, and the factor of 6.3 was manufactured rather than measured - it
+      moves $p$ from about 3 in 100,000 to nothing at all. The $n$ in that
+      formula is the number of independent units, and deciding what the
+      independent unit is is a judgement an opposing expert attacks first,
+      because it is the cheapest place to find a factor of six.
+  - text: |
+      (a) $n = 10{,}000$. (b) You have 10,000 measurements, and every one of
+      them carries the same mean shift, so $z = 4$ stands; the chapters being
+      similar is a property of the catalogue, not a defect in the statistic.
+    misconception: D19
+    explain: |
+      This is the error the opposing expert opens with. Variances add only for
+      independent draws; correlated units give you far less noise reduction
+      than $\sqrt{n}$ promises, so the honest effective $n$ here is 250 and the
+      honest $z$ is 0.63. More rows is not more evidence when the rows repeat
+      each other.
+  - text: |
+      (a) $n = 10{,}000$. (b) The dependence that matters is training
+      randomness, not chapter similarity, so average the statistic over several
+      training seeds and $z = 4$ at $n = 10{,}000$ survives.
+    misconception: D16
+    explain: |
+      Seed noise is real and it is a different problem - it is why single-run
+      contribution numbers need averaging. It does not repair this $z$, because
+      the failure here is in the sample: 10,000 chapters of 250 books are not
+      10,000 independent observations no matter how many seeds you average.
+      Aggregate within each book first, then test across books.
+check: choice
 ```
 
 **What dataset inference actually does.** The published method that works has
@@ -1155,8 +1206,6 @@ difference between an audit and a list of coincidences.
 id: v6-b8
 type: completion
 concept: d-evidence-discipline
-# variants: blank the document count and give the corrected threshold; or give
-# a best-document z and blank the number of tests it could survive.
 prompt: |
   An audit tests 1,000 documents from one catalogue against one model, and you
   want the probability of *any* false positive across the whole report held to
@@ -1170,37 +1219,25 @@ prompt: |
           $1000 \times 0.01 =$ ____
   Step 2. Bonferroni per-document threshold: $0.01 / 1000 =$ ____
   Step 3. One-sided $z$ required to clear it: ____
-  Step 4. Your single best document scores $z = 3.1$. Does it clear the bar?
+  Step 4. Your single best document scores $z = 3.1$. Does it clear the bar,
+          and what would you change about the audit to make it reportable?
           ____
 
-  Fill the four blanks. Then state in one sentence what you would have to
-  change about the audit for that best document to become reportable.
-answer: |
-  Step 1: 10 documents
-  Step 2: 1e-5 (0.00001)
-  Step 3: z = 4.27
-  Step 4: No. z = 3.1 corresponds to p ~ 0.001, which is a hundred times
-          larger than the corrected threshold of 1e-5.
-
-  The one sentence: reduce the number of tests - pre-register a small number
-  of specific documents chosen before seeing any model output, rather than
-  sweeping the catalogue, since the bar is set by how many tests the family
-  contains and nothing else about that document changed.
-rubric: |
-  Required, exactly: blank 1 = 10; blank 2 = 1e-5; blank 3 = 4.27; blank 4 =
-  no.
-  The one-sentence answer must identify reducing the family size / pre-
-  registering a smaller set of tests. Accept "test at the collection level
-  instead of per document" as an equally correct answer, since it also
-  collapses the family to one test.
-  All four blanks plus a valid remedy = pass.
-  An answer that proposes relaxing the family-wise rate to make z = 3.1 pass =
-  fail, diagnosing D19; choosing the threshold after seeing the result is the
-  specific move that destroys the evidence.
-  An answer that reports z = 3.1 as "significant at p < 0.01, uncorrected" and
-  treats the caveat as sufficient = fail; an uncorrected number in a report
-  with 1,000 tests behind it is not a caveat, it is the finding being wrong.
-check: llm
+  Pick the filling that is correct in all four blanks.
+options:
+  - text: "10 documents; $1 \\times 10^{-5}$; $z = 4.27$; no - $z = 3.1$ is about $p = 0.001$, a hundred times larger than the corrected threshold, so the fix is to shrink the family: pre-register a small set of specific documents before seeing any model output, or test once at the collection level."
+    correct: true
+    explain: "Right. $n\\alpha = 1000 \\times 0.01 = 10$ expected false positives; Bonferroni divides, $0.01/1000 = 10^{-5}$, which the table puts at $z = 4.27$; and $z = 3.1$ sits an order of magnitude of $p$ short of it. The bar is set by how many tests the family contains and by nothing about that document, so the only honest lever is running fewer tests - and choosing which ones before you look."
+  - text: "10 documents; $1 \\times 10^{-5}$; $z = 4.27$; yes - $z = 3.1$ is significant at $p < 0.01$ uncorrected, so report it with the multiple-testing caveat noted in a footnote."
+    misconception: D19
+    explain: "The arithmetic is right and the conclusion undoes it. With 1,000 tests behind the number, an uncorrected $p$ is not a caveat, it is the finding being wrong: roughly 10 documents clear $p < 0.01$ against a model that saw none of them. A footnote does not change how many tests you ran."
+  - text: "10 documents; $1 \\times 10^{-5}$; $z = 4.27$; yes, once you relax the family-wise rate to 0.05 - that moves the per-document threshold to $5 \\times 10^{-5}$ and lets $z = 3.1$ through."
+    misconception: D19
+    explain: "Two problems. Arithmetically $0.05/1000 = 5 \\times 10^{-5}$ still needs about $z = 3.9$, so $z = 3.1$ misses anyway. More importantly the threshold was chosen after seeing the score, which is the specific move that destroys the evidence: an opposing expert asks when you set it, and there is no good answer."
+  - text: "50 documents; $1 \\times 10^{-5}$; $z = 4.27$; no - the expected false-positive count comes from the conventional $\\alpha = 0.05$ applied to the 1,000 tests."
+    misconception: D19
+    explain: "The expected count is $n\\alpha$ at the threshold you are actually testing at, and the question fixes that at $p < 0.01$, giving 10. Reaching for 0.05 because it is the customary number is the habit this whole section is about: the convention is not the quantity."
+check: choice
 ```
 
 **Two: dependence between test units.** Bonferroni assumed independence, and
@@ -1264,8 +1301,6 @@ and putting the two in an AUC column side by side hides it.
 id: v6-b9
 type: completion
 concept: d-evidence-discipline
-# variants: blank the FPR column and give the TPRs; or add a fifth row and ask
-# which row is the reportable operating point.
 prompt: |
   A different detector, run on 800 known members and 800 known non-members.
 
@@ -1280,35 +1315,23 @@ prompt: |
   Step 3. strict: TPR = 16/800 = ____    FPR = 8/800 = ____
   Step 4. TPR at 1% FPR = ____
 
-  Fill the blanks. Then answer in one sentence: a colleague wants to report
-  this detector's medium row, "30% detection at 20% false positives," as the
-  headline. What is wrong with that as the headline of an audit?
-answer: |
-  Step 1: TPR = 0.80, FPR = 0.70
-  Step 2: TPR = 0.30, FPR = 0.20
-  Step 3: TPR = 0.02, FPR = 0.01
-  Step 4: TPR at 1% FPR = 0.02, i.e. 2%
-
-  The one sentence: a 20% false-positive rate means one in five accused
-  documents is wrongly accused, which is not an operating point any audit
-  report can stand behind - the reportable operating point is the strict row,
-  where the honest claim is 2% detection, and choosing the medium row makes
-  the detector look six times better by accepting an error rate that would
-  discredit the report.
-rubric: |
-  Required, exactly: 0.80/0.70, 0.30/0.20, 0.02/0.01, and TPR at 1% FPR =
-  2% (0.02).
-  The one-sentence answer must identify that a 20% FPR is unusable for an
-  accusation, and that the honest number is the one at the operating point you
-  would actually use.
-  All blanks plus that reasoning = pass.
-  An answer that computes the blanks and then defends the medium row because
-  "the detection rate is higher" = fail; that is the AUC error (V6-M1) in its
-  operational form - a detection rate quoted without its false-positive rate
-  is not a quantity.
-  An answer that gives FPR as members-flagged over total-flagged = fail on
-  arithmetic; FPR is per non-member, not per flag.
-check: llm
+  A colleague wants the medium row, "30% detection at 20% false positives,"
+  as the headline of the audit. Pick the filling that is correct in all four
+  blanks and judges the headline correctly.
+options:
+  - text: "0.80 / 0.70; 0.30 / 0.20; 0.02 / 0.01; TPR at 1% FPR = 2%. The medium row cannot be the headline: a 20% FPR means one accused document in five is wrongly accused, so the reportable operating point is the strict row and the honest claim is 2% detection."
+    correct: true
+    explain: "Right. Each rate is per its own denominator - members flagged over 800 members, non-members flagged over 800 non-members - and the strict row is the only one at an FPR an accusation can stand behind. Quoting the medium row makes the detector look fifteen times better by accepting an error rate that would discredit the report."
+  - text: "0.80 / 0.70; 0.30 / 0.20; 0.02 / 0.01; TPR at 1% FPR = 2%. The medium row is the right headline, because 30% detection is the highest rate the detector achieves at a threshold that still separates the two groups."
+    misconception: V6-M1
+    explain: "That is the AUC error in its operational form: a detection rate quoted without the false-positive rate it was bought at is not a quantity. Every threshold 'separates the groups' to some degree; the loose row separates them too, at an FPR of 0.70. You pick one operating point, and for an accusation you pick a strict one."
+  - text: "0.80 / 0.47; 0.30 / 0.40; 0.02 / 0.33; TPR at 1% FPR = 2%. The medium row cannot be the headline because its false-positive rate is too high for an accusation."
+    misconception: V6-M1
+    explain: "The FPRs here are non-members flagged divided by total flagged (560/1200, 160/400, 8/24). FPR is per non-member: the denominator is the 800 non-members, not the flag count. Dividing by flags makes the rate depend on how many members you caught, which is the one thing it must not depend on."
+  - text: "0.80 / 0.70; 0.30 / 0.20; 0.02 / 0.01; TPR at 1% FPR = 2%. Report the average across the three rows, about 37% detection, since a single row is an arbitrary choice of threshold."
+    misconception: V6-M1
+    explain: "Averaging across thresholds is exactly what AUC does, and it is why AUC hides what a detector does in use. Nothing you do with a detector is an average over thresholds - you deploy one, and the average is dominated by permissive settings where you would be flagging most of everything."
+check: choice
 ```
 
 **Four: pre-registration.** The first three are analysis choices, and every
@@ -1419,60 +1442,27 @@ type: self-explain
 concept: d-evidence-discipline
 prompt: |
   You are writing the one-page artifact described above, before running
-  anything. For each of the three measurements - extraction, per-document
-  membership inference, collection-level dataset inference - state in two or
-  three sentences: what a POSITIVE result licenses you to claim, what a
-  NEGATIVE result licenses you to claim, and where that method's null
-  distribution comes from.
+  anything: for each of extraction, per-document membership inference, and
+  collection-level dataset inference, what a positive result licenses, what a
+  negative result licenses, and where the null comes from.
 
-  Answer from this unit's text. Do not reference any run you have or have not
-  performed.
-answer: |
-  **Extraction.** Positive: this specific document is reproducible from this
-  model, demonstrated, with the prompt and the decoding procedure stated. It
-  needs no null because it is a demonstration rather than an inference - you
-  are not estimating a probability, you are exhibiting an output. Negative:
-  almost nothing. The base rate of extractable content is under one percent of
-  tokens and is concentrated on duplicated and high-entropy material, so a
-  null result is the expected outcome regardless of membership and carries no
-  information about it.
-
-  **Per-document membership inference.** Positive: that this document's
-  statistic is unusual relative to a comparison set you assembled - which is a
-  claim about your comparison set, not about the model, unless that set is
-  exchangeable with the document in every respect except membership. There is
-  no valid null available, because sampling it would require retraining the
-  model without the document, which needs the corpus, the recipe, the compute
-  and several seeds. Negative: nothing, for the same reason, and worse: the
-  per-document verdict flips with the training seed alone, so neither
-  direction is stable.
-
-  **Collection-level dataset inference.** Positive: this collection as a whole
-  scores differently from a matched held-out collection, at a stated p, at a
-  stated effective sample size. The null is borrowed - it comes from the
-  held-out set, so the claim is exactly as good as the match between the two
-  sets, and it is a claim about the collection and never about any individual
-  document in it. Negative: weak evidence of absence at collection level, and
-  it degrades under paraphrase fine-tuning, so a negative is consistent with
-  an adversary who took a cheap countermeasure.
-rubric: |
-  Must contain, per method: the positive claim, the negative claim, and the
-  source of the null. The three nulls are the graded core: extraction needs
-  none because it is demonstrative; MIA's is unsampleable; DI borrows one from
-  a matched held-out set.
-  Pass = all three nulls correct AND at least four of the six positive/
-  negative claims correct, with the extraction negative ("nothing") among
-  them.
-  Full credit additionally requires the dataset-inference positive to be
-  scoped to the collection rather than to individual documents.
-  An answer that gives membership inference a null of "documents I believe
-  were not used" without flagging that this is an assumption, not a sample of
-  the null = fail, diagnosing V6-M3.
-  An answer that treats a negative extraction result as evidence of absence =
-  fail, diagnosing D3.
-  An answer that describes the dataset-inference p-value as proof that a
-  specific document was used = fail; the test was never about a document.
-check: llm
+  Four drafts of the page are below. Pick the one you would sign, and be clear
+  with yourself about what is wrong with each of the others before you read
+  on.
+options:
+  - text: "Extraction: positive shows this document is reproducible from this model, prompt and decoding stated, and needs no null because it demonstrates rather than infers; negative licenses nothing, since under 1% of tokens are extractable and that fraction is skewed to duplicated and high-entropy text. Membership inference: positive says the statistic is unusual against a comparison set you assembled, which is a claim about that set unless it is exchangeable in every respect but membership; there is no valid null, since sampling it means retraining without the document; negative licenses nothing, and the verdict flips with the seed. Dataset inference: positive says this collection scores differently from a matched held-out collection at a stated $p$ and a stated effective $n$, never about an individual document, with the null borrowed from the held-out set; negative is weak and degrades under paraphrase fine-tuning."
+    correct: true
+    explain: "Right, and the three nulls are the spine of the page: extraction needs none, membership inference cannot have one, dataset inference borrows one and is exactly as good as the match. Scoping the dataset-inference positive to the collection is the sentence that keeps the page defensible."
+  - text: "Same as the signed page for extraction and dataset inference, except: membership inference's null comes from documents you have good reason to believe were never crawled - post-cutoff publications and uncrawled domains - so a positive licenses a stated confidence that this document was used."
+    misconception: V6-M3
+    explain: "That set is a belief about membership, not a sample of the null, and it is the substitution that broke the field: with post-cutoff text as controls, date and membership are confounded, and a blind classifier that never queries the model beat published attacks across eight datasets. A control set is valid only when it matches on everything that moves the statistic."
+  - text: "Same as the signed page for membership inference and dataset inference, except: extraction's negative result licenses the claim that the model does not appear to have been trained on this material, since the battery was exhaustive across prompt lengths and decoding strategies."
+    misconception: D3
+    explain: "Failure to extract is the expected outcome whether or not the document was used - transcript two in this unit is a paper that was demonstrably in the corpus and came back as invention. An exhaustive battery raises the power of a test that has almost none for ordinary documents; the sentence 'does not appear to have been trained on' is the one that gets quoted back at you."
+  - text: "Same as the signed page for extraction and membership inference, except: dataset inference's positive licenses the claim that the collection was used and therefore that each document in it was used, at the collection-level $p$."
+    misconception: D19
+    explain: "The test was never about a document. It aggregated a per-document effect too small to see into a collection-level statistic via $z = d\\sqrt{n}$; nothing in that construction says which documents carried the shift, and pushing the collection $p$ down onto each member is a claim the method does not support."
+check: choice
 ```
 
 

@@ -147,29 +147,57 @@ type: predict
 concept: c-sampling
 prompt: |
   You send the identical prompt to your local model twice. First call sets
-  `temperature=0.2`, second sets `temperature=1.4`. Before reading on:
+  `temperature=0.2`, second sets `temperature=1.4`.
 
-  Name every tensor inside the forward pass (embeddings, attention scores,
-  attention outputs, MLP activations, residual stream, final logits) whose
-  numeric contents differ between the two calls. Then say where in the pipeline
-  the two calls first diverge.
-answer: |
-  None of them differ. Embeddings, attention scores, attention outputs, MLP
-  activations, the residual stream, and the final logit vector are bit-identical
-  across the two calls. The forward pass never receives temperature as an input.
-  The two calls first diverge strictly after the forward pass returns, at the
-  point where the logits are divided by T and softmaxed into a sampling
-  distribution.
-rubric: |
-  Pass requires: (1) the answer "none" or an explicit statement that every listed
-  tensor including the logits is identical, and (2) locating the divergence
-  after the forward pass, at the logits-to-distribution step.
-  Naming the logits as differing is the M6 error - fail, because it means the
-  learner still believes temperature is an input to the network.
-  Saying "the outputs differ so something inside must differ" is M6 - fail.
-  Saying only "the sampled token differs" without locating where the divergence
-  begins is partial: probe for where.
-check: llm
+  Commit before reading on. Consider every tensor inside the forward pass -
+  embeddings, attention scores, attention outputs, MLP activations, the residual
+  stream, the final logits $z$. Which of these accounts is right about what
+  differs between the two calls, and about where they first diverge?
+options:
+  - text: |
+      None of them differ. Embeddings, attention scores, attention outputs, MLP
+      activations, the residual stream and the final logit vector are
+      bit-identical across the two calls. The two calls first diverge strictly
+      after the forward pass returns, where the logits are divided by $T$ and
+      softmaxed into a sampling distribution.
+    correct: true
+    explain: |
+      Right. Temperature is never an argument to the network - it is applied by a
+      few lines of serving code to the logits the pass already returned. That is
+      why you can compute $z$ once and sample it at ten temperatures without
+      re-running the model, which people do.
+  - text: |
+      Everything up to the last layer is identical, but the final logits differ:
+      temperature is folded into the output projection, so the $T = 1.4$ call
+      returns a flatter logit vector.
+    misconception: M6
+    explain: |
+      This is the belief that temperature reaches into the model. The logits are
+      produced by frozen weights from the token sequence alone; the division by
+      $T$ happens afterwards, outside the pass. $z$ is bit-identical at $T = 0.2$
+      and $T = 1.4$.
+  - text: |
+      From the attention scores onward everything differs. The two calls produce
+      visibly different text, so some tensor inside the forward pass must have
+      differed to produce it.
+    misconception: M6
+    explain: |
+      The inference runs backwards. The outputs differ because one fixed
+      distribution was reshaped and sampled twice at different sharpness. Turning
+      the knob up does not loosen the model; it moves mass into a tail that was
+      always there.
+  - text: |
+      Nothing differs, the softmax output included - those probabilities are the
+      model's estimate that each token is the right continuation, and only new
+      evidence could move them. The two calls diverge only at the random draw.
+    misconception: M2
+    explain: |
+      Softmax output is not a probability of being correct; it is a normalized
+      exponential weighting of scores, and $T$ rescales the scores before that
+      normalization. On $z = [3.0, 1.0, 0.0, -1.0, -2.0]$ the last token carries
+      0.0056 at $T = 1$ and 0.0454 at $T = 2$ - genuinely different
+      distributions, not one distribution drawn from differently.
+check: choice
 ```
 
 ### top-k and top-p truncate the tail instead of rescaling it
@@ -222,7 +250,8 @@ id: u6-b2
 type: completion
 concept: c-sampling
 prompt: |
-  Same logit vector, new temperature. Fill in the four blanks.
+  Same logit vector, new temperature. One of the fillings below completes all
+  four blanks correctly.
 
   $$z = [3.0,\ 1.0,\ 0.0,\ -1.0,\ -2.0], \qquad T = 4.0, \qquad \text{top-}p = 0.9$$
 
@@ -245,32 +274,46 @@ prompt: |
   Step 6, one sentence: state which of the model's five logits changed between
   the T = 0.5 computation earlier in this section and this T = 4.0 computation.
       ____(d)____
-answer: |
-  (a) Z = 2.1170 + 1.2840 + 1.0000 + 0.7788 + 0.6065 = 5.7863
-
-  (b) 1.2840 / 5.7863 = 0.2219
-
-  (c) Cumulative sums: 0.3659, 0.5878, 0.7606, 0.8952, 1.0000. Four tokens give
-      0.8952, which is below 0.9, so the fifth is required: survivors = 5, the
-      entire vocabulary. At T = 4.0 the distribution is flat enough that
-      top-p = 0.9 truncates nothing at all - the mirror image of T = 0.5, where
-      it kept a single token and became greedy decoding.
-
-  (d) None of them. The logits are [3.0, 1.0, 0.0, -1.0, -2.0] in both
-      computations; only the divisor applied to them after the forward pass
-      changed.
-rubric: |
-  (a) 5.7863 +/- 0.01. (b) 0.2219 +/- 0.005.
-  (c) exactly 5. Answering 4 is the expected trap - the learner eyeballed
-  0.8952 as "about 0.9" instead of checking the inequality. Give partial credit
-  and correct it explicitly, since the whole point is that the cut is
-  mechanical, not approximate.
-  (d) must be "none" or equivalent. Any answer naming a changed logit is M6 and
-  fails the beat regardless of (a)-(c) being right.
-  Pass = (d) correct AND at least two of (a), (b), (c) correct.
-# variant blanking: for a second pass, blank steps 1 and 2 instead of 3 and 4,
-# keeping (c) and (d) blank in every variant - those two carry the concept.
-check: llm
+options:
+  - text: |
+      (a) 5.7863   (b) 0.2219   (c) 5
+      (d) None of them: the logits are [3.0, 1.0, 0.0, -1.0, -2.0] in both
+          computations, and only the divisor applied to them after the forward
+          pass changed.
+    correct: true
+    explain: |
+      Right. Cumulative sums are 0.3659, 0.5878, 0.7606, 0.8952, 1.0000 - four
+      tokens give 0.8952, which has not reached 0.9, so the fifth is required and
+      top-p truncates nothing at all. That is the mirror image of $T = 0.5$,
+      where the same setting kept one token and became greedy decoding.
+  - text: |
+      (a) 5.7863   (b) 0.2219   (c) 4
+      (d) None of them: only the divisor applied after the forward pass changed.
+    misconception: U6-2
+    explain: |
+      0.8952 has not reached 0.9. The cut is a mechanical inequality on
+      cumulative mass, not an eyeball - treating it as approximate is the same
+      instinct that treats top-p as a soft creativity dial. The fifth token is
+      required, so survivors = 5.
+  - text: |
+      (a) 5.7863   (b) 0.2219   (c) 5
+      (d) All five changed: at T = 4.0 the pass produced the logit vector
+          [0.75, 0.25, 0.0, -0.25, -0.5], which is flatter than at T = 0.5.
+    misconception: M6
+    explain: |
+      $[0.75, 0.25, 0.0, -0.25, -0.5]$ is $z/T$, computed by the sampler after
+      the forward pass returned. The model's logits are $[3.0, 1.0, 0.0, -1.0,
+      -2.0]$ in both computations; temperature is not an input to the network.
+  - text: |
+      (a) 5.7863   (b) 0.2219   (c) 2, since top_p = 0.9 kept two tokens at
+          T = 1.0 and it is the same setting here.
+      (d) None of them changed.
+    misconception: U6-2
+    explain: |
+      top_p = 0.9 is not a fixed number of survivors. On these same logits it
+      keeps 1, 2, 4 and 5 tokens at $T = 0.5, 1.0, 2.0, 4.0$: the cut point reads
+      the cumulative mass of a distribution temperature has already reshaped.
+check: choice
 ```
 
 Across the four temperatures worked in this section, `top_p=0.9` keeps 1, 2, 4,
@@ -335,42 +378,59 @@ prompt: |
   single run. Something is broken in our serving stack - at T=0 it should give
   the real answer."
 
-  In your own words, explain (a) why their expectation is wrong, (b) what T=0
-  actually guarantees, and (c) what part of the pipeline the hallucination
-  actually comes from. Do not assert it and move on - say what T=0 does
-  mechanically.
-answer: |
-  (a) The expectation assumes temperature reaches back into the model and that
-  T=0 selects for correctness. It does not. Temperature divides the logits after
-  the forward pass has already finished. The logits at T=0 are the same logits
-  as at T=1, so if the top-scoring token is the first token of a hallucinated
-  method name, T=0 returns it with probability 1.
-
-  (b) T=0 guarantees determinism only: repeated argmax over the same
-  distribution gives the same output every run. That is why they see the same
-  wrong method every time - the reproducibility is evidence the stack is working
-  correctly, not evidence it is broken.
-
-  (c) The hallucination comes from the logits, which come from the weights,
-  which come from pretraining. The model assigns high probability to a
-  plausible-looking method name because plausible-looking method names are what
-  the objective rewarded. Sampling has no correctness signal to consult.
-rubric: |
-  Must contain all three: (1) temperature is applied to logits after the forward
-  pass, so the logits are unchanged by it; (2) T=0 = argmax = determinism, not
-  correctness; (3) the error originates upstream in the weights/logits, not in
-  the sampler.
-  Pass = all three present in the learner's own phrasing.
-  Partial = (1) and (2) present, (3) vague ("the model is wrong somewhere").
-  Fail patterns to name explicitly:
-  - "T=0 should show what the model really knows, so the weights must be
-    corrupted" = M6, still treating T=0 as a knowledge probe.
-  - "the softmax probability was high so the model believed it was true" = M2,
-    reading softmax output as a truth probability. Correct this directly:
-    softmax output is a frequency-calibrated sampling weight.
-  - "raise the temperature to escape the hallucination" = M6 inverted; note that
-    this changes which wrong token you get, not whether it is wrong.
-check: llm
+  Which explanation would you give them? Pick the one that says what T = 0 does
+  mechanically, what it guarantees, and where the hallucination comes from.
+options:
+  - text: |
+      Their expectation assumes temperature reaches back into the model and
+      selects for correctness. It divides the logits after the forward pass has
+      finished, so the logits at T = 0 are the same logits as at T = 1; if the
+      top-scoring token starts a hallucinated method name, argmax returns it
+      every time. T = 0 guarantees determinism only - the identical wrong answer
+      each run is evidence the stack works. The error is upstream, in the logits
+      and therefore the weights.
+    correct: true
+    explain: |
+      Right, and the ordering matters: the sampler has no correctness signal to
+      consult, so nothing downstream of the logits could have caught this. The
+      reproducibility they are reading as a symptom is the one thing T = 0 does
+      buy.
+  - text: |
+      T = 0 is the model's knowledge probe - it shows what the model really
+      knows, stripped of sampling noise. Getting the same nonexistent method on
+      every run therefore means the weights or the serving stack are corrupted,
+      and the next step is to re-verify the checkpoint hash.
+    misconception: M6
+    explain: |
+      T = 0 is argmax over the same distribution every other temperature samples
+      from - one point on the sampling dial, not an escape from it. Greedy
+      decoding hallucinates at close to the rate of T = 0.7 and sometimes worse,
+      because it locks into a confident wrong opening and conditions on it.
+  - text: |
+      The softmax put the highest probability on that method, which means the
+      model assessed it as most likely to be true. The stack is fine and the
+      weights are fine; the distribution is miscalibrated, so the fix belongs at
+      the sampler - rescale or threshold the probabilities before argmax.
+    misconception: M2
+    explain: |
+      Softmax output in the output layer parameterizes a next-token sampling
+      distribution calibrated to training-data frequencies, not a probability of
+      truth. A false claim seen ten thousand times gets high probability. No
+      rescaling at the sampler can add a correctness signal that the logits never
+      carried.
+  - text: |
+      Greedy decoding returns the single most likely sequence, so the model is
+      locked onto it. The correct method name lies on a lower-probability path
+      that argmax cannot reach - raise the temperature, or use beam search, to
+      let the model find it.
+    misconception: U6-5
+    explain: |
+      Two errors. Greedy does not maximize sequence probability: with step 1 at
+      $p = [0.6, 0.4]$ where the 0.6 branch continues at best 0.5 and the 0.4
+      branch at 0.99, greedy scores 0.30 against 0.396. And raising $T$ changes
+      which wrong token you get, not whether it is wrong, because the logits it
+      samples are unchanged.
+check: choice
 ```
 
 ## The KV cache is not memory
@@ -437,33 +497,57 @@ prompt: |
   process is killed and restarted. The harness resends the identical 18,000
   tokens and generation continues.
 
-  Predict, before reading on:
-  (a) Is the next-token logit vector after the restart identical to, similar to,
-      or different from what it would have been without the restart?
-  (b) What did the restart actually cost?
-  (c) A second scenario: instead of resending the same tokens, the harness
-      compacts the history into a 4,000-token summary and sends that. Same
-      questions.
-answer: |
-  (a) Identical, exactly. Same weights, same tokens, same causal mask, therefore
-  the same K and V for every position, therefore the same logits. Cache eviction
-  is not observable in the output.
-
-  (b) Time and arithmetic only: one prefill pass over 18,000 tokens instead of
-  reading a table that was already in memory. Latency to the next token goes up.
-  Nothing about the model's behavior changes.
-
-  (c) Now the output does change, and this is the important contrast. It changed
-  because the TOKENS changed, not because the cache changed. The state lives in
-  the token sequence; compaction is lossy because it rewrites the sequence.
-rubric: |
-  Pass requires (a) "identical" (not "similar", not "close") and (c) attributing
-  the difference to the changed token sequence rather than to the cache.
-  Answering (a) "similar" or "slightly different" indicates M17 - the learner
-  still believes accumulated state lives in the cache. Fail.
-  Answering (c) "the summary lost information from the cache" is M17 - fail.
-  (b) naming latency/compute cost is expected but not sufficient alone.
-check: llm
+  Commit before reading on. Which account is right about (a) the next-token
+  logit vector after the restart, (b) what the restart cost, and (c) the second
+  scenario in which the harness instead compacts the history into a 4,000-token
+  summary and sends that?
+options:
+  - text: |
+      (a) Identical, exactly - same weights, same tokens, same causal mask,
+      therefore the same K and V at every position. (b) Time and arithmetic only:
+      one prefill pass over 18,000 tokens instead of reading a table already in
+      memory, so latency to the next token rises. (c) The summary does change the
+      output, because the token sequence changed, not because the cache did.
+    correct: true
+    explain: |
+      Right, and the contrast is the whole point. A cache whose contents can be
+      regenerated exactly from the inputs holds no information the inputs did not
+      already hold. The state is the token sequence; compaction is lossy because
+      it rewrites that sequence.
+  - text: |
+      (a) Similar but not identical - 40 turns of accumulated state were in the
+      cache and a cold recompute cannot reconstruct all of it, so the model comes
+      back slightly flatter. (b) It cost conversational continuity. (c) The
+      summary loses more of the same accumulated state.
+    misconception: M17
+    explain: |
+      Evict the cache mid-conversation and force a full recompute over the
+      identical tokens: the logits come back bit-identical, not similar. K and V
+      for token $i$ are functions of tokens $1 \dots i$ alone under the causal
+      mask, so nothing accumulates that the tokens do not already determine.
+  - text: |
+      (a) Identical. (b) One prefill pass over 18,000 tokens, so latency only.
+      (c) The summary is worse specifically because compaction discards the KV
+      cache that 40 turns of conversation built up - a fresh 4,000-token cache
+      cannot hold what the 18,000-token one did.
+    misconception: M17
+    explain: |
+      Getting (a) right and (c) wrong is the common half-held version. The
+      summary degrades the output because different tokens go in, and it would
+      degrade it identically on a cold process with no cache at all. The cache is
+      a memoization table over the sequence, never a second store of it.
+  - text: |
+      (a) Identical. (b) Essentially nothing: cached tokens are free, so
+      refilling the cache is a memory copy and decode speed does not depend on
+      how long the context is. (c) The summary buys back RAM and nothing else.
+    misconception: U6-3
+    explain: |
+      The cache removes re-projection of old tokens, not attention over them. The
+      restart pays a real prefill over 18,000 positions, and afterwards every
+      decoded token attends across the whole cache: on this model attention
+      arithmetic overtakes all the weight matmuls at about 8,500 tokens of
+      context, so a shorter sequence is cheaper per token as well as in memory.
+check: choice
 ```
 
 ### Deriving what it costs
@@ -525,7 +609,8 @@ concept: c-kv-cache
 prompt: |
   Size the KV cache for a different model: L = 64 layers, d_model = 8192,
   H_q = 64 query heads, H_kv = 8 key/value heads, d_head = 128, fp16 cache
-  (b = 2 bytes), n = 8192 tokens of context.
+  (b = 2 bytes), n = 8192 tokens of context. One filling below is correct
+  throughout.
 
   Step 1, write the formula:
       bytes = 2 * L * H_kv * d_head * b * n
@@ -543,28 +628,56 @@ prompt: |
   Step 5, this model has 2x the H_kv of the 35B model in this section but only
   1.33x the layers. Its per-token cache is how many times larger?
       ____(g)____
-answer: |
-  (a) d_model = 8192 (and H_q = 64).
-  (b) The cache stores only K and V, which are projected to H_kv * d_head
-      dimensions; d_model is the input width to that projection and does not
-      appear in the output size. H_q affects how many queries read the cache,
-      not how large it is.
-  (c) 2 * 64 * 8 * 128 * 2 = 262,144 bytes
-  (d) 262,144 / 1024 = 256 KiB per token
-  (e) 256 KiB * 8192 = 2,097,152 KiB = 2048 MiB
-  (f) 2.0 GiB
-  (g) 256 / 96 = 2.667x
-rubric: |
-  (c) 262144 exact. (d) 256 exact. (f) 2.0 GiB. (g) 2.667 +/- 0.01.
-  (a) and (b) carry the concept: the learner must name d_model (naming H_q as
-  well is a bonus, not required) and give a reason grounded in the projection
-  output width. "d_model is unused because the formula does not have it" is
-  circular - partial credit only.
-  Pass = (a) and (b) correct AND at least three of (c)-(g) correct.
-# variant blanking: blank (c) and (e) in one variant, (a)/(b) and (g) in
-# another. (a)/(b) should be blank in every variant - the transferable skill is
-# knowing which model dimensions the cache depends on.
-check: llm
+options:
+  - text: |
+      (a) d_model = 8192 (and H_q = 64).
+      (b) because the cache stores only K and V, which are projected to
+          H_kv * d_head dimensions - d_model is the input width to that
+          projection and does not appear in the output size.
+      (c) 262,144 bytes   (d) 256 KiB   (e) 2048 MiB   (f) 2.0 GiB
+      (g) 256 / 96 = 2.667x
+    correct: true
+    explain: |
+      Right, and (a)-(b) are the transferable part: the cache does not care how
+      big the model is, only about $L$, $H_{kv}$ and $d_{head}$. $H_q$ sets how
+      many queries read the cache, not how large it is.
+  - text: |
+      (a) Nothing is unused.
+      (b) because d_model enters through the residual stream that each layer
+          stores per token.
+      (c) 2 * 64 * 8192 * 2 = 2,097,152 bytes   (d) 2048 KiB
+      (e) 16,384 MiB   (f) 16.0 GiB   (g) 2048 / 96 = 21.3x
+    misconception: M17
+    explain: |
+      That sizes the residual stream at every layer - which is exactly the thing
+      that is not cached. Queries, attention outputs, MLP activations and the
+      residual stream are all discarded after each step. Only K and V persist,
+      and they are $H_{kv} \cdot d_{head} = 1024$ wide, not 8192.
+  - text: |
+      (a) d_model = 8192.
+      (b) because the cache is indexed by heads, and there are 64 query heads per
+          layer, so 64 key/value pairs must be stored for each.
+      (c) 2 * 64 * 64 * 128 * 2 = 2,097,152 bytes   (d) 2048 KiB
+      (e) 16,384 MiB   (f) 16.0 GiB   (g) 2048 / 96 = 21.3x
+    misconception: U6-3
+    explain: |
+      Sizing by $H_q$ is off by exactly $H_q / H_{kv} = 8$, and that factor is
+      the entire point of grouped-query attention: 64 query heads share 8
+      key/value heads. Many queries read one cached K/V pair; reading it again
+      does not store it again.
+  - text: |
+      (a) d_model = 8192.
+      (b) because only the keys need storing - the values can be regenerated from
+          the residual stream when they are needed.
+      (c) 64 * 8 * 128 * 2 = 131,072 bytes   (d) 128 KiB
+      (e) 1024 MiB   (f) 1.0 GiB   (g) 128 / 96 = 1.333x
+    misconception: M17
+    explain: |
+      The residual stream is thrown away after each step, so there is nothing
+      left to regenerate V from. The leading 2 in the formula counts K and V, and
+      both are immutable for earlier positions under the causal mask - which is
+      precisely why both are worth caching.
+check: choice
 ```
 
 ## Prefill and decode are different machines
@@ -769,7 +882,8 @@ type: completion
 concept: c-quant
 prompt: |
   Quantize this group of 8 weights to 4 bits with the affine scheme
-  (16 levels, per-group scale and zero-point). Fill in the blanks.
+  (16 levels, per-group scale and zero-point). One filling below is correct
+  throughout.
 
       w = [0.10, -0.05, 0.20, 0.00, -0.10, 0.15, 0.05, -0.02]
 
@@ -795,29 +909,54 @@ prompt: |
   Step 6, state the bound that every reconstruction error must satisfy, and
   give its numeric value for this group:
       |w_hat_i - w_i| <= ____(g)____
-answer: |
-  (a) s = 0.30 / 15 = 0.02
-  (b) z = round(0.10 / 0.02) = round(5) = 5
-  (c) round(2.5) = 3   (half away from zero)
-  (d) round(12.5) = 13
-  (e) round(7.5) = 8
-  (f) w_hat_1 = 0.02 * (10 - 5) = 0.02 * 5 = 0.10, exact - this weight landed
-      on a grid point.
-  (g) s/2 = 0.01. Rounding to a grid of spacing s cannot miss by more than
-      half a step, and no weight here is outside [min, max] so no clamping
-      occurs.
-rubric: |
-  (a) 0.02, (b) 5, (f) 0.10, (g) 0.01 - all exact, no tolerance.
-  (c)(d)(e) accept 3/13/8 (half away from zero) or 2/12/8 (banker's rounding)
-  as long as the learner is internally consistent across all three.
-  (g) carries the concept and must be present: the answer must be s/2 = 0.01
-  WITH the reason (half a grid step). Answering "it depends on the weights" or
-  giving a number without the half-step justification is partial.
-  Pass = (a), (b), (g) correct AND at least two of (c), (d), (e), (f).
-# variant blanking: blank (a) and (b) in one variant, (f) and (g) in another.
-# (g) should be blank in every variant - the error bound is the transferable
-# idea, and it is what makes the M16 refutation quantitative.
-check: llm
+options:
+  - text: |
+      (a) 0.02   (b) 5   (c) 3   (d) 13   (e) 8
+      (f) w_hat_1 = 0.02 * (10 - 5) = 0.10, exact - this weight landed on a grid
+          point.
+      (g) s/2 = 0.01, because rounding to a grid of spacing s cannot miss by more
+          than half a step, and no weight here lies outside [min, max] so nothing
+          is clamped.
+    correct: true
+    explain: |
+      Right, and (g) is what makes the argument quantitative: every weight is
+      still present and moved by at most half a step. Nothing was deleted; the
+      function was perturbed.
+  - text: |
+      (a) 0.02   (b) 5   (c) 3   (d) 13   (e) 8   (f) 0.10
+      (g) s = 0.02, because a weight that falls between two levels can end up a
+          full grid step from where it started.
+    misconception: M16
+    explain: |
+      Rounding always goes to the nearer level, so the miss is at most $s/2 =
+      0.01$ - check the worked group earlier in this section, where every error
+      is under 0.0069. Doubling the assumed error is the bit-counting instinct
+      again: 4-bit is roughly a 9% perturbation of each weight, not a whole step
+      and not an 87.5% deletion.
+  - text: |
+      (a) 0.02   (b) 5   (c) 3   (d) 13   (e) 8
+      (f) w_hat_1 = 0.00, because 0.10 is not one of the 16 values the group can
+          store, so that weight is dropped.
+      (g) unbounded - the dropped weights are the ones that lose everything.
+    misconception: M4
+    explain: |
+      Nothing is dropped. $\hat{w}_1 = s(q_1 - z) = 0.02 \times (10 - 5) = 0.10$
+      exactly, and every one of the eight weights survives within $s/2$ of its
+      original value. "Stored or not stored" is the lookup-table model of
+      parameters; affine quantization moves each weight to a nearby grid point
+      instead.
+  - text: |
+      (a) 0.02   (b) 5   (c) 3   (d) 13   (e) 8
+      (f) w_hat_1 = s * q_1 = 0.02 * 10 = 0.20
+      (g) 0.0896, the 4-bit error figure from the table in this section.
+    misconception: M16
+    explain: |
+      Two slips with one root. The zero-point is what lets the 16 levels straddle
+      zero, so the reconstruction is $s(q_i - z) = 0.10$, not $s q_i$. And 8.96%
+      is an error standard deviation relative to the weights' own standard
+      deviation over a Gaussian group - a statistic about how little the function
+      moves, not the per-weight bound, which is $s/2 = 0.01$.
+check: choice
 ```
 
 ### Sizing the file on your disk

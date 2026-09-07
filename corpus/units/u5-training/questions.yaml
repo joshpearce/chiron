@@ -5,81 +5,72 @@
 pretest:
   - id: u5-p1
     concept: c-xent
-    prompt: >
-      A language model is trained to minimize cross-entropy loss. Suppose you
-      had unlimited compute, unlimited data, and a perfect architecture. What
-      loss value would that ideal model reach on held-out text, and why that
-      value?
-    answer: >
-      Not zero. It would reach the entropy of the true next-token distribution
-      given context, roughly 1.7 nats per token on standard English corpora.
-      Cross-entropy decomposes as (entropy of the data) + (KL divergence from
-      the model to the data), and only the second term is reducible by better
-      modeling. The first is the genuine stochasticity of language: after "I
-      went to the" there are many legitimate continuations, and the ideal model
-      assigns each its true frequency rather than putting 1.0 on one of them.
-    check: llm
-    rubric: >
-      Pass requires (1) the answer is NOT zero, and (2) a reason grounded in
-      the irreducible randomness/entropy of language rather than in practical
-      limits like compute or data. Naming a rough number is a bonus, not
-      required. Answering "zero, or as close as possible" = fail, cites M18 and
-      is the expected pretest response. Answering "nonzero because you can
-      never train perfectly" = fail; that locates the floor in the optimizer
-      rather than in the data.
+    kind: mcq
+    prompt: "Unlimited compute, unlimited data, a perfect architecture. What cross-entropy loss does that ideal model reach on held-out English text, and why that value?"
+    options:
+      - text: "About $1.7$ nats per token - the entropy of the true next-token distribution, since cross-entropy is (entropy of the data) $+$ (KL from model to data) and only the KL term is reducible."
+        correct: true
+        explain: "Right. After 'I went to the' there are many legitimate continuations, and the ideal model assigns each its true frequency. The entropy term is a property of language, not of the model, so no amount of scale removes it."
+      - text: "$0$ nats - a perfect model assigns probability $1.0$ to the token that actually came next at every position."
+        misconception: M18
+        explain: "This is the expected first answer: the loss is the objective and $\\min(-\\log p_t) = 0$. But $p_t = 1$ means one deterministic continuation per prefix, which is a lookup table, not a language model. Near-zero loss is reached in practice only by memorizing a small corpus, and held-out loss then rises."
+      - text: "Slightly above $0$ - never exactly zero, because floating-point precision and finite optimizer steps always leave a small residual."
+        misconception: M18
+        explain: "Attractive because it concedes zero is unattainable. But it locates the floor in the optimizer and the hardware, so with a better optimizer the floor would shrink. The floor is set by the information content of the data and is unmoved by any engineering."
+      - text: "About $\\ln V \\approx 10.8$ nats for a $50{,}257$-token vocabulary - the vocabulary size bounds how well any model can do."
+        misconception: M2
+        explain: "That is the loss of a model that has learned nothing: uniform logits give $L = \\ln V$ and $\\text{PPL} = V$. It is the ceiling, not the floor, and it treats the softmax output as if it were fixed by the vocabulary rather than shaped by training."
+      - text: "Whatever value gives $\\text{PPL} = 1$, since perplexity $1$ means total certainty and that is what a perfect predictor has."
+        misconception: M18
+        explain: "$\\text{PPL} = 1$ is $L = 0$ restated in the friendlier unit, so it carries the same error. A perfect predictor of a genuinely stochastic source is uncertain by exactly the source's entropy: $\\text{PPL} = e^{1.7} \\approx 5.5$, not $1$."
+    answer: "About $1.7$ nats per token - the entropy of the true next-token distribution, since cross-entropy is (entropy of the data) $+$ (KL from model to data) and only the KL term is reducible."
+    check: choice
 
   - id: u5-p2
     concept: c-backprop
-    prompt: >
-      You have a 70-billion-parameter model and a single scalar loss for one
-      batch. Estimate how many backward passes are required to obtain the
-      gradient of that loss with respect to all 70 billion parameters, and
-      roughly what one backward pass costs relative to one forward pass.
-    answer: >
-      One backward pass, costing roughly 2x a forward pass (so a full training
-      step is about 3x inference on the same batch). Reverse-mode
-      differentiation gives the sensitivity of ONE output to ALL inputs in a
-      single sweep, which is the right direction when you have one loss and
-      many parameters. Each layer does one vector-Jacobian product to pass
-      blame back plus one outer product for its own weight gradient, each
-      comparable in cost to that layer's forward matmul.
-    check: llm
-    rubric: >
-      Pass requires answering ONE backward pass and a cost within roughly 1x-3x
-      of the forward pass. Any answer scaling with parameter count (70 billion
-      passes, "one per parameter", "one per layer times parameters") = fail,
-      cites U5M1. "One per layer" = partial: right that it is not
-      per-parameter, wrong that layers are sequential passes rather than
-      stages of one pass. An answer of 100x-1000x the forward cost = fail on
-      the second half; this is the belief that makes people think training is
-      unaffordable for reasons other than data volume.
+    kind: mcq
+    prompt: "A 70-billion-parameter model, one scalar loss for one batch. How many backward passes are needed to obtain $\\partial L / \\partial w$ for all $7 \\times 10^{10}$ parameters, and what does one backward pass cost relative to one forward pass?"
+    options:
+      - text: "One backward pass, costing roughly $2\\times$ a forward pass, so a full training step is about $3\\times$ inference on the same batch."
+        correct: true
+        explain: "Right. Reverse-mode differentiation gives the sensitivity of ONE output to ALL inputs in a single sweep - the right direction when there is one loss and many parameters. Each layer does one vector-Jacobian product to pass blame back plus one outer product for its own weight gradient, each comparable to that layer's forward matmul."
+      - text: "About $7 \\times 10^{10}$ passes - one per parameter, since each parameter must be perturbed separately to measure its effect on the loss."
+        misconception: U5M1
+        explain: "This is finite differences, the derivative algorithm most engineers have actually implemented. It would make one training step take thousands of years for a 70B model. Backprop computes exact analytic derivatives for every parameter in one sweep; nothing is perturbed."
+      - text: "One pass per layer, run in sequence, each costing about one forward pass - so roughly as many passes as the model is deep."
+        misconception: U5M1
+        explain: "Right that the cost is not per-parameter, wrong that layers are separate passes. Visiting each layer once in reverse order is what the single backward pass IS; the layers are stages of one sweep, not repeated sweeps over the network."
+      - text: "One backward pass, but costing $100\\times$ to $1000\\times$ the forward pass, because the derivative of a $10^{11}$-parameter function is far more work than evaluating it."
+        misconception: U5M1
+        explain: "The count is right and the cost is badly wrong. The constant factor is about 2, independent of parameter count. This belief is what makes people think training is unaffordable for reasons other than data volume - a $100\\times$ backward pass would make pretraining impossible."
+      - text: "Two backward passes - one to accumulate the activations and a second to apply the chain rule to the weights."
+        misconception: U5M1
+        explain: "The activations are stored on the way FORWARD, which is why training memory dwarfs inference memory and why gradient checkpointing exists. No second backward sweep is needed: blame arriving times local sensitivity equals blame departing, computed once per node."
+    answer: "One backward pass, costing roughly $2\\times$ a forward pass, so a full training step is about $3\\times$ inference on the same batch."
+    check: choice
 
   - id: u5-p3
     concept: c-posttrain
-    prompt: >
-      Base model and chat model, same checkpoint lineage. The chat model
-      answers your questions helpfully; the base model rambles. Roughly what
-      fraction of the chat model's factual knowledge and reasoning ability was
-      installed during post-training (SFT/RLHF) rather than pretraining, and
-      what evidence would settle it?
-    answer: >
-      Essentially none. Post-training shapes behavior - format, instruction
-      following, refusals - by raising the probability of continuations the
-      base model could already produce. The evidence: measure a knowledge
-      benchmark like MMLU on the base model with careful few-shot prompting and
-      on the post-trained model; scores move a couple of points and sometimes
-      down. The compute accounting agrees: post-training touches on the order
-      of 10^-6 of the pretraining token budget, which cannot install a world
-      model.
-    check: llm
-    rubric: >
-      Pass requires (1) a fraction near zero / "almost all from pretraining"
-      and (2) at least one form of evidence, either the benchmark comparison
-      or the compute-budget argument. Any substantial fraction attributed to
-      post-training = fail, cites M15, and is the expected pretest response.
-      Answering "none, post-training only adds refusals" = partial; it
-      understates that format and instruction-following are also behavioral
-      changes and both are real.
+    kind: mcq
+    prompt: "Base model and chat model, same checkpoint lineage: the chat model answers helpfully, the base model rambles. Which statement about where the chat model's factual knowledge came from is best supported by measurement?"
+    options:
+      - text: "Essentially all of it came from pretraining: measure MMLU on the base model with careful few-shot prompting and on the post-trained model and the score moves a couple of points, sometimes down, while post-training touches on the order of $10^{-6}$ of the pretraining token budget."
+        correct: true
+        explain: "Right, and both halves matter. The benchmark comparison is the direct evidence; the compute accounting says why - an SFT set of $10^{5}$ examples at 500 tokens is $5 \\times 10^{7}$ tokens against $1.5 \\times 10^{13}$ pretrained, which cannot install a world model. Post-training raises the probability of continuations the base model could already produce."
+      - text: "Most of it came from post-training: the reasoning and factual recall you see in the chat model are what SFT and RLHF taught it, which is why the base model cannot produce them."
+        misconception: M15
+        explain: "The expected answer, because the behavior change is enormous and post-training is the only phase most people can observe. But the base model CAN produce a polite correct answer - that continuation already had probability, competing with a hundred others. What changed is which mode is selected, not what is known."
+      - text: "Roughly half: pretraining supplies raw facts and post-training supplies the reasoning ability that combines them into answers."
+        misconception: M15
+        explain: "A tidy division of labour with no measurement behind it. Reasoning benchmarks behave like knowledge benchmarks across post-training - a few points, sometimes negative. Compositional ability is bought by scale during pretraining, which is what the scaling-law curve on held-out data is measuring."
+      - text: "None, and post-training adds only refusals - everything else the chat model does is exactly the base model's behavior with a different prompt template."
+        misconception: M15
+        explain: "Right on the fraction, wrong on the scope. Instruction following and answer formatting are real behavioral changes that post-training installs, not template artifacts. Understating them makes it hard to explain why a base model rambles at all."
+      - text: "Most of it came from post-training, and the evidence is that the chat model can answer questions about events the base model gets wrong."
+        misconception: M4
+        explain: "This treats knowledge as rows that post-training inserted. The observation usually reflects the base model continuing the document instead of answering; prompt it few-shot and the same facts come out. The mechanism is selection among behaviors, not new storage."
+    answer: "Essentially all of it came from pretraining: measure MMLU on the base model with careful few-shot prompting and on the post-trained model and the score moves a couple of points, sometimes down, while post-training touches on the order of $10^{-6}$ of the pretraining token budget."
+    check: choice
 
 check:
   - id: u5-q1
@@ -105,37 +96,29 @@ check:
 
   - id: u5-q2
     concept: c-xent
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
+    prompt: "Two teams report on the same held-out corpus with the same tokenizer. Team A: loss $2.05$. Team B: loss $1.55$. A third engineer says \"so Team B is 24% of the way from A to a perfect model.\" What is the right reading of these numbers?"
+    options:
+      - text: "The comparison should be excess over the entropy floor, not distance to zero - and with a floor near $1.7$ nats, Team B's $1.55$ sits BELOW it, so the first move is to audit Team B's evaluation for contamination rather than to rank the models."
+        correct: true
+        explain: "Right. Cross-entropy decomposes into the irreducible entropy of the data plus the KL divergence from the model to it, and only the second term is reducible. Team A's excess is about $0.35$; a reported $1.55$ is not a better model but evidence the held-out set was not held out, or that the two numbers were not measured the same way."
+      - text: "The arithmetic is fine: $2.05 \\to 1.55$ closes $0.50$ of the $2.05$ gap to a loss of $0$, so Team B is about 24% of the way to a perfect model."
+        misconception: M18
+        explain: "This is the framing under test. It takes $0$ as the endpoint, but $L = 0$ means $p_t = 1$ at every position - one deterministic continuation per prefix. The reachable endpoint is the entropy of language, so the denominator is wrong before the division starts."
+      - text: "Convert to perplexity: $e^{2.05} = 7.77$ against $e^{1.55} = 4.71$, so Team B's model is meaningfully better and the ranking is what the numbers are for."
+        misconception: M18
+        explain: "The conversion is correct and the conclusion skips the anomaly. Perplexity is a strictly monotone function of loss, so it ranks identically and hides the same problem: $\\text{PPL} = 4.71$ is below the floor's $e^{1.7} \\approx 5.5$, which is the signal to investigate."
+      - text: "A loss of $1.55$ is mathematically impossible below the $1.7$-nat entropy of English, so Team B has made an arithmetic error in computing the mean cross-entropy."
+        misconception: M18
+        explain: "Close, and wrong about what is impossible. The floor bounds expected loss on data drawn from the true distribution; on a contaminated or memorized evaluation set $1.55$ is entirely achievable. Calling it impossible rules out the diagnosis that actually fits."
+      - text: "Neither number is comparable to the other or to any floor, because perplexity and loss depend on the tokenizer and no cross-model comparison is meaningful."
+        misconception: U5M4
+        explain: "The tokenizer caveat is real but the premise here removes it: same corpus, same tokenizer, so these two ARE comparable. Refusing the comparison outright loses the specific finding, which is that one of the numbers is under the floor."
+    answer: "The comparison should be excess over the entropy floor, not distance to zero - and with a floor near $1.7$ nats, Team B's $1.55$ sits BELOW it, so the first move is to audit Team B's evaluation for contamination rather than to rank the models."
+    check: choice
     difficulty: core
-    prompt: >
-      Two teams report results on the same held-out corpus with the same
-      tokenizer. Team A reports loss 2.05. Team B reports loss 1.55. A third
-      engineer says "so Team B is 24% of the way from A to a perfect model."
-      Explain what is wrong with that framing and give the correct way to
-      compare the two numbers.
-    answer: >
-      The framing measures distance to zero, and zero is unreachable and
-      undesirable. Cross-entropy decomposes into the irreducible entropy of the
-      data plus the KL divergence from the model to it; only the second term is
-      reducible. With a floor near 1.7 nats, Team A's excess is about 0.35 and
-      Team B's reported 1.55 is BELOW the floor, which is not a better model -
-      it is evidence of contamination, that the held-out set was not actually
-      held out, or that the two numbers are not measured the same way. The
-      correct comparison is excess loss over the floor, and the correct first
-      move here is to audit Team B's evaluation setup. Secondarily, loss is
-      logarithmic, so linear "percent of the way" arithmetic on it is
-      meaningless regardless of the endpoint chosen.
-    check: llm
-    rubric: >
-      Must contain (1) the target is the entropy floor, not zero, and (2) the
-      observation that 1.55 is implausibly at or below the floor, so the right
-      response is to suspect the measurement rather than celebrate. Both = pass.
-      (1) alone = partial. An answer that only computes perplexities and ranks
-      the models = fail, cites M18. An answer claiming 1.55 is mathematically
-      impossible = partial; it is achievable on contaminated or memorized data,
-      which is exactly the diagnosis.
 
   - id: u5-q3
     concept: c-xent
@@ -224,40 +207,29 @@ check:
 
   - id: u5-q5
     concept: c-backprop
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
+    prompt: "For softmax followed by cross-entropy with a one-hot target, $\\partial L / \\partial z = p - y$. Which reading of that vector, and which reason for fusing softmax and cross-entropy into one operation, are both correct?"
+    options:
+      - text: "Each entry is the misallocated probability at that slot - $p_t - 1$ at the true token (negative, the mass the model failed to put there) and $p_i$ at every other (the mass it wasted there); fused because computing them separately needs $1/p_t$, which overflows exactly when $p_t$ is tiny and the example is most informative, while the joint derivation cancels that factor analytically."
+        correct: true
+        explain: "Right on both. Since updates move against the gradient, the true logit rises and the others fall in proportion to the mass misplaced. The fusion also avoids materializing the $V \\times V$ softmax Jacobian - $2.5$ billion entries per position at $V = 50{,}000$."
+      - text: "Each entry is the misallocated probability mass as described, and the fusion is a throughput optimization: one kernel launch instead of two, saving a pass over the logits."
+        misconception: U5M1
+        explain: "The interpretation is right and the fusion reason is not. Kernel-launch savings are real but incidental; the load-bearing reason is numerical, since the separate path evaluates $1/p_t$ and loses precision or overflows precisely on the high-loss examples that matter most."
+      - text: "Each entry is a finite-difference estimate of how much the loss would change if that logit were nudged, so the fusion exists to pick a single well-scaled epsilon for the whole vector."
+        misconception: U5M1
+        explain: "There is no epsilon anywhere. $p - y$ is an exact analytic derivative, correct to floating-point rounding; what is approximate about a training gradient is the minibatch, not the differentiation. A step-size choice would make the gradient depend on a tuning knob it does not have."
+      - text: "Each entry is the probability that the model's answer at that slot is correct, and the fusion exists so the two normalizations - softmax's and cross-entropy's - are not applied twice."
+        misconception: M2
+        explain: "Softmax outputs are a normalized exponential weighting of scores, not correctness probabilities; temperature reshapes them with no new evidence. And cross-entropy performs no normalization to duplicate - it reads one entry of an already-normalized $p$."
+      - text: "Each entry is the raw prediction error $p_i$ scaled by the learning rate, so the fusion exists to apply $\\eta$ once rather than in both stages."
+        misconception: U5M3
+        explain: "The learning rate lives in the optimizer's update $w \\leftarrow w - \\eta \\, u(g)$, not in the gradient; backprop never sees $\\eta$. It also drops the true token's entry, which is the only negative one and the only one telling a logit to rise."
+    answer: "Each entry is the misallocated probability at that slot - $p_t - 1$ at the true token (negative, the mass the model failed to put there) and $p_i$ at every other (the mass it wasted there); fused because computing them separately needs $1/p_t$, which overflows exactly when $p_t$ is tiny and the example is most informative, while the joint derivation cancels that factor analytically."
+    check: choice
     difficulty: core
-    prompt: >
-      For softmax followed by cross-entropy with a one-hot target, the gradient
-      of the loss with respect to the logits is exactly p - y. State what each
-      entry of that vector means in terms of the model's prediction, and
-      explain why frameworks implement softmax and cross-entropy as one fused
-      operation rather than two composable ones.
-    answer: >
-      Each entry is the misallocated probability at that vocabulary slot: for
-      the true token, p_t - 1, which is negative and equals how much probability
-      the model failed to put there; for every other token, p_i, exactly the
-      probability it wasted there. Since updates move against the gradient, the
-      true token's logit rises and the others fall, each in proportion to the
-      mass misplaced.
-      The fusion reason is numerical. Computed separately, the loss step needs
-      1/p_t, which overflows when p_t is tiny - precisely the case where the
-      example is most informative and the gradient matters most. Derived
-      jointly, the softmax Jacobian's p_t cancels against the log's 1/p_t
-      analytically, leaving a subtraction that is stable for any p_t. The fused
-      op also avoids materializing the V x V softmax Jacobian, which for a
-      50,000-token vocabulary would be 2.5 billion entries per position.
-    check: llm
-    rubric: >
-      Must contain (1) the interpretation as misallocated probability mass,
-      with the true entry negative, and (2) at least one correct fusion reason:
-      the 1/p_t overflow/cancellation, or avoiding the V x V Jacobian. Both =
-      pass. (1) alone = partial. An answer stating the gradient is "the error"
-      with no account of what the entries are = partial. An answer explaining
-      the fusion as a speed optimization only, with no numerical reason = fail
-      on (2). Any answer describing the gradient as approximate or
-      finite-differenced = fail, cites U5M1.
 
   - id: u5-q6
     concept: c-backprop
@@ -347,41 +319,29 @@ check:
 
   - id: u5-q8
     concept: c-optimizers
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
+    prompt: "Your script uses `torch.optim.Adam` with `weight_decay=0.1`. A colleague calls a switch to AdamW cosmetic since \"both do weight decay.\" At the level of the update equation, what differs, and which parameters shift most?"
+    options:
+      - text: "Adam adds $\\lambda w$ into $g$ before the moment updates, so the decay is then divided by $\\sqrt{\\hat v}$ and the effective decay becomes $\\lambda / \\sqrt{\\hat v}$; AdamW subtracts $\\eta \\lambda w$ separately, a fixed shrink meaning the same thing everywhere. Most affected: the extremes of the gradient-magnitude distribution - rare embedding rows (tiny $\\hat v$, previously over-decayed) and high-gradient projections (previously under-decayed)."
+        correct: true
+        explain: "Right. The placement relative to the adaptive normalization is the whole difference, and it changes effective regularization strength per parameter by orders of magnitude. Not cosmetic."
+      - text: "Nothing meaningful differs at the update equation: both subtract a multiple of $w$ each step, and with the same $\\lambda$ the trajectories match to within numerical noise."
+        misconception: U5M3
+        explain: "This is the claim under test. It would be true under SGD, where L2 regularization and weight decay are literally the same update. Under Adam the division by $\\sqrt{\\hat v}$ sits between the two formulations, which is the only reason AdamW exists."
+      - text: "AdamW performs true weight decay while Adam applies an L2 penalty on the loss - two different regularizers, so $\\lambda$ has to be retuned when switching."
+        misconception: U5M3
+        explain: "The names are right and the mechanism is missing. L2-on-the-loss and decoupled decay are identical updates under SGD; the distinction only exists because Adam divides the step by $\\sqrt{\\hat v}$, catching the $\\lambda w$ term along with the gradient."
+      - text: "AdamW's decay is scaled by the adaptive term too, but it also stores a third moment vector to track the decay separately, which is why its memory footprint is higher."
+        misconception: U5M3
+        explain: "Backwards on both counts. AdamW keeps exactly the same two moment vectors as Adam and adds no state, and the point of the change is that the decay is NOT scaled by the adaptive term."
+      - text: "The change matters most for parameters with the largest weights, since the decay term $\\eta \\lambda w$ is proportional to $w$ and Adam's normalization makes the step size independent of it."
+        misconception: U5M6
+        explain: "Both formulations scale the decay by $w$, so weight magnitude does not distinguish them. What does is $\\hat v$: the divisor Adam applies to the decay and AdamW does not, which sorts parameters by recent gradient magnitude, not by size."
+    answer: "Adam adds $\\lambda w$ into $g$ before the moment updates, so the decay is then divided by $\\sqrt{\\hat v}$ and the effective decay becomes $\\lambda / \\sqrt{\\hat v}$; AdamW subtracts $\\eta \\lambda w$ separately, a fixed shrink meaning the same thing everywhere. Most affected: the extremes of the gradient-magnitude distribution - rare embedding rows (tiny $\\hat v$, previously over-decayed) and high-gradient projections (previously under-decayed)."
+    check: choice
     difficulty: core
-    prompt: >
-      Your training script uses torch.optim.Adam with weight_decay=0.1. A
-      colleague says switching to AdamW with the same value is cosmetic since
-      "both do weight decay." Explain at the level of the update equation what
-      actually differs, and predict which parameters are affected most by the
-      change.
-    answer: >
-      Adam adds lambda*w into the gradient before the moment updates, so the
-      decay term is subsequently divided by sqrt(vhat) along with everything
-      else. The effective per-parameter decay becomes lambda/sqrt(vhat): weights
-      in high-gradient directions get their decay divided down to nearly
-      nothing, and weights in low-gradient directions get it amplified. AdamW
-      computes the adaptive step from the gradient alone and then subtracts
-      eta*lambda*w separately, making the decay a fixed (1 - eta*lambda)
-      multiplicative shrink that means the same thing for every parameter.
-      Most affected are the parameters at the extremes of the gradient-magnitude
-      distribution - in a transformer, the rarely-updated embedding rows for
-      infrequent tokens (tiny vhat, so previously over-decayed) and the
-      high-gradient projections (large vhat, previously under-decayed). It is
-      not cosmetic; it changes the effective regularization strength
-      per-parameter by orders of magnitude.
-    check: llm
-    rubric: >
-      Must contain (1) the placement difference stated concretely - inside the
-      adaptive normalization versus outside it - and (2) the consequence that
-      the effective decay becomes gradient-magnitude-dependent under Adam.
-      Both = pass. Naming which parameter groups shift most = full credit,
-      not required for pass. "AdamW decays weights and Adam uses L2" with no
-      account of the normalization = partial; the two are literally identical
-      under SGD, so the distinction only exists because of the division.
-      Agreeing that the change is cosmetic = fail.
 
   - id: u5-q9
     concept: c-optimizers
@@ -443,39 +403,70 @@ check:
 
   - id: u5-q10
     concept: c-scaling
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
-    difficulty: core
     prompt: >
-      You have a fixed compute budget. Using C = 6ND (C in FLOPs, N parameters,
-      D training tokens), your team proposes doubling N and halving D versus the
-      current plan, keeping C constant. State whether that helps or hurts, why,
-      and name one consideration outside the training budget that bears on the
-      decision.
-    answer: >
-      It hurts, if the current plan is anywhere near compute-optimal. Held-out
-      loss falls off as a sum of a term in N and a term in D, both of which must
-      shrink together; starving D while inflating N buys capacity the model has
-      no experience to fill, which is precisely the misallocation Chinchilla
-      identified. Concretely with the Hoffmann fit, at a fixed budget an
-      allocation near 20 tokens per parameter beats one near 2 tokens per
-      parameter by roughly 0.07 nats at the same cost.
-      The outside consideration: serving. A model twice as large costs twice as
-      much per token to run, for the entire deployment lifetime, while training
-      cost is paid once. That is why production models are typically trained
-      well PAST the compute-optimal token count - deliberately accepting a
-      worse training-compute tradeoff to get a smaller model with the same loss.
-    check: llm
-    rubric: >
-      Must contain (1) the verdict that it hurts, (2) a reason grounded in N and
-      D needing to scale together rather than a vague "bigger is not always
-      better", and (3) one valid outside consideration - inference cost is the
-      canonical one; data availability or memory limits also count. Any 2 of 3
-      = pass. Answering "helps, more parameters means more capability" = fail,
-      cites M11. Answering "hurts because bigger models overfit" = fail; that is
-      the storage model of parameters and predicts the opposite of the measured
-      curve.
+      A team has a fixed compute budget and proposes doubling $N$ and halving
+      $D$ versus a current plan already near 20 tokens per parameter, keeping
+      $C \approx 6ND$ constant. Which statement best captures the effect on
+      held-out loss and the outside-the-training-budget consideration?
+    options:
+      - text: >
+          It hurts: with $L(N,D) = E + A/N^{\alpha} + B/D^{\beta}$ both shrinking
+          terms have to come down together, and starving $D$ leaves the extra
+          capacity untrained - about 0.07 nats worse at the same $C$. It also
+          doubles the per-token serving cost, paid for the deployment's whole
+          life.
+        correct: true
+        explain: >
+          Correct. The Chinchilla fit is a sum of an $N$ term and a $D$ term;
+          moving budget from $D$ to $N$ past the optimum raises $B/D^{\beta}$
+          more than it lowers $A/N^{\alpha}$. And training compute is paid once
+          while inference compute is paid forever, which is why production models
+          are trained well past 20:1.
+      - text: >
+          It helps: parameters are what carry capability, so at fixed $C$ the
+          larger model is the stronger one, and the extra serving cost is the
+          price of that capability.
+        misconception: M11
+        explain: >
+          This is the storage view of parameters - more weights, more stored
+          capability. The measured curve says otherwise: held-out loss depends on
+          $N$ and $D$ jointly, and a $3\times$ smaller model at 20 tokens per
+          parameter beats a larger one at 2 tokens per parameter on the same
+          budget.
+      - text: >
+          It hurts, because a model twice as large on half the data will memorize
+          that data and overfit, so held-out loss rises even though training loss
+          falls.
+        misconception: M11
+        explain: >
+          Right verdict, wrong mechanism, and the mechanism predicts the wrong
+          curve. If capacity were storage, held-out loss would U-turn as $N$
+          grows; it does not - it improves smoothly over five orders of
+          magnitude. The loss here comes from the undertrained $D$ term, not from
+          overfitting.
+      - text: >
+          It is neutral: $C \approx 6ND$ is held constant, and loss is a function
+          of compute, so any allocation of the same FLOPs reaches the same
+          held-out loss.
+        misconception: M11
+        explain: >
+          Compute-optimality is exactly the claim that allocation matters at
+          fixed $C$. $L$ is a function of $N$ and $D$ separately, not of their
+          product, which is why the Chinchilla fit has two independent shrinking
+          terms.
+      - text: >
+          It helps on training loss but the decision is unimportant either way,
+          since enough scale drives loss toward zero on either allocation.
+        misconception: M18
+        explain: >
+          Loss does not approach zero; it approaches the fitted irreducible term
+          $E = 1.69$ nats, the entropy of the data. The gap that scaling closes
+          is $L - E$, and allocation determines how fast you close it.
+    check: choice
+    difficulty: core
 
   - id: u5-q11
     concept: c-scaling
@@ -533,46 +524,72 @@ check:
 
   - id: u5-q12
     concept: c-posttrain
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
-    difficulty: core
     prompt: >
-      SFT, PPO-based RLHF, and DPO all consume human judgments and all update
-      the same weights. Distinguish them by the SHAPE of supervision each loss
-      consumes and by whether each can push probability AWAY from a bad
-      response. Then state the one capability PPO has that DPO structurally
-      lacks.
-    answer: >
-      SFT consumes a target: a (prompt, response) pair, scored with the same
-      cross-entropy as pretraining, masked so gradient comes only from response
-      tokens. It can only push probability toward a demonstrated response; there
-      is no way to express "worse", because the loss's only sentence is "this is
-      the target."
-      PPO-based RLHF consumes a learned scalar over the model's own samples. A
-      reward model trained on preference pairs scores rollouts, and the policy
-      gradient raises the probability of high-reward tokens and lowers
-      low-reward ones, so it can push away, with a KL penalty against the frozen
-      reference bounding the drift.
-      DPO consumes a pair directly, (winner, loser), with no reward model and no
-      sampling. Its gradient raises log-prob of the winner and lowers the
-      loser's, weighted by how badly the current model has the pair ordered, so
-      it can also push away.
-      What PPO has that DPO structurally lacks: it is online. PPO samples from
-      the current, improving policy and scores what the model actually produces
-      now, so it can discover and correct problems in behavior that did not
-      exist when the data was collected. DPO is offline and can only learn from
-      the fixed pairs on disk.
-    check: llm
-    rubric: >
-      Must contain (1) the three supervision shapes distinguished - target
-      versus scalar-over-own-samples versus pair - with SFT correctly unable to
-      express "worse", and (2) online sampling named as PPO's structural
-      advantage. Both = pass. Getting (1) with only two of three shapes right =
-      partial. Describing DPO as needing a reward model or as an RL algorithm =
-      fail, cites U5M7. Describing the model as receiving or reading its reward
-      score = fail, cites U5M5. Naming DPO's mass-leakage failure (lowering the
-      loser harder than it raises the winner) = full credit.
+      SFT, PPO-based RLHF and DPO all consume human judgments and update the
+      same weights. Which option correctly gives the shape of supervision each
+      loss consumes, which of them can push probability AWAY from a bad
+      response, and the one capability PPO has that DPO structurally lacks?
+    options:
+      - text: >
+          SFT consumes a target (prompt, response) scored with masked
+          cross-entropy and can only push probability TOWARD it; PPO consumes a
+          learned scalar $r_\phi$ over the model's own samples and can push
+          away; DPO consumes a (winner, loser) pair directly and can push away.
+          PPO alone is online - it samples from the improving policy, so it can
+          correct behavior that did not exist when the data was collected.
+        correct: true
+        explain: >
+          Correct on all three counts. Cross-entropy's only sentence is "this is
+          the target", so SFT has no way to say "worse"; both preference methods
+          do. And DPO reads a fixed file of pairs, so it can never see what the
+          current policy actually produces.
+      - text: >
+          SFT consumes a target and pushes toward it; PPO consumes a learned
+          scalar and can push away; DPO is a lighter reinforcement learner that
+          trains its own reward model and samples rollouts more cheaply than PPO.
+          PPO's structural advantage is that it is faster per step.
+        misconception: U5M7
+        explain: >
+          DPO trains no reward model and draws no samples: the reward cancels out
+          of the KL-constrained optimum, leaving a supervised loss on fixed pairs
+          that runs through the same code path as SFT. The real difference is
+          offline versus online, not speed.
+      - text: >
+          SFT consumes a target; PPO shows the model its reward score so it can
+          read that it was rated 0.7 and try again; DPO consumes a pair. Both
+          preference methods push away, and PPO's advantage is that the model
+          receives explicit numeric feedback DPO cannot give it.
+        misconception: U5M5
+        explain: >
+          Nothing about the reward reaches the model except as a gradient on its
+          weights. $r_\phi$ is computed outside the model and used to weight a
+          policy gradient; the model never represents or reasons about the score.
+      - text: >
+          All three consume a target and differ only in data curation, so all
+          three can push probability away from a bad response; PPO's advantage is
+          that its preference data is higher quality because humans compared
+          responses.
+        misconception: M15
+        explain: >
+          SFT's masked cross-entropy can only raise the probability of the
+          demonstrated response - there is no "worse" term in it. And the
+          distinction among these methods is the shape of supervision the loss
+          consumes, not the quality of the annotation.
+      - text: >
+          SFT consumes a target; PPO consumes a scalar; DPO consumes a pair. All
+          push away. PPO's structural advantage is that it installs new knowledge
+          DPO cannot, because sampling exposes the model to text it has not seen.
+        misconception: M15
+        explain: >
+          The supervision shapes are right, but no post-training method installs
+          knowledge: an SFT-scale set is about 0.0003% of the pretraining token
+          budget, and rollouts are the model's own output, not new corpus. PPO's
+          advantage is being online.
+    check: choice
+    difficulty: core
 
   - id: u5-q13
     concept: c-posttrain
@@ -634,41 +651,72 @@ check:
 
   - id: u5-q14
     concept: c-backprop
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: false
-    difficulty: stretch
     prompt: >
-      Training a model needs far more memory than running it, at the same batch
-      size and sequence length, and the gap grows with depth. Explain the
-      mechanism, then explain why gradient checkpointing trades roughly a 33%
-      compute increase for a large memory reduction, and where the 33% comes
-      from.
-    answer: >
-      Reverse-mode differentiation computes each layer's local derivative at the
-      value its input actually took, so every intermediate activation from the
-      forward pass must stay resident until the backward pass reaches it. With
-      L layers the live set is O(L * B * S * d) plus attention intermediates,
-      whereas inference can free each layer's activations as soon as the next
-      layer consumes them. Optimizer state compounds this separately - AdamW
-      keeps two extra values per parameter - but the depth-scaling term is the
-      activations.
-      Gradient checkpointing stores activations only at a subset of layers and
-      discards the rest, then during the backward pass recomputes each discarded
-      segment from its nearest stored checkpoint just before it is needed.
-      Storing every sqrt(L)-th layer reduces resident activations from O(L) to
-      O(sqrt(L)). The compute cost is one extra forward pass over the recomputed
-      segments. Since a training step is roughly one forward plus two forward-
-      equivalents of backward, adding one more forward takes it from about 3
-      units to about 4, which is the ~33% figure.
-    check: llm
-    rubric: >
-      Must contain (1) activations retained for the backward pass as the
-      mechanism, tied to needing the forward values to evaluate local
-      derivatives, and (2) recomputation as the checkpointing trade, and (3) the
-      33% derived from adding one forward pass to a ~3-unit step. Any 2 of 3 =
-      pass; (1) is mandatory for any credit. Attributing the memory gap
-      primarily to optimizer state = partial: it is real and large but does not
-      scale with sequence length and is not what checkpointing addresses.
-      Describing the backward pass as needing extra forward passes per parameter
-      = fail, cites U5M1.
+      Training needs far more memory than inference at the same batch size and
+      sequence length, and the gap grows with depth. Which option gives the
+      mechanism, what gradient checkpointing trades, and where its roughly 33%
+      compute increase comes from?
+    options:
+      - text: >
+          Every intermediate activation from the forward pass must stay resident
+          until the backward pass reaches it, because each local derivative is
+          evaluated at the value its input actually took - a live set of
+          $O(L \cdot B \cdot S \cdot d)$, where inference frees each layer's
+          activations once the next consumes them. Checkpointing stores only
+          every $\sqrt{L}$-th layer and recomputes the rest, adding one forward
+          pass to a step that costs about 3 forward-equivalents: 3 to 4, or ~33%.
+        correct: true
+        explain: >
+          Correct. The depth-scaling term is the stored activations, and the
+          trade is recomputation for residency. A step is one forward plus about
+          two forward-equivalents of backward, so one extra forward is a third
+          more.
+      - text: >
+          Backprop perturbs each weight and measures the change in loss, so it
+          must keep a copy of the network state per perturbation. Checkpointing
+          stores fewer of those copies and re-perturbs from the nearest one, and
+          the 33% is the cost of the re-perturbation sweep.
+        misconception: U5M1
+        explain: >
+          Backprop is reverse-mode automatic differentiation, not finite
+          differences. Perturbing would cost one forward pass per parameter -
+          $10^{11}$ of them per step. The whole backward pass costs about twice
+          the forward, total.
+      - text: >
+          The gap is optimizer state: AdamW keeps two extra values per parameter,
+          so training memory is roughly three times the weights. Checkpointing
+          keeps the moments for only a subset of layers and recomputes the rest,
+          and the 33% is the extra moment arithmetic.
+        misconception: U5M1
+        explain: >
+          Optimizer state is real and large, but it is fixed by parameter count -
+          it does not scale with depth, batch or sequence length, and it is not
+          what checkpointing addresses. Checkpointing discards and recomputes
+          activations; moments are never recomputed.
+      - text: >
+          Training runs the sequence position by position to score each token,
+          so it holds $S$ separate forward states at once where inference holds
+          one. Checkpointing keeps only some positions and replays the rest,
+          costing about a third more compute.
+        misconception: U5M2
+        explain: >
+          Teacher forcing scores every position in one parallel forward pass; the
+          model never consumes its own output during pretraining. The memory is
+          per-layer activations retained for the backward sweep, not per-position
+          replay states.
+      - text: >
+          Training stores the KV cache for the whole batch so the backward pass
+          can re-read the conversation, which inference discards between calls.
+          Checkpointing drops most of that cache and rebuilds it, at roughly a
+          third more compute.
+        misconception: M17
+        explain: >
+          The KV cache is a generation-time optimization to avoid re-projecting
+          old tokens; it is not the training memory bill and carries no state
+          beyond what the tokens themselves determine. What training retains is
+          the forward activations needed to evaluate local derivatives.
+    check: choice
+    difficulty: stretch

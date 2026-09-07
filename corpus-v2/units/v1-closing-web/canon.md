@@ -128,44 +128,62 @@ id: v1-b1
 type: predict
 concept: d-compensation-schemes
 prompt: |
-  Commit before reading on. For each of the three schemes, name which source
-  does best and which does worst, and - this is the part that matters - state
-  in one phrase what quantity each scheme is actually proportional to.
+  Commit before reading on. Citations that month: S2 6,000, S3 3,600, S1 400,
+  out of 10,000. The pool is $12,000.
 
-  Then answer the harder question: which scheme, if any, pays S1 for having
-  been the origin of the analysis?
-answer: |
-  Flat fee: everyone gets $4,000. Proportional to nothing - it is proportional
-  to being enrolled. Best for the smallest source, worst for the largest.
-
-  Citation counting: S2 and S3 do well, S1 does badly. Proportional to
-  retrieval placement - how often a retriever ranked you into the context
-  window at answer time. That is a function of the index, the embedding model,
-  the recency weighting, and your SEO, and it is only loosely a function of
-  whether you wrote anything.
-
-  Causal attribution: S3 does best, S1 does worst. Proportional to measured
-  marginal effect on held-out loss - which, for a source whose content has been
-  copied into other sources, is close to zero, because removing it changes
-  nothing the model could not learn from the copies.
-
-  None of the three pays S1 for being the origin. Flat fee pays it for
-  existing, citation counting pays it for placement it does not have, and
-  causal attribution actively punishes it for having been copied. Origination
-  is not a quantity any of these schemes measures.
-rubric: |
-  Must contain: (1) an explicit proportionality target for each scheme -
-  enrollment, retrieval placement, and marginal effect on the model, in any
-  wording; (2) the recognition that citation counting is about the retriever
-  and not about writing; (3) the answer "none of them" to the origin question,
-  with a reason for at least one scheme.
-  All three = pass. (1) and (3) = pass.
-  An answer that says causal attribution rewards S1 because S1 wrote it first
-  = fail, and deliver the duplication argument below slowly: this is the
-  single most common wrong intuition about counterfactual attribution.
-  An answer that treats citation counting as "the fair one because it tracks
-  actual use" = fail, diagnosing D1.
-check: llm
+  Which statement gets all three schemes right - who wins, and what quantity
+  each scheme is actually proportional to - and answers the question of whether
+  any of them pays S1 for having originated the analysis?
+options:
+  - text: |
+      Flat fee gives each source $4,000 and is proportional to enrollment;
+      citation counting pays S2 most and is proportional to retrieval
+      placement; causal attribution pays S3 most and is proportional to
+      measured marginal effect on held-out loss. None of the three pays S1 for
+      originating: causal attribution in fact punishes it, because the copies
+      in S2 and S3 make its removal cost the model almost nothing.
+    correct: true
+    explain: |
+      Right, and the last clause is the load-bearing one. Origination is not a
+      quantity any of these rules measures. Flat fee pays for existing,
+      citations pay for a retriever's ranking, and counterfactual contribution
+      is near zero exactly when your content has been duplicated elsewhere.
+  - text: |
+      Citation counting is the scheme that tracks real use, so it is the fair
+      one: S2 and S3 earn their shares because the engine genuinely drew on
+      them, and S1's $480 correctly reflects that its analysis reached readers
+      only through others.
+    misconception: D1
+    explain: |
+      Citations are corroborative, not contributive. Hold the model fixed and
+      swap the retrieval index and every citation changes while nothing the
+      model learned moves. That share is a fact about the retriever's index,
+      embedding model, recency weighting and your SEO - not about use of what
+      you wrote.
+  - text: |
+      Causal attribution is the one scheme that rewards S1, because
+      leave-one-out training would show that removing the origin of the
+      analysis degrades the model on this domain - the copies exist only
+      because S1 wrote it first.
+    misconception: D5
+    explain: |
+      Counterfactual measurement asks what changes when the source is removed,
+      not who wrote it first. With S2's wire copy and S3's encyclopedic entry
+      still in the corpus, the model learns the same content without S1, so
+      S1's measured drop is near zero. Being copied lowers your measured
+      contribution.
+  - text: |
+      All three schemes are proportional to volume of content supplied, so they
+      differ only in the accounting overhead; S1 loses under each simply
+      because 400 subscribers is a small business.
+    misconception: D10
+    explain: |
+      They are proportional to three different quantities - enrollment,
+      retrieval placement, and marginal effect on the model - and those
+      quantities produce three different winners on the same month's data. The
+      pool formula $s_i = w_i / \sum_j w_j$ is shared; the choice of $w_i$ is
+      the whole design.
+check: choice
 ```
 
 Now the numbers. Citations that month: S2 6,000, S3 3,600, S1 400, total 10,000.
@@ -330,42 +348,58 @@ prompt: |
   default blocking shipped, and has the dashboards to prove it. Two years
   later a model can discuss its exclusive reporting in detail.
 
-  Before reading on: give two distinct mechanisms by which this happens with no
-  crawler ever having been unblocked, and then state what evidence would let
-  the publisher tell those mechanisms apart. Be specific about the evidence -
-  "check the model" is not an answer.
-answer: |
-  Mechanisms, any two of: (1) syndication - wire pickups, aggregators, and
-  quote-heavy secondary coverage reproduce the substance on domains that were
-  never blocked; (2) mirrors and scrapers that copied the content before or
-  despite the block and serve it from their own origins; (3) shared corpora
-  built before the block, including archived crawls whose removal compliance is
-  slow and incomplete; (4) users pasting the article into a chat, which is
-  inference-time, not training, but produces the same apparent knowledge;
-  (5) a licensed intermediary that itself carries the syndicated copy.
-
-  Telling them apart is a measurement problem, not a modelling one. Useful
-  evidence: near-duplicate search across the open web and public crawl archives
-  for the distinctive phrasing, dated, to find which copies existed before the
-  training cutoff; checking whether the model reproduces details unique to the
-  original rendering (a correction only the original carried, a figure caption,
-  a paywalled-section-only fact) versus only the details that survived into the
-  wire version; and comparing behavior on content published after the model's
-  cutoff, which cannot have been trained on at all.
-rubric: |
-  Must contain: (1) at least two distinct leakage paths, at least one of which
-  is syndication or mirroring - the copies-never-touched-your-CDN mechanism;
-  (2) at least one concrete piece of evidence tied to dating or to
-  original-only detail, not merely "ask the model."
-  Both = pass.
-  An answer that concludes the block failed technically (bots evaded it,
-  residential proxies, user-agent spoofing) and stops there = fail, diagnosing
-  D11: evasion is real but it is not the main path, and treating it as the main
-  path leads to spending the budget on better blocking.
-  An answer that says the model must be reproducing the text verbatim to
-  "know" the reporting = flag D3 and do not pass; verbatim is a lower bound on
-  what was learned, and unit v6 dismantles it.
-check: llm
+  Commit before reading on: which account best explains how this happened with
+  no crawler ever having been unblocked, and names evidence that could
+  distinguish the mechanisms?
+options:
+  - text: |
+      The content syndicated: wire pickups and quote-heavy secondary coverage
+      carried the substance on domains that were never blocked, and mirrors and
+      scrapers serve their own copies from their own origins. To tell those
+      apart, run dated near-duplicate search over the open web and public crawl
+      archives to see which copies predate the training cutoff, and check
+      whether the model reproduces details that existed only in the original
+      rendering rather than only what survived into the wire version.
+    correct: true
+    explain: |
+      Yes - the copies never touched the CDN, so the wall could not see them.
+      And the discriminating evidence is dating plus original-only detail:
+      both are measurements over copies and outputs, not questions put to the
+      model.
+  - text: |
+      The block failed technically: crawlers rotated through residential
+      proxies and spoofed user agents, so the dashboard counted the requests it
+      recognized and missed the rest. The evidence is server log analysis for
+      anomalous fetch patterns from unsignatured clients.
+    misconception: D11
+    explain: |
+      Evasion is real but it is not the main path, and treating it as the main
+      path spends the budget on better blocking. Web Bot Auth means the major
+      crawlers identify themselves; the leak is that a hundred lawful copies of
+      your text live on domains you do not control.
+  - text: |
+      Nothing is established yet, because a model discussing the reporting is
+      not evidence of training on it. Unless the model emits the article
+      verbatim, it did not learn from that text, and the only useful evidence
+      is prompting for exact reproduction of distinctive sentences.
+    misconception: D3
+    explain: |
+      Verbatim emission is a lower bound on what was learned, not the test.
+      Ask for the same content in a different style and the knowledge is
+      plainly intact with no n-gram overlap; most of what training data
+      contributes is semantic and never resurfaces word for word.
+  - text: |
+      The publisher's own licensing counterparty passed the archive on, so the
+      leak is contractual rather than technical, and the evidence is an audit of
+      the deal's downstream-sharing clauses.
+    misconception: V1-M2
+    explain: |
+      A licensed intermediary is one possible path, but it treats a deal
+      document as the explanation for a web-scale phenomenon. Syndication and
+      mirroring reproduce the substance across hundreds of unblocked domains
+      without any contract at all, which is why the fix is near-duplicate
+      detection rather than clause review.
+check: choice
 ```
 
 ## What the deals actually buy
@@ -438,46 +472,61 @@ prompt: |
   source's share of a royalty pool. Someone across the table who reads the deal
   flow closely asks one question.
 
-  In your own words: which single line of the market data above is the most
-  dangerous to your pitch, why it is more dangerous than the others, and what
-  the honest response is. Do not defend the product - diagnose it.
-answer: |
-  The most dangerous line is that only ~40% of recent deals include training
-  rights, and that the share is falling while inference-time access deals
-  double year over year. It is more dangerous than the small absolute size of
-  the market ($75-100M/yr) because size is a "we are early" objection and every
-  founder has an answer to it, whereas a falling share is a direction. It says
-  the buyers who already pay are moving away from the thing being measured. A
-  product priced on training-time contribution is being built for a shrinking
-  fraction of a small market.
-
-  The runner-up is the expert-data comparison - one labeling vendor at ~$2B
-  annualized against a low-single-digit-billions cumulative content-licensing
-  market - because it shows labs will spend enormous sums on data when they
-  believe it is scarce, and they do not believe text is scarce.
-
-  The honest response is not to argue the trend will reverse. It is to note
-  what the trend does not touch: every player self-reports what it trained on,
-  the EU AI Act creates a disclosure obligation with a supervisor and a fine
-  attached, and disclosure without verification is an unsupported claim.
-  Verification is needed under every outcome, including the outcome where
-  nobody ever pays a training royalty. That is the argument that survives the
-  question.
-rubric: |
-  Must contain: (1) identification of the shrinking training-rights share as
-  the load-bearing threat, with a reason that distinguishes a trend from a
-  size objection; (2) an honest response that does not depend on the trend
-  reversing.
-  Both = pass. (1) alone = partial, do not pass; the point of the beat is to
-  produce a response, not a diagnosis.
-  Naming the market's small absolute size as the biggest threat = partial;
-  it is a real objection but the weaker one.
-  Any answer that responds with "the courts will force royalties" = fail,
-  diagnosing D13, which the next section dismantles.
-  Any answer that claims RAG citation products validate the market = fail,
-  diagnosing D1: those products pay for retrieval placement and are a
-  different business.
-check: llm
+  Which diagnosis of your own pitch is the honest one - naming the most
+  dangerous line in the market data, why it is more dangerous than the others,
+  and a response that does not depend on wishful thinking?
+options:
+  - text: |
+      The dangerous line is that only about 40% of recent deals include
+      training rights, down from near-universal, while inference-time access
+      deals double year over year. It is worse than the market's small absolute
+      size ($75-100M/yr) because size is a "we are early" objection and a
+      falling share is a direction: the buyers who already pay are moving away
+      from the thing being measured. The response is not that the trend
+      reverses, but that what the trend does not touch is verification - every
+      player self-reports what it trained on, and Article 53(1)(d) attaches a
+      supervisor and a fine to that self-report from August 2, 2026.
+    correct: true
+    explain: |
+      Right on both halves. A shrinking share is a statement about direction
+      that no amount of market growth answers, and the surviving argument is
+      the one that holds under every branch: disclosure without verification is
+      an unsupported claim, needed even if no royalty is ever paid.
+  - text: |
+      The dangerous line is the litigation record, and it is also the answer:
+      the $1.5B Bartz settlement shows the dam breaking, so ongoing royalties
+      are coming and the product is early rather than mispointed.
+    misconception: D13
+    explain: |
+      That settlement priced the acquisition of pirated copies at about $3,000
+      per work, once, from a court that had already held training on lawfully
+      acquired copies to be fair use. The rational lab response is to buy one
+      clean copy, not to enter a royalty relationship - the case law removed the
+      forcing function rather than supplying it.
+  - text: |
+      The dangerous line is the small absolute market size, and the answer is
+      that RAG citation products - ProRata, TollBit, Perplexity's pool - are
+      already paying out per source, which validates that buyers will pay for
+      attribution.
+    misconception: D1
+    explain: |
+      Those products pay for retrieval placement in a context window, which is
+      corroborative and a different business from training contribution. Citing
+      them as validation invites the reply that your quantity is the one nobody
+      is buying. Size is also the weaker objection: it is answered by "we are
+      early," whereas a falling share is not.
+  - text: |
+      The dangerous line is that no lab participates in Pay Per Crawl or RSL,
+      and the answer is the posted rate card: roughly 1,500 organizations
+      endorse RSL and prices are published, so the market's clearing price is
+      already visible and the pool is sizable.
+    misconception: V1-M1
+    explain: |
+      Posted prices are asks with no recorded bid. Pay Per Crawl never left
+      private beta and there is no confirmation any AI company has paid under
+      RSL terms; quoting those rates as market size is the fastest way to lose
+      someone who tracks the demand side.
+check: choice
 ```
 
 ## What the courts priced
@@ -632,44 +681,59 @@ prompt: |
   documents that "the model used" - complete with percentage weights that sum
   to 100%.
 
-  In your own words: state the one experiment that determines whether those
-  percentages are contributive or corroborative, what result each answer
-  predicts, and why the vendor's percentages summing to 100% is itself
-  informative.
-answer: |
-  The experiment: hold the model's weights fixed and change the retrieval index
-  - remove a cited document, add a new one that says the same thing, or swap
-  the retriever's ranking function. Re-ask the identical question.
-
-  If the percentages are corroborative, they change, because they were computed
-  over the retrieved set. If they were contributive - a claim about what
-  training data shaped the weights - they cannot change, because nothing about
-  the weights changed. A contributive number can only move if you retrain.
-
-  A second, cheaper version: turn retrieval off entirely. If the system still
-  answers but shows no percentages, the percentages were about retrieval.
-
-  The 100% sum is informative because it says the quantity is a share of a
-  fixed set - a normalized allocation over whatever happened to be in the
-  context window. Contributive attribution over a full training corpus does not
-  naturally normalize over three documents; it is defined against millions, and
-  the measured contributions do not conveniently sum to a clean total. A tidy
-  three-way split summing to 100% is a strong signal that the denominator is
-  the retrieved set.
-rubric: |
-  Must contain: (1) the swap-the-index-hold-the-weights-fixed experiment, or
-  the retrieval-off variant; (2) the correct prediction for each case -
-  corroborative numbers move, contributive numbers cannot without retraining;
-  (3) some recognition that normalizing over a handful of documents implies the
-  denominator is the retrieved set, not the corpus.
-  (1) and (2) = pass. (3) upgrades to full credit.
-  An answer that proposes inspecting attention weights over the retrieved
-  documents to decide = fail: that measures how the model used its context,
-  which is still corroborative, and does not touch training data at all.
-  An answer that accepts the percentages as contributive if the vendor says
-  they are computed with gradients = fail, diagnosing D1; the test is the
-  experiment, not the vendor's method name.
-check: llm
+  Which explanation correctly states the experiment that settles whether those
+  percentages are contributive or corroborative, what each answer predicts, and
+  what the 100% sum tells you on its own?
+options:
+  - text: |
+      Hold the weights completely fixed and change the retrieval index - drop a
+      cited document, add one saying the same thing, or swap the ranking
+      function - then re-ask the identical question. Corroborative percentages
+      move, because they were computed over the retrieved set; contributive
+      ones cannot move, because a claim about training data can only change if
+      you retrain. The clean sum to 100% is itself a tell: it means the
+      denominator is a handful of retrieved documents, whereas contribution
+      over a full corpus is defined against millions and does not normalize
+      tidily over three.
+    correct: true
+    explain: |
+      Exactly. The experiment separates a fact about a retriever's ranking,
+      computed seconds before the answer, from a fact about what shaped the
+      weights. The cheaper variant is switching retrieval off: the model still
+      answers, and the percentages vanish.
+  - text: |
+      Inspect the attention weights the model places on each retrieved document
+      while generating the sentence. High attention mass on a document means
+      that document causally drove the output, so if the percentages track
+      attention they are contributive.
+    misconception: D1
+    explain: |
+      Attention over the context window measures how the model used text placed
+      in front of it, which is still corroborative and says nothing about
+      training data. The corpus is gone once training finishes; no reading of
+      the forward pass over retrieved documents reaches it.
+  - text: |
+      Ask the vendor how the numbers are computed. If they are gradient-based
+      influence scores rather than retrieval similarity scores, they are
+      contributive by construction, and no further experiment is needed.
+    misconception: D6
+    explain: |
+      The method name is not the test - the experiment is. And gradient
+      influence at scale is exactly where the credibility problem lives:
+      measured against retraining ground truth, the scalable variants have
+      performed no better than random guessing, so a label of "gradient-based"
+      buys nothing without a reported correlation.
+  - text: |
+      Check whether the cited documents contain the sentence's claim, phrase by
+      phrase. If each percentage is proportional to how much of the claim that
+      document entails, the split is contributive; if not, it is arbitrary.
+    misconception: D5
+    explain: |
+      Entailment and influence are different targets: what contains a fact is
+      not what moved the loss, and the two rankings systematically disagree.
+      Verifying entailment over retrieved documents confirms corroboration, and
+      confirms it well - it just never touches training data.
+check: choice
 ```
 
 ## Three ways to pay, and what each one misallocates
@@ -744,8 +808,6 @@ already hired, and the pathologies come attached.
 id: v1-b6
 type: completion
 concept: d-compensation-schemes
-# variants: blank the flat-fee row and one causal row instead; or supply the
-# payouts and blank the weights.
 prompt: |
   Same pool split procedure as before: $s_i = w_i / \sum_j w_j$, payout is
   $s_i \times P$. New month, same three sources, pool $P = \$20{,}000$.
@@ -759,33 +821,56 @@ prompt: |
   Step 4. S1's payout:         (0.05 / 0.50) x $20,000 = ____
   Step 5. Flat-fee payout to each source, same pool: ____
 
-  Fill the five blanks. Then answer in one sentence: the seed-noise standard
-  deviation on each contribution measurement is 0.06 nats. What does that do to
-  your confidence in the difference between S1's payout and S2's payout?
-answer: |
-  Step 1: 0.50
-  Step 2: 0.50
-  Step 3: $6,000
-  Step 4: $2,000
-  Step 5: $20,000 / 3 = $6,666.67 each
-
-  The noise sentence: with a seed-noise SD of 0.06 nats, S1 (0.05) and S2
-  (0.15) are about 0.10 nats apart, well inside two standard deviations of the
-  measurement, so the ordering itself is not established - rerun with different
-  seeds and S1 could measure above S2. The 3x payout difference between them is
-  not supported by the measurement. Only S3 is clearly separated from the
-  others, and even that separation is a few sigma at best.
-rubric: |
-  Required, exactly: 0.50; 0.50; $6,000; $2,000; $6,666.67 (accept $6,667 or
-  "one third of the pool").
-  The noise sentence must state that the S1-S2 gap is within noise, so the
-  ranking and therefore the payout ratio is not established.
-  All five numbers plus the noise point = pass.
-  Numbers right, noise point missing or hand-waved as "add error bars later"
-  = fail, diagnosing D20: the noise is not a caveat on the result, it is the
-  result, and unit v5 shows that below a threshold the optimal contract is the
-  flat fee in step 5.
-check: llm
+  The seed-noise standard deviation on each contribution measurement is 0.06
+  nats. Which filling of the five blanks, together with its reading of that
+  noise figure, is correct?
+options:
+  - text: |
+      0.50; 0.50; $6,000; $2,000; $6,666.67 each. With a seed-noise SD of 0.06
+      nats, the S1-S2 gap of 0.10 nats sits inside two standard deviations, so
+      the ordering itself is not established - rerun with different seeds and
+      S1 could measure above S2. The 3x payout difference between them is not
+      supported by the measurement.
+    correct: true
+    explain: |
+      Correct, and the noise reading is the point of the beat. Only S3 is
+      clearly separated, and even that is a few sigma at best; unit v5 shows
+      that below a signal-to-noise threshold the welfare-optimal contract is
+      the flat fee in step 5.
+  - text: |
+      0.50; 0.50; $6,000; $2,000; $6,666.67 each. The arithmetic is exact and
+      the split stands as computed; the 0.06 nats of seed noise is a caveat to
+      note in a methods appendix and to shrink later with better estimators or
+      more training runs.
+    misconception: D20
+    explain: |
+      The numbers are right and the reading is not. The noise is not a caveat
+      on the result - it is the result. There is a proven threshold below which
+      no better estimator changes the optimal contract, only more signal does,
+      and a 0.10-nat gap against a 0.06-nat SD is on the wrong side of it.
+  - text: |
+      0.50; 0.50; $6,000; $2,000; $6,666.67 each. Averaging over seeds recovers
+      the true contribution for each source, so the 0.06 nats affects only how
+      many runs are needed - once averaged, S1's 0.05 and S2's 0.15 are stable
+      properties of those sources and can be billed on indefinitely.
+    misconception: D16
+    explain: |
+      Averaging narrows the error on one corpus and model, but contribution is
+      not a stable property to measure once and bill forever: it moves with
+      seed, with data order, and with the rest of the corpus. A billing-grade
+      number needs a reported noise floor attached each time, not a one-off
+      calibration.
+  - text: |
+      0.50; 0.15; $6,000; $2,000; $6,666.67 each. The noise figure of 0.06 nats
+      is smaller than every measured contribution, so all three measurements
+      clear it and the ranking S3 > S2 > S1 is established.
+    misconception: D20
+    explain: |
+      Step 2's blank is the denominator, the total weight 0.50, not S2's own
+      weight. And comparing the SD to each contribution separately is the wrong
+      comparison: what must clear the noise is the gap between two sources, and
+      S1 and S2 are 0.10 nats apart against a 0.06-nat SD.
+check: choice
 ```
 
 ```beat
@@ -796,48 +881,63 @@ prompt: |
   A marketplace pays a $42.5M annual pool to publishers pro-rata by citations.
   You are an adversary with a budget of $50,000 and no content anyone wants.
 
-  Before reading on: describe the attack, then state which of the three
-  schemes - flat fee, citation counting, causal attribution - is hardest to
-  attack this way and why. Name what each scheme forces the attacker to
-  actually produce.
-answer: |
-  The attack: generate large volumes of plausible, factually unobjectionable
-  text on high-query-volume topics, host it across many domains, and optimize
-  it for the retriever rather than for readers - the embedding model and the
-  keyword index are the audience, and both can be probed cheaply by issuing
-  queries and observing what gets cited. Enroll all the domains. Each is a
-  small share; the aggregate is not. Text generation is the cheap part; the
-  spend goes on domains, hosting, and enough surface legitimacy to pass
-  enrollment.
-
-  Hardest to attack is causal attribution, because the attacker must produce
-  content that measurably improves a model that already has the entire web.
-  Redundant plausible text has near-zero marginal contribution by construction:
-  if the model can already predict it, removing it changes nothing. The
-  attacker must produce genuinely new information, which is the thing the
-  scheme was trying to buy.
-
-  What each forces the attacker to produce: flat fee forces enrollment - so the
-  attack is on identity, incorporating many entities rather than one, which is
-  the shell-company attack of unit v5. Citation counting forces retrieval
-  placement, which is SEO with a machine reader and costs the price of hosting.
-  Causal attribution forces non-redundant information, which cannot be
-  synthesized from what the model already knows.
-rubric: |
-  Must contain: (1) a farming attack aimed at the retriever, with the
-  recognition that plausible text is nearly free; (2) causal attribution named
-  as hardest, with the redundancy argument - content the model can already
-  predict has no marginal contribution; (3) at least one correct statement of
-  what a different scheme forces the attacker to produce.
-  (1) and (2) = pass.
-  An answer that names flat fee as hardest to attack because there is nothing
-  to count = partial, do not pass: flat fee moves the attack to identity and
-  enrollment rather than eliminating it, and unit v5 shows source-splitting
-  breaks group Shapley too.
-  An answer claiming detection and moderation solve this = fail; the design
-  question is what the rule is proportional to, and any countable proxy invites
-  manufacture.
-check: llm
+  Commit before reading on: which account describes the attack, names the
+  scheme hardest to attack this way with the right reason, and says what each
+  scheme forces the attacker to actually produce?
+options:
+  - text: |
+      Generate large volumes of plausible, unobjectionable text on
+      high-query-volume topics, spread it across many enrolled domains, and
+      tune it for the retriever - the embedding model and keyword index are the
+      audience, and both can be probed cheaply by issuing queries and watching
+      what gets cited. Causal attribution is hardest, because redundant text
+      has near-zero marginal contribution by construction: if the model can
+      already predict it, removing it changes nothing. Flat fee forces
+      enrollment (so the attack becomes incorporating many entities), citation
+      counting forces retrieval placement (SEO with a machine reader), and
+      causal attribution forces genuinely non-redundant information.
+    correct: true
+    explain: |
+      Right. Text is the cheap part; the spend goes on domains, hosting and
+      enough surface legitimacy to pass enrollment. And the reason causal
+      attribution resists is that it demands the one thing that cannot be
+      synthesized from what the model already knows.
+  - text: |
+      Flat fee is hardest to attack, because there is no countable weight to
+      manufacture: everyone enrolled gets the same cheque, so generating text
+      buys the attacker nothing and the pool is safe.
+    misconception: D7
+    explain: |
+      Flat fee does not eliminate the attack, it relocates it onto identity:
+      incorporate 200 entities and collect 200 equal shares. Unit v5 shows the
+      same source-splitting attack breaks group Shapley, which is why the
+      enrollment boundary needs defending however the pool is divided.
+  - text: |
+      Citation counting is as robust as causal attribution here, because
+      manufactured text still has to be retrieved and cited for real user
+      queries, which means it genuinely served readers; the marketplace can
+      screen the rest with content moderation and fraud detection.
+    misconception: D10
+    explain: |
+      Being retrieved is not serving readers - the listener is a retriever that
+      can be reverse-engineered and optimized against, and plausible citable
+      text costs essentially nothing to generate, which makes citation farms
+      cheaper than stream farms. The design question is what the rule is
+      proportional to; any countable proxy invites manufacture, and moderation
+      is a patch on a rule that rewards the wrong quantity.
+  - text: |
+      Causal attribution is the easiest to attack, because the attacker can
+      simply flood the corpus with duplicates of high-value content: the more
+      copies of a passage the corpus holds, the larger the measured
+      leave-one-out contribution of whoever supplied them.
+    misconception: D5
+    explain: |
+      Duplication cuts the other way under a counterfactual measurement.
+      Removing one copy of a passage that exists elsewhere changes the model
+      almost not at all, so the measured contribution of redundant content is
+      near zero - which is precisely why the original source in this unit's
+      opening example loses under causal attribution.
+check: choice
 ```
 
 ```beat
@@ -990,43 +1090,58 @@ prompt: |
       100,000.
   (b) Per venue: each journal or conference is a source. n is about 11.
 
-  Before reading on: name the fatal problem with (a) that is not about compute
-  cost, and name the two distinct measurement problems that (b) creates even
-  though its arithmetic is easy.
-answer: |
-  (a)'s fatal problem is not the 2^100000 coalitions - it is that a paper is
-  not a payment counterparty. Nobody can sign a contract as "paper #40118."
-  Payouts at that granularity are dust, the administrative cost of paying
-  exceeds the payment, and the entity that would actually be paid (the
-  publisher, the funder, the authors' institution) is a different object that
-  the scheme never names. Choosing the attribution unit to be different from
-  the payment unit means the output of the whole system has to be re-aggregated
-  by a rule nobody has justified.
-
-  (b) creates two distinct problems. First, confounding: removing an entire
-  venue removes a topic. A leave-one-source-out measurement then reports how
-  much the model needed that subject area, not how much it needed that
-  publisher's version of it. The measurement answers a different question than
-  the one being billed.
-
-  Second, overlap and containment: preprints and published versions of the same
-  paper live in different venues, so venues are not disjoint. The same content
-  is in two "sources," each of which measures as low-contribution because the
-  other still covers it, and the duplicate-cluster policy - not the model -
-  decides who gets paid.
-rubric: |
-  Must contain: (1) for (a), that a paper is not a payment counterparty / the
-  attribution unit must match the payment unit, NOT merely that 2^n is too big;
-  (2) for (b), the topic-confounding problem - removing a venue removes a
-  subject area, so the measurement is about the domain rather than the source;
-  (3) for (b), the overlap problem - preprint/published duplication means
-  sources are not disjoint and the dedup policy decides credit.
-  (1) plus either (2) or (3) = pass. All three = full credit.
-  An answer whose only objection to (a) is computational cost = fail: the
-  compute objection is answered by sampling, and it hides the real defect.
-  An answer that proposes dropping duplicates and moving on = flag D9 and do
-  not pass; which copy survives is a payout decision, not hygiene.
-check: llm
+  Commit before reading on: which statement correctly names the fatal defect in
+  (a) and the measurement damage that (b) does despite its easy arithmetic?
+options:
+  - text: |
+      (a) fails because a paper is not a payment counterparty - nobody signs a
+      contract as "paper #40118", so the attribution unit and the payment unit
+      differ and the output has to be re-aggregated by a rule nobody has
+      justified. (b) is arithmetically easy but confounds source with topic
+      (removing a venue removes a subject area) and its venues are not disjoint
+      (preprint and published versions overlap), so the duplicate-cluster policy
+      rather than the model decides who gets credit.
+    correct: true
+    explain: |
+      Right on both counts. The unit of attribution must be the unit of payment,
+      which is what collapses the combinatorics from $2^{100000}$ to $2^{12}$ and
+      makes the answer billable. And a venue-level leave-one-out measures how much
+      the model needed that subject area, while overlapping preprints let each
+      copy measure near zero because the other still covers it.
+  - text: |
+      (a) fails only because $2^{100000}$ coalitions can never be enumerated; with
+      sampling or an approximation it would be the most precise definition, since
+      finer granularity always means a more accurate attribution.
+    misconception: D7
+    explain: |
+      The compute objection is the answerable one - sampling exists. The defect
+      that sampling cannot fix is that a paper is not an entity that can be paid.
+      Choose the attribution unit to match the payment unit and the combinatorics
+      collapse on their own; per-document valuation is simply the wrong problem.
+  - text: |
+      Both definitions are sound as measurements; (b)'s preprint overlap is
+      ordinary pipeline hygiene - deduplicate, keep one copy of each paper, and
+      the venues become disjoint with nothing of substance decided.
+    misconception: D9
+    explain: |
+      Keeping one copy is exactly the substantive decision. When the preprint and
+      the published version are the same passage and you keep one, you have chosen
+      which venue is credited for everything that passage teaches the model. At
+      corpus scale that choice is made silently millions of times, and here it
+      moves money.
+  - text: |
+      (b) is the fatal one, because with $n \approx 11$ each source's measured
+      contribution is a stable property of the corpus that can be measured once
+      and billed forever; (a) at least averages that instability away across
+      100,000 papers.
+    misconception: D16
+    explain: |
+      Neither granularity buys stability. Retrain with a different seed and a
+      source's marginal contribution to held-out loss can swing by more than its
+      own magnitude, and data order introduces the largest variation of all. Small
+      $n$ makes the coalitions enumerable; it does not make the numbers
+      reproducible.
+check: choice
 ```
 
 ```beat
@@ -1037,50 +1152,63 @@ prompt: |
   Six months from now, a rightsholder disputes your PoC's payout: "your model
   says my catalogue is worth 3.2% of the pool. Prove it."
 
-  In your own words, list the fields the manifest must have recorded at
-  ingestion time for you to be able to answer that at all, and for each field
-  say what specific question it answers. Then name one thing you cannot answer
-  no matter how good the manifest is.
-answer: |
-  Fields and the question each answers:
-
-  - source_id, stable across reruns: which rows of the payout table are yours,
-    and are this month's numbers comparable to last month's.
-  - document IDs and token counts: what exactly was included and how much of
-    it, so the disputed 3.2% can be tied to a specific set of text rather than
-    a name.
-  - shard and byte offsets: that the tokens the model actually consumed are the
-    ones claimed - the difference between a manifest and an assertion.
-  - duplicate-cluster ID plus full cluster membership: whether the passages you
-    are being paid for also appeared in other sources, and which policy
-    assigned the credit. Without this the biggest single objection - "you paid
-    them for my text" - cannot be answered.
-  - license and its provenance: whether the content was eligible to be in the
-    corpus at all, which is a separate question from what it was worth.
-  - extraction and filter code version: whether a changed number reflects a
-    changed corpus or a changed pipeline.
-  - ingestion timestamp: what the corpus looked like at the time of the run
-    being disputed.
-
-  What the manifest cannot answer, no matter how complete: whether the measured
-  3.2% is stable. That is a property of the training process, not of the
-  corpus. Rerunning with a different seed moves contributions, and only
-  repeated runs with a reported noise floor can say whether 3.2% is
-  distinguishable from 2.1%. The manifest establishes what went in; it cannot
-  establish that the number coming out is reproducible.
-rubric: |
-  Must contain: (1) at least four fields with the specific question each
-  answers, including duplicate-cluster membership and token counts;
-  (2) the recognition that the manifest cannot establish stability of the
-  measured contribution, which requires seeds and a noise floor.
-  Both = pass. (2) missing = fail, diagnosing D16: a manifest is provenance,
-  not evidence about the estimate.
-  Listing fields with no question attached to each = partial, do not pass; the
-  beat tests whether the learner can say what each record is for.
-  Naming citation counts or retrieval logs among the required fields = fail,
-  diagnosing D1: those are corroborative records and have no bearing on a
-  training-contribution dispute.
-check: llm
+  Which explanation of what the manifest must have recorded - and of what it can
+  never settle - would you give?
+options:
+  - text: |
+      A stable source_id (are this month's rows comparable to last month's),
+      document IDs and token counts (what exactly was included and how much),
+      shard and byte offsets (that the tokens the model consumed are the ones
+      claimed), duplicate-cluster ID plus full cluster membership (whether these
+      passages also sat in other sources, and which policy assigned the credit),
+      license provenance, code version, ingestion timestamp. What no manifest can
+      settle is whether 3.2% is stable: that is a property of the training run,
+      and only repeated seeds with a reported noise floor can say whether 3.2% is
+      distinguishable from 2.1%.
+    correct: true
+    explain: |
+      Correct, and the second half is the load-bearing half. The manifest
+      establishes what went in; it says nothing about whether the number coming
+      out survives a rerun. Cluster membership is what answers the single biggest
+      objection - "you paid them for my text" - and token counts are what make any
+      per-token normalization possible later.
+  - text: |
+      The same provenance fields - source_id, token counts, offsets, cluster
+      membership, license, code version, timestamp. With that record complete and
+      auditable, the 3.2% is fully proven: the measurement was computed from
+      exactly these documents, so the number follows from the manifest.
+    misconception: D16
+    explain: |
+      Complete provenance proves what entered training, not that the estimate is
+      reproducible. Contribution is a noisy random variable - reseed the run and a
+      source's marginal effect can move by more than its own magnitude - so a
+      billing-grade number needs seeds averaged and a noise floor reported
+      alongside it.
+  - text: |
+      The records that matter are the answer-time logs: which of the rightsholder's
+      documents the retriever placed in the context window, how often the system
+      cited them, and the per-sentence citation weights. Those logs show where the
+      answers actually came from, so they are what substantiates a 3.2% share.
+    misconception: D1
+    explain: |
+      Those are corroborative records - facts about a retriever's ranking computed
+      seconds before each answer. Hold the weights fixed, swap the index, and they
+      change completely while nothing the model learned changed. A dispute about
+      training contribution cannot be settled with evidence about retrieval
+      placement.
+  - text: |
+      Provenance is beside the point: run the trained model and check whether it
+      reproduces passages from the catalogue verbatim. Extractable text proves the
+      catalogue was used and how much; no verbatim match means there is nothing to
+      pay for, whatever the manifest says.
+    misconception: D3
+    explain: |
+      Verbatim emission is a lower bound and a measurement artifact. Ask for the
+      same content in a different style and the knowledge is intact with no shared
+      n-grams; most of what training data contributes is semantic and never
+      resurfaces verbatim. Extraction is corroborating evidence, not the ledger the
+      payout was computed from.
+check: choice
 ```
 
 The next unit takes this spec and builds the corpus underneath it: extraction,

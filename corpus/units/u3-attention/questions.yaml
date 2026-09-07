@@ -7,32 +7,76 @@ pretest:
   # learner commits to an answer before the unit, not that they get it right.
   - id: u3-p1
     concept: c-sdpa
+    kind: mcq
+    check: choice
     prompt: |
-      Without looking anything up, write down the scaled dot-product attention
-      equation as completely as you can, and state the shape of every matrix
-      in it. If you can only recall part of it, write the part you have and
-      mark explicitly what you are unsure about.
-    answer: |
-      $\text{Attention}(Q,K,V) = \text{softmax}(QK^T/\sqrt{d_k})V$, with $Q$
-      and $K$ of shape $n \times d_k$, $V$ of shape $n \times d_v$, $QK^T$ of
-      shape $n \times n$, the softmax applied row-wise, and the result of
-      shape $n \times d_v$.
-    check: llm
-    rubric: |
-      This item is EXPECTED to fail; score it for diagnosis, not for pass/fail
-      gating. Record which of these five components the learner produced:
-        (1) the three-matrix form softmax(QK^T ...)V at all;
-        (2) the $\sqrt{d_k}$ scaling;
-        (3) $QK^T$ being $n \times n$;
-        (4) softmax being ROW-wise (absence or a column claim flags U3-M5);
-        (5) output shape $n \times d_v$, not $n \times n$ (an $n \times n$
-            output claim flags U3-M4).
-      A learner producing (1) plus any two others has strong prior knowledge -
-      the planner should compress the equation section. Producing none is the
-      expected case and is not a deficiency.
-      Note separately if the learner describes attention agentively ("picks
-      the important tokens") rather than as an equation - that flags M1 and
-      should raise the priority of the QKV section regardless of the score.
+      Without looking anything up: which line below is scaled dot-product
+      attention, with every shape and every axis stated correctly? Throughout,
+      $X$ is $n \times d_{model}$, $Q = XW^Q$ and $K = XW^K$ are $n \times d_k$,
+      and $V = XW^V$ is $n \times d_v$. Pick one - if you have never seen the
+      equation, pick the one that looks most likely.
+    options:
+      - text: |
+          $\text{Attention}(Q,K,V) = \text{softmax}(QK^T/\sqrt{d_k})\,V$, where
+          $QK^T$ is $n \times n$, the softmax runs along each row, and the
+          result is $n \times d_v$.
+        correct: true
+        explain: |
+          This is the equation. $QK^T$ scores every query against every key
+          ($n \times n$), the constant $\sqrt{d_k}$ keeps the scores at roughly
+          unit variance, the row-wise softmax gives each query a distribution
+          over positions that sums to 1, and the final multiply by $V$ returns
+          one vector per token, $n \times d_v$ - the same row count as the
+          input, which is why attention layers stack.
+      - text: |
+          $\text{Attention}(Q,K,V) = \text{softmax}(QK^T/\sqrt{d_k})$, an
+          $n \times n$ matrix of attention weights; $V$ is what the next layer
+          reads those weights against.
+        misconception: U3-M4
+        explain: |
+          The $n \times n$ heatmap is the picture in every paper, so it reads as
+          the thing the layer produces. It is a transient intermediate. If the
+          layer emitted an $n \times n$ object, its width would grow with
+          sequence length and no residual connection back into a
+          $d_{model}$-wide stream could be shape-compatible. The output is $AV$,
+          shape $n \times d_v$.
+      - text: |
+          $\text{Attention}(Q,K,V) = \text{softmax}(QK^T/\sqrt{d_k})\,V$, where
+          the softmax is applied down the columns of the $n \times n$ matrix, so
+          the attention each key receives sums to 1.
+        misconception: U3-M5
+        explain: |
+          "Softmax the scores" does not name an axis, and a conservation story -
+          each token has one unit of influence to give out - sounds principled.
+          Under column normalization, how much position $i$ reads from position
+          $j$ would change when an unrelated query changes, and deleting a
+          trailing token would alter earlier outputs. Rows sum to 1; columns sum
+          to whatever they sum to.
+      - text: |
+          $\text{Attention}(Q,K,V) = \text{softmax}(QK^T/\|q_i\|)\,V$: each row
+          of scores is divided by the magnitude of its own query vector (in
+          practice the row max) to bring the scores into a fixed range.
+        misconception: U3-M2
+        explain: |
+          This is feature scaling by analogy: divide by something derived from
+          the data. The real divisor is $\sqrt{d_k}$, a compile-time constant
+          fixed by the head dimension alone - a row of tiny scores is divided by
+          the same $\sqrt{d_k}$ as a row of enormous ones, which no
+          normalization scheme would do. It is a variance correction, not a
+          normalization.
+      - text: |
+          Attention has no single closed-form equation: the head scores the
+          tokens, selects the ones that matter for the current position, and
+          passes those forward.
+        misconception: M1
+        explain: |
+          The name invites this and the behaviour of a trained head supports it,
+          because training really does concentrate weight on tokens a human
+          would call relevant. But there is no selection step. Replace every
+          value vector - the content - with noise and the weights come out
+          bit-identical, because the weights are computed from $Q$ and $K$ and
+          $V$ never enters them. Attention is a fixed similarity-weighted
+          average with no branch in it.
 
   - id: u3-p2
     concept: c-causal-mask
@@ -45,71 +89,135 @@ pretest:
 
   - id: u3-p3
     concept: c-qkv
+    kind: mcq
+    check: choice
     prompt: |
-      In a trained attention layer, you replace the value projection matrix
-      $W^V$ with random numbers and leave everything else alone. Do the
-      attention weights change? Answer yes or no, and give your reason in one
-      sentence.
-    answer: |
-      No. The attention weights are computed from $Q$ and $K$ only -
-      $\text{softmax}(QK^T/\sqrt{d_k})$ contains no $V$ term - so corrupting
-      $W^V$ destroys the layer's output while leaving every weight
-      bit-identical.
-    check: llm
-    rubric: |
-      Expected to fail before the unit. PASS = "no" WITH the reason that the
-      weights depend only on Q and K.
-      "No" with no reason or a wrong reason = partial; record it.
-      "Yes" = M1 (agentive attention): the learner believes the weighting
-      mechanism inspects the content being weighted. This is the single most
-      important diagnostic in the pretest - if it fires, the QKV refutation
-      section is mandatory and must not be compressed.
+      In a trained attention layer you replace the value projection matrix
+      $W^V$ with random numbers and leave $W^Q$ and $W^K$ untouched. Which
+      statement describes what happens to the attention weights and to the
+      layer's output?
+    options:
+      - text: |
+          The weights are bit-identical; the output is garbage.
+        correct: true
+        explain: |
+          The weights are $\text{softmax}(QK^T/\sqrt{d_k})$, which contains no
+          $V$ term at all, so corrupting $W^V$ cannot move a single weight. The
+          output is a weighted average of noise payloads, so it is destroyed.
+          That asymmetry is the whole point: the content being mixed is not the
+          content being scored.
+      - text: |
+          The weights change, because the head inspects the content it is
+          weighting in order to decide which positions matter.
+        misconception: M1
+        explain: |
+          This is the spotlight picture: something looks at the tokens and picks
+          the important ones. If that were the mechanism, replacing the content
+          with noise would have to change what gets picked. It does not - the
+          weight computation reads $Q$ and $K$ only. What concentrates weight on
+          relevant tokens is the trained $W^Q$ and $W^K$, not an inspection of
+          $V$.
+      - text: |
+          The weights change, because $V$ holds the entries the queries are
+          matched against; randomizing the store means the queries no longer
+          match anything.
+        misconception: U3-M1
+        explain: |
+          The names are lifted from key-value stores, where the caller supplies
+          a query and the store supplies the pairs - so it is natural to think
+          matching happens against $V$. Matching happens against $K$. $Q$, $K$
+          and $V$ are three projections of the same $X$, all with $n$ rows;
+          $V$ is only the payload delivered after the match.
+      - text: |
+          Neither changes much: the weights come from $Q$ and $K$, and the
+          layer's product is the $n \times n$ attention map, so $W^V$ barely
+          matters.
+        misconception: U3-M4
+        explain: |
+          The first half is right and the conclusion is not, because the layer's
+          output is not the attention map. The output is $AV$, shape
+          $n \times d_v$, and every row of it is a convex combination of the
+          rows of $V$. Noise payloads mean noise output, even with perfect
+          weights.
 
 check:
   - id: u3-q1
     concept: c-qkv
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
+    check: choice
     prompt: |
-      Explain what $Q$, $K$, and $V$ are in an attention layer - where each
-      one comes from, what shape it has, and what role it plays. Then state
-      precisely what is wrong with the sentence "the attention head looks at
-      the previous tokens and decides which ones matter."
-    answer: |
-      All three are learned linear projections of the same input matrix $X$
-      (shape $n \times d_{model}$, one row per token): $Q = XW^Q$ and
-      $K = XW^K$ are $n \times d_k$, and $V = XW^V$ is $n \times d_v$. Every
-      token produces all three. The query is what a position is looking for,
-      the key is the surface other positions match against, and the value is
-      the payload a position contributes when matched. Key and value are
-      separate matrices so a token can be found by one property and
-      contribute a different one.
-
-      The sentence is wrong because there is no inspection and no decision.
-      The weights are $\text{softmax}(QK^T/\sqrt{d_k})$, a fixed function of
-      two projections; $V$ - the content being combined - never enters that
-      computation. Replace every value vector with noise and the weights are
-      bit-identical. The layer computes a similarity-weighted average with no
-      branch in it; the concentration of weight on human-relevant tokens is a
-      learned outcome of the training objective, not a selection step.
-    check: llm
-    rubric: |
-      MUST contain, for a pass:
-        (1) all three are linear projections OF THE SAME INPUT $X$ (a learner
-            who sources K and V from anywhere other than the sequence holds
-            U3-M1);
-        (2) correct shapes, or at minimum that all three have $n$ rows;
-        (3) the refutation must rest on the mechanism - weights come from
-            Q and K only, V does not affect them, no branching - and not
-            merely assert "it's just math".
-      PARTIAL: (1) and (2) correct but the refutation is hedged into "it's
-      not really deciding, it's more like weighting" with no statement of what
-      the weights are computed from.
-      FAIL if the learner defends any form of selection/inspection (M1), or
-      claims the head outputs the $n \times n$ weight matrix (U3-M4).
-      Do NOT require the query/key/value role descriptions to be phrased any
-      particular way; require only that key and value are distinguished.
+      Pick the statement that gets $Q$, $K$ and $V$ right - where each comes
+      from, what shape it has, what role it plays - and that correctly names
+      what is wrong with the sentence "the attention head looks at the previous
+      tokens and decides which ones matter."
+    options:
+      - text: |
+          All three are learned linear projections of the same input $X$
+          ($n \times d_{model}$): $Q = XW^Q$ and $K = XW^K$ are $n \times d_k$,
+          $V = XW^V$ is $n \times d_v$, so every token issues a query,
+          advertises a key and offers a value. The sentence is wrong because the
+          weights are $\text{softmax}(QK^T/\sqrt{d_k})$, a fixed function of two
+          projections that $V$ never enters - there is no inspection and no
+          branch.
+        correct: true
+        explain: |
+          This is the mechanism. Key and value are separate matrices so a token
+          can be found by one property ("I am a capital city") and contribute a
+          different one ("France, Seine, 48.85N"). The concentration of weight
+          on human-relevant tokens is a learned outcome of the objective, not a
+          selection step.
+      - text: |
+          $Q$ is projected from the current position's vector, while $K$ and $V$
+          are rows of a learned store the head queries against - a store whose
+          size is set by the weights, not by the number of tokens. The sentence
+          is roughly right: the query retrieves the best-matching entries.
+        misconception: U3-M1
+        explain: |
+          Every retrieval system an engineer has used works this way, so the
+          borrowed names carry the analogy too far. If $K$ and $V$ came from a
+          store, their row count would be independent of $n$; instead all three
+          are $XW$ for the same $X$, always exactly $n$ rows, and adding a token
+          adds a row to all three at once. The store is the sequence itself,
+          rebuilt every forward pass.
+      - text: |
+          All three are projections of $X$ with $n$ rows each, and the sentence
+          is a fair description: the head compares its query against the keys,
+          inspects the candidate values, and decides which positions to pass
+          forward.
+        misconception: M1
+        explain: |
+          The shapes are right, which makes this the most tempting wrong answer.
+          The values are never inspected: swap every value vector for noise and
+          the weights are bit-identical. There is no decision anywhere in the
+          six steps - three projections, a dot-product matrix, a division, a
+          row-wise softmax, one more multiply, no control flow.
+      - text: |
+          All three are projections of $X$; the head scores queries against keys
+          and emits the resulting $n \times n$ map of how much each position
+          matters, which the next layer applies to the values. The sentence is
+          wrong only in saying "previous" - an unmasked head sees the future
+          too.
+        misconception: U3-M4
+        explain: |
+          The correction offered is real but minor, and the description of the
+          output is wrong. $A$ is consumed inside the layer by $O = AV$; what
+          leaves is $n \times d_v$, one vector per token. A layer emitting an
+          $n \times n$ object could not be stacked or added back into the
+          residual stream.
+      - text: |
+          $K$ and $V$ are the model's learned key-value memory of facts from
+          training - the rows where knowledge is stored - and $Q$ is the lookup
+          into it. The sentence is wrong because the head retrieves rather than
+          decides.
+        misconception: M4
+        explain: |
+          The database analogy is the first one an engineer reaches for, and
+          retrieval failures do look like missing rows. But $K$ and $V$ are
+          projections of the tokens present in this sequence, not stored facts;
+          the parameters are $W^K$ and $W^V$, matrices that transform whatever
+          arrives. Nothing is stored per position.
     difficulty: core
 
   - id: u3-q2
@@ -138,102 +246,148 @@ check:
 
   - id: u3-q3
     concept: c-sdpa
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     fade: sdpa
+    check: choice
     prompt: |
-      Write out scaled dot-product attention as a procedure a colleague could
-      implement from your description alone. Give the equation, then the
-      ordered steps from input $X$ (shape $n \times d_{model}$) to output,
-      annotating the shape of every intermediate. Say explicitly which axis
-      the softmax runs along and what the output shape is.
-    answer: |
-      $$\text{Attention}(Q,K,V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
-
-      1. Project: $Q = XW^Q$ and $K = XW^K$, both $n \times d_k$;
-         $V = XW^V$, $n \times d_v$. ($W^Q, W^K$ are $d_{model} \times d_k$;
-         $W^V$ is $d_{model} \times d_v$.)
-      2. Score: $S = QK^T$, shape $n \times n$, with
-         $S_{ij} = q_i \cdot k_j$.
-      3. Scale: $S' = S/\sqrt{d_k}$, still $n \times n$.
-      4. Mask (causal models only): $S'_{ij} \leftarrow -\infty$ for $j > i$.
-      5. Normalize: $A = \text{softmax}(S')$ applied along each ROW, so
-         $A_{ij} = e^{S'_{ij}}/\sum_m e^{S'_{im}}$ and every row sums to 1.
-         Shape $n \times n$.
-      6. Aggregate: $O = AV$, shape $n \times d_v$. Row $i$ is
-         $\sum_j A_{ij}v_j$.
-    check: llm
-    rubric: |
-      This is the solo (unfaded) item in the `sdpa` fade sequence - the
-      learner has seen it worked in prose and completed it with blanks, so
-      the standard here is full unaided reconstruction.
-      MUST have, for a pass:
-        (1) the equation, with $\sqrt{d_k}$ present and inside the softmax;
-        (2) $QK^T$ identified as $n \times n$;
-        (3) softmax stated as ROW-wise (or equivalently, that each row sums
-            to 1). Saying column-wise, or over the whole matrix, is U3-M5 and
-            is an automatic fail;
-        (4) output shape $n \times d_v$. Claiming $n \times n$ is U3-M4 and is
-            an automatic fail;
-        (5) steps in the right ORDER - in particular scaling and masking both
-            before the softmax, never after. Masking after the softmax is
-            U3-M3.
-      PARTIAL: all of (1)-(4) correct but the projection step omitted or
-      shapes of $W^Q/W^K/W^V$ unstated.
-      Writing $\sqrt{d_k}$ as $d_k$ is the variance-vs-standard-deviation
-      slip - deduct but do not fail if everything else is right.
+      A colleague will implement scaled dot-product attention from one of the
+      procedures below and nothing else. Input $X$ is $n \times d_{model}$;
+      $W^Q, W^K$ are $d_{model} \times d_k$ and $W^V$ is
+      $d_{model} \times d_v$. Which procedure is correct in every step, axis and
+      shape?
+    options:
+      - text: |
+          1. $Q = XW^Q$, $K = XW^K$ ($n \times d_k$), $V = XW^V$
+          ($n \times d_v$). 2. $S = QK^T$, $n \times n$, $S_{ij} = q_i \cdot k_j$.
+          3. $S' = S/\sqrt{d_k}$. 4. Causal only: $S'_{ij} \leftarrow -\infty$
+          for $j > i$. 5. $A = \text{softmax}(S')$ along each row, so
+          $A_{ij} = e^{S'_{ij}}/\sum_m e^{S'_{im}}$ and every row sums to 1.
+          6. $O = AV$, $n \times d_v$.
+        correct: true
+        explain: |
+          Six steps in the order that matters: scaling and masking are both
+          modifications to the scores, so both happen before the softmax; the
+          softmax is row-wise, giving each query a distribution over positions;
+          and the output has one row per token, $n \times d_v$, so the layer
+          stacks and its result can be added back into the residual stream.
+      - text: |
+          Project; $S = QK^T$; $S' = S/\sqrt{d_k}$; $A = \text{softmax}(S')$
+          row-wise; then apply the causal mask by setting $A_{ij} = 0$ for
+          $j > i$; then $O = AV$, $n \times d_v$.
+        misconception: U3-M3
+        explain: |
+          Masking as a filter on a finished result is what "mask" means
+          everywhere else in engineering, and zeroing the upper triangle does
+          produce a lower-triangular matrix that looks right. But those rows no
+          longer sum to 1: row 1 sums to whatever weight position 1 happened to
+          win against the future, so early positions emit systematically
+          shrunken outputs purely as a function of index. The mask is added as
+          $-\infty$ before the softmax so the denominator sums only visible
+          positions.
+      - text: |
+          Project; $S = QK^T$; $S' = S/\sqrt{d_k}$; causal mask to $-\infty$;
+          $A = \text{softmax}(S')$ down each column, so the attention each key
+          receives sums to 1; $O = AV$, $n \times d_v$.
+        misconception: U3-M5
+        explain: |
+          Every other step is right, which is what makes the axis error easy to
+          ship. Column normalization would make how much position $i$ reads from
+          position $j$ depend on what unrelated queries wanted, so deleting a
+          trailing token would change earlier outputs and the KV cache would be
+          invalid. Row $i$ is query $i$'s scores against every key; that is the
+          thing that must sum to 1.
+      - text: |
+          Project; $S = QK^T$; $S' = S/\sqrt{d_k}$; causal mask; row-wise
+          softmax; return $A$, the $n \times n$ attention matrix, as the layer's
+          output - the values are applied later, when the head's map is combined
+          with the residual stream.
+        misconception: U3-M4
+        explain: |
+          $A$ is scaffolding, consumed by the final multiply and thrown away.
+          A layer whose output width grows with sequence length could not be
+          stacked and could not be added to a $d_{model}$-wide stream. $O = AV$
+          is part of the layer, and its rows are convex combinations of the rows
+          of $V$.
+      - text: |
+          Project; $S = QK^T$; causal mask; $A = \text{softmax}(S)$ row-wise;
+          divide each row of $A$ by that row's largest entry to keep the
+          weights in a sane range; $O = AV$, $n \times d_v$.
+        misconception: U3-M2
+        explain: |
+          Rescaling by something measured from the data is the shape of every
+          feature-scaling step, and dividing by a row max is a real trick - but
+          it belongs inside a numerically stable softmax, before exponentiating,
+          and it is not the $\sqrt{d_k}$ step. Done here it destroys the
+          row-sums-to-1 property, and it leaves the unscaled scores to saturate
+          the softmax in the first place.
     difficulty: core
 
   - id: u3-q4
     concept: c-sdpa
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: false
+    check: choice
     prompt: |
-      Derive why the scores are divided by $\sqrt{d_k}$ rather than by $d_k$,
-      by some learned parameter, or not at all. Your answer should include a
-      statement about the variance of a dot product and a statement about what
-      happens to gradients.
-    answer: |
-      Model the components of $q$ and $k$ as independent with mean 0 and
-      variance 1. Then $q \cdot k = \sum_{m=1}^{d_k} q_m k_m$ is a sum of
-      $d_k$ independent terms, each with mean $E[q]E[k] = 0$ and variance
-      $E[q^2]E[k^2] = 1$. Variance adds, so $\text{Var}(q \cdot k) = d_k$ and
-      the standard deviation is $\sqrt{d_k}$.
-
-      Softmax responds to differences between scores, so a spread growing like
-      $\sqrt{d_k}$ pushes it toward one-hot as $d_k$ grows. At $d_k = 64$ the
-      spread is about $\pm 8$; a gap of 10 between two scores gives weights
-      $0.99995$ and $0.00005$. The derivative of a softmax output with respect
-      to its own score is $p(1-p)$, which at $p = 0.99995$ is about
-      $4.5 \times 10^{-5}$ - effectively no gradient, so the layer cannot
-      learn, and it is in that state at initialization.
-
-      Dividing by the standard deviation $\sqrt{d_k}$ restores unit variance.
-      Dividing by $d_k$ would over-correct, shrinking the spread like
-      $1/\sqrt{d_k}$ and flattening every row toward a uniform average. A
-      learned parameter is unnecessary because the correct value is known in
-      closed form from the architecture, and making it learnable adds a
-      parameter that can itself saturate.
-    check: llm
-    rubric: |
-      MUST contain both:
-        (1) variance of the dot product is $d_k$, hence standard deviation
-            $\sqrt{d_k}$ - this is why the square root appears. An answer that
-            says only "scores get big with $d_k$" without the variance
-            argument is partial, not a pass;
-        (2) the consequence is softmax saturation and therefore vanishing
-            gradients (accept: "gradients go to zero", "the layer stops
-            learning", "$p(1-p) \to 0$").
-      AUTOMATIC FAIL: attributing the scaling to numerical overflow, float
-      range, or NaN avoidance (M7-style; also U3-M2). Production softmax
-      subtracts the row max, which handles overflow separately, and the
-      scaling would still be needed in exact arithmetic.
-      AUTOMATIC FAIL: describing it as normalizing the vectors, or as a
-      data-dependent divisor such as the row max or the norm of $q$ - that is
-      U3-M2. The divisor is a constant fixed by the architecture.
-      Explaining why not $d_k$ is credit-worthy but not required.
+      The scores $S = QK^T$ are divided by $\sqrt{d_k}$ before the softmax.
+      Which statement gives the reason - the property of the dot product that
+      fixes the constant, and the consequence of omitting it?
+    options:
+      - text: |
+          With $q$ and $k$ components independent, mean 0, variance 1,
+          $q \cdot k = \sum_{m=1}^{d_k} q_m k_m$ is a sum of $d_k$ independent
+          variance-1 terms, so $\text{Var}(q \cdot k) = d_k$ and the standard
+          deviation is $\sqrt{d_k}$. Dividing by that standard deviation
+          restores roughly unit variance; without it the softmax saturates and
+          its derivative $p(1-p)$ collapses toward 0, so no gradient flows and
+          the layer is stuck at initialization.
+        correct: true
+        explain: |
+          This is the argument, and it fixes the exact form: the square root
+          appears because spread is standard deviation, not variance. At
+          $d_k = 64$ the spread is about $\pm 8$, and a gap of 10 gives weights
+          $0.99995$ and $0.00005$ with derivative $4.5 \times 10^{-5}$; dividing
+          by 8 first turns that gap into 1.25, weights $0.7773$ and $0.2227$,
+          derivative $0.1731$ - about 3800 times larger.
+      - text: |
+          Raw dot products of $d_k$-dimensional vectors get large enough that
+          $e^{S_{ij}}$ overflows the float range and produces inf or NaN in the
+          softmax; dividing by $\sqrt{d_k}$ keeps the exponentials
+          representable.
+        misconception: M7
+        explain: |
+          Normalization-as-numerics is the familiar story, and the numbers do
+          get large. But production softmax subtracts the row max before
+          exponentiating, which handles overflow completely and independently -
+          and the scaling would still be needed in exact arithmetic, because a
+          saturated softmax has a near-zero derivative no matter how it is
+          stored. Switching the layer to float64 fixes nothing.
+      - text: |
+          It normalizes the query and key vectors before comparing them: each
+          row is divided by a magnitude derived from that row's own scores (the
+          row max, or $\|q_i\|$), the way you scale features before any distance
+          computation.
+        misconception: U3-M2
+        explain: |
+          Both a norm and $\sqrt{d_k}$ have units of length, so this reads as
+          the same operation. The tell is that $\sqrt{d_k}$ is a compile-time
+          constant from the head dimension alone: a row whose scores are all
+          tiny gets divided by the same 8 as a row whose scores are enormous.
+          No normalization scheme does that. It is a fixed variance correction.
+      - text: |
+          Without the division the softmax outputs would not be a valid
+          probability distribution over the keys - the scaling is what makes the
+          weights non-negative and sum to 1, so they can be read as the
+          probability that each key is the relevant one.
+        misconception: M2
+        explain: |
+          Softmax outputs sum to 1 for any input whatsoever; that is what the
+          denominator does, with or without scaling. And the weights are not
+          probabilities of relevance - they are a normalized exponential
+          weighting of scores. What the constant controls is how sharply the
+          distribution separates, and therefore whether any gradient survives.
     difficulty: core
 
   - id: u3-q5
@@ -303,62 +457,74 @@ check:
 
   - id: u3-q8
     concept: c-attn-numeric
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: false
+    check: choice
     prompt: |
       You instrument a trained causal model and find one head whose attention
       matrix is, on every input you try, almost exactly the identity: each
       position puts weight $\approx 1$ on itself and $\approx 0$ everywhere
-      else.
-
-      (a) Write down what this head's output is, approximately, as a function
-      of the input $X$.
-      (b) What does that make the head equivalent to, as a layer?
-      (c) Predict what happens to the model's outputs if you ablate this head
-      (zero its contribution), and contrast that with ablating a head whose
-      weight is spread broadly across earlier positions.
-    answer: |
-      (a) With $A \approx I$, the output is $O = AV \approx V = XW^V$. Each
-      output row is that token's own value vector.
-
-      (b) A position-wise linear map. It applies the same matrix $W^V$ to
-      every token independently, with no mixing between positions - which is
-      what an MLP-style layer does, not what attention is for. The head is
-      spending an $n \times n$ score computation to accomplish something a
-      $d_{model} \times d_v$ matrix multiply would do.
-
-      (c) Ablating it removes a linear transform of each token's own
-      representation from the residual stream. The damage is local and
-      uniform across positions, and downstream layers that mostly need
-      cross-position information degrade gracefully. Ablating a
-      broadly-attending head instead removes the only path by which
-      information from other positions reaches this one, so the failure is
-      contextual: outputs stay fluent but stop being conditioned on the rest
-      of the sequence - resolving a pronoun, copying a name from earlier,
-      matching a bracket.
-    check: llm
-    rubric: |
-      (a) MUST reach $O \approx V = XW^V$. The key inference is that $A = I$
-      makes the aggregation step a no-op. A learner who cannot get here does
-      not have the $O = AV$ step.
-      (b) MUST identify that the head performs NO cross-position mixing and is
-      therefore a position-wise/pointwise linear transform. Accept "it's just
-      a linear layer", "equivalent to an MLP without the nonlinearity",
-      "does nothing attention is for".
-      (c) Requires only a coherent contrast: local/uniform damage versus loss
-      of cross-position information. Specific examples are a bonus.
-      PASS = (a) and (b) correct plus a reasonable (c).
-      FAIL if the learner says the head "attends to itself because it decided
-      its own token was most relevant" and stops there (M1 - describing the
-      weight pattern agentively instead of computing its consequence), or if
-      they claim the output is the identity matrix rather than $V$ (U3-M4,
-      confusing the weight matrix with the output).
+      else. Which statement gives this head's output, what it is equivalent to
+      as a layer, and the effect of ablating it compared with ablating a head
+      whose weight is spread broadly across earlier positions?
+    options:
+      - text: |
+          $O = AV \approx V = XW^V$, so the head is a position-wise linear map:
+          it applies the same $W^V$ to each token with no mixing between
+          positions. Ablating it removes a linear transform of each token's own
+          representation - damage that is local and uniform across positions -
+          whereas ablating a broadly-attending head removes the path by which
+          information from other positions reaches this one, so outputs stay
+          fluent but stop being conditioned on the sequence.
+        correct: true
+        explain: |
+          $A \approx I$ makes step 6 a no-op, so the head spends an
+          $n \times n$ score computation to achieve what a
+          $d_{model} \times d_v$ multiply would do. The contrast is the useful
+          part: the identity head costs the model a pointwise transform, the
+          broad head costs it pronoun resolution, copying a name from earlier,
+          matching a bracket.
+      - text: |
+          The head's output is approximately the identity matrix $I$, shape
+          $n \times n$; ablating it removes that map, and downstream layers lose
+          the diagonal signal that tells each position which token is its own.
+        misconception: U3-M4
+        explain: |
+          This treats the weight matrix as the output. $A \approx I$ is a
+          statement about the weights; the layer still computes $O = AV$, so
+          what it emits is $\approx V = XW^V$, shape $n \times d_v$. Positions
+          do not need a signal telling them which token is their own - that is
+          what being row $i$ of $X$ means.
+      - text: |
+          The head has learned that each token is the most relevant thing to
+          itself, so it selects its own token and passes it on; ablating it
+          removes the model's ability to judge self-relevance, while ablating a
+          broad head removes its judgement about other positions.
+        misconception: M1
+        explain: |
+          This describes the weight pattern agentively and then stops, so it
+          never computes the consequence - which is the whole question. There is
+          no judgement to remove: $A \approx I$ means $O \approx XW^V$, a
+          pointwise linear transform, and that is what ablation deletes.
+      - text: |
+          $O = AV \approx V = XW^V$, a pointwise transform - but ablating any
+          head destroys everything downstream of it, since each layer's output
+          is the next layer's input; residual connections only matter during the
+          backward pass.
+        misconception: M8
+        explain: |
+          The first clause is right and the ablation claim is not. The residual
+          stream is a shared workspace that each block reads from and writes an
+          additive update into, so zeroing one head's contribution subtracts one
+          update rather than cutting a chain. Real ablations degrade gracefully,
+          which is exactly what lets you tell the identity head's local damage
+          from the broad head's loss of context.
     difficulty: stretch
 
   - id: u3-q9
     concept: c-causal-mask
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
@@ -367,46 +533,24 @@ check:
       entry above the diagonal. Their loss curve looks plausible and the model
       trains.
 
-      Explain what is wrong, what specific observable symptom it produces, and
-      what the correct implementation is.
-    answer: |
-      The mask must be applied to the scores before the softmax, not to the
-      weights after it. Their version softmaxes over all $n$ positions
-      including the future ones, so the weights that survive the zeroing are
-      the ones left over after the future positions took their share of the
-      normalization budget.
-
-      The observable symptom is that rows of their masked $A$ no longer sum to
-      1, and the deficit is worst at position 1 - which sees one position out
-      of $n$ - and shrinks monotonically toward the last position, whose row
-      is unaffected. Since the output is $AV$, early tokens emit systematically
-      shrunken output vectors, with the shrinkage a pure function of index and
-      sequence length. It trains anyway because the network can partly
-      compensate downstream, which is what makes the bug survive review.
-
-      The correct implementation adds $-\infty$ (in practice a large negative
-      constant) to $S'_{ij}$ for every $j > i$ before the softmax. Then
-      $e^{-\infty} = 0$, the denominator sums only the visible positions, and
-      each row renormalizes to exactly 1 over what it can see.
-    check: llm
-    rubric: |
-      MUST contain all three:
-        (1) the mask belongs BEFORE the softmax, as an additive $-\infty$ (or
-            large negative constant) on the scores;
-        (2) the symptom is rows summing to LESS than 1, worst at early
-            positions and vanishing at the last position;
-        (3) the mechanism - the softmax denominator must exclude masked
-            positions so the survivors renormalize.
-      Getting (1) alone, with no account of the symptom, is partial.
-      FAIL if the learner sees nothing wrong with post-softmax zeroing, or
-      says the fix is to renormalize $A$'s rows after zeroing without noting
-      that this is exactly equivalent to masking before the softmax (if they
-      DO note the equivalence, that is a correct and sophisticated answer -
-      pass it).
-      Holding that masking is a post-hoc filter is U3-M3.
-      A learner who says "it drops the future tokens from the sequence" holds
-      U3-M3 in its stronger form - the sequence is unchanged; only scores are
-      modified.
+      Which statement correctly identifies the bug and its observable symptom?
+    options:
+      - text: "Rows of their masked $A$ sum to less than 1, with the deficit worst at position 1 and shrinking to zero at the last position, because the future positions took part of the softmax normalization budget before being zeroed; the fix is to add $-\\infty$ to $S'_{ij}$ for $j > i$ before the softmax so the denominator sums only visible positions."
+        correct: true
+        explain: "Correct. The denominator $\\sum_m e^{S'_{im}}$ must exclude masked positions. Zeroing afterwards leaves each surviving weight scaled by the fraction of mass the future had claimed, so row $i$ sums to less than 1 by an amount that is a pure function of index and sequence length - and since $O = AV$, early tokens emit systematically shrunken outputs. Masking before the softmax renormalizes each row to exactly 1 over what it can see."
+      - text: "Nothing is wrong: zeroing the upper triangle of $A$ produces exactly the same lower-triangular matrix that pre-softmax masking produces, so the two implementations are identical."
+        misconception: U3-M3
+        explain: "Attractive because both routes yield a lower-triangular $A$ and 'masking' usually means filtering a finished result. But the surviving entries differ: pre-softmax masking normalizes over the visible positions only, so rows sum to 1; post-softmax zeroing leaves rows summing to less than 1."
+      - text: "The bug is that zeroing does not remove the future tokens from the sequence, so the $n \\times n$ matrix still has $n$ columns and the future values are still averaged into the output by $O = AV$."
+        misconception: U3-M3
+        explain: "This is the stronger form of the post-hoc-filter model. The sequence is never modified by masking, and a zeroed weight contributes exactly $0 \\cdot v_j$ to the output, so no future value leaks through. The damage is to the normalization, not to which values are summed."
+      - text: "The bug is that softmaxing over all $n$ positions makes the columns of $A$ fail to sum to 1, so a key that many queries read from gets its influence double-counted."
+        misconception: U3-M5
+        explain: "Columns of $A$ never sum to 1 in any correct implementation - softmax is row-wise, and column sums carry no meaning. A single key may be read heavily by many queries or by none."
+      - text: "The bug is that zeroing entries above the diagonal leaves the $-\\infty$ handling to the softmax, which returns NaN for the fully masked first row; the fix is to skip the mask for row 1."
+        misconception: U3-M3
+        explain: "There is no $-\\infty$ anywhere in their implementation - that is precisely what is missing. Row 1 is also never fully masked: position 1 always sees itself, so its row has one surviving term and softmaxes to $[1, 0, 0]$."
+    check: choice
     difficulty: core
 
   - id: u3-q10
@@ -436,53 +580,34 @@ check:
 
   - id: u3-q11
     concept: c-sdpa
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      Derive the asymptotic cost of a single self-attention head in sequence
-      length $n$, by counting the arithmetic in each step. Then answer: your
-      colleague reports that attention is empirically much faster than the
-      RNN layer it replaced, and concludes it must therefore be cheaper in
-      $n$. What have they confused, and what is the concrete consequence for
-      a model whose context grows from 1,024 to 8,192 tokens?
-    answer: |
-      Counting, with head dimension $d_k = d_v = d$:
-      $S = QK^T$ is an $(n \times d)$ by $(d \times n)$ multiply, so $n^2$
-      output entries at $d$ multiply-accumulates each: $n^2 d$. The softmax
-      touches $n^2$ entries at constant cost. $O = AV$ is $(n \times n)$ by
-      $(n \times d)$: another $n^2 d$. The projections are $n d_{model} d$
-      each, linear in $n$. Total $\Theta(n^2 d)$, dominated by the two
-      quadratic multiplies. The $n^2$ is intrinsic: every query is compared
-      against every key, which is what content-addressing without a
-      position-indexed shortcut costs.
+      A colleague reports that a self-attention layer runs much faster in
+      wall-clock than the RNN layer it replaced, and concludes that attention
+      must therefore be cheaper in sequence length $n$.
 
-      The confusion is parallelism with work. Attention has $O(n^2)$ work but
-      $O(1)$ sequential depth; an RNN layer has $O(n d^2)$ work but $O(n)$
-      sequential depth. On hardware with thousands of idle cores, the shorter
-      dependency chain wins the wall-clock comparison at moderate $n$ even
-      though attention does more total arithmetic. Faster is not cheaper.
-
-      Going from 1,024 to 8,192 is 8 times the tokens and $8^2 = 64$ times the
-      attention arithmetic. That is why long context is priced non-linearly
-      and why sliding-window, sparse, and linear-attention variants exist.
-    check: llm
-    rubric: |
-      MUST contain:
-        (1) $\Theta(n^2 d)$ or $O(n^2)$ in sequence length, WITH the count
-            attributed to the two quadratic matrix multiplies ($QK^T$ and
-            $AV$) - or at minimum to every query dotting every key;
-        (2) the parallelism-versus-work distinction, stated as work/FLOPs
-            versus latency/wall-clock or sequential depth/critical path;
-        (3) the factor 64 for an 8x context increase. An answer saying "it
-            gets much more expensive" without the quadratic factor is partial.
-      FAIL if the learner concludes attention is $O(n)$ (M10), or attributes
-      the quadratic term to the KV cache or to memory rather than to compute -
-      the cache is linear in $n$; it is attention compute per new token that
-      grows with $n$ (M10 compounded with M17).
-      Mentioning that FlashAttention removes the $O(n^2)$ MEMORY cost while
-      leaving the $O(n^2)$ compute is correct and earns credit; treating it as
-      making attention linear does not.
+      Taking head dimension $d_k = d_v = d$, which statement gives the correct
+      asymptotic cost, the correct diagnosis of the confusion, and the correct
+      consequence of growing context from 1,024 to 8,192 tokens?
+    options:
+      - text: "Cost is $\\Theta(n^2 d)$, from the two quadratic multiplies $S = QK^T$ ($n^2$ entries at $d$ multiply-accumulates each) and $O = AV$; they have confused wall-clock latency with total work, since attention has $O(n^2)$ work but $O(1)$ sequential depth while an RNN has $O(n d^2)$ work and $O(n)$ depth; 8x the tokens is $8^2 = 64$x the attention arithmetic."
+        correct: true
+        explain: "Correct on all three counts. The $n^2$ is intrinsic - every query is dotted against every key, which is what content-addressing without a position-indexed shortcut costs. Parallel hardware hides that work at moderate $n$ by shortening the dependency chain, which is why faster is not cheaper, and the 64x factor is why long context is priced non-linearly."
+      - text: "Cost is $\\Theta(n d)$ in sequence length, because $S = QK^T$, the softmax and $O = AV$ are each a single parallel kernel launch with no loop over positions; going from 1,024 to 8,192 tokens costs 8x more."
+        misconception: M10
+        explain: "This reads asymptotic work off the number of sequential steps. A kernel launch is $O(1)$ depth, not $O(1)$ work: $QK^T$ still produces $n^2$ entries and $AV$ still consumes them. Parallelism changes latency, never the count of multiply-accumulates."
+      - text: "Attention compute per token is linear in $n$; the quadratic term everyone quotes is the KV cache, which stores a key and a value per position per layer, so an 8x context is 64x the memory but only 8x the arithmetic."
+        misconception: M17
+        explain: "The KV cache grows linearly in $n$, not quadratically - one key and one value row per position. It is the query-key product that is quadratic, and it is compute, not storage. Attributing the $n^2$ to the cache inverts both facts."
+      - text: "Cost is $\\Theta(n d^2)$, dominated by the three projections $XW^Q$, $XW^K$, $XW^V$; the score matrix is only an $n \\times n$ intermediate that is thrown away, so it does not enter the cost, and 8x the tokens is 8x the arithmetic."
+        misconception: U3-M4
+        explain: "Being discarded is not being free. $A$ costs $n^2 d$ to build and another $n^2 d$ to consume in $AV$; at long context those two terms dominate the linear-in-$n$ projections entirely."
+      - text: "Cost is $\\Theta(n^2 d)$, and the colleague is right that this makes attention cheaper: FlashAttention removes the $O(n^2)$ term so real implementations are linear in $n$, and 8x the tokens is 8x the cost."
+        misconception: M10
+        explain: "FlashAttention removes the $O(n^2)$ MEMORY cost by never materializing $A$; the $O(n^2)$ compute is unchanged, because every query still has to be dotted against every key. Treating a memory optimization as making attention linear is the same latency-for-work substitution in a newer costume."
+    check: choice
     difficulty: core
 
   - id: u3-q12
@@ -512,60 +637,35 @@ check:
 
   - id: u3-q13
     concept: c-causal-mask
-    kind: constructed
+    kind: mcq
     congruent: true
     callback_eligible: true
     prompt: |
-      Prove that adding the same constant $c$ to every entry of one row of the
-      score matrix leaves that row's attention weights unchanged.
-
-      Then use the result to answer two implementation questions:
-      (a) real implementations subtract the row maximum from every score
-      before exponentiating - what does your proof say about whether this
-      changes the result?
-      (b) real implementations mask with a large negative constant such as
-      $-10^9$ rather than a true $-\infty$ - is that a different operation,
-      and what would go wrong if the constant were merely $-10$?
-    answer: |
-      For row $i$ with scores $s_1, \dots, s_n$, adding $c$ to each gives
+      Adding the same constant $c$ to every entry of one row of the score
+      matrix leaves that row's attention weights unchanged, since
 
       $$\frac{e^{s_j + c}}{\sum_m e^{s_m + c}}
       = \frac{e^{c}e^{s_j}}{e^{c}\sum_m e^{s_m}}
       = \frac{e^{s_j}}{\sum_m e^{s_m}}$$
 
-      The $e^c$ factors out of numerator and denominator and cancels. Softmax
-      is invariant to adding a constant along the axis it normalizes over.
-
-      (a) Subtracting the row max is adding $c = -\max_j s_j$, so by the proof
-      it cannot change the result. It is a free change of representation. Its
-      purpose is that the largest exponent becomes $e^0 = 1$, so nothing
-      overflows regardless of how large the raw scores were. This is why the
-      $\sqrt{d_k}$ scaling is not about overflow: overflow is already handled
-      here, and handled exactly.
-
-      (b) It is an approximation, not an identity. $e^{-10^9}$ underflows to
-      exactly 0 in any float format, so the result is bit-identical to a true
-      $-\infty$ while avoiding $\infty - \infty = \text{NaN}$ if an entire row
-      were masked. With $-10$ it would break: the masked entry contributes
-      $e^{s - 10}$, which is small but nonzero, so a future position would
-      receive a small positive weight. The leak is worse when the visible
-      scores are themselves small, and it leaks future information into the
-      training signal - the exact failure causal masking exists to prevent.
-    check: llm
-    rubric: |
-      The proof MUST show $e^c$ factoring out of numerator and denominator and
-      cancelling. An assertion that "softmax normalizes so constants do not
-      matter" without the algebra is partial.
-      (a) MUST conclude the result is unchanged AND connect it to overflow
-      handling. Extra credit for noting this decouples overflow from the
-      $\sqrt{d_k}$ question (against U3-M2 and M7).
-      (b) MUST identify that $-10^9$ underflows to 0 so it is numerically
-      equivalent, and that $-10$ would leave a small NONZERO weight on future
-      positions - an information leak, not merely an inaccuracy. Answering
-      that $-10$ "would still work, just less precisely" is a fail: the
-      failure mode is causality violation.
-      A learner who invokes this shift-invariance to claim that the
-      $\sqrt{d_k}$ SCALING is also a no-op has confused adding a constant with
-      multiplying by one - that is U3-M2 and must be flagged even if the rest
-      of the answer is correct.
+      Which statement correctly applies this to two implementation details -
+      subtracting the row maximum before exponentiating, and masking with a
+      large negative constant such as $-10^9$ rather than a true $-\infty$?
+    options:
+      - text: "Subtracting the row max is the case $c = -\\max_j s_j$, so it cannot change the weights - it is a free change of representation that makes the largest exponent $e^0 = 1$ and prevents overflow exactly; masking with $-10^9$ is an approximation that is bit-identical because $e^{-10^9}$ underflows to 0, whereas $-10$ would leave a small nonzero weight on future positions and leak the future into the training signal."
+        correct: true
+        explain: "Correct. The shift is an identity, the mask constant is an approximation that happens to be exact in floating point, and the failure mode of an insufficiently negative constant is a causality violation rather than a rounding error - worst when the visible scores are themselves small."
+      - text: "Subtracting the row max cannot change the weights and handles overflow exactly, so the division by $\\sqrt{d_k}$ is redundant and can be dropped for the same reason: both are constants applied uniformly to a row and softmax is invariant to them."
+        misconception: U3-M2
+        explain: "This confuses adding a constant with multiplying by one. Softmax is invariant to an additive shift, not to a rescaling: dividing by $\\sqrt{d_k}$ changes the differences between scores, which is exactly what softmax exponentiates, and dropping it saturates the layer at initialization."
+      - text: "Subtracting the row max cannot change the weights, and $-10^9$ versus $-10$ makes no difference either, since both push the masked entry far below the visible scores - $-10$ is merely less precise, not wrong."
+        misconception: U3-M3
+        explain: "$e^{s - 10}$ is small but not zero, so a future position receives a small positive weight and the row's normalization budget is partly spent on it. That is not lost precision, it is the model reading a token it must not see - the exact failure causal masking exists to prevent."
+      - text: "Subtracting the row max does change the weights - it is a normalization of the row, which is why implementations that skip it produce different attention maps - and $-10^9$ is used because a true $-\\infty$ would make the row sum to less than 1."
+        misconception: U3-M2
+        explain: "The algebra above shows the shift cancels exactly, so no attention map changes. And $-\\infty$ does not shrink a row sum: $e^{-\\infty} = 0$ removes the term from the denominator too, so the survivors renormalize to exactly 1. $-10^9$ is used to avoid $\\infty - \\infty = \\text{NaN}$, not to fix a sum."
+      - text: "Subtracting the row max cannot change the weights, and the shift invariance also means masking may be applied after the softmax and the rows rescaled afterwards, since rescaling a row is the same uniform operation as shifting it."
+        misconception: U3-M3
+        explain: "Rescaling normalized weights back to sum 1 after zeroing does happen to reproduce pre-softmax masking, but not for this reason - and the invariance proved here is additive, applying to scores before the exponential, not multiplicative on weights after it. Conflating the two is what makes post-hoc masking look safe in general."
+    check: choice
     difficulty: stretch
