@@ -1407,3 +1407,28 @@ sources:
     checked: '2026-09-05'
   voice: Strong top-down voice; prose not licensed for reuse.
   format: HTML
+- id: private-debt
+  title: 'Private Debt: Yield, Safety, and the Emergence of Alternative Lending'
+  authors:
+  - Stephen L. Nesbitt
+  subjects:
+  - private-credit
+  - direct-lending
+  - credit
+  - fixed-income
+  - finance
+  - investing
+  - asset-allocation
+  - portfolio-construction
+  verdict: A
+  licence:
+    name: All rights reserved (Wiley, 2nd edition); the reader's own copy, adapted for personal study only, never published
+    url: file:///home/sprite/chiron/sources/private-debt.pdf
+    checked: '2026-09-07'
+  voice: An allocator's voice; plain, data-led, every claim tied to the Cliffwater Direct Lending Index; short chapters that each settle one question.
+  format: PDF on the server, one chapter per page range
+  exercises: None.
+  fetch:
+    kind: file
+    path: /home/sprite/chiron/sources/private-debt.pdf
+

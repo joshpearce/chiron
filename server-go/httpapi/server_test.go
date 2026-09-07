@@ -340,13 +340,24 @@ func TestTeachEndpointGuards(t *testing.T) {
 func TestTeachCreatePassesTheSourcesOn(t *testing.T) {
 	s := newServer(t, "")
 	var got []string
-	s.startGenerate = func(slug, title, brief string, named []string) { got = append([]string{slug, title, brief}, named...) }
+	var planOnly bool
+	s.startGenerate = func(slug, title, brief string, named []string, plan bool) {
+		got = append([]string{slug, title, brief}, named...)
+		planOnly = plan
+	}
 	w := do(t, s, "POST", "/teach/create", `{"slug":"bayes","title":"Bayes for Engineers","brief":"short","sources":["Think Bayes","MIT 18.05"]}`, "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("create -> %d: %s", w.Code, w.Body.String())
 	}
-	if strings.Join(got, "|") != "bayes|Bayes for Engineers|short|Think Bayes|MIT 18.05" {
-		t.Fatalf("generator got %v", got)
+	if strings.Join(got, "|") != "bayes|Bayes for Engineers|short|Think Bayes|MIT 18.05" || planOnly {
+		t.Fatalf("generator got %v, plan only %v", got, planOnly)
+	}
+	// Plan first, author later: the request says so, and the generator
+	// stops once the syllabus is on disk.
+	s.jobs["bayes"].Done = true
+	w = do(t, s, "POST", "/teach/create", `{"slug":"bayes","title":"Bayes for Engineers","brief":"short","plan_only":true}`, "")
+	if w.Code != http.StatusOK || !planOnly {
+		t.Fatalf("plan-only create -> %d: %s, plan only %v", w.Code, w.Body.String(), planOnly)
 	}
 }
 

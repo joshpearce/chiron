@@ -564,6 +564,7 @@ func (c *client) teach(args []string) (string, error) {
 	briefFile := fs.String("brief-file", "", "a file holding the brief")
 	var srcs multi
 	fs.Var(&srcs, "source", "an open text to build from; repeat for interleaves")
+	planOnly := fs.Bool("plan-only", false, "write the syllabus and stop; the same command again authors from it")
 	if err := fs.Parse(args); err != nil {
 		return "", fmt.Errorf("%w: %v", errUsage, err)
 	}
@@ -580,6 +581,9 @@ func (c *client) teach(args []string) (string, error) {
 	body := map[string]any{"slug": *slug, "title": *title, "brief": b}
 	if len(srcs) > 0 {
 		body["sources"] = []string(srcs)
+	}
+	if *planOnly {
+		body["plan_only"] = true
 	}
 	var out map[string]any
 	if err := c.call("POST", "/teach/create", body, &out); err != nil {

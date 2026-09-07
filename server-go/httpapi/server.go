@@ -189,7 +189,7 @@ type Server struct {
 	jobs   map[string]*Job
 	// startGenerate begins a book's generation for a job already listed;
 	// tests replace it with a recorder.
-	startGenerate func(slug, title, brief string, named []string)
+	startGenerate func(slug, title, brief string, named []string, planOnly bool)
 
 	// renders tracks eager background page renders so tests (and shutdown)
 	// can wait for them instead of racing temp-dir cleanup.
@@ -219,7 +219,9 @@ func New(cfg *Config, root string) (*Server, error) {
 			ClaudeCLIModel: cfg.ClaudeCLIModel, Upstreams: cfg.Upstreams, LLM: cfg.LLM,
 		}),
 	}
-	s.startGenerate = func(slug, title, brief string, named []string) { go s.generate(slug, title, brief, named) }
+	s.startGenerate = func(slug, title, brief string, named []string, planOnly bool) {
+		go s.generate(slug, title, brief, named, planOnly)
+	}
 	for _, spec := range cfg.Subjects {
 		if err := s.register(spec.ID, spec.Title,
 			resolve(root, spec.CorpusDir), resolve(root, spec.StateDir)); err != nil {

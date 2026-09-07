@@ -21,7 +21,7 @@ var slugOK = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,31}$`)
 type Job struct {
 	Slug       string `json:"slug"`
 	Title      string `json:"title"`
-	Stage      string `json:"stage"` // queued | planning | authoring | ready | failed
+	Stage      string `json:"stage"` // queued | planning | planned | authoring | ready | failed
 	UnitsTotal int    `json:"units_total"`
 	UnitsDone  int    `json:"units_done"`
 	Done       bool   `json:"done"`
@@ -55,6 +55,10 @@ type teachCreateRequest struct {
 	// Sources the book is built from, by index id or title; the first is
 	// the spine. Without them the brief's own "starting from X" counts.
 	Sources []string `json:"sources,omitempty"`
+	// PlanOnly stops once the syllabus is written, for a look at the plan
+	// before any unit is authored; the same request again, without it,
+	// authors from the syllabus on disk.
+	PlanOnly bool `json:"plan_only,omitempty"`
 }
 
 // slugify normalises a model-proposed slug into a directory-safe id.
@@ -109,7 +113,7 @@ func (s *Server) handleTeachCreate(w http.ResponseWriter, r *http.Request) {
 	s.jobs[slug] = job
 	s.jobsMu.Unlock()
 
-	s.startGenerate(slug, req.Title, req.Brief, req.Sources)
+	s.startGenerate(slug, req.Title, req.Brief, req.Sources, req.PlanOnly)
 	writeJSON(w, http.StatusOK, job)
 }
 

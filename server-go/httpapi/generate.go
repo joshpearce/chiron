@@ -10,8 +10,10 @@ import (
 )
 
 // generate runs plan then authoring on a worker goroutine, reporting progress
-// through the job record. It outlives the request that started it.
-func (s *Server) generate(slug, title, brief string, named []string) {
+// through the job record. It outlives the request that started it. With
+// planOnly it stops at the syllabus, done, so the plan can be read before
+// a second request authors from it.
+func (s *Server) generate(slug, title, brief string, named []string, planOnly bool) {
 	parent := filepath.Dir(s.root)
 	outDir := filepath.Join(parent, "corpus-"+slug)
 
@@ -41,6 +43,11 @@ func (s *Server) generate(slug, title, brief string, named []string) {
 	total, err := g.Plan(brief, title, named)
 	if err != nil {
 		fail("planning failed: " + err.Error())
+		return
+	}
+	if planOnly {
+		s.updateJob(slug, func(j *Job) { j.Stage, j.UnitsTotal, j.Done = "planned", total, true })
+		log.Printf("teach %s: planned %d units, waiting to be told to author", slug, total)
 		return
 	}
 	s.updateJob(slug, func(j *Job) { j.Stage, j.UnitsTotal = "authoring", total })
