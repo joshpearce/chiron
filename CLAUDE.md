@@ -41,8 +41,12 @@ You are on the machine that serves the book. Facts that matter:
   before debugging; add to it in the same commit as the fix.
 - Tests: `make test` (Go and the page script); corpus lint: `make lint`.
 - `corpus-taps <unit dir>` (from `server-go`, `go run ./cmd/corpus-taps`)
-  rewrites a bank's prose items as tap-answered ones; `corpus-v2` and
-  generated books have no spec copy, so pass `-spec corpus/authoring-spec.md`.
+  rewrites a bank's prose items as tap-answered ones, and with `-beats`
+  a chapter's prose beats as choices (canon.md and every depth);
+  `corpus-calibrate <book dir>` gives a built book its placement unit.
+  `corpus-v2` and generated books have no spec copy, so pass
+  `-spec corpus/authoring-spec.md`. A stored chapter of a unit in
+  progress is dropped when its bank changes; nothing else to clear.
 - App tests and Simulator walks need the Mac: `scripts/sim-run.sh test`,
   `scripts/sim-verify.sh`.
 - Plans and status: `IPAD-PLAN.md`, `SPRITE-DEV-PLAN.md`. Open material
