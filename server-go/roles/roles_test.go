@@ -56,20 +56,33 @@ func TestComposeCheckAlwaysFillsTheQuota(t *testing.T) {
 	}
 }
 
-// Response congruency: the goal is to derive and explain, so most of the check
-// must be constructed rather than recognition.
+// Response congruency: the goal is to derive and explain, so the check
+// takes the unit's constructed items before its recognition items. The
+// bank decides how many there are (the spec asks for about half MCQ);
+// the check's job is to leave none of them out while the quota allows.
 func TestComposeCheckPrefersConstructedItems(t *testing.T) {
 	c, l := fixtures(t)
 	rng := rand.New(rand.NewSource(3))
-	items := ComposeCheck(c.Units["u2"], l, c, 9, 0.4, rng)
+	unit := c.Units["u2"]
+	inBank := 0
+	for _, q := range unit.Questions.Check {
+		if q.Kind == "constructed" {
+			inBank++
+		}
+	}
+	if inBank == 0 {
+		t.Fatal("u2's bank has no constructed item to prefer")
+	}
+	n, callback := 9, 0.4
+	items := ComposeCheck(unit, l, c, n, callback, rng)
 	constructed := 0
 	for _, q := range items {
-		if q.Kind == "constructed" {
+		if q.Kind == "constructed" && q.Unit == "u2" {
 			constructed++
 		}
 	}
-	if float64(constructed)/float64(len(items)) < 0.6 {
-		t.Errorf("%d/%d constructed, spec wants at least 60%%", constructed, len(items))
+	if want := min(inBank, n-int(float64(n)*callback)); constructed < want {
+		t.Errorf("%d of u2's %d constructed items in the check, want %d", constructed, inBank, want)
 	}
 }
 
