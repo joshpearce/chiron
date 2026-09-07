@@ -42,6 +42,9 @@ type unitPlan struct {
 	Notes string `json:"notes" yaml:"notes"`
 	// Sources are the sections of the chosen sources this unit adapts.
 	Sources []UnitSource `json:"sources,omitempty" yaml:"sources,omitempty"`
+	// Calibration marks the placement unit: a screener and a banded series,
+	// no prose sections and no depth variants.
+	Calibration bool `json:"calibration,omitempty" yaml:"calibration,omitempty"`
 }
 
 type misconceptionPlan struct {
@@ -471,6 +474,10 @@ func (g *Generator) authorUnit(u unitPlan, learner, bank, spec string) error {
 		"Here are this unit's headings:\n"+headingList+
 			"\n\nWrite the unit-local misconceptions.yaml, and nothing else."); err != nil {
 		return err
+	}
+	if u.Calibration {
+		// A placement unit has no prose sections to vary.
+		return nil
 	}
 	for _, d := range depths {
 		// The server swaps sections by heading, so a drifted heading silently

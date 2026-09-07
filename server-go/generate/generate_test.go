@@ -327,3 +327,49 @@ func TestSourcesAreFoundWhenTheBriefNamesNone(t *testing.T) {
 		t.Fatalf("the found source was not read back: %+v", s)
 	}
 }
+
+// A book written before placement units existed gets one: authored from
+// the syllabus and the bank, put first, with the old first unit following.
+func TestCalibrateGivesABookAPlacementUnit(t *testing.T) {
+	dir := t.TempDir()
+	spec := filepath.Join(dir, "spec.md")
+	os.WriteFile(spec, []byte("contract"), 0o644)
+	out := filepath.Join(dir, "out")
+	os.MkdirAll(out, 0o755)
+	os.WriteFile(filepath.Join(out, "syllabus.yaml"), []byte("title: Bayes\nlearner:\n  profile: an engineer\nunits:\n  - id: u0\n    slug: cookies\n    title: Cookies\n    minutes: 30\n    prereqs: []\n    concepts:\n      - id: c-prior\n        name: Prior probability\n  - id: u1\n    slug: bayes\n    title: Bayes\n    minutes: 30\n    prereqs: [u0]\n    concepts: []\n"), 0o644)
+	os.WriteFile(filepath.Join(out, "misconception-bank.yaml"), []byte("misconceptions: []\n"), 0o644)
+	chain := &stubChain{payloads: map[string]map[string]any{
+		"author": {"body": "---\nunit: cal\ntitle: Placement\ncalibration: true\n---\n\nA short placement.\n"},
+	}}
+	g := &Generator{Chain: chain, SpecPath: spec, OutDir: out, Workers: 1}
+	id, err := g.Calibrate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != "cal" {
+		t.Fatalf("id = %q", id)
+	}
+	prompt := chain.asked["author"][0]
+	if !strings.Contains(prompt, "calibration: true") || !strings.Contains(prompt, "Prior probability") || !strings.Contains(prompt, "calibration_sets") {
+		t.Fatalf("the author was not told what a placement unit is:\n%s", prompt)
+	}
+	if _, err := os.Stat(filepath.Join(out, "units", "cal-placement", "questions.yaml")); err != nil {
+		t.Fatal("the unit was not written")
+	}
+	if entries, _ := os.ReadDir(filepath.Join(out, "units", "cal-placement", "depths")); len(entries) != 0 {
+		t.Fatal("a placement unit has no depth variants")
+	}
+	raw, _ := os.ReadFile(filepath.Join(out, "syllabus.yaml"))
+	var syl struct {
+		Units []unitPlan `yaml:"units"`
+	}
+	if err := yaml.Unmarshal(raw, &syl); err != nil {
+		t.Fatal(err)
+	}
+	if len(syl.Units) != 3 || syl.Units[0].ID != "cal" || !syl.Units[0].Calibration || syl.Units[1].ID != "u0" || strings.Join(syl.Units[1].Prereqs, ",") != "cal" || strings.Join(syl.Units[2].Prereqs, ",") != "u0" {
+		t.Fatalf("syllabus after: %+v", syl.Units)
+	}
+	if _, err := g.Calibrate(); err == nil {
+		t.Fatal("a second placement unit was allowed")
+	}
+}

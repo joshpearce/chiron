@@ -66,6 +66,8 @@ const beatInstructions = `Rewrite each beat below as a choice, keeping its id, t
 - ` + "`check: choice`" + `; no ` + "`answer`" + `, no ` + "`rubric`" + `.
 - Keep the mathematics and notation of the original. Never write an option that refers to another option's position.
 
+In YAML, put LaTeX and anything with a backslash in a single-quoted string or a block scalar (|), never in double quotes, where a backslash is an escape and the file fails to parse.
+
 Return each rewritten beat as the YAML body that goes inside its fence (no fence markers), starting with "id: <id>".`
 
 // RewriteBeats rewrites the prose beats of the unit at dir as choices, in
@@ -124,16 +126,22 @@ func RewriteBeats(chain llm.Chain, dir, bankPath, specPath string, batch int) ([
 		}
 		for _, r := range out.Beats {
 			if err := validateBeat(r.ID, r.YAML); err != nil {
-				return nil, err
+				fmt.Fprintf(os.Stderr, "%s: skipped: %v\n", filepath.Base(dir), err)
+				continue
 			}
 			bodies[r.ID] = strings.TrimRight(r.YAML, "\n") + "\n"
 		}
-		for _, id := range ids[i:end] {
-			if _, ok := bodies[id]; !ok {
-				return nil, fmt.Errorf("the model did not return %s", id)
-			}
+	}
+	if len(bodies) == 0 {
+		return nil, fmt.Errorf("none of the %d prose beats could be rewritten", len(ids))
+	}
+	var done []string
+	for _, id := range ids {
+		if _, ok := bodies[id]; ok {
+			done = append(done, id)
 		}
 	}
+	ids = done
 	if err := os.WriteFile(canonPath, []byte(spliceBeats(canon, bodies)), 0o644); err != nil {
 		return nil, err
 	}

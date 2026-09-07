@@ -150,6 +150,8 @@ const instructions = `Rewrite each item below as an item answered by a tap, keep
 - No ` + "`rubric`" + ` and no ` + "`check: llm`" + ` in the result.
 - Keep the mathematics and the notation of the original; keep the item at the same band and difficulty.
 
+In YAML, put LaTeX and anything with a backslash in a single-quoted string or a block scalar (|), never in double quotes, where a backslash is an escape and the file fails to parse.
+
 Return each rewritten item as one YAML list item starting with "- id: <id>" at zero indent with two-space fields, exactly as the schema in the contract shows, and nothing else in that string.`
 
 // questionsContract is the part of the authoring spec that governs the
@@ -215,15 +217,16 @@ func Rewrite(chain llm.Chain, dir, bankPath, specPath string, batch int) ([]stri
 		for _, r := range out.Items {
 			r.YAML = withChoiceCheck(r.YAML)
 			if err := validate(r.ID, r.YAML); err != nil {
-				return nil, err
+				// One bad item does not cost the unit the rest: it stays
+				// as it was, is reported, and a rerun finds it again.
+				fmt.Fprintf(os.Stderr, "%s: skipped: %v\n", filepath.Base(dir), err)
+				continue
 			}
 			replacements[r.ID] = strings.TrimRight(r.YAML, "\n") + "\n"
 		}
-		for _, it := range prose[i:end] {
-			if _, ok := replacements[it.ID]; !ok {
-				return nil, fmt.Errorf("the model did not return %s", it.ID)
-			}
-		}
+	}
+	if len(replacements) == 0 {
+		return nil, fmt.Errorf("none of the %d prose items could be rewritten", len(prose))
 	}
 	spliced, err := Splice(text, replacements)
 	if err != nil {
@@ -238,7 +241,9 @@ func Rewrite(chain llm.Chain, dir, bankPath, specPath string, batch int) ([]stri
 	}
 	var ids []string
 	for _, it := range prose {
-		ids = append(ids, it.ID)
+		if _, ok := replacements[it.ID]; ok {
+			ids = append(ids, it.ID)
+		}
 	}
 	return ids, nil
 }
