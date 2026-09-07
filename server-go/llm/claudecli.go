@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -114,8 +115,7 @@ func (c *ClaudeCLI) Structured(role, system, user string, schema map[string]any,
 		// word splitting, no globbing, no metacharacters. Building a command
 		// string and handing it to `sh -c` is what would make this dangerous.
 		argv := c.Command(role, prompt, system)
-		cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
-		stdout, err := cmd.Output()
+		stdout, err := run(ctx, argv)
 		cancel()
 
 		if ctx.Err() == context.DeadlineExceeded {
@@ -159,4 +159,22 @@ func tail(s string, n int) string {
 		return s
 	}
 	return s[len(s)-n:]
+}
+
+// cliEnv is the environment a CLI call runs with: the server's own, and
+// the CLI's update check and other non-essential traffic switched off.
+// The check shells out through an npm shim that never returns on the
+// sprite (see LESSONS), and four author calls once hung at startup on it.
+func cliEnv() []string {
+	return append(os.Environ(), "DISABLE_AUTOUPDATER=1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1")
+}
+
+// run executes one CLI call under ctx. When the deadline kills the
+// process, Wait must not then sit on the output pipe until every child
+// the CLI spawned has exited too: WaitDelay closes the pipe and returns.
+func run(ctx context.Context, argv []string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd.Env = cliEnv()
+	cmd.WaitDelay = 15 * time.Second
+	return cmd.Output()
 }

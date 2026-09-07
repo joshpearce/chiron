@@ -254,3 +254,14 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   markup mode PDFView's own text selection is off. The Simulator could not
   show this because the harness's stroke verb writes into the canvas
   directly; `DocumentUITests` now drags and long-presses through XCUITest.
+- **A timed-out CLI call took 108 minutes to return (2026-09-07).** Four
+  author calls hung at startup (no session file ever appeared; the CLI's
+  update check goes through the npm shim that never returns here), the
+  thirty-minute deadline killed them, and `cmd.Output()` then sat on the
+  output pipe until the children they had spawned let go. `run` now sets
+  `WaitDelay`, so Wait gives up on the pipe fifteen seconds after the
+  kill, and every call carries `DISABLE_AUTOUPDATER=1` and
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`. A unit that failed this
+  way is re-authored by running the same `chiron teach` again: files on
+  disk are kept, only the missing ones are written.
+

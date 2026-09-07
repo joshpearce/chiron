@@ -1,8 +1,10 @@
 package llm
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The case that matters is `--tools ""`. With the built-in tools enabled the
@@ -94,5 +96,30 @@ func TestUnmarshalLooseHandlesFencedJSON(t *testing.T) {
 func TestPlannerTimeoutCoversASyllabus(t *testing.T) {
 	if got, want := roleTimeouts["planner"], roleTimeouts["author"]; got < want {
 		t.Errorf("planner timeout %v is shorter than the author's %v; a syllabus is one call and needs the same room", got, want)
+	}
+}
+
+// A CLI process killed at the deadline may leave a child holding its
+// output pipe; the call must still return promptly rather than wait for
+// that child. Four author calls once took 108 minutes to time out at 30.
+func TestRunReturnsAtTheDeadlineDespiteAChildOnThePipe(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := run(ctx, []string{"sh", "-c", "sleep 30 & exec sleep 30"})
+	if err == nil {
+		t.Fatal("a killed call returned no error")
+	}
+	if took := time.Since(start); took > 20*time.Second {
+		t.Fatalf("run returned after %v; the child's pipe held it", took)
+	}
+}
+
+func TestCLICallsRunWithoutTheUpdater(t *testing.T) {
+	env := strings.Join(cliEnv(), "\n")
+	for _, want := range []string{"DISABLE_AUTOUPDATER=1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1"} {
+		if !strings.Contains(env, want) {
+			t.Errorf("env lacks %s", want)
+		}
 	}
 }
