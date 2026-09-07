@@ -327,7 +327,9 @@ func calibrationItems(unit *corpus.Unit, rating int) []corpus.Question {
 // must stay byte-identical to what buildChapter will produce once the
 // rating is recorded, or the cache keys will not line up.
 func (s *Server) prerenderCalibrationSets(sub *Subject, unit *corpus.Unit, checkSummary string) {
+	sub.setStage("planning")
 	d := roles.PlanDirectives(s.chain, sub.Learner, unit, checkSummary)
+	sub.setStage("writing")
 	sections, _ := roles.AuthorChapter(s.chain, unit, d, sub.Corpus)
 	var wg sync.WaitGroup
 	for rating := 1; rating <= 5; rating++ {
@@ -414,7 +416,9 @@ func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*rende
 			}
 		}
 	}
+	sub.setStage("planning")
 	d := roles.PlanDirectives(s.chain, sub.Learner, unit, checkSummary)
+	sub.setStage("writing")
 	sections, _ := roles.AuthorChapter(s.chain, unit, d, sub.Corpus)
 
 	var items []corpus.Question
@@ -628,6 +632,9 @@ func (s *Server) handleChapter(w http.ResponseWriter, r *http.Request) {
 		"chapter":         nil,
 		"authoring":       building,
 		"authoring_error": buildErr,
+	}
+	if stage, seconds := sub.buildProgress(); stage != "" {
+		out["authoring_stage"], out["authoring_seconds"] = stage, seconds
 	}
 	if ch, err := requestChapter(sub, r); err == nil {
 		out["chapter"] = ch
@@ -961,6 +968,7 @@ func (s *Server) buildAsync(sub *Subject, unitID, checkSummary string) {
 			sub.endBuild(err.Error())
 			return
 		}
+		sub.setStage("pages")
 		if _, err := sub.Pages.Render(ch); err != nil {
 			log.Printf("eager page render %s: %v", ch.Unit, err)
 		}

@@ -37,6 +37,10 @@ final class BookSession: ObservableObject {
 
     @Published var screen: Screen = .empty
     @Published var wait: Wait?
+    /// While the next chapter is being written: the server's stage and
+    /// when the build began, for the waiting screen.
+    @Published var authoringStage: String?
+    @Published var authoringSince: Date?
     @Published var chapter: ChapterPayload?
     @Published var bookState: BookState?
     @Published var lastResults: [GradeResult] = []
@@ -460,11 +464,15 @@ final class BookSession: ObservableObject {
                 return
             }
             if status.authoring {
+                authoringStage = status.authoringStage
+                authoringSince = Date().addingTimeInterval(-Double(status.authoringSeconds ?? 0))
                 try? await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
                 if Task.isCancelled { return }
                 continue
             }
             pendingAuthoring = nil
+            authoringStage = nil
+            authoringSince = nil
             if let err = status.authoringError, !err.isEmpty {
                 persist()
                 fail("Chapter authoring failed:\n\(err)") { [weak self] in await self?.start() }

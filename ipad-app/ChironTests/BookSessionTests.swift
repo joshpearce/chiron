@@ -523,6 +523,45 @@ final class BookSessionTests: XCTestCase {
         XCTAssertEqual(polls, 2)
     }
 
+    /// While the next chapter is being written the server says which stage
+    /// the build is at and for how long; the session keeps both for the
+    /// waiting screen, and drops them when the chapter arrives.
+    func testTheAuthoringWaitCarriesTheServersStage() async throws {
+        let json = #"{"chapter":null,"authoring":true,"authoring_error":"","authoring_stage":"writing","authoring_seconds":42}"#
+        let mid = try JSONDecoder().decode(ChapterStatus.self, from: Data(json.utf8))
+        XCTAssertEqual(mid.authoringStage, "writing")
+        XCTAssertEqual(mid.authoringSeconds, 42)
+
+        scriptFreshBook()
+        let s = session()
+        var polls = 0
+        var seenStage: String?
+        var seenSince: Date?
+        fake.onChapter = { [unowned self] _ in
+            // Nothing to say until a graded series has u1 authoring; then
+            // one poll mid-build, and the chapter on the next.
+            guard self.fake.exchanges.contains(where: { $0.checkResponses.count > 1 }) else {
+                return ChapterStatus(chapter: nil, authoring: false, authoringError: "")
+            }
+            polls += 1
+            if polls == 1 { return mid }
+            seenStage = s.authoringStage
+            seenSince = s.authoringSince
+            return self.fixture(ChapterStatus.self, "chapter")
+        }
+        await s.open()
+        await s.place(level: 3)
+        await s.submitCheck(s.chapter!.check.map {
+            ItemResponse(itemId: $0.id, response: nil, selectedIndex: nil, confidence: 1, idk: true)
+        })
+        await s.proceed()
+        guard case .reading = s.screen else { return XCTFail("\(s.screen)") }
+        XCTAssertEqual(seenStage, "writing", "the stage the first poll reported")
+        let since = try XCTUnwrap(seenSince)
+        XCTAssertEqual(Date().timeIntervalSince(since), 42, accuracy: 5, "the build started 42 s before the first poll")
+        XCTAssertNil(s.authoringStage, "cleared once the chapter arrived")
+    }
+
     func testACachedChapterTheServerDroppedIsWrittenAfresh() async {
         scriptFreshBook()
         var starts = 0

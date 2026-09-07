@@ -73,7 +73,7 @@ enum AppCommands {
             d.captureRequested = (args["text"] as? String) ?? ""
         case "pdf/tool":
             guard let d = library.document else { throw Failure.noBook }
-            guard let tool = (args["tool"] as? String).flatMap(DocumentSession.Tool.init(rawValue:)) else { throw Failure.badArguments("pdf/tool needs pen or eraser") }
+            guard let tool = (args["tool"] as? String).flatMap(DocumentSession.Tool.init(rawValue:)) else { throw Failure.badArguments("pdf/tool needs select, pen or eraser") }
             d.tool = tool
         case "pdf/stroke":
             // A stroke in page points, as a Pencil would leave it.
@@ -293,6 +293,7 @@ enum AppCommands {
         ]
         if let d = library.document {
             out["document"] = ["id": d.id, "title": d.title, "page": d.page, "pages": d.pages, "tool": d.tool.rawValue,
+                               "selection": d.selection,
                                "ink_pages": d.ink.filter { !$0.value.strokes.isEmpty }.keys.sorted(),
                                "ink_strokes": d.ink.values.reduce(0) { $0 + $1.strokes.count },
                                "overlaid_pages": d.overlaidPages.sorted()]
@@ -312,6 +313,7 @@ enum AppCommands {
             out["unit"] = s.chapter?.unit ?? ""
             out["items"] = s.chapter?.check.count ?? 0
             out["wait"] = s.wait?.rawValue ?? ""
+            out["authoring_stage"] = s.authoringStage ?? ""
             out["contents"] = s.contentsShown
             out["chrome_hidden"] = s.chromeHidden
             out["tool"] = s.tool.rawValue

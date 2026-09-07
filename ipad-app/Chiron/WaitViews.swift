@@ -21,30 +21,63 @@ struct WaitOverlay: View {
     }
 }
 
-/// The next chapter is being written. Static on purpose: the model takes
-/// minutes, and a spinner for minutes reads as a hang.
+/// The next chapter is being written. The server says which of its three
+/// stages it is at and when it began; the screen shows the stages ticked
+/// off and the time it has been at it, so minutes of waiting read as
+/// progress rather than a hang.
 struct AuthoringView: View {
-    @State private var long = false
+    @EnvironmentObject var session: BookSession
+
+    static let stages: [(id: String, label: String)] = [
+        ("planning", "Planning the chapter around your answers"),
+        ("writing", "Writing the sections"),
+        ("pages", "Laying out the pages"),
+    ]
 
     var body: some View {
-        VStack(spacing: 18) {
+        let current = Self.stages.firstIndex { $0.id == session.authoringStage } ?? 0
+        VStack(alignment: .leading, spacing: 18) {
             Text("The next chapter is being written.")
                 .font(Typography.display(30))
+                .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
-            Text(long
-                 ? "Still writing. This can take a few minutes; the book opens on it as soon as it is done."
-                 : "It is being shaped by what you just answered.")
-                .font(Typography.serif(20, relativeTo: .title3))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            ProgressView()
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(Array(Self.stages.enumerated()), id: \.offset) { i, stage in
+                    HStack(spacing: 12) {
+                        if i < current {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        } else if i == current {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "circle").foregroundStyle(.tertiary)
+                        }
+                        Text(stage.label)
+                            .font(Typography.serif(20, relativeTo: .title3))
+                            .foregroundStyle(i <= current ? .primary : .secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(stage.label): \(i < current ? "done" : i == current ? "in progress" : "to come")")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24)
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Text(elapsed(at: context.date))
+                    .font(Typography.sans(16, relativeTo: .callout))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .monospacedDigit()
+            }
         }
         .padding(40)
         .frame(maxWidth: 560)
-        .task {
-            try? await Task.sleep(nanoseconds: 60_000_000_000)
-            long = true
-        }
+    }
+
+    private func elapsed(at now: Date) -> String {
+        guard let since = session.authoringSince else { return "Starting" }
+        let s = max(0, Int(now.timeIntervalSince(since)))
+        let clock = String(format: "%d:%02d", s / 60, s % 60)
+        return s < 180 ? "\(clock) so far, usually two to four minutes" : "\(clock) so far, still writing"
     }
 }
 

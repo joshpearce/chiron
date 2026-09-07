@@ -22,8 +22,18 @@ final class DocumentSession: ObservableObject, Identifiable {
     var inkVersions: [Int: Int] = [:]
     private var dirtyInk: Set<Int> = []
     var onInk: ((Int) -> Void)?
-    enum Tool: String { case pen, eraser }
+    /// Select gives the page to PDFKit (text selection, links); pen and
+    /// eraser give it to the ink layer over the page.
+    enum Tool: String { case select, pen, eraser }
     @Published var tool: Tool = .pen
+    /// The text selected on the page, as the harness sees it.
+    @Published var selection = ""
+
+    /// The Pencil Pro's double-tap and squeeze: pen to eraser and back;
+    /// from select, to the pen.
+    func flipEraser() {
+        tool = tool == .pen ? .eraser : .pen
+    }
     /// Pages with a canvas laid over them, for the harness to see the
     /// overlays came up.
     var overlaidPages: Set<Int> = []
@@ -95,6 +105,10 @@ struct DocumentReaderView: View {
         NavigationStack {
             PDFKitView(doc: doc)
                 .ignoresSafeArea(edges: .bottom)
+                .onPencilDoubleTap { _ in doc.flipEraser() }
+                .onPencilSqueeze { phase in
+                    if case .ended = phase { doc.flipEraser() }
+                }
                 .navigationTitle(doc.title)
                 .toolbarTitleDisplayMode(.inline)
                 .toolbar {
@@ -105,6 +119,10 @@ struct DocumentReaderView: View {
                         .accessibilityLabel("Bookshelf")
                     }
                     ToolbarItemGroup(placement: .topBarTrailing) {
+                        Button { doc.tool = .select } label: { Label("Select", systemImage: "character.cursor.ibeam") }
+                            .tint(doc.tool == .select ? .accentColor : .secondary)
+                            .accessibilityLabel("Select")
+                            .accessibilityAddTraits(doc.tool == .select ? .isSelected : [])
                         Button { doc.tool = .pen } label: { Label("Pen", systemImage: "pencil.tip") }
                             .tint(doc.tool == .pen ? .accentColor : .secondary)
                             .accessibilityLabel("Pen")
@@ -149,10 +167,18 @@ struct PDFKitView: UIViewRepresentable {
         }
         NotificationCenter.default.addObserver(context.coordinator, selector: #selector(Coordinator.pageChanged),
                                                name: .PDFViewPageChanged, object: view)
+        NotificationCenter.default.addObserver(context.coordinator, selector: #selector(Coordinator.selectionChanged),
+                                               name: .PDFViewSelectionChanged, object: view)
+        view.isInMarkupMode = doc.tool != .select
         return view
     }
 
     func updateUIView(_ view: PDFView, context: Context) {
+        // Markup mode hands touches to the overlays; off, PDFKit keeps them
+        // for text selection. Without it the ink layer is never hit-tested
+        // and a Pencil stroke scrolls the page.
+        let markup = doc.tool != .select
+        if view.isInMarkupMode != markup { view.isInMarkupMode = markup }
         if let text = doc.captureRequested {
             // The harness's way of choosing the menu item: the selection
             // when there is one, else the text it gave.
@@ -212,6 +238,11 @@ struct PDFKitView: UIViewRepresentable {
             let index = document.index(for: page)
             Task { @MainActor in self.doc.turned(to: index, position: 0) }
         }
+
+        @objc func selectionChanged() {
+            let text = view?.currentSelection?.string ?? ""
+            Task { @MainActor in self.doc.selection = text }
+        }
     }
 }
 
@@ -234,7 +265,14 @@ final class InkOverlay: UIView, PKCanvasViewDelegate {
         isOpaque = false
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
+        // The canvas never scrolls: with its pan gesture off, a finger on
+        // the page reaches PDFKit's scroll view and scrolls the document.
+        canvas.isScrollEnabled = false
+        #if targetEnvironment(simulator)
+        canvas.drawingPolicy = .anyInput  // no Pencil in the Simulator
+        #else
         canvas.drawingPolicy = .pencilOnly
+        #endif
         canvas.delegate = self
         addSubview(canvas)
     }
@@ -259,6 +297,7 @@ final class InkOverlay: UIView, PKCanvasViewDelegate {
 
     func apply(tool: DocumentSession.Tool) {
         switch tool {
+        case .select: break  // the page is PDFKit's; the canvas is not hit-tested
         case .pen: canvas.tool = PKInkingTool(.pen, color: .label, width: 2.5)
         case .eraser: canvas.tool = PKEraserTool(.vector)
         }

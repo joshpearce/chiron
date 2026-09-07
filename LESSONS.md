@@ -245,3 +245,12 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   copy. It now treats that answer as "the server dropped it" and asks for
   the chapter afresh. The fingerprint also covers the beats, since a beat
   rewrite changes what a chapter bakes in as much as a bank rewrite does.
+- **PDFKit overlays are hit-tested only in markup mode (2026-09-07).**
+  A `PDFPageOverlayViewProvider` canvas came up and showed ink the
+  harness injected, but on the iPad a Pencil stroke scrolled the page and
+  a long press selected nothing: with `isInMarkupMode` false PDFView keeps
+  every gesture for itself, and the overlays never see a touch. Markup
+  mode is on for the pen and eraser, off for the select tool, since in
+  markup mode PDFView's own text selection is off. The Simulator could not
+  show this because the harness's stroke verb writes into the canvas
+  directly; `DocumentUITests` now drags and long-presses through XCUITest.

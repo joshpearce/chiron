@@ -445,10 +445,22 @@ struct ChapterStatus: Codable {
     let chapter: ChapterPayload?
     let authoring: Bool
     let authoringError: String?
+    /// While authoring: where the build is (planning, writing, pages) and
+    /// how many seconds ago it began.
+    let authoringStage: String?
+    let authoringSeconds: Int?
+
+    init(chapter: ChapterPayload?, authoring: Bool, authoringError: String?,
+         authoringStage: String? = nil, authoringSeconds: Int? = nil) {
+        self.chapter = chapter; self.authoring = authoring; self.authoringError = authoringError
+        self.authoringStage = authoringStage; self.authoringSeconds = authoringSeconds
+    }
 
     enum CodingKeys: String, CodingKey {
         case chapter, authoring
         case authoringError = "authoring_error"
+        case authoringStage = "authoring_stage"
+        case authoringSeconds = "authoring_seconds"
     }
 }
 

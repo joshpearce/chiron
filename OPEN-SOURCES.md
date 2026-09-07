@@ -576,9 +576,12 @@ checked date), `voice` (one line), `format`, and a `fetch` recipe naming a
 fetcher and its parameters (`github-raw` with repo, ref and path pattern;
 `openstax-rex` with book uuid; `libretexts` with the book URL; `mediawiki`
 with the site and page prefix; `ocw` with the course id; `gutenberg` with
-the ebook id; `pressbooks` with the network and book slug), plus a
-`contents` recipe for the table of contents and an `exercises` note from
-2d. Hand-curated, about 130 entries; a lint checks every A entry has a
+the ebook id; `pressbooks` with the network and book slug; `file` with
+the path of a PDF, Markdown or text file on the server's disk, for a
+book the reader owns a copy of and keeps beside the corpus: a PDF is
+read through pdftotext and split into chapters at the pages that open
+with "CHAPTER", a number and a title), plus a `contents` recipe for the
+table of contents and an `exercises` note from 2d. Hand-curated, about 130 entries; a lint checks every A entry has a
 fetch recipe and a licence URL.
 
 ### 6.2 Find

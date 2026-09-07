@@ -91,7 +91,10 @@ whose order the syllabus follows, the rest interleave), or write
 "starting from X, interleaving Y" in the brief, or name nothing and the
 builder searches its index and the open catalogues and picks a spine
 itself. The picks and their reasons are in the book's `sources.yaml`,
-and each chapter ends with what it was adapted from.
+and each chapter ends with what it was adapted from. A book the reader
+owns as a PDF is a source too: copy it to the sprite, add an index entry
+with `fetch: {kind: file, path: /home/sprite/chiron/sources/<name>.pdf}`
+and the licence it was read under, and name it with `-source`.
 
 ## Planning instead of a brief
 

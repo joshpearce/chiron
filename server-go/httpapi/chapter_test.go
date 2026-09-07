@@ -225,3 +225,35 @@ func TestAStoredChapterIsDroppedWhenItsBankChanges(t *testing.T) {
 		t.Fatal("the chapter was not rebuilt from the changed bank")
 	}
 }
+
+// While a chapter is being written, /chapter says which stage the build is
+// at and for how long it has run, so the reader sees movement rather than
+// a static line for minutes.
+func TestChapterStatusReportsBuildStage(t *testing.T) {
+	s := newServer(t, "")
+	sub, ok := s.subject("ai")
+	if !ok {
+		t.Fatal("no ai subject")
+	}
+	if !sub.beginBuild() {
+		t.Fatal("beginBuild refused a first build")
+	}
+	sub.setStage("writing")
+	var status struct {
+		Authoring bool   `json:"authoring"`
+		Stage     string `json:"authoring_stage"`
+		Seconds   int    `json:"authoring_seconds"`
+	}
+	w := do(t, s, "GET", "/chapter/ai", "", "")
+	if err := json.Unmarshal(w.Body.Bytes(), &status); err != nil {
+		t.Fatal(err)
+	}
+	if !status.Authoring || status.Stage != "writing" || status.Seconds < 0 {
+		t.Fatalf("mid-build status = %s", w.Body.String())
+	}
+	sub.endBuild("")
+	w = do(t, s, "GET", "/chapter/ai", "", "")
+	if strings.Contains(w.Body.String(), "authoring_stage") {
+		t.Fatalf("stage reported after the build: %s", w.Body.String())
+	}
+}

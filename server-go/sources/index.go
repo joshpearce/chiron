@@ -31,11 +31,13 @@ type Licence struct {
 
 // Recipe says how to reach a source: which fetcher, and what it needs.
 type Recipe struct {
-	// Kind: github, openstax, libretexts, mediawiki, ocw, gutenberg, pressbooks.
+	// Kind: github, openstax, libretexts, mediawiki, ocw, gutenberg,
+	// pressbooks, file.
 	Kind string `yaml:"kind" json:"kind"`
 	// Base overrides the fetcher's default host (tests point it at a fixture).
 	Base string `yaml:"base,omitempty" json:"base,omitempty"`
 	// github: Repo "owner/name", Ref, Path with {locator}, Dir to list.
+	// file: Path of a PDF, Markdown or text file on the server's disk.
 	Repo string `yaml:"repo,omitempty" json:"repo,omitempty"`
 	Ref  string `yaml:"ref,omitempty" json:"ref,omitempty"`
 	Path string `yaml:"path,omitempty" json:"path,omitempty"`
@@ -100,7 +102,7 @@ func LoadIndex(path string) (*Index, error) {
 
 var kinds = map[string]bool{
 	"github": true, "openstax": true, "libretexts": true, "mediawiki": true,
-	"ocw": true, "gutenberg": true, "pressbooks": true,
+	"ocw": true, "gutenberg": true, "pressbooks": true, "file": true,
 }
 
 // Lint is what every entry must satisfy before the builder trusts it: an
@@ -165,6 +167,10 @@ func (idx *Index) Lint() []string {
 			case "ocw":
 				if s.Fetch.Course == "" {
 					out = append(out, where+": ocw needs course")
+				}
+			case "file":
+				if s.Fetch.Path == "" {
+					out = append(out, where+": file needs path")
 				}
 			case "gutenberg":
 				if s.Fetch.ID == 0 {

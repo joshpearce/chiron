@@ -104,9 +104,11 @@ type Subject struct {
 
 	// Background authoring state: one build at a time per subject, with the
 	// failure kept for the pages meta to surface.
-	buildMu  sync.Mutex
-	building bool
-	buildErr string
+	buildMu    sync.Mutex
+	building   bool
+	buildErr   string
+	buildStage string
+	buildStart time.Time
 }
 
 func (sub *Subject) beginBuild() bool {
@@ -117,7 +119,27 @@ func (sub *Subject) beginBuild() bool {
 	}
 	sub.building = true
 	sub.buildErr = ""
+	sub.buildStage = "planning"
+	sub.buildStart = time.Now()
 	return true
+}
+
+// setStage names where the running build is: planning, writing, pages.
+func (sub *Subject) setStage(stage string) {
+	sub.buildMu.Lock()
+	sub.buildStage = stage
+	sub.buildMu.Unlock()
+}
+
+// buildProgress is the running build's stage and age in seconds, for the
+// status the reader polls while waiting.
+func (sub *Subject) buildProgress() (string, int) {
+	sub.buildMu.Lock()
+	defer sub.buildMu.Unlock()
+	if !sub.building {
+		return "", 0
+	}
+	return sub.buildStage, int(time.Since(sub.buildStart).Seconds())
 }
 
 func (sub *Subject) endBuild(err string) {

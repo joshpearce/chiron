@@ -74,6 +74,7 @@ var fetchers = map[string]fetcher{
 	"ocw":        ocwFetcher{},
 	"gutenberg":  gutenbergFetcher{},
 	"pressbooks": pressbooksFetcher{},
+	"file":       fileFetcher{},
 }
 
 // Client fetches, one request at a time per host with a pause between,

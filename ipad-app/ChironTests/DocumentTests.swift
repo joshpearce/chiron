@@ -191,4 +191,20 @@ final class DocumentInkTests: XCTestCase {
         XCTAssertEqual(doc.inkVersions[1], 6)
         XCTAssertNotNil(library.document)
     }
+
+    /// The Pencil Pro's double-tap and squeeze swap pen and eraser, and
+    /// from the select tool go to the pen; the select tool is reached only
+    /// from the toolbar.
+    func testPencilGesturesSwapPenAndEraser() {
+        let doc = DocumentSession(id: "d", title: "t", pages: 1, page: 0, position: 0, fileURL: URL(fileURLWithPath: "/dev/null"))
+        XCTAssertEqual(doc.tool, .pen, "a document opens ready to mark")
+        doc.flipEraser()
+        XCTAssertEqual(doc.tool, .eraser)
+        doc.flipEraser()
+        XCTAssertEqual(doc.tool, .pen)
+        doc.tool = .select
+        doc.flipEraser()
+        XCTAssertEqual(doc.tool, .pen)
+        XCTAssertEqual(DocumentSession.Tool(rawValue: "select"), .select, "the harness names it")
+    }
 }
