@@ -1,9 +1,10 @@
 // Command corpus-taps rewrites the prose-answered items of a unit's
 // question bank as items answered by a tap, then reports what changed.
 //
-//	corpus-taps [-model M] [-batch N] <unit dir> ...
+//	corpus-taps [-model M] [-batch N] [-beats] <unit dir> ...
 //
-// The corpus's misconception bank and authoring spec are read from the
+// With -beats the chapter's prose beats become choices, in canon.md and
+// every depth variant, instead of the question bank's items. The corpus's misconception bank and authoring spec are read from the
 // unit's corpus root (two directories up) unless -bank and -spec say
 // otherwise. The model runs through the claude CLI.
 package main
@@ -24,9 +25,10 @@ func main() {
 	batch := flag.Int("batch", 6, "items per model call")
 	bank := flag.String("bank", "", "misconception bank (default: <corpus>/misconception-bank.yaml)")
 	spec := flag.String("spec", "", "authoring spec (default: <corpus>/authoring-spec.md)")
+	beats := flag.Bool("beats", false, "rewrite the chapter's prose beats as choices instead of the question bank")
 	flag.Parse()
 	if flag.NArg() == 0 {
-		fmt.Fprintln(os.Stderr, "usage: corpus-taps [-model M] [-batch N] <unit dir> ...")
+		fmt.Fprintln(os.Stderr, "usage: corpus-taps [-model M] [-batch N] [-beats] <unit dir> ...")
 		os.Exit(2)
 	}
 	chain := llm.New(llm.FactoryConfig{Provider: "claude-cli", ClaudeCLIModel: *model})
@@ -41,7 +43,11 @@ func main() {
 		if s == "" {
 			s = filepath.Join(root, "authoring-spec.md")
 		}
-		ids, err := taps.Rewrite(chain, dir, b, s, *batch)
+		rewrite := taps.Rewrite
+		if *beats {
+			rewrite = taps.RewriteBeats
+		}
+		ids, err := rewrite(chain, dir, b, s, *batch)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %v\n", dir, err)
 			failed++

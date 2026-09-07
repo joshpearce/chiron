@@ -191,6 +191,12 @@ func (c *Corpus) loadUnit(spec UnitSpec) (*Unit, error) {
 		if err := yaml.Unmarshal(qraw, &u.Questions); err != nil {
 			return nil, fmt.Errorf("questions.yaml: %w", err)
 		}
+		for i := range u.Questions.Pretest {
+			u.Questions.Pretest[i].shuffleOptions()
+		}
+		for i := range u.Questions.Check {
+			u.Questions.Check[i].shuffleOptions()
+		}
 	}
 	if mraw, err := os.ReadFile(filepath.Join(udir, "misconceptions.yaml")); err == nil {
 		var local struct {
@@ -253,6 +259,7 @@ func parseSegments(body string) ([]Segment, error) {
 		if err := yaml.Unmarshal([]byte(raw), &b); err != nil {
 			return nil, fmt.Errorf("beat block: %w", err)
 		}
+		b.Options = Shuffled(b.ID, b.Options)
 		segs = append(segs, Segment{Type: "beat", Beat: b, raw: strings.TrimLeft(raw, "\n")})
 		cursor = m[1]
 	}

@@ -94,25 +94,33 @@ in canon-only sections with no depth-variant heading.
    concept: c-sdpa
    prompt: |
      We have scores $S = QK^T$. Before reading on: what goes wrong if we
-     softmax $S$ directly when $d_k = 512$, and what is the fix?
-   answer: |
-     Dot products grow with d_k (variance ~ d_k), pushing softmax into
-     saturated regions with near-zero gradients. Fix: divide by sqrt(d_k).
-   rubric: |
-     Must identify: (1) score magnitude grows with dimension, (2) softmax
-     saturates -> gradients vanish, (3) scale by sqrt(d_k). Any 2 of 3 = pass.
-     Mentioning "numerical overflow" alone = M7-style confusion, fail.
-   check: llm            # llm | exact | numeric(tolerance)
+     softmax $S$ directly when $d_k = 512$?
+   options:
+     - text: "The scores grow with $d_k$, softmax saturates and the gradients vanish; the fix is to divide by $\sqrt{d_k}$."
+       correct: true
+       explain: "Right. The variance of a dot product grows with the dimension, so the softmax input is pushed into its flat regions."
+     - text: "The exponentials overflow in floating point, so the fix is a lower-precision safe softmax."
+       misconception: M7
+       explain: "Overflow is real but is handled by subtracting the max; the scaling exists for the gradients, not the numerics."
+     - text: "Nothing: softmax is scale-invariant, so the size of the scores does not matter."
+       misconception: M2
+       explain: "Softmax is shift-invariant, not scale-invariant: multiplying every score by ten sharpens the distribution."
+   check: choice         # choice | exact | numeric(tolerance)
    ```
    ````
 
+   - **Every beat is answered by a tap (2026-09-06).** A `predict`,
+     `self-explain` or `completion` beat is a choice: `options` with exactly
+     one `correct`, an `explain` on every option, a misconception id on every
+     distractor, and `check: choice`. No beat is `check: llm`: nothing in the
+     book waits on a grader, and the reader is not asked to type prose
+     mid-chapter. Options are delivered in an order fixed by the beat's id,
+     so never write an option that refers to another option's position.
    - `compute` beats use `check: numeric(0.01)` or `exact` - the server grades
      them mechanically; `answer` must then be the bare number/string.
    - `completion` beats: include the full worked sequence in `prompt` with
-     2-3 steps replaced by `____`; blank the steps that carry the concept
-     being taught, and note in a comment which steps to blank in variants.
-   - Every `self-explain` beat MUST have a rubric (unadjudicated
-     self-explanation is worse than none).
+     2-3 steps replaced by `____`; the options are candidate fillings for the
+     blanks, one right; blank the steps that carry the concept being taught.
 3. **Fade sequences**: every mathematical procedure appears 3 times: fully
    worked in prose, as a `completion` beat, and as a solo item in
    questions.yaml. Mark the worked version with `<!-- fade: <procedure-name> -->`.
@@ -141,8 +149,7 @@ pretest:            # 2-3 items, EXPECTED to fail, calibration + pretesting effe
     concept: c-sdpa
     prompt: "..."
     answer: "..."
-    check: llm      # llm | exact | numeric(tol) | choice
-    rubric: "..."   # required when check: llm
+    check: exact    # exact | numeric(tol) | choice
 
 check:              # >=10 items so the server can compose an 8+ item check
   - id: u3-q1
@@ -152,11 +159,7 @@ check:              # >=10 items so the server can compose an 8+ item check
     callback_eligible: true   # may appear in later units' cumulative checks
     prompt: "..."
     answer: "..."
-    check: llm
-    rubric: |
-      ...explicit pass/fail criteria; list what a correct answer MUST contain,
-      what earns partial credit, and which misconception each characteristic
-      error indicates (cite bank IDs)...
+    check: numeric(0.01)
     difficulty: core    # warmup | core | stretch
     band: 3             # calibration units only: 1-5 on the screener's own scale
   - id: u3-q7
@@ -177,13 +180,16 @@ check:              # >=10 items so the server can compose an 8+ item check
 Rules:
 - Every distractor keyed to a misconception ID. No throwaway options. Every
   option gets an `explain` (feedback adjudicates each option, not just the right one).
-- **The mix (2026-09-06):** about half the check items are `kind: mcq`; of
-  the constructed items, most are answered with a number or a term
-  (`check: numeric(tol)` or `exact`); `check: llm` items, which the reader
-  answers in prose, are at most a fifth of the bank and only where
-  explaining or deriving is the skill being checked. A reader on a phone
-  answers by tapping; prose is the exception that has to earn its place.
-- Anything a program can check (`numeric`, `exact`, `choice`) must NOT use `check: llm`.
+- **The mix (2026-09-06):** about half the check items are `kind: mcq`; the
+  constructed items are answered with a number or a term (`check:
+  numeric(tol)` or `exact`). No item is `check: llm`: a reader on a phone
+  answers by tapping, nothing waits on a grader, and what a prose item
+  would have checked is asked as a choice whose distractors carry the
+  misconceptions the rubric would have diagnosed. `rubric` is therefore
+  never needed.
+- Options are delivered in an order fixed by the item's id (the correct
+  one is not first because it was written first), so never write an option
+  that refers to another option's position ("all of the above").
 - **Imported items (2026-09-06):** when a unit adapts a source whose
   exercises come with answers, the pipeline imports them first as items in
   this schema, each carrying `source: "<source id> <locator> exercise <n>"`.

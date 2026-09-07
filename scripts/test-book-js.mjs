@@ -49,5 +49,23 @@ for (const [check, expected, given, want, why] of cases) {
     console.error(`FAIL ${check} expected=${JSON.stringify(expected)} given=${JSON.stringify(given)} -> ${got}, wanted ${want} (${why})`);
   }
 }
-console.log(`${cases.length - failed}/${cases.length} book.js grading cases pass`);
+// A choice beat grades from its own options, the way checkers.CheckMCQ does.
+const options = [
+  { text: "scale by sqrt(d_k)", correct: true, explain: "Right." },
+  { text: "overflow", misconception: "M7", explain: "Numerics, not gradients." },
+];
+const choiceCases = [
+  [0, true, "Right.", "the correct option"],
+  [1, false, "Numerics, not gradients.", "a distractor's own reveal"],
+  [5, false, "no option selected", "out of range"],
+];
+for (const [index, correct, explain, label] of choiceCases) {
+  const g = sandbox.gradeChoice(options, index);
+  if (g.correct !== correct || g.explain !== explain || g.answer !== "scale by sqrt(d_k)") {
+    failed++;
+    console.log(`FAIL choice ${label}: ${JSON.stringify(g)}`);
+  }
+}
+const total = cases.length + choiceCases.length;
+console.log(`${total - failed}/${total} book.js grading cases pass`);
 process.exit(failed ? 1 : 0);

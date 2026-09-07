@@ -229,6 +229,7 @@ const BEAT_LABELS = {
 };
 
 function renderBeat(holder, beat) {
+  if (beat.options && beat.options.length) { renderChoiceBeat(holder, beat); return; }
   const mechanical = beat.check && beat.check !== "llm";
   const isCompute = beat.type === "compute";
   holder.innerHTML = `
@@ -275,6 +276,44 @@ function renderBeat(holder, beat) {
     }
     renderMathIn(reveal);
   });
+}
+
+/* A beat answered by a tap: one option is right, every other one carries
+ * the misconception it was written for, and the reveal adjudicates the
+ * option chosen, not just the right one. Graded here so reading works
+ * detached; the server grades the same choice again from the same options. */
+function renderChoiceBeat(holder, beat) {
+  holder.innerHTML = `
+    <div class="beat-label">${BEAT_LABELS[beat.type] || "Your turn"}</div>
+    <div class="beat-prompt">${mdLite(beat.prompt)}</div>
+    <div class="beat-options">${beat.options.map((o, i) =>
+      `<button class="option" data-i="${i}"><span class="letter">${String.fromCharCode(65 + i)}</span> ${mdLite(o.text)}</button>`).join("")}</div>
+    <div class="reveal" hidden></div>`;
+  renderMathIn(holder);
+  holder.querySelectorAll("button.option").forEach((b) =>
+    b.addEventListener("click", () => {
+      const i = Number(b.dataset.i);
+      holder.querySelectorAll("button.option").forEach((x) => (x.disabled = true));
+      b.classList.add("chosen");
+      const g = gradeChoice(beat.options, i);
+      const reveal = holder.querySelector(".reveal");
+      reveal.hidden = false;
+      reveal.innerHTML =
+        `<div class="${g.correct ? "verdict-ok" : "verdict-bad"}">${g.correct ? "Correct." : "Not quite."}</div>` +
+        (g.explain ? `<p>${mdLite(g.explain)}</p>` : "") +
+        (g.correct ? "" : `<p><strong>Answer:</strong> ${mdLite(g.answer)}</p>`);
+      renderMathIn(reveal);
+      finishBeat(holder, beat, beat.options[i].text, { selectedIndex: i, mechanicalVerdict: g.correct ? "pass" : "fail" });
+    })
+  );
+}
+
+/* Mirrors checkers.CheckMCQ: the chosen option's own verdict and reveal. */
+function gradeChoice(options, index) {
+  const chosen = options[index];
+  const right = options.find((o) => o.correct);
+  if (!chosen) return { correct: false, explain: "no option selected", answer: right ? right.text : "" };
+  return { correct: !!chosen.correct, explain: chosen.explain || "", answer: right ? right.text : "" };
 }
 
 function finishBeat(holder, beat, response, extra) {

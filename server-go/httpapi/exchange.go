@@ -29,6 +29,8 @@ type BeatResponse struct {
 	SelfVerdict string `json:"self_verdict,omitempty"`
 	// The JS-graded result for compute beats, graded offline while reading.
 	MechanicalVerdict string `json:"mechanical_verdict,omitempty"`
+	// The option tapped on a choice beat.
+	SelectedIndex *int `json:"selected_index,omitempty"`
 }
 
 type ItemResponse struct {
@@ -198,7 +200,14 @@ func (s *Server) gradeBeats(sub *Subject, responses []BeatResponse, results *[]R
 			check = "llm"
 		}
 		var g roles.Grade
-		if checkers.IsMechanical(check) {
+		if len(beat.Options) > 0 {
+			idx := -1
+			if r.SelectedIndex != nil {
+				idx = *r.SelectedIndex
+			}
+			m := checkers.CheckMCQ(beat.Options, idx)
+			g = roles.Grade{Verdict: m.Verdict, Misconceptions: m.Misconceptions, FeedbackMD: m.Explain}
+		} else if checkers.IsMechanical(check) {
 			ok, err := checkers.CheckAnswer(check, beat.Answer.String(), r.Response)
 			verdict := "fail"
 			if err != nil {

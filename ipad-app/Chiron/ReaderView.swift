@@ -409,7 +409,8 @@ struct ReaderView: UIViewRepresentable {
                     beatId: body["beatId"] as? String ?? "",
                     response: body["response"] as? String ?? "",
                     selfVerdict: body["selfVerdict"] as? String,
-                    mechanicalVerdict: body["mechanicalVerdict"] as? String)
+                    mechanicalVerdict: body["mechanicalVerdict"] as? String,
+                    selectedIndex: body["selectedIndex"] as? Int)
                 Task { @MainActor in self.session.recordBeat(r) }
             default:
                 break

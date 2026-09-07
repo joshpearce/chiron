@@ -62,7 +62,9 @@ func loadChapter(sub *Subject, unit string) (*render.Chapter, error) {
 	// The items were baked in when the chapter was built; a bank rewritten
 	// since (a corpus edit, a tap-only rewrite) makes the snapshot stale,
 	// and the next start builds the chapter from the bank as it is now.
-	if u, ok := sub.Corpus.Units[unit]; ok && ch.BankHash != "" && ch.BankHash != bankHash(u) {
+	// A chapter stored before banks were fingerprinted predates the
+	// option shuffle too, so its order and the server's no longer agree.
+	if u, ok := sub.Corpus.Units[unit]; ok && ch.BankHash != bankHash(u) {
 		return nil, errStaleChapter
 	}
 	return &ch, nil

@@ -160,12 +160,14 @@ struct BeatResponse: Codable {
     let response: String
     var selfVerdict: String?
     var mechanicalVerdict: String?
+    var selectedIndex: Int?
 
     enum CodingKeys: String, CodingKey {
         case beatId = "beat_id"
         case response
         case selfVerdict = "self_verdict"
         case mechanicalVerdict = "mechanical_verdict"
+        case selectedIndex = "selected_index"
     }
 }
 

@@ -112,6 +112,9 @@ type Beat struct {
 	Answer  Scalar `yaml:"answer" json:"answer,omitempty"`
 	Rubric  string `yaml:"rubric" json:"rubric,omitempty"`
 	Check   string `yaml:"check" json:"check,omitempty"`
+	// Options make a beat a choice, answered by a tap; reveals travel with
+	// the options, since a beat's reveal is a learning tool, not a secret.
+	Options []checkers.Option `yaml:"options,omitempty" json:"options,omitempty"`
 }
 
 // Misconception is a bank entry: a wrong model plus the specific prediction it

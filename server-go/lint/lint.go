@@ -198,9 +198,9 @@ func checkSpecConformance(u *corpus.Unit, r *Report) {
 			}
 		}
 	}
-	if len(checks) > 0 && float64(constructed)/float64(len(checks)) < 0.4 {
-		r.warnf(where, "%d/%d constructed; the spec wants about half, for response congruency",
-			constructed, len(checks))
+	if len(checks) > 0 && float64(constructed)/float64(len(checks)) < 0.2 {
+		r.warnf(where, "%d/%d constructed; a bank that is all choices never asks for a number "+
+			"or a term the reader has to produce", constructed, len(checks))
 	}
 	if len(checks) > 0 && float64(prose)/float64(len(checks)) > 0.2 {
 		r.warnf(where, "%d/%d check items are answered in prose (check: llm); the spec allows a fifth, "+
@@ -222,11 +222,19 @@ func checkSpecConformance(u *corpus.Unit, r *Report) {
 		r.warnf(where, "%d interaction beats, spec asks for 6-10 (step-based interaction "+
 			"is where the tutoring effect lives)", len(beats))
 	}
+	proseBeats := 0
 	for _, b := range beats {
-		if b.Type == "self-explain" && b.Rubric == "" {
+		if b.Type == "self-explain" && b.Rubric == "" && len(b.Options) == 0 {
 			r.errorf(u.ID+"/"+b.ID, "self-explain beat has no rubric - an unadjudicated "+
 				"self-explanation can entrench a wrong model")
 		}
+		if len(b.Options) == 0 && (b.Check == "" || b.Check == "llm") {
+			proseBeats++
+		}
+	}
+	if proseBeats > 0 {
+		r.warnf(where, "%d beats answered in prose; a beat is a choice (options) or a computed "+
+			"number or term, so the reader taps and nothing waits on a grader", proseBeats)
 	}
 }
 

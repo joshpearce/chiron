@@ -95,6 +95,8 @@ func extractBeats(markdown string, out *[]corpus.Beat) (string, error) {
 			err = fmt.Errorf("beat block: %w", e)
 			return ""
 		}
+		// The same order the grader will see: both parses shuffle by id.
+		b.Options = corpus.Shuffled(b.ID, b.Options)
 		*out = append(*out, b)
 		return fmt.Sprintf("\n<div class=\"beat\" data-beat-id=%q></div>\n", b.ID)
 	})
