@@ -29,10 +29,19 @@ final class DocumentSession: ObservableObject, Identifiable {
     /// The text selected on the page, as the harness sees it.
     @Published var selection = ""
 
-    /// The Pencil Pro's double-tap and squeeze: pen to eraser and back;
-    /// from select, to the pen.
+    /// The Pencil Pro's double-tap: pen to eraser and back; from select,
+    /// to the pen.
     func flipEraser() {
         tool = tool == .pen ? .eraser : .pen
+    }
+
+    /// The Pencil Pro's squeeze: round the three tools.
+    func nextTool() {
+        switch tool {
+        case .select: tool = .pen
+        case .pen: tool = .eraser
+        case .eraser: tool = .select
+        }
     }
     /// Pages with a canvas laid over them, for the harness to see the
     /// overlays came up.
@@ -107,7 +116,7 @@ struct DocumentReaderView: View {
                 .ignoresSafeArea(edges: .bottom)
                 .onPencilDoubleTap { _ in doc.flipEraser() }
                 .onPencilSqueeze { phase in
-                    if case .ended = phase { doc.flipEraser() }
+                    if case .ended = phase { doc.nextTool() }
                 }
                 .navigationTitle(doc.title)
                 .toolbarTitleDisplayMode(.inline)
@@ -170,6 +179,7 @@ struct PDFKitView: UIViewRepresentable {
         NotificationCenter.default.addObserver(context.coordinator, selector: #selector(Coordinator.selectionChanged),
                                                name: .PDFViewSelectionChanged, object: view)
         view.isInMarkupMode = doc.tool != .select
+        context.coordinator.installSelector(on: view)
         return view
     }
 
@@ -179,6 +189,7 @@ struct PDFKitView: UIViewRepresentable {
         // and a Pencil stroke scrolls the page.
         let markup = doc.tool != .select
         if view.isInMarkupMode != markup { view.isInMarkupMode = markup }
+        context.coordinator.selector.isEnabled = !markup
         if let text = doc.captureRequested {
             // The harness's way of choosing the menu item: the selection
             // when there is one, else the text it gave.
@@ -205,11 +216,73 @@ struct PDFKitView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(doc: doc) }
 
-    @MainActor final class Coordinator: NSObject, @preconcurrency PDFPageOverlayViewProvider {
+    @MainActor final class Coordinator: NSObject, @preconcurrency PDFPageOverlayViewProvider,
+                                        @preconcurrency UIGestureRecognizerDelegate, @preconcurrency UIEditMenuInteractionDelegate {
         let doc: DocumentSession
         weak var view: PDFView?
         var overlays: [Int: InkOverlay] = [:]
+        /// With the select tool up, a Pencil drag selects the text under
+        /// it, as the highlighter's drag does on a chapter page; a finger
+        /// keeps PDFKit's own long press and handles.
+        let selector = UIPanGestureRecognizer()
+        private var selectionStart: (page: PDFPage, point: CGPoint)?
+        private var menu: UIEditMenuInteraction?
         init(doc: DocumentSession) { self.doc = doc }
+
+        func installSelector(on view: PDFView) {
+            selector.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.pencil.rawValue)]
+            selector.maximumNumberOfTouches = 1
+            selector.delegate = self
+            selector.addTarget(self, action: #selector(selectPan(_:)))
+            selector.isEnabled = false
+            view.addGestureRecognizer(selector)
+            // The page scrolls only once the selector has declined the
+            // touch, which for a finger is at once.
+            if let scroll = view.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView {
+                scroll.panGestureRecognizer.require(toFail: selector)
+            }
+            let menu = UIEditMenuInteraction(delegate: self)
+            view.addInteraction(menu)
+            self.menu = menu
+        }
+
+        @objc private func selectPan(_ g: UIPanGestureRecognizer) {
+            guard let view, let document = view.document else { return }
+            let location = g.location(in: view)
+            guard let page = view.page(for: location, nearest: true) else { return }
+            let point = view.convert(location, to: page)
+            switch g.state {
+            case .began:
+                selectionStart = (page, point)
+                view.clearSelection()
+            case .changed, .ended:
+                guard let start = selectionStart else { return }
+                let selection = document.selection(from: start.page, at: start.point, to: page, at: point)
+                view.setCurrentSelection(selection, animate: false)
+                doc.selection = selection?.string ?? ""
+                if g.state == .ended, let selection, !(selection.string ?? "").isEmpty {
+                    menu?.presentEditMenu(with: UIEditMenuConfiguration(identifier: nil, sourcePoint: location))
+                }
+            default:
+                break
+            }
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { false }
+
+        func editMenuInteraction(_ interaction: UIEditMenuInteraction, menuFor configuration: UIEditMenuConfiguration,
+                                 suggestedActions: [UIMenuElement]) -> UIMenu? {
+            guard let view = view as? DocumentPDFView, let selection = view.currentSelection,
+                  let text = selection.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            let page = selection.pages.first.flatMap { view.document?.index(for: $0) } ?? 0
+            let copy = UIAction(title: "Copy", image: UIImage(systemName: "doc.on.doc")) { _ in UIPasteboard.general.string = text }
+            let send = UIAction(title: "Send to Chiron", image: UIImage(systemName: "text.badge.plus")) { [weak view] _ in
+                view?.onCapture?(text, page)
+                view?.clearSelection()
+            }
+            return UIMenu(children: [send, copy])
+        }
 
         // One canvas per page, made when the page comes into view and kept,
         // so scrolling back does not rebuild the strokes.
@@ -299,7 +372,7 @@ final class InkOverlay: UIView, PKCanvasViewDelegate {
         switch tool {
         case .select: break  // the page is PDFKit's; the canvas is not hit-tested
         case .pen: canvas.tool = PKInkingTool(.pen, color: .label, width: 2.5)
-        case .eraser: canvas.tool = PKEraserTool(.vector)
+        case .eraser: canvas.tool = PKEraserTool(.bitmap, width: 24)  // rubs out what it covers, not whole strokes
         }
     }
 

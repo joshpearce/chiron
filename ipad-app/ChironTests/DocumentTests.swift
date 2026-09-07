@@ -206,5 +206,12 @@ final class DocumentInkTests: XCTestCase {
         doc.flipEraser()
         XCTAssertEqual(doc.tool, .pen)
         XCTAssertEqual(DocumentSession.Tool(rawValue: "select"), .select, "the harness names it")
+        // The squeeze goes round all three, select included.
+        doc.nextTool()
+        XCTAssertEqual(doc.tool, .eraser)
+        doc.nextTool()
+        XCTAssertEqual(doc.tool, .select)
+        doc.nextTool()
+        XCTAssertEqual(doc.tool, .pen)
     }
 }
