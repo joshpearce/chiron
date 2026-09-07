@@ -224,3 +224,18 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   next open rebuilds it; chapters stored before the hash existed are kept
   as they are, so after rewriting a bank by hand, move the unit's stored
   chapter aside (`~/backups/...`) for any unit in progress.
+- **The correct option was always A (2026-09-06).** Authors, human and
+  model, write the right option first. Options are now shuffled at load
+  in an order fixed by the item's id (`corpus.Shuffled`), in both places
+  a beat is parsed (the corpus loader and the renderer), so delivery and
+  grading agree without the files changing; the screener keeps its
+  authored novice-to-expert order. Never write an option that refers to
+  another's position.
+- **Models put LaTeX in double-quoted YAML (2026-09-06).** `"\sqrt{d}"`
+  is an unknown escape and the whole block fails to parse. The rewrite
+  prompts now say single quotes or a block scalar; the tools skip the one
+  bad item and report it, so a rerun picks it up.
+- **zsh does not word-split `$var` (2026-09-06).** `for d in "a b c"; do
+  set -- $d` leaves `$1` as the whole string; the device install loop
+  built nothing and `devicectl` complained about a missing path. Use
+  `${=d}` or write the commands out.
