@@ -186,3 +186,42 @@ func TestGradedExchangeCarriesTheResultsDoc(t *testing.T) {
 		t.Error("the screener answer produced a results_doc")
 	}
 }
+
+// A stored chapter is a snapshot of the unit with its items baked in.
+// When the unit's question bank changes underneath it (a rewrite of the
+// corpus), the snapshot is stale: the chapter endpoint reports none and
+// the next start builds the chapter from the bank as it is now.
+func TestAStoredChapterIsDroppedWhenItsBankChanges(t *testing.T) {
+	s := newServer(t, "")
+	w := do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start","unit":"u0"}`, "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("start: %d %s", w.Code, w.Body)
+	}
+	chapter := func() json.RawMessage {
+		w := do(t, s, "GET", "/chapter/ai", "", "")
+		var status struct {
+			Chapter json.RawMessage `json:"chapter"`
+		}
+		json.Unmarshal(w.Body.Bytes(), &status)
+		return status.Chapter
+	}
+	if string(chapter()) == "null" {
+		t.Fatal("no stored chapter after start")
+	}
+	sub, _ := s.subject("ai")
+	unit := sub.Corpus.Units["u0"]
+	if len(unit.Questions.Check) == 0 {
+		t.Fatal("u0 has no check items to change")
+	}
+	unit.Questions.Check[0].Prompt = "A rewritten prompt."
+	if got := chapter(); string(got) != "null" {
+		t.Fatalf("a chapter built from the old bank is still served: %.120s", got)
+	}
+	w = do(t, s, "POST", "/exchange", `{"subject":"ai","phase":"start","unit":"u0"}`, "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("restart: %d %s", w.Code, w.Body)
+	}
+	if got := chapter(); string(got) == "null" {
+		t.Fatal("the chapter was not rebuilt from the changed bank")
+	}
+}

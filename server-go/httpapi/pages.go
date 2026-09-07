@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,8 +11,10 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/mjbraun/chiron/server/corpus"
 	"github.com/mjbraun/chiron/server/pages"
 	"github.com/mjbraun/chiron/server/render"
+	"gopkg.in/yaml.v3"
 )
 
 // Chapters are delivered inside exchange responses and normally live only on
@@ -32,6 +36,9 @@ func persistChapter(sub *Subject, ch *render.Chapter) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
+	if u, ok := sub.Corpus.Units[ch.Unit]; ok {
+		ch.BankHash = bankHash(u)
+	}
 	data, err := json.Marshal(ch)
 	if err != nil {
 		return err
@@ -52,7 +59,25 @@ func loadChapter(sub *Subject, unit string) (*render.Chapter, error) {
 	if err := json.Unmarshal(data, &ch); err != nil {
 		return nil, err
 	}
+	// The items were baked in when the chapter was built; a bank rewritten
+	// since (a corpus edit, a tap-only rewrite) makes the snapshot stale,
+	// and the next start builds the chapter from the bank as it is now.
+	if u, ok := sub.Corpus.Units[unit]; ok && ch.BankHash != "" && ch.BankHash != bankHash(u) {
+		return nil, errStaleChapter
+	}
 	return &ch, nil
+}
+
+var errStaleChapter = errors.New("stored chapter was built from an earlier question bank")
+
+// bankHash fingerprints a unit's question bank.
+func bankHash(u *corpus.Unit) string {
+	data, err := yaml.Marshal(u.Questions)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:8])
 }
 
 // currentChapter returns the persisted chapter for the learner's active unit.

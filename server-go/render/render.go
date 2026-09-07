@@ -145,6 +145,9 @@ type Chapter struct {
 	NextAction  string        `json:"next_action"`
 	// Sources are the attribution lines for the open texts the unit adapts.
 	Sources []string `json:"sources,omitempty"`
+	// BankHash fingerprints the question bank the items came from, so a
+	// stored chapter is known stale when the corpus is rewritten under it.
+	BankHash string `json:"bank_hash,omitempty"`
 }
 
 func RenderChapter(u *corpus.Unit, sections []AssembledSection, d Directives,

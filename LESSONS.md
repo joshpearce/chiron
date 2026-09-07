@@ -214,3 +214,13 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   with no error. Set the provider first. And a test that returns a
   `Library` from a helper and drops it (`let (_, doc) = ...`) silently
   loses every `[weak self]` push: keep the library bound until the end.
+- **A stored chapter is a snapshot with its items baked in
+  (2026-09-06).** The server keeps `state/<subject>/chapters/<unit>.json`
+  from the moment a unit is first opened and serves it on every open
+  until the unit is cleared, so rewriting `questions.yaml` changed
+  nothing on the iPad for a unit already begun (the Agent Auth intake
+  kept its prose items). Chapters now carry `bank_hash`, a fingerprint of
+  the bank they were built from, and a mismatch drops the snapshot so the
+  next open rebuilds it; chapters stored before the hash existed are kept
+  as they are, so after rewriting a bank by hand, move the unit's stored
+  chapter aside (`~/backups/...`) for any unit in progress.
