@@ -3,7 +3,9 @@ package httpapi
 import (
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/mjbraun/chiron/server/generate"
 	"github.com/mjbraun/chiron/server/sources"
@@ -28,7 +30,7 @@ func (s *Server) generate(slug, title, brief string, named []string, planOnly bo
 		Chain:    s.chain,
 		SpecPath: filepath.Join(parent, "corpus", "authoring-spec.md"),
 		OutDir:   outDir,
-		Workers:  4,
+		Workers:  authorWorkers(),
 	}
 	// The open sources the book may be built from. A missing or broken
 	// index is logged, and the book is written from the brief alone.
@@ -73,4 +75,14 @@ func (s *Server) generate(slug, title, brief string, named []string, planOnly bo
 		}
 	}
 	fail("generated corpus did not load")
+}
+
+// authorWorkers is how many units are authored at once: four, or
+// CHIRON_AUTHOR_WORKERS, so a run can be narrowed to one call at a time
+// when the model calls are being watched.
+func authorWorkers() int {
+	if n, err := strconv.Atoi(os.Getenv("CHIRON_AUTHOR_WORKERS")); err == nil && n > 0 {
+		return n
+	}
+	return 4
 }

@@ -1,11 +1,15 @@
 package llm
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -115,12 +119,16 @@ func (c *ClaudeCLI) Structured(role, system, user string, schema map[string]any,
 		// word splitting, no globbing, no metacharacters. Building a command
 		// string and handing it to `sh -c` is what would make this dangerous.
 		argv := c.Command(role, prompt, system)
+		started := time.Now()
 		stdout, err := run(ctx, argv)
 		cancel()
+		took := time.Since(started).Round(time.Second)
 
 		if ctx.Err() == context.DeadlineExceeded {
-			return Errorf("claude-cli: timed out (%s)", role)
+			log.Printf("claude-cli %s: %d KB prompt, timed out after %v: %v", role, len(prompt)/1024, took, err)
+			return Errorf("claude-cli: timed out (%s) after %v", role, took)
 		}
+		log.Printf("claude-cli %s: %d KB prompt, %d KB reply in %v", role, len(prompt)/1024, len(stdout)/1024, took)
 		if err != nil {
 			// With --output-format json the CLI reports the cause on stdout,
 			// so stderr alone leaves a bare "exit 1".
@@ -169,12 +177,26 @@ func cliEnv() []string {
 	return append(os.Environ(), "DISABLE_AUTOUPDATER=1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1")
 }
 
-// run executes one CLI call under ctx. When the deadline kills the
-// process, Wait must not then sit on the output pipe until every child
-// the CLI spawned has exited too: WaitDelay closes the pipe and returns.
+// run executes one CLI call under ctx, in its own process group so the
+// deadline kills the CLI's children with it (an orphan otherwise keeps
+// the API call, and the output pipe, alive). WaitDelay then bounds how
+// long Wait sits on that pipe. Stderr is kept: on a timeout it is the
+// only record of what the CLI was doing (a 529 it kept retrying, say).
 func run(ctx context.Context, argv []string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Env = cliEnv()
 	cmd.WaitDelay = 15 * time.Second
-	return cmd.Output()
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) == 0 {
+			ee.Stderr = stderr.Bytes()
+		} else if ctx.Err() != nil {
+			err = fmt.Errorf("%w; stderr: %s", err, tail(strings.TrimSpace(stderr.String()), 300))
+		}
+	}
+	return out, err
 }

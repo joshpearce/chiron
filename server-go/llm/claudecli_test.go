@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -121,5 +122,18 @@ func TestCLICallsRunWithoutTheUpdater(t *testing.T) {
 		if !strings.Contains(env, want) {
 			t.Errorf("env lacks %s", want)
 		}
+	}
+}
+
+// The deadline kills the CLI's children too: a background process the
+// CLI left behind does not outlive the call.
+func TestRunKillsTheWholeProcessGroup(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	_, _ = run(ctx, []string{"sh", "-c", "sleep 31.7 & exec sleep 31.7"})
+	time.Sleep(200 * time.Millisecond)
+	if out, _ := exec.Command("pgrep", "-f", "sleep 31.7").Output(); len(strings.TrimSpace(string(out))) > 0 {
+		exec.Command("pkill", "-f", "sleep 31.7").Run()
+		t.Fatalf("a child survived the deadline: pids %s", out)
 	}
 }
