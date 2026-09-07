@@ -737,3 +737,20 @@ humanities brief. Step 5 is open.
 
 Guardrails throughout: rules 1 to 10 of section 4, one fetch at a time
 per host, and nothing behind a bot wall.
+
+Status 2026-09-07: a `file` source kind reads a PDF the reader owns from
+the sprite's disk (pdftotext, chapters split at the pages that open with
+"CHAPTER", a number and a title), and `chiron teach -plan-only` writes
+the syllabus and stops so the plan can be cut before a unit is authored.
+The first such book, Private Debt for Norm Capital, was planned at 21
+units, merged by hand to 17 plus placement, and authored from there.
+
+Next, agreed 2026-09-07 but not started: **a book appears after its
+first unit or two, and the rest is authored ahead of the reader.** Today
+`generate` registers the subject only once every unit is on disk, so the
+whole book's budget is spent before a page is read. The change: register
+after u0 and u1, keep authoring in the background in syllabus order, and
+have the reader's next-unit request wait on the unit if it is not there
+yet (the chapter wait screen already shows a stage). Worth doing when
+more books are started than finished.
+
