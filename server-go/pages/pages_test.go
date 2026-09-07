@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mjbraun/chiron/server/checkers"
 	"github.com/mjbraun/chiron/server/corpus"
 	"github.com/mjbraun/chiron/server/render"
 )
@@ -148,6 +149,11 @@ func TestBeatInjection(t *testing.T) {
 	}
 	if contains(html, `data-beat-id="x1"></div><p>after`) {
 		t.Fatalf("placeholder left behind: %s", html)
+	}
+	choice := injectBeats(`<div class="beat" data-beat-id="x2"></div>`,
+		[]corpus.Beat{{ID: "x2", Type: "predict", Prompt: "Which?", Options: []checkers.Option{{Text: "this", Correct: true}, {Text: "that"}}}})
+	if !contains(choice, `<span class="letter">A</span> this`) || !contains(choice, `<span class="letter">B</span> that`) || !contains(choice, `beat-ink short`) {
+		t.Fatalf("options not printed: %s", choice)
 	}
 }
 

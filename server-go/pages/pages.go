@@ -485,6 +485,17 @@ func injectBeats(doc string, beats []corpus.Beat) string {
 		if b.Type == "self-explain" {
 			label = "Explain in your own words"
 		}
+		// A choice beat prints its options as lettered rows to mark, with a
+		// short ink strip; a prose or compute beat prints writing room.
+		if len(b.Options) > 0 {
+			var rows strings.Builder
+			for i, o := range b.Options {
+				fmt.Fprintf(&rows, `<div class="beat-option"><span class="letter">%c</span> %s</div>`, 'A'+i, o.Text)
+			}
+			return `<div class="beat-box"><div class="beat-label">` +
+				html.EscapeString(label) + `</div><div class="beat-prompt">` +
+				b.Prompt + `</div><div class="beat-options">` + rows.String() + `</div><div class="beat-ink short"></div></div>`
+		}
 		return `<div class="beat-box"><div class="beat-label">` +
 			html.EscapeString(label) + `</div><div class="beat-prompt">` +
 			b.Prompt + `</div><div class="beat-ink"></div></div>`
@@ -703,6 +714,10 @@ blockquote p, .planner-note p { font-size: 32px; line-height: 48px; text-align: 
 .beat-label { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase; color: #444; margin-bottom: 22px; }
 .beat-prompt { font-size: 32px; line-height: 48px; }
 .beat-ink { border-top: 2px dotted #999; margin-top: 20px; height: 280px; }
+.beat-ink.short { height: 120px; }
+.beat-options { margin-top: 16px; }
+.beat-option { font-size: 30px; line-height: 44px; margin: 10px 0; padding-left: 64px; text-indent: -64px; }
+.beat-option .letter { display: inline-block; width: 48px; height: 48px; line-height: 44px; text-align: center; border: 2px solid #000; border-radius: 50%; margin-right: 12px; text-indent: 0; font-weight: 600; }
 .item-num { font-weight: 700; margin-right: 14px; }
 .item-prompt { font-size: 34px; line-height: 50px; text-align: left; hyphens: none; max-width: none; }
 .mcq { list-style: none; padding: 0; margin: 14px 0 0 0; }
