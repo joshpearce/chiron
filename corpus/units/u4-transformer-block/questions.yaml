@@ -105,7 +105,7 @@ check:
       $W^Q, W^K, W^V, W^O$ are each $d \times d$. How many parameters does the
       attention sublayer hold at $h = 64$? Give the number.
     answer: "67108864"
-    check: numeric(0)
+    check: exact
     difficulty: warmup
 
   - id: u4-q2

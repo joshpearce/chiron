@@ -112,17 +112,16 @@ func TestRealCorpusLintsClean(t *testing.T) {
 	for _, e := range r.Errors {
 		t.Errorf("corpus error: %s", e)
 	}
-	// The tap-only rules (2026-09-06) warn on this book's own calibration
-	// bank and prose-heavy checks until those are reworked; the other
-	// warnings are the 2 known large-integer ones.
+	// Banks rewritten to taps are mostly choices, which the constructed
+	// count remarks on; the other warnings are the 2 known large-integer ones.
 	other := 0
 	for _, w := range r.Warnings {
-		if !strings.Contains(w, "prose") && !strings.Contains(w, "taps") {
+		if !strings.Contains(w, "constructed") {
 			other++
 		}
 	}
 	if other != 2 {
-		t.Errorf("%d warnings beyond the tap-only ones, expected the 2 known large-integer ones: %v",
+		t.Errorf("%d warnings beyond the constructed ones, expected the 2 known large-integer ones: %v",
 			other, r.Warnings)
 	}
 }
@@ -138,7 +137,7 @@ func TestProseInPlacementIsFlagged(t *testing.T) {
 		}}}
 	r := &Report{}
 	checkTapOnly(u, r)
-	joined := strings.Join(r.Warnings, "\n")
+	joined := strings.Join(r.Errors, "\n")
 	if !strings.Contains(joined, "u0/p1") || strings.Contains(joined, "u0/p2") {
 		t.Errorf("pretest findings wrong:\n%s", joined)
 	}

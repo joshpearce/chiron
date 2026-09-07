@@ -202,9 +202,9 @@ func checkSpecConformance(u *corpus.Unit, r *Report) {
 		r.warnf(where, "%d/%d constructed; a bank that is all choices never asks for a number "+
 			"or a term the reader has to produce", constructed, len(checks))
 	}
-	if len(checks) > 0 && float64(prose)/float64(len(checks)) > 0.2 {
-		r.warnf(where, "%d/%d check items are answered in prose (check: llm); the spec allows a fifth, "+
-			"the rest should be mcq, numeric or exact so the reader taps", prose, len(checks))
+	if prose > 0 {
+		r.errorf(where, "%d/%d check items are answered in prose (check: llm); every item is mcq, "+
+			"numeric or exact, so the reader taps and nothing waits on a grader", prose, len(checks))
 	}
 	checkTapOnly(u, r)
 	eligible := 0
@@ -233,7 +233,7 @@ func checkSpecConformance(u *corpus.Unit, r *Report) {
 		}
 	}
 	if proseBeats > 0 {
-		r.warnf(where, "%d beats answered in prose; a beat is a choice (options) or a computed "+
+		r.errorf(where, "%d beats answered in prose; a beat is a choice (options) or a computed "+
 			"number or term, so the reader taps and nothing waits on a grader", proseBeats)
 	}
 }
@@ -384,7 +384,7 @@ func checkTapOnly(u *corpus.Unit, r *Report) {
 	}
 	for _, q := range u.Questions.Pretest {
 		if prose(q) {
-			r.warnf(u.ID+"/"+q.ID, "pretest item answered in prose; pretests are taps (choice, numeric or exact)")
+			r.errorf(u.ID+"/"+q.ID, "pretest item answered in prose; pretests are taps (choice, numeric or exact)")
 		}
 	}
 	if u.IsCalibration() {
@@ -395,7 +395,7 @@ func checkTapOnly(u *corpus.Unit, r *Report) {
 			}
 		}
 		if n > 0 {
-			r.warnf(u.ID, "%d prose items in a calibration unit; placement is answered by taps, "+
+			r.errorf(u.ID, "%d prose items in a calibration unit; placement is answered by taps, "+
 				"so every item should be mcq, numeric or exact", n)
 		}
 	}
