@@ -239,3 +239,9 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   set -- $d` leaves `$1` as the whole string; the device install loop
   built nothing and `devicectl` complained about a missing path. Use
   `${=d}` or write the commands out.
+- **A dropped chapter snapshot did not reach the iPad (2026-09-06).**
+  The app keeps its own copy of the chapter for reading detached and, with
+  the server reachable but answering "no chapter, not writing", showed the
+  copy. It now treats that answer as "the server dropped it" and asks for
+  the chapter afresh. The fingerprint also covers the beats, since a beat
+  rewrite changes what a chapter bakes in as much as a bank rewrite does.
