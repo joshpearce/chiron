@@ -43,10 +43,11 @@ struct CaptureCard: View {
                             .frame(maxHeight: 220)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
+                    // The reader's to edit wherever it came from: a PDF
+                    // selection picks up a running header or drops a word.
                     TextEditor(text: $capture.text)
                         .font(Typography.serif(16))
                         .frame(minHeight: 120, maxHeight: 260)
-                        .disabled(fromElsewhere && !capture.text.isEmpty)
                 } header: {
                     Text(capture.imagePNG != nil && capture.text.isEmpty ? "Captured image" : "Captured text")
                 } footer: {

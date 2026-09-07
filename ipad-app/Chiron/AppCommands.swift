@@ -75,6 +75,14 @@ enum AppCommands {
             guard let d = library.document else { throw Failure.noBook }
             guard let tool = (args["tool"] as? String).flatMap(DocumentSession.Tool.init(rawValue:)) else { throw Failure.badArguments("pdf/tool needs select, pen or eraser") }
             d.tool = tool
+        case "pdf/select":
+            // A Pencil drag under the select tool, from one page point to another.
+            guard let d = library.document else { throw Failure.noBook }
+            guard let page = args["page"] as? Int, let from = args["from"] as? [Double], let to = args["to"] as? [Double],
+                  from.count == 2, to.count == 2 else {
+                throw Failure.badArguments("pdf/select needs page, from [x,y] and to [x,y]")
+            }
+            d.selectRequested = DocumentSession.SelectRequest(page: page, from: CGPoint(x: from[0], y: from[1]), to: CGPoint(x: to[0], y: to[1]))
         case "pdf/stroke":
             // A stroke in page points, as a Pencil would leave it.
             guard let d = library.document else { throw Failure.noBook }
@@ -294,6 +302,7 @@ enum AppCommands {
         if let d = library.document {
             out["document"] = ["id": d.id, "title": d.title, "page": d.page, "pages": d.pages, "tool": d.tool.rawValue,
                                "selection": d.selection,
+                               "highlight": d.highlightProbe,
                                "ink_pages": d.ink.filter { !$0.value.strokes.isEmpty }.keys.sorted(),
                                "ink_strokes": d.ink.values.reduce(0) { $0 + $1.strokes.count },
                                "overlaid_pages": d.overlaidPages.sorted()]

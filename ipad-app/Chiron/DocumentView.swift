@@ -15,6 +15,14 @@ final class DocumentSession: ObservableObject, Identifiable {
     /// A page the app asked the view to show (the harness, a link).
     @Published var requestedPage: Int?
     @Published var captureRequested: String?
+    /// The harness's way of dragging the Pencil under the select tool:
+    /// a selection from one point to another, in page points.
+    @Published var selectRequested: SelectRequest?
+    struct SelectRequest {
+        let id = UUID()
+        let page: Int
+        let from, to: CGPoint
+    }
     var onTurn: ((Int, Double) -> Void)?
     /// Ink per page, in the page's own points, with the version the server
     /// last gave for each and the pages drawn on since.
@@ -28,6 +36,9 @@ final class DocumentSession: ObservableObject, Identifiable {
     @Published var tool: Tool = .pen
     /// The text selected on the page, as the harness sees it.
     @Published var selection = ""
+    #if DEBUG
+    var highlightProbe = ""
+    #endif
 
     /// The Pencil Pro's double-tap: pen to eraser and back; from select,
     /// to the pen.
@@ -206,6 +217,14 @@ struct PDFKitView: UIViewRepresentable {
             // shows on the page it belongs to.
             if let latest = doc.ink[index], latest != overlay.canonical { overlay.show(latest) }
         }
+        // Selecting publishes the selection, which brings this update round
+        // again while the request is still set: each request runs once.
+        if let req = doc.selectRequested, req.id != context.coordinator.handledSelect,
+           let page = view.document?.page(at: req.page) {
+            context.coordinator.handledSelect = req.id
+            context.coordinator.select(from: (page, req.from), to: (page, req.to), at: view.convert(req.to, from: page), ended: true)
+            DispatchQueue.main.async { doc.selectRequested = nil }
+        }
         if let wanted = doc.requestedPage {
             if let page = view.document?.page(at: wanted), view.currentPage != page {
                 view.go(to: page)
@@ -227,6 +246,7 @@ struct PDFKitView: UIViewRepresentable {
         let selector = UIPanGestureRecognizer()
         private var selectionStart: (page: PDFPage, point: CGPoint)?
         private var menu: UIEditMenuInteraction?
+        var handledSelect: UUID?
         init(doc: DocumentSession) { self.doc = doc }
 
         func installSelector(on view: PDFView) {
@@ -257,14 +277,26 @@ struct PDFKitView: UIViewRepresentable {
                 view.clearSelection()
             case .changed, .ended:
                 guard let start = selectionStart else { return }
-                let selection = document.selection(from: start.page, at: start.point, to: page, at: point)
-                view.setCurrentSelection(selection, animate: false)
-                doc.selection = selection?.string ?? ""
-                if g.state == .ended, let selection, !(selection.string ?? "").isEmpty {
-                    menu?.presentEditMenu(with: UIEditMenuConfiguration(identifier: nil, sourcePoint: location))
-                }
+                select(from: start, to: (page, point), at: location, ended: g.state == .ended)
             default:
                 break
+            }
+        }
+
+        /// Select the text between two page points, show it, and when the
+        /// drag has ended offer the menu at the view point it ended on.
+        func select(from start: (page: PDFPage, point: CGPoint), to end: (page: PDFPage, point: CGPoint),
+                    at location: CGPoint, ended: Bool) {
+            guard let view, let document = view.document else { return }
+            let selection = document.selection(from: start.page, at: start.point, to: end.page, at: end.point)
+            view.setCurrentSelection(selection, animate: false)
+            // PDFKit draws nothing for a selection set in code, so the
+            // page's overlay paints it, and moves with the page.
+            ownSelection = selection
+            paint(selection)
+            doc.selection = selection?.string ?? ""
+            if ended, let selection, !(selection.string ?? "").isEmpty {
+                menu?.presentEditMenu(with: UIEditMenuConfiguration(identifier: nil, sourcePoint: location))
             }
         }
 
@@ -314,7 +346,47 @@ struct PDFKitView: UIViewRepresentable {
 
         @objc func selectionChanged() {
             let text = view?.currentSelection?.string ?? ""
-            Task { @MainActor in self.doc.selection = text }
+            Task { @MainActor in
+                self.doc.selection = text
+                // PDFKit's own selection (a finger's long press) or none:
+                // the painted one is stale.
+                // PDFView keeps its own copy of the selection, so the two
+                // are compared by their text, not their identity.
+                if self.view?.currentSelection?.string != self.ownSelection?.string {
+                    self.ownSelection = nil
+                    self.paint(nil)
+                }
+            }
+        }
+
+        private var ownSelection: PDFSelection?
+
+        /// Paint the selection's lines on the overlays of the pages it
+        /// touches, and clear every other page's.
+        private func paint(_ selection: PDFSelection?) {
+            guard let document = view?.document else { return }
+            var byPage: [Int: [CGRect]] = [:]
+            let lines = selection?.selectionsByLine() ?? []
+            for line in lines {
+                for page in line.pages {
+                    byPage[document.index(for: page), default: []].append(line.bounds(for: page))
+                }
+            }
+            if byPage.isEmpty, let selection {
+                // No line breakdown for this selection: the block it spans.
+                for page in selection.pages {
+                    byPage[document.index(for: page), default: []].append(selection.bounds(for: page))
+                }
+            }
+            #if DEBUG
+            doc.highlightProbe = "lines \(lines.count) pages \(selection?.pages.count ?? -1) "
+            #endif
+            for (index, overlay) in overlays {
+                overlay.highlight(byPage[index] ?? [])
+            }
+            #if DEBUG
+            doc.highlightProbe += "\(byPage) on overlays \(overlays.keys.sorted()); " + (overlays.values.map(\.highlightProbe).joined(separator: " | "))
+            #endif
         }
     }
 }
@@ -325,6 +397,10 @@ struct PDFKitView: UIViewRepresentable {
 final class InkOverlay: UIView, PKCanvasViewDelegate {
     let canvas = PKCanvasView()
     let pageSize: CGSize
+    /// The selected lines, painted under the ink; in page points like
+    /// the ink, so a zoom moves them with the page.
+    private let selected = CAShapeLayer()
+    private var selectedRects: [CGRect] = []
     private(set) var canonical: PKDrawing
     var onChange: ((PKDrawing) -> Void)?
     private var shownAt: CGFloat = 0
@@ -348,6 +424,24 @@ final class InkOverlay: UIView, PKCanvasViewDelegate {
         #endif
         canvas.delegate = self
         addSubview(canvas)
+        selected.fillColor = UIColor.systemYellow.withAlphaComponent(0.45).cgColor
+        layer.addSublayer(selected)  // over the ink: the wash shows either way
+    }
+
+    #if DEBUG
+    /// What the overlay was last asked to paint, for the harness.
+    var highlightProbe: String { "\(selectedRects.count) rects at scale \(scale), first \(selectedRects.first.map { "\($0)" } ?? "-")" }
+    #endif
+
+    /// Rectangles in the page's own coordinates (origin bottom left).
+    func highlight(_ rects: [CGRect]) {
+        selectedRects = rects
+        let path = CGMutablePath()
+        for r in rects {
+            path.addRect(CGRect(x: r.minX * scale, y: (pageSize.height - r.maxY) * scale,
+                                width: r.width * scale, height: r.height * scale))
+        }
+        selected.path = rects.isEmpty ? nil : path
     }
 
     required init?(coder: NSCoder) { nil }
@@ -357,7 +451,11 @@ final class InkOverlay: UIView, PKCanvasViewDelegate {
     override func layoutSubviews() {
         super.layoutSubviews()
         canvas.frame = bounds
-        if shownAt != scale { show(canonical) }
+        selected.frame = bounds
+        if shownAt != scale {
+            show(canonical)
+            highlight(selectedRects)
+        }
     }
 
     func show(_ drawing: PKDrawing) {
