@@ -523,6 +523,28 @@ final class BookSessionTests: XCTestCase {
         XCTAssertEqual(polls, 2)
     }
 
+    func testACachedChapterTheServerDroppedIsWrittenAfresh() async {
+        scriptFreshBook()
+        var starts = 0
+        fake.onExchange = { [unowned self] req in
+            if req.phase == "start" { starts += 1 }
+            return self.deliversU1()
+        }
+        let s = session()
+        await s.open()
+        XCTAssertEqual(s.chapter?.unit, "u1")
+        XCTAssertEqual(starts, 1)
+
+        // The server dropped its snapshot (the unit's bank was rewritten)
+        // and is not writing: the cache is stale too, and a start rebuilds.
+        fake.onChapter = { _ in ChapterStatus(chapter: nil, authoring: false, authoringError: "") }
+        let s2 = session()
+        await s2.open()
+        guard case .reading = s2.screen else { return XCTFail("\(s2.screen)") }
+        XCTAssertEqual(starts, 2, "the reopen asked the server to write the chapter again")
+        XCTAssertEqual(s2.chapter?.unit, "u1")
+    }
+
     func testMarksAndInkBelongToTheChapterAndSurviveRelaunch() async {
         scriptFreshBook()
         fake.onExchange = { [unowned self] _ in self.deliversU1() }

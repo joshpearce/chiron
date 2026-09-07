@@ -142,6 +142,11 @@ enum AppCommands {
             guard let text = args["text"] as? String else { throw Failure.badArguments("shell/type needs text") }
             library.shell.send(text: text)
             try? await Task.sleep(nanoseconds: 300_000_000)
+        case "reader/eval":
+            // Development only: a line of JavaScript against the open page,
+            // for scrolling to a beat or tapping an option in a walk.
+            guard let s = library.session, let js = args["js"] as? String else { throw Failure.badArguments("reader/eval needs js") }
+            return ["result": await s.page?.eval(js) ?? ""]
         case "mark/rect":
             guard let s = library.session, let id = args["id"] as? String else { throw Failure.badArguments("mark/rect needs id") }
             guard let r = await s.page?.rect(of: id) else { return ["found": false] }

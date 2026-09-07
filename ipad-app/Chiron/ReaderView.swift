@@ -369,6 +369,14 @@ struct ReaderView: UIViewRepresentable {
             return CGRect(x: x + o.x, y: y + o.y, width: w, height: h)
         }
 
+        /// The harness's window into the page: run a line of JavaScript and
+        /// read back what it evaluates to.
+        func eval(_ js: String) async -> String {
+            guard let web, pageReady else { return "" }
+            let out = try? await web.evaluateJavaScript(js)
+            return out.map { String(describing: $0) } ?? ""
+        }
+
         func find(_ text: String) async -> (start: Int, end: Int, text: String)? {
             guard let web, pageReady else { return nil }
             let escaped = text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")

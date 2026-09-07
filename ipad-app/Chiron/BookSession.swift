@@ -206,6 +206,11 @@ final class BookSession: ObservableObject {
                       chapter == nil || fresh.unit != chapter?.unit || fresh.html != chapter?.html {
                 setChapter(fresh)
                 persist()
+            } else if status.chapter == nil, !status.authoring, chapter != nil {
+                // The server dropped its copy (the unit's bank or beats were
+                // rewritten under it): the cache is just as stale, and the
+                // start below has the server write the chapter afresh.
+                chapter = nil
             }
         }
         // The wait clears before anything below runs an exchange: an
@@ -926,4 +931,6 @@ protocol PageBridge: AnyObject {
     func find(_ text: String) async -> (start: Int, end: Int, text: String)?
     /// Where a mark's badge is drawn, in the page view's coordinates.
     func rect(of markID: String) async -> CGRect?
+    /// A line of JavaScript against the page, for the harness.
+    func eval(_ js: String) async -> String
 }
