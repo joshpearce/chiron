@@ -22,6 +22,7 @@ import Network
 ///   POST /close              close the ask card (the mark and its badge stay)
 ///   POST /delete             delete the question in hand with its highlight
 ///   POST /mark/rect {id}     where a mark's badge is, in page-view points
+///   POST /undo               take back the last mark or stroke (pdf/undo for a document)
 ///   POST /answer {mode}      answer every item of the current chapter:
 ///                            correct | idk | wrong | mixed (default correct;
 ///                            mixed inks one item, passes on one, types the rest)

@@ -82,6 +82,17 @@ struct Palette: View {
                         toolButton(tool, symbol, label)
                     }
                 }
+                Button {
+                    session.undo()
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 18, weight: .medium))
+                        .frame(width: 26, height: 26)
+                }
+                .buttonStyle(.glass)
+                .glassEffectID("undo", in: palette)
+                .disabled(!session.canUndo)
+                .accessibilityLabel("Undo")
             }
         }
         .onChange(of: session.tool) { choosingColour = false }

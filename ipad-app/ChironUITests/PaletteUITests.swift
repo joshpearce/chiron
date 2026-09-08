@@ -108,6 +108,23 @@ final class InkUITests: XCTestCase {
         wait(for: [done], timeout: 30)
     }
 
+    /// Where a mark's badge is, in the page view's points.
+    private func rectOf(_ id: String) throws -> CGRect {
+        var req = URLRequest(url: harness.appendingPathComponent("mark/rect"))
+        req.httpMethod = "POST"
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["id": id])
+        var out: [String: Any] = [:]
+        let done = expectation(description: "mark/rect")
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            out = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 30)
+        XCTAssertEqual(out["found"] as? Bool, true, "the mark is on the page: \(out)")
+        return CGRect(x: out["x"] as? Double ?? 0, y: out["y"] as? Double ?? 0,
+                      width: out["width"] as? Double ?? 0, height: out["height"] as? Double ?? 0)
+    }
+
     func testFingersScrollDrawAndHighlightOverThePage() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -119,6 +136,10 @@ final class InkUITests: XCTestCase {
         try post("open", ["subject": "ai"])
         XCTAssertTrue(app.buttons["Pen"].waitForExistence(timeout: 15))
         Thread.sleep(forTimeInterval: 2)
+        // Start clean: any marks from an earlier run go.
+        for m in (try state()["marks"] as? [[String: Any]]) ?? [] {
+            if let id = m["id"] as? String { try post("unmark", ["id": id]) }
+        }
 
         // With the pen up, a finger drag draws (no Pencil in the Simulator).
         try post("tool", ["tool": "pen"])
@@ -142,6 +163,49 @@ final class InkUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.0)
         let marks = try state()["marks"] as? [[String: Any]] ?? []
         XCTAssertTrue(marks.contains { $0["kind"] as? String == "highlight" }, "a highlight from the drag: \(marks)")
+
+        // Undo takes the highlight back, then the stroke.
+        let undo = app.buttons["Undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 5))
+        undo.tap()
+        Thread.sleep(forTimeInterval: 0.7)
+        var s = try state()
+        XCTAssertFalse((s["marks"] as? [[String: Any]] ?? []).contains { $0["kind"] as? String == "highlight" }, "the highlight came back off")
+        XCTAssertEqual(s["ink_strokes"] as? Int, strokesBefore + 1, "the ink stayed")
+        undo.tap()
+        Thread.sleep(forTimeInterval: 0.7)
+        XCTAssertEqual(try state()["ink_strokes"] as? Int, strokesBefore, "then the stroke went")
+
+        // With no tool, a tap on a highlight offers to remove it.
+        try post("tool", ["tool": "none"])
+        try post("mark", ["text": "predict the next token", "kind": "highlight"])
+        Thread.sleep(forTimeInterval: 0.5)
+        s = try state()
+        let highlight = try XCTUnwrap((s["marks"] as? [[String: Any]])?.first { $0["kind"] as? String == "highlight" }?["id"] as? String)
+        var rect = try rectOf(highlight)
+        page.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: rect.midX, dy: rect.midY)).tap()
+        let remove = app.buttons["Remove highlight"]
+        if !remove.waitForExistence(timeout: 5) {
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.lifetime = .keepAlways
+            add(shot)
+            XCTFail("the tap at \(rect) asked about the highlight; state \(try state())")
+        }
+        remove.tap()
+        Thread.sleep(forTimeInterval: 0.7)
+        XCTAssertFalse((try state()["marks"] as? [[String: Any]] ?? []).contains { $0["id"] as? String == highlight }, "the highlight went")
+
+        // The eraser over a highlight takes it off too.
+        try post("mark", ["text": "predict the next token", "kind": "highlight"])
+        Thread.sleep(forTimeInterval: 0.5)
+        let again = try XCTUnwrap((try state()["marks"] as? [[String: Any]])?.first { $0["kind"] as? String == "highlight" }?["id"] as? String)
+        try post("tool", ["tool": "eraser"])
+        Thread.sleep(forTimeInterval: 0.5)
+        rect = try rectOf(again)
+        page.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: rect.midX, dy: rect.midY)).tap()
+        Thread.sleep(forTimeInterval: 0.7)
+        XCTAssertFalse((try state()["marks"] as? [[String: Any]] ?? []).contains { $0["id"] as? String == again }, "the eraser rubbed the highlight out")
+
         // With no tool, a finger swipe scrolls the page.
         try post("tool", ["tool": "none"])
         Thread.sleep(forTimeInterval: 0.5)

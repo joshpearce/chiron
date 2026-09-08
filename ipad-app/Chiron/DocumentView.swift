@@ -30,6 +30,9 @@ final class DocumentSession: ObservableObject, Identifiable {
     var inkVersions: [Int: Int] = [:]
     private var dirtyInk: Set<Int> = []
     var onInk: ((Int) -> Void)?
+    /// A page's ink as it was before each stroke, the latest last.
+    @Published private(set) var undoable: [(page: Int, before: PKDrawing)] = []
+    var canUndo: Bool { !undoable.isEmpty }
     /// Select gives the page to PDFKit (text selection, links); pen and
     /// eraser give it to the ink layer over the page.
     enum Tool: String { case select, pen, eraser }
@@ -98,9 +101,19 @@ final class DocumentSession: ObservableObject, Identifiable {
 
     /// The reader drew on a page.
     func drew(on page: Int, _ drawing: PKDrawing) {
+        undoable.append((page, ink[page] ?? PKDrawing()))
+        if undoable.count > 50 { undoable.removeFirst() }
         ink[page] = drawing
         dirtyInk.insert(page)
         onInk?(page)
+    }
+
+    /// Take back the last stroke, on whichever page it was.
+    func undo() {
+        guard let last = undoable.popLast() else { return }
+        ink[last.page] = last.before
+        dirtyInk.insert(last.page)
+        onInk?(last.page)
     }
 
     /// The other device's ink on this page lies over ours.
@@ -138,6 +151,12 @@ struct DocumentReaderView: View {
                         }
                         .accessibilityLabel("Bookshelf")
                     }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { doc.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
+                            .disabled(!doc.canUndo)
+                            .accessibilityLabel("Undo")
+                    }
+                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button { doc.tool = .select } label: { Label("Select", systemImage: "character.cursor.ibeam") }
                             .tint(doc.tool == .select ? .accentColor : .secondary)

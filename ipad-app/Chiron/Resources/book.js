@@ -77,8 +77,18 @@ function markRect(id) {
   const last = document.querySelector(`mark[data-id="${id}"][data-last="1"]`)
     || document.querySelector(`mark[data-id="${id}"]`);
   if (!last) return null;
-  const r = last.getBoundingClientRect();
+  // A mark that wraps is one element over two lines; its badge sits on
+  // the last line, and the box of both lines together is mostly prose.
+  const boxes = last.getClientRects();
+  const r = boxes.length ? boxes[boxes.length - 1] : last.getBoundingClientRect();
   return { x: r.left, y: r.top, width: r.width, height: r.height };
+}
+
+/* The mark under a point of the page, for the eraser. */
+function markAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const m = el && el.closest("mark.mark");
+  return m && m.dataset.id !== "preview" ? m.dataset.id : null;
 }
 
 document.addEventListener("click", (e) => {

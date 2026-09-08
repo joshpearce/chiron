@@ -83,6 +83,9 @@ enum AppCommands {
                 throw Failure.badArguments("pdf/select needs page, from [x,y] and to [x,y]")
             }
             d.selectRequested = DocumentSession.SelectRequest(page: page, from: CGPoint(x: from[0], y: from[1]), to: CGPoint(x: to[0], y: to[1]))
+        case "pdf/undo":
+            guard let d = library.document else { throw Failure.noBook }
+            d.undo()
         case "pdf/stroke":
             // A stroke in page points, as a Pencil would leave it.
             guard let d = library.document else { throw Failure.noBook }
@@ -226,6 +229,8 @@ enum AppCommands {
         case "unmark":
             guard let id = args["id"] as? String else { throw Failure.badArguments("unmark needs id") }
             session.removeMark(id)
+        case "undo":
+            session.undo()
         case "answer":
             guard let ch = session.chapter else { throw Failure.noBook }
             await session.submitCheck(answers(for: ch, mode: args["mode"] as? String ?? "correct", llm: llm))
@@ -305,6 +310,7 @@ enum AppCommands {
                                "highlight": d.highlightProbe,
                                "ink_pages": d.ink.filter { !$0.value.strokes.isEmpty }.keys.sorted(),
                                "ink_strokes": d.ink.values.reduce(0) { $0 + $1.strokes.count },
+                               "can_undo": d.canUndo,
                                "overlaid_pages": d.overlaidPages.sorted()]
         }
         if let p = library.planning {
@@ -328,6 +334,8 @@ enum AppCommands {
             out["tool"] = s.tool.rawValue
             out["pen_color"] = s.penColor.rawValue
             out["ink_strokes"] = s.inkData.flatMap { try? PKDrawing(data: $0) }?.strokes.count ?? 0
+            out["can_undo"] = s.canUndo
+            out["removing"] = s.removing?.mark.id ?? ""
             out["position"] = s.chapter.map { s.position(for: $0.unit) } ?? 0
             #if DEBUG
             out["canvas_pen"] = ReaderView.Coordinator.probe?.canvasPen ?? ""

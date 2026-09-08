@@ -20,6 +20,24 @@ struct ReaderContainer: View {
         // the card stay within the safe area.
         ReaderView(chapter: chapter)
             .ignoresSafeArea()
+            // A tapped highlight asks before it goes, beside the highlight;
+            // a question has its card.
+            .popover(isPresented: Binding(
+                get: { session.removing != nil },
+                set: { if !$0 { session.removing = nil } }),
+                attachmentAnchor: .rect(.rect(session.removing?.at ?? .zero)), arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(session.removing?.mark.text ?? "")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                    Button("Remove highlight", role: .destructive) { session.removeMarkInHand() }
+                        .buttonStyle(.bordered)
+                }
+                .padding(16)
+                .frame(maxWidth: 320, alignment: .leading)
+                .presentationCompactAdaptation(.popover)
+            }
             .overlay(alignment: compact ? .bottomTrailing : .trailing) {
                 Palette()
                     .padding(.trailing, 10)
@@ -181,6 +199,7 @@ struct ReaderView: UIViewRepresentable {
             canvas.contentInsetAdjustmentBehavior = .never
             canvas.delegate = self
             canvas.isUserInteractionEnabled = false
+            canvas.onTouch = { [weak self] touch in self?.eraserTouched(touch) }
             canvas.translatesAutoresizingMaskIntoConstraints = false
             web.addSubview(canvas)
             NSLayoutConstraint.activate([
@@ -305,6 +324,17 @@ struct ReaderView: UIViewRepresentable {
 
         // MARK: marks
 
+        /// The eraser over a highlight takes it off, as it takes ink off.
+        private func eraserTouched(_ touch: UITouch) {
+            guard appliedTool == .eraser, let web else { return }
+            let o = pageOrigin
+            let p = touch.location(in: web)
+            web.evaluateJavaScript("markAt(\(p.x - o.x), \(p.y - o.y))") { [weak self] result, _ in
+                guard let self, let id = result as? String else { return }
+                Task { @MainActor in self.session.erase(markID: id) }
+            }
+        }
+
         func apply(marks: [Mark]) {
             guard pageReady, marks != appliedMarks else { return }
             appliedMarks = marks
@@ -360,13 +390,18 @@ struct ReaderView: UIViewRepresentable {
 
         /// Where a mark's badge is on screen, in the web view's coordinates.
         func rect(of markID: String) async -> CGRect? {
+            guard let r = await pageRect(of: markID) else { return nil }
+            let o = pageOrigin
+            return r.offsetBy(dx: o.x, dy: o.y)
+        }
+
+        func pageRect(of markID: String) async -> CGRect? {
             guard let web, pageReady else { return nil }
             let escaped = markID.replacingOccurrences(of: "'", with: "\\'")
             guard let r = try? await web.evaluateJavaScript("markRect('\(escaped)')") as? [String: Any],
                   let x = r["x"] as? Double, let y = r["y"] as? Double,
                   let w = r["width"] as? Double, let h = r["height"] as? Double else { return nil }
-            let o = pageOrigin
-            return CGRect(x: x + o.x, y: y + o.y, width: w, height: h)
+            return CGRect(x: x, y: y, width: w, height: h)
         }
 
         /// The harness's window into the page: run a line of JavaScript and
@@ -410,7 +445,7 @@ struct ReaderView: UIViewRepresentable {
                 Task { @MainActor in self.session.toggleChrome() }
             case "mark":
                 if let id = body["id"] as? String {
-                    Task { @MainActor in self.session.openMark(id) }
+                    Task { @MainActor in await self.session.openMark(id) }
                 }
             case "beat":
                 let r = BeatResponse(
@@ -432,12 +467,17 @@ struct ReaderView: UIViewRepresentable {
 
 /// The ink layer over the page.
 final class PageInkCanvas: PKCanvasView {
+    /// Every touch that lands on the ink, for the eraser to look under.
+    var onTouch: ((UITouch) -> Void)?
     #if DEBUG
     /// Touches that reached the canvas, for the harness.
     private(set) var touchesSeen = 0
+    #endif
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        #if DEBUG
         touchesSeen += touches.count
+        #endif
+        touches.forEach { onTouch?($0) }
         super.touchesBegan(touches, with: event)
     }
-    #endif
 }

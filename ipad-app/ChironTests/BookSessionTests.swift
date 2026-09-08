@@ -618,6 +618,68 @@ final class BookSessionTests: XCTestCase {
         XCTAssertEqual(s3.marks.count, 2, "a question on a highlighted span is its own mark")
     }
 
+    func testUndoTakesBackTheLastMarkOrStroke() async {
+        scriptFreshBook()
+        fake.onExchange = { [unowned self] _ in self.deliversU1() }
+        let s = session()
+        await s.open()
+        XCTAssertFalse(s.canUndo)
+        s.addMark(kind: .highlight, start: 10, end: 40, text: "a model trained to do nothing")
+        s.saveInk(Data([1]))
+        s.saveInk(Data([1, 2]))
+        XCTAssertTrue(s.canUndo)
+        s.undo()
+        XCTAssertEqual(s.inkData, Data([1]), "the last stroke goes")
+        s.undo()
+        XCTAssertNil(s.inkData, "then the first")
+        XCTAssertEqual(s.marks.count, 1)
+        s.undo()
+        XCTAssertTrue(s.marks.isEmpty, "then the highlight")
+        XCTAssertFalse(s.canUndo)
+        s.undo()
+        XCTAssertTrue(s.marks.isEmpty, "nothing left to take back")
+
+        // A mark already removed is not in the history; reopening the
+        // chapter forgets the history.
+        let m = s.addMark(kind: .highlight, start: 50, end: 60, text: "trained")
+        s.removeMark(m.id)
+        XCTAssertFalse(s.canUndo)
+        s.addMark(kind: .highlight, start: 50, end: 60, text: "trained")
+        s.setChapterForTesting(fixture(ChapterStatus.self, "chapter").chapter!)
+        XCTAssertEqual(s.marks.count, 1, "the mark is kept")
+        XCTAssertFalse(s.canUndo)
+    }
+
+    func testAHighlightComesOffByATapOrTheEraser() async {
+        scriptFreshBook()
+        fake.onExchange = { [unowned self] _ in self.deliversU1() }
+        let s = session()
+        await s.open()
+        let h = s.addMark(kind: .highlight, start: 10, end: 40, text: "a model trained to do nothing")
+        let q = s.addMark(kind: .question, start: 50, end: 60, text: "trained")
+        s.asking = nil
+        // A tap on a highlight offers to remove it; on a question it
+        // reopens the card.
+        await s.openMark(h.id)
+        XCTAssertEqual(s.removing?.mark.id, h.id)
+        XCTAssertNil(s.asking)
+        s.removing = nil
+        XCTAssertEqual(s.marks.count, 2, "kept")
+        await s.openMark(h.id)
+        s.removeMarkInHand()
+        XCTAssertEqual(s.marks.map(\.id), [q.id])
+        XCTAssertNil(s.removing)
+        await s.openMark(q.id)
+        XCTAssertNil(s.removing)
+        XCTAssertEqual(s.asking?.mark.id, q.id)
+        // The eraser takes a highlight off as it takes ink off; a question
+        // is deleted from its card, not rubbed out.
+        let h2 = s.addMark(kind: .highlight, start: 70, end: 80, text: "nothing")
+        s.erase(markID: q.id)
+        s.erase(markID: h2.id)
+        XCTAssertEqual(s.marks.map(\.id), [q.id])
+    }
+
     func testAskingSendsThePassageAndKeepsTheAnswerOnTheMark() async {
         scriptFreshBook()
         fake.onExchange = { [unowned self] _ in self.deliversU1() }
@@ -647,7 +709,7 @@ final class BookSessionTests: XCTestCase {
         let s2 = session()
         await s2.open()
         XCTAssertEqual(s2.marks.count, 1)
-        s2.openMark(m.id)
+        await s2.openMark(m.id)
         XCTAssertEqual(s2.asking?.mark.question, "why nats and not bits?")
 
         // The tutor away: the question stays on the mark, the card says so.
@@ -713,7 +775,7 @@ final class AskThreadTests: XCTestCase {
         s.closeAsking()
         XCTAssertNil(s.asking)
         XCTAssertEqual(s.marks.count, 1, "closing keeps the mark and its thread")
-        s.openMark(mark.id)
+        await s.openMark(mark.id)
         XCTAssertEqual(s.asking?.mark.history.count, 2)
 
         s.deleteAsking()

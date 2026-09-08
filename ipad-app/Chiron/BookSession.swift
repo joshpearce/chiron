@@ -71,6 +71,23 @@ final class BookSession: ObservableObject {
     /// while the Pencil was still down, which showed as the page flickering.
     var inkData: Data?
     private var inkSave: Task<Void, Never>?
+    /// What undo takes back, the latest last: a mark placed, or the ink as
+    /// it was before a stroke. Published, so the palette's button follows
+    /// it and an undone stroke reaches the page, whose ink is not.
+    enum Undoable: Equatable {
+        case mark(String)
+        case ink(Data?)
+    }
+    @Published private(set) var undoable: [Undoable] = []
+    var canUndo: Bool { !undoable.isEmpty }
+    /// A highlight tapped on the page, waiting on the reader's word to go,
+    /// and where it is, in the page's coordinates, for the question to sit
+    /// beside it.
+    struct Removing {
+        let mark: Mark
+        let at: CGRect
+    }
+    @Published var removing: Removing?
 
     /// The pen's colour, kept across books.
     enum PenColor: String, CaseIterable {
@@ -551,27 +568,62 @@ final class BookSession: ObservableObject {
         let mark = Mark(id: UUID().uuidString, kind: kind, start: start, end: end, text: text)
         marks.append(mark)
         if kind == .question || kind == .note { asking = Asking(mark: mark) }
+        remember(.mark(mark.id))
         persistMarks()
         return mark
     }
 
     func removeMark(_ id: String) {
         marks.removeAll { $0.id == id }
+        undoable.removeAll { $0 == .mark(id) }
         if asking?.mark.id == id { asking = nil }
+        if removing?.mark.id == id { removing = nil }
         persistMarks()
     }
 
-    /// Reopen the card on an existing question, or nothing for a highlight.
-    func openMark(_ id: String) {
-        guard let m = marks.first(where: { $0.id == id }), m.kind == .question || m.kind == .note else { return }
-        asking = Asking(mark: m)
+    /// Reopen the card on an existing question; a highlight asks whether
+    /// to remove it.
+    func openMark(_ id: String) async {
+        guard let m = marks.first(where: { $0.id == id }) else { return }
+        if m.kind == .highlight {
+            let at = await page?.pageRect(of: id) ?? .zero
+            removing = Removing(mark: m, at: at)
+        } else {
+            asking = Asking(mark: m)
+        }
+    }
+
+    /// The reader said yes to removing the tapped highlight.
+    func removeMarkInHand() {
+        guard let r = removing else { return }
+        removeMark(r.mark.id)
+    }
+
+    /// The eraser over a highlight takes it off, as it takes ink off. A
+    /// question is deleted from its card, not rubbed out.
+    func erase(markID id: String) {
+        guard let m = marks.first(where: { $0.id == id }), m.kind == .highlight else { return }
+        removeMark(id)
+    }
+
+    private func remember(_ step: Undoable) {
+        undoable.append(step)
+        if undoable.count > 50 { undoable.removeFirst() }
+    }
+
+    /// Take back the last mark placed or stroke drawn.
+    func undo() {
+        guard let last = undoable.popLast() else { return }
+        switch last {
+        case .mark(let id): removeMark(id)
+        case .ink(let before): setInk(before)
+        }
     }
 
     func closeAsking() {
         // A question card closed with nothing asked leaves no mark behind.
         if let a = asking, a.mark.question == nil {
-            marks.removeAll { $0.id == a.mark.id }
-            persistMarks()
+            removeMark(a.mark.id)
         }
         asking = nil
     }
@@ -653,6 +705,11 @@ final class BookSession: ObservableObject {
     /// Strokes arrive many times a second; the file is written once the
     /// hand pauses.
     func saveInk(_ data: Data?) {
+        remember(.ink(inkData))
+        setInk(data)
+    }
+
+    private func setInk(_ data: Data?) {
         inkData = data
         inkDirty = true
         annotationsChanged()
@@ -708,6 +765,7 @@ final class BookSession: ObservableObject {
         marks = a.marks
         inkData = a.ink
         inkDirty = true
+        undoable = []  // history from before the copy would take it apart
         positions[unit] = a.position
         annotationVersions[unit] = a.version
         annotationDirty.remove(unit)
@@ -855,6 +913,8 @@ final class BookSession: ObservableObject {
         marks = []
         inkData = nil
         asking = nil
+        removing = nil
+        undoable = []
         guard let unit = chapter?.unit else { return }
         if let d = try? Data(contentsOf: dir.appendingPathComponent("marks-\(unit).json")),
            let m = try? JSONDecoder().decode([Mark].self, from: d) {
@@ -940,6 +1000,9 @@ protocol PageBridge: AnyObject {
     func find(_ text: String) async -> (start: Int, end: Int, text: String)?
     /// Where a mark's badge is drawn, in the page view's coordinates.
     func rect(of markID: String) async -> CGRect?
+    /// The same in the page's own coordinates, which start below the bars:
+    /// what a popover over the page anchors to.
+    func pageRect(of markID: String) async -> CGRect?
     /// A line of JavaScript against the page, for the harness.
     func eval(_ js: String) async -> String
 }

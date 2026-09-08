@@ -171,6 +171,25 @@ final class DocumentInkTests: XCTestCase {
         XCTAssertNotNil(library.document, "the library lives as long as the reader")
     }
 
+    func testUndoTakesBackTheLastStrokeOnItsPage() async {
+        let fake = FakeService()
+        let (_, doc) = await open(fake)
+        XCTAssertFalse(doc.canUndo)
+        doc.drew(on: 0, stroke(at: 10))
+        doc.drew(on: 0, stroke(at: 10).appending(stroke(at: 60)))
+        doc.drew(on: 1, stroke(at: 5))
+        _ = doc.takeDirtyInk()
+        XCTAssertTrue(doc.canUndo)
+        doc.undo()
+        XCTAssertEqual(doc.ink[1]?.strokes.count, 0, "the last stroke, on the second page")
+        doc.undo()
+        XCTAssertEqual(doc.ink[0]?.strokes.count, 1)
+        doc.undo()
+        XCTAssertEqual(doc.ink[0]?.strokes.count, 0)
+        XCTAssertFalse(doc.canUndo)
+        XCTAssertEqual(doc.takeDirtyInk(), [0, 1], "undone pages go up like drawn ones")
+    }
+
     func testAPageBothDrewOnKeepsBothDrawings() async {
         let fake = FakeService()
         let theirs = stroke(at: 200)

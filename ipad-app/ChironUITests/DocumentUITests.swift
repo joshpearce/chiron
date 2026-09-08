@@ -55,6 +55,14 @@ final class DocumentUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.0)
         let drawn = try document()
         XCTAssertEqual(drawn?["ink_strokes"] as? Int, before + 1, "one stroke of ink: \(drawn ?? [:])")
+        app.buttons["Undo"].tap()
+        Thread.sleep(forTimeInterval: 0.7)
+        XCTAssertEqual(try document()?["ink_strokes"] as? Int, before, "undo took the stroke back")
+        page.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.6))
+            .press(forDuration: 0.1, thenDragTo: page.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.65)),
+                   withVelocity: .slow, thenHoldForDuration: 0.1)
+        Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertEqual(try document()?["ink_strokes"] as? Int, before + 1)
 
         // Select: a long press on the text selects a word, and draws nothing.
         select.tap()
