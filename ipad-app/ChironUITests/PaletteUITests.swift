@@ -108,6 +108,32 @@ final class InkUITests: XCTestCase {
         wait(for: [done], timeout: 30)
     }
 
+    /// A line of JavaScript against the page, and what it came to.
+    private func eval(_ js: String) throws -> String {
+        try call("reader/eval", ["js": js])["result"] as? String ?? ""
+    }
+
+    private func rectOf(selector: String) throws -> CGRect {
+        let out = try call("reader/rect", ["selector": selector])
+        XCTAssertEqual(out["found"] as? Bool, true, "\(selector) is on the page: \(out)")
+        return CGRect(x: out["x"] as? Double ?? 0, y: out["y"] as? Double ?? 0,
+                      width: out["width"] as? Double ?? 0, height: out["height"] as? Double ?? 0)
+    }
+
+    private func call(_ path: String, _ body: [String: Any]) throws -> [String: Any] {
+        var req = URLRequest(url: harness.appendingPathComponent(path))
+        req.httpMethod = "POST"
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        var out: [String: Any] = [:]
+        let done = expectation(description: path)
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            out = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 30)
+        return out
+    }
+
     /// Where a mark's badge is, in the page view's points.
     private func rectOf(_ id: String) throws -> CGRect {
         var req = URLRequest(url: harness.appendingPathComponent("mark/rect"))
@@ -154,6 +180,23 @@ final class InkUITests: XCTestCase {
         let drawn = try state()
         XCTAssertEqual(drawn["ink_strokes"] as? Int, strokesBefore + 1,
                        "one stroke of ink; canvas touches=\(drawn["canvas_touches"] ?? "?") frame=\(drawn["canvas_frame"] ?? "?") pen=\(drawn["canvas_pen"] ?? "?")")
+        XCTAssertEqual(drawn["canvas_hit"] as? String, "canvas", "a touch on the prose is the canvas's")
+
+        // With the pen still up, a beat's field takes a tap and typing:
+        // the canvas hands a touch over a control through to the page.
+        _ = try eval("document.querySelector('textarea, input').scrollIntoView({block: 'center'}); 'ok'")
+        Thread.sleep(forTimeInterval: 1.0)
+        let field = try rectOf(selector: "textarea, input")
+        page.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: field.midX, dy: field.midY)).tap()
+        Thread.sleep(forTimeInterval: 1.0)
+        XCTAssertEqual(try state()["canvas_hit"] as? String, "page", "the touch over the field went to the page")
+        XCTAssertTrue(["TEXTAREA", "INPUT"].contains(try eval("document.activeElement.tagName")), "the field took focus")
+        app.typeText("3")
+        Thread.sleep(forTimeInterval: 0.5)
+        XCTAssertEqual(try eval("document.querySelector('textarea, input').value"), "3", "and the typing")
+        XCTAssertEqual(try state()["ink_strokes"] as? Int, strokesBefore + 1, "no ink from the tap")
+        _ = try eval("document.activeElement.blur(); window.scrollTo(0, 0); 'ok'")
+        Thread.sleep(forTimeInterval: 1.0)
 
         // The highlighter's drag selects a run of text.
         try post("tool", ["tool": "highlighter"])

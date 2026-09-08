@@ -1003,6 +1003,9 @@ protocol PageBridge: AnyObject {
     /// The same in the page's own coordinates, which start below the bars:
     /// what a popover over the page anchors to.
     func pageRect(of markID: String) async -> CGRect?
+    /// The first element matching a selector, in the page view's
+    /// coordinates, for the harness to tap.
+    func rect(matching selector: String) async -> CGRect?
     /// A line of JavaScript against the page, for the harness.
     func eval(_ js: String) async -> String
 }

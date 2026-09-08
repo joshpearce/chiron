@@ -255,6 +255,7 @@ struct ReaderView: UIViewRepresentable {
             return String(format: "pen rgb(%.0f,%.0f,%.0f) w%.1f", r * 255, g * 255, b * 255, ink.width)
         }
         var canvasTouches: Int { canvas.touchesSeen }
+        var canvasHit: String { canvas.lastHitTest }
         var canvasFrame: String { "\(canvas.frame) content \(canvas.contentSize) offset \(canvas.contentOffset) enabled \(canvas.isUserInteractionEnabled)" }
         #endif
 
@@ -396,9 +397,22 @@ struct ReaderView: UIViewRepresentable {
         }
 
         func pageRect(of markID: String) async -> CGRect? {
-            guard let web, pageReady else { return nil }
             let escaped = markID.replacingOccurrences(of: "'", with: "\\'")
-            guard let r = try? await web.evaluateJavaScript("markRect('\(escaped)')") as? [String: Any],
+            return await rect(from: "markRect('\(escaped)')")
+        }
+
+        /// The first element matching a selector, in the page view's
+        /// coordinates, for the harness to tap.
+        func rect(matching selector: String) async -> CGRect? {
+            let escaped = selector.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+            guard let r = await rect(from: "elementRect('\(escaped)')") else { return nil }
+            let o = pageOrigin
+            return r.offsetBy(dx: o.x, dy: o.y)
+        }
+
+        private func rect(from js: String) async -> CGRect? {
+            guard let web, pageReady else { return nil }
+            guard let r = try? await web.evaluateJavaScript(js) as? [String: Any],
                   let x = r["x"] as? Double, let y = r["y"] as? Double,
                   let w = r["width"] as? Double, let h = r["height"] as? Double else { return nil }
             return CGRect(x: x, y: y, width: w, height: h)
@@ -437,6 +451,10 @@ struct ReaderView: UIViewRepresentable {
                         Task { @MainActor in self.apply(marks: self.session.marks) }
                     }
                 }
+            case "controls":
+                if let rects = body["rects"] as? [[Double]] {
+                    canvas.controls = rects.filter { $0.count == 4 }.map { CGRect(x: $0[0], y: $0[1], width: $0[2], height: $0[3]) }
+                }
             case "scroll":
                 if let unit = loadedUnit, let position = body["position"] as? Double {
                     Task { @MainActor in self.session.recordPosition(unit: unit, position: position) }
@@ -470,9 +488,32 @@ final class PageInkCanvas: PKCanvasView {
     /// Every touch that lands on the ink, for the eraser to look under.
     var onTouch: ((UITouch) -> Void)?
     #if DEBUG
-    /// Touches that reached the canvas, for the harness.
+    /// Touches that reached the canvas, and what the last hit test saw,
+    /// for the harness.
     private(set) var touchesSeen = 0
+    private(set) var lastHitTest = ""
     #endif
+
+    /// Where the page's controls are, in the page's document coordinates,
+    /// which are the canvas's own: its content follows the page's scroll.
+    var controls: [CGRect] = []
+
+    /// A touch over a beat's button or field goes to the page even with
+    /// the pen up: the tool cannot tell a tap from a stroke, but a stroke
+    /// over a control is not what anyone means. (The event does not show
+    /// its touches at hit-test time, so the touch's kind cannot decide.)
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        if isUserInteractionEnabled, controls.contains(where: { $0.insetBy(dx: -6, dy: -6).contains(point) }) {
+            #if DEBUG
+            lastHitTest = "page"
+            #endif
+            return nil
+        }
+        #if DEBUG
+        lastHitTest = "canvas"
+        #endif
+        return super.hitTest(point, with: event)
+    }
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         #if DEBUG
         touchesSeen += touches.count

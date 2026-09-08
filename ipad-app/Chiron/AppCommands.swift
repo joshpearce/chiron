@@ -153,6 +153,12 @@ enum AppCommands {
             guard let text = args["text"] as? String else { throw Failure.badArguments("shell/type needs text") }
             library.shell.send(text: text)
             try? await Task.sleep(nanoseconds: 300_000_000)
+        case "reader/rect":
+            // Development only: where the first element matching a selector
+            // is, in page-view points, for a test to tap.
+            guard let s = library.session, let selector = args["selector"] as? String else { throw Failure.badArguments("reader/rect needs selector") }
+            guard let r = await s.page?.rect(matching: selector) else { return ["found": false] }
+            return ["found": true, "x": r.minX, "y": r.minY, "width": r.width, "height": r.height]
         case "reader/eval":
             // Development only: a line of JavaScript against the open page,
             // for scrolling to a beat or tapping an option in a walk.
@@ -340,6 +346,7 @@ enum AppCommands {
             #if DEBUG
             out["canvas_pen"] = ReaderView.Coordinator.probe?.canvasPen ?? ""
             out["canvas_touches"] = ReaderView.Coordinator.probe?.canvasTouches ?? -1
+            out["canvas_hit"] = ReaderView.Coordinator.probe?.canvasHit ?? ""
             out["pencil"] = s.lastPencil
             out["canvas_frame"] = ReaderView.Coordinator.probe?.canvasFrame ?? ""
             #endif

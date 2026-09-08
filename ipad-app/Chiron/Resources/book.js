@@ -36,6 +36,36 @@ function initChapter(payload, position) {
   }
   renderMathIn(root);
   window.scrollTo(0, scrollTop(position));
+  reportControls();
+  if (typeof ResizeObserver !== "undefined") new ResizeObserver(reportControls).observe(root);
+  if (typeof MutationObserver !== "undefined") {
+    new MutationObserver(reportControls).observe(root, { childList: true, subtree: true, attributes: true });
+  }
+}
+
+/* Where the page's controls are, in document coordinates, so the ink
+ * layer over the page can hand a touch on a button or a field through
+ * while the pen is up. Sent whenever the page's layout changes. */
+let controlsTimer = null;
+function reportControls() {
+  clearTimeout(controlsTimer);
+  controlsTimer = setTimeout(() => {
+    const rects = [];
+    for (const el of document.querySelectorAll("button, input, textarea, select")) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      rects.push([r.left + window.scrollX, r.top + window.scrollY, r.width, r.height]);
+    }
+    post({ type: "controls", rects });
+  }, 100);
+}
+
+/* The first element matching a selector, for the harness. */
+function elementRect(selector) {
+  const el = document.querySelector(selector);
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  return { x: r.left, y: r.top, width: r.width, height: r.height };
 }
 
 /* How far the page can scroll. */
