@@ -176,3 +176,24 @@ func TestCallsNameTheirEffortAndCapThinking(t *testing.T) {
 		t.Error("CHIRON_THINKING_TOKENS not honoured")
 	}
 }
+
+// Each call writes the CLI's own debug log to a file of its own under the
+// config dir, the one record of what the CLI and the API did when a call
+// is killed at its deadline; without a config dir there is nowhere for
+// it and the flag is left out.
+func TestCallsKeepADebugFileUnderTheConfigDir(t *testing.T) {
+	c := &ClaudeCLI{ConfigDir: t.TempDir()}
+	argv := c.Command("author", "PROMPT", "SYSTEM")
+	file := ""
+	for i := 0; i < len(argv)-1; i++ {
+		if argv[i] == "--debug-file" {
+			file = argv[i+1]
+		}
+	}
+	if !strings.HasPrefix(file, c.ConfigDir+"/debug/author-") || !strings.HasSuffix(file, ".log") {
+		t.Errorf("debug file = %q", file)
+	}
+	if strings.Contains(strings.Join((&ClaudeCLI{}).Command("author", "P", "S"), " "), "--debug-file") {
+		t.Error("a debug file with no config dir to hold it")
+	}
+}

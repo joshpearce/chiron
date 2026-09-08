@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -85,7 +86,7 @@ func (c *ClaudeCLI) Status() Status {
 // Command builds the argv. Exported so the contract below can be tested without
 // spending a model call.
 func (c *ClaudeCLI) Command(role, prompt, system string) []string {
-	return []string{
+	argv := []string{
 		"claude", "-p", prompt,
 		"--append-system-prompt", system,
 		"--output-format", "json",
@@ -102,6 +103,51 @@ func (c *ClaudeCLI) Command(role, prompt, system string) []string {
 		// finished in 82 seconds. Medium unless the environment says.
 		"--effort", effort(),
 		"--model", c.ModelFor(role),
+	}
+	if c.ConfigDir != "" {
+		// The CLI's own debug log, per call: on a timeout its tail is the
+		// record of what the CLI and the API were doing.
+		argv = append(argv, "--debug-file", c.debugFile(role))
+	}
+	return argv
+}
+
+func (c *ClaudeCLI) debugFile(role string) string {
+	dir := filepath.Join(c.ConfigDir, "debug")
+	_ = os.MkdirAll(dir, 0o755)
+	return filepath.Join(dir, fmt.Sprintf("%s-%d-%d.log", role, time.Now().UnixNano(), os.Getpid()))
+}
+
+// debugTail is the end of a call's debug file, API lines preferred.
+func debugTail(argv []string) string {
+	for i := 0; i < len(argv)-1; i++ {
+		if argv[i] == "--debug-file" {
+			data, err := os.ReadFile(argv[i+1])
+			if err != nil {
+				return ""
+			}
+			var api []string
+			for _, l := range strings.Split(string(data), "\n") {
+				if strings.Contains(l, "[API") || strings.Contains(l, "retry") || strings.Contains(l, "Retry") || strings.Contains(l, "error") {
+					api = append(api, l)
+				}
+			}
+			if len(api) > 8 {
+				api = api[len(api)-8:]
+			}
+			return strings.Join(api, "\n")
+		}
+	}
+	return ""
+}
+
+// forget removes a finished call's debug file; the ones that matter are
+// the timeouts, which keep theirs.
+func forget(argv []string) {
+	for i := 0; i < len(argv)-1; i++ {
+		if argv[i] == "--debug-file" {
+			os.Remove(argv[i+1])
+		}
 	}
 }
 
@@ -152,10 +198,11 @@ func (c *ClaudeCLI) Structured(role, system, user string, schema map[string]any,
 		took := time.Since(started).Round(time.Second)
 
 		if ctx.Err() == context.DeadlineExceeded {
-			log.Printf("claude-cli %s: %d KB prompt, timed out after %v: %v", role, len(prompt)/1024, took, err)
+			log.Printf("claude-cli %s: %d KB prompt, timed out after %v: %v\n%s", role, len(prompt)/1024, took, err, debugTail(argv))
 			return Errorf("claude-cli: timed out (%s) after %v", role, took)
 		}
 		log.Printf("claude-cli %s: %d KB prompt, %d KB reply in %v", role, len(prompt)/1024, len(stdout)/1024, took)
+		forget(argv)
 		if err != nil {
 			// With --output-format json the CLI reports the cause on stdout,
 			// so stderr alone leaves a bare "exit 1".
