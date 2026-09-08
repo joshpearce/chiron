@@ -21,6 +21,12 @@ import (
 type ClaudeCLI struct {
 	// Model, when set, overrides the per-role tiers entirely.
 	Model string
+	// ConfigDir, when set, is CLAUDE_CONFIG_DIR for every call: a
+	// directory of the server's own, so the user's hooks (which on the
+	// sprite call its control plane on every prompt) and any stale
+	// credentials there never run under a call. Auth is the token in the
+	// environment.
+	ConfigDir string
 }
 
 // The planner writes a whole syllabus in one call (every unit's concepts,
@@ -120,7 +126,7 @@ func (c *ClaudeCLI) Structured(role, system, user string, schema map[string]any,
 		// string and handing it to `sh -c` is what would make this dangerous.
 		argv := c.Command(role, prompt, system)
 		started := time.Now()
-		stdout, err := run(ctx, argv)
+		stdout, err := run(ctx, argv, cliEnv(c.ConfigDir))
 		cancel()
 		took := time.Since(started).Round(time.Second)
 
@@ -173,8 +179,13 @@ func tail(s string, n int) string {
 // the CLI's update check and other non-essential traffic switched off.
 // The check shells out through an npm shim that never returns on the
 // sprite (see LESSONS), and four author calls once hung at startup on it.
-func cliEnv() []string {
-	return append(os.Environ(), "DISABLE_AUTOUPDATER=1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1")
+func cliEnv(configDir string) []string {
+	env := append(os.Environ(), "DISABLE_AUTOUPDATER=1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1")
+	if configDir != "" {
+		_ = os.MkdirAll(configDir, 0o755)
+		env = append(env, "CLAUDE_CONFIG_DIR="+configDir)
+	}
+	return env
 }
 
 // run executes one CLI call under ctx, in its own process group so the
@@ -182,9 +193,9 @@ func cliEnv() []string {
 // the API call, and the output pipe, alive). WaitDelay then bounds how
 // long Wait sits on that pipe. Stderr is kept: on a timeout it is the
 // only record of what the CLI was doing (a 529 it kept retrying, say).
-func run(ctx context.Context, argv []string) ([]byte, error) {
+func run(ctx context.Context, argv []string, env []string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
-	cmd.Env = cliEnv()
+	cmd.Env = env
 	cmd.WaitDelay = 15 * time.Second
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }

@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -107,7 +108,7 @@ func TestRunReturnsAtTheDeadlineDespiteAChildOnThePipe(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 	start := time.Now()
-	_, err := run(ctx, []string{"sh", "-c", "sleep 30 & exec sleep 30"})
+	_, err := run(ctx, []string{"sh", "-c", "sleep 30 & exec sleep 30"}, cliEnv(""))
 	if err == nil {
 		t.Fatal("a killed call returned no error")
 	}
@@ -116,12 +117,19 @@ func TestRunReturnsAtTheDeadlineDespiteAChildOnThePipe(t *testing.T) {
 	}
 }
 
-func TestCLICallsRunWithoutTheUpdater(t *testing.T) {
-	env := strings.Join(cliEnv(), "\n")
-	for _, want := range []string{"DISABLE_AUTOUPDATER=1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1"} {
+func TestCLICallsRunWithoutTheUpdaterInTheirOwnConfigDir(t *testing.T) {
+	dir := t.TempDir() + "/claude"
+	env := strings.Join(cliEnv(dir), "\n")
+	for _, want := range []string{"DISABLE_AUTOUPDATER=1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1", "CLAUDE_CONFIG_DIR=" + dir} {
 		if !strings.Contains(env, want) {
 			t.Errorf("env lacks %s", want)
 		}
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Errorf("config dir not made: %v", err)
+	}
+	if strings.Contains(strings.Join(cliEnv(""), "\n"), "CLAUDE_CONFIG_DIR") {
+		t.Error("no dir asked for, yet one set")
 	}
 }
 
@@ -130,7 +138,7 @@ func TestCLICallsRunWithoutTheUpdater(t *testing.T) {
 func TestRunKillsTheWholeProcessGroup(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
-	_, _ = run(ctx, []string{"sh", "-c", "sleep 31.7 & exec sleep 31.7"})
+	_, _ = run(ctx, []string{"sh", "-c", "sleep 31.7 & exec sleep 31.7"}, cliEnv(""))
 	time.Sleep(200 * time.Millisecond)
 	if out, _ := exec.Command("pgrep", "-f", "sleep 31.7").Output(); len(strings.TrimSpace(string(out))) > 0 {
 		exec.Command("pkill", "-f", "sleep 31.7").Run()

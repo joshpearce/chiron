@@ -9,6 +9,10 @@ type FactoryConfig struct {
 	ClaudeCLIModel string     `yaml:"claude_cli_model"`
 	Upstreams      []Upstream `yaml:"upstreams"`
 	LLM            Config     `yaml:"llm"`
+	// CLIConfigDir is the Claude CLI's own configuration directory for the
+	// server's calls, kept apart from the user's (whose hooks and stale
+	// credentials would otherwise run under every call).
+	CLIConfigDir string `yaml:"-"`
 }
 
 // New picks a backend: "anthropic" for the direct API, "claude-cli" for
@@ -27,7 +31,7 @@ func New(cfg FactoryConfig) Chain {
 		return NewAnthropic(cfg.AnthropicModel)
 	case "claude-cli":
 		// An empty model means the per-role tiers apply.
-		return &ClaudeCLI{Model: cfg.ClaudeCLIModel}
+		return &ClaudeCLI{Model: cfg.ClaudeCLIModel, ConfigDir: cfg.CLIConfigDir}
 	default:
 		return NewOpenAIChain(cfg.Upstreams, cfg.LLM)
 	}

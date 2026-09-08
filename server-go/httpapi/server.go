@@ -217,6 +217,7 @@ func New(cfg *Config, root string) (*Server, error) {
 		chain: llm.New(llm.FactoryConfig{
 			Provider: cfg.Provider, AnthropicModel: cfg.AnthropicModel,
 			ClaudeCLIModel: cfg.ClaudeCLIModel, Upstreams: cfg.Upstreams, LLM: cfg.LLM,
+			CLIConfigDir: filepath.Join(root, "claude"),
 		}),
 	}
 	s.startGenerate = func(slug, title, brief string, named []string, planOnly bool) {
