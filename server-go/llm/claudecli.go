@@ -96,8 +96,29 @@ func (c *ClaudeCLI) Command(role, prompt, system string) []string {
 		// call, which is most of what made grading slow (~55s/item -> ~7s).
 		"--tools", "",
 		"--max-turns", "1",
+		// Left to itself the CLI thinks at high effort with no bound, and
+		// on an authoring prompt of 80 KB that ran past thirty minutes
+		// without a word of text, every time; at low effort the same call
+		// finished in 82 seconds. Medium unless the environment says.
+		"--effort", effort(),
 		"--model", c.ModelFor(role),
 	}
+}
+
+func effort() string {
+	if e := os.Getenv("CHIRON_CLI_EFFORT"); e != "" {
+		return e
+	}
+	return "medium"
+}
+
+// thinkingBudget caps extended thinking per call (MAX_THINKING_TOKENS),
+// the other half of keeping an authoring call inside its deadline.
+func thinkingBudget() string {
+	if n := os.Getenv("CHIRON_THINKING_TOKENS"); n != "" {
+		return n
+	}
+	return "4000"
 }
 
 func (c *ClaudeCLI) Structured(role, system, user string, schema map[string]any,
@@ -180,7 +201,8 @@ func tail(s string, n int) string {
 // The check shells out through an npm shim that never returns on the
 // sprite (see LESSONS), and four author calls once hung at startup on it.
 func cliEnv(configDir string) []string {
-	env := append(os.Environ(), "DISABLE_AUTOUPDATER=1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1")
+	env := append(os.Environ(), "DISABLE_AUTOUPDATER=1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1",
+		"MAX_THINKING_TOKENS="+thinkingBudget())
 	if configDir != "" {
 		_ = os.MkdirAll(configDir, 0o755)
 		env = append(env, "CLAUDE_CONFIG_DIR="+configDir)

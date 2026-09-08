@@ -145,3 +145,34 @@ func TestRunKillsTheWholeProcessGroup(t *testing.T) {
 		t.Fatalf("a child survived the deadline: pids %s", out)
 	}
 }
+
+// Left to itself the CLI thinks at high effort with no bound, and on an
+// authoring prompt of 80 KB that ran past thirty minutes without a word
+// of text, every time. Each call names its effort and the environment
+// caps the thinking budget; both can be turned from the environment.
+func TestCallsNameTheirEffortAndCapThinking(t *testing.T) {
+	c := &ClaudeCLI{}
+	argv := c.Command("author", "PROMPT", "SYSTEM")
+	got := ""
+	for i := 0; i < len(argv)-1; i++ {
+		if argv[i] == "--effort" {
+			got = argv[i+1]
+		}
+	}
+	if got != "medium" {
+		t.Errorf("author effort = %q, want medium by default", got)
+	}
+	t.Setenv("CHIRON_CLI_EFFORT", "low")
+	argv = c.Command("author", "PROMPT", "SYSTEM")
+	if !strings.Contains(strings.Join(argv, " "), "--effort low") {
+		t.Errorf("CHIRON_CLI_EFFORT not honoured: %v", argv)
+	}
+	env := strings.Join(cliEnv(""), "\n")
+	if !strings.Contains(env, "MAX_THINKING_TOKENS=4000") {
+		t.Errorf("thinking not capped: %s", env)
+	}
+	t.Setenv("CHIRON_THINKING_TOKENS", "1024")
+	if !strings.Contains(strings.Join(cliEnv(""), "\n"), "MAX_THINKING_TOKENS=1024") {
+		t.Error("CHIRON_THINKING_TOKENS not honoured")
+	}
+}

@@ -264,4 +264,19 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`. A unit that failed this
   way is re-authored by running the same `chiron teach` again: files on
   disk are kept, only the missing ones are written.
+- **Every author call stalled for a day, and it was extended thinking
+  (2026-09-08).** After the first few calls of a run, each CLI call opened
+  its stream within a second and then delivered only thinking events for
+  thirty minutes, never a word of text; the 20 KB cut of the same prompt
+  finished in 23 s. Not the network (the sockets were live), not auth, not
+  input size (20, 40 and 81 KB inputs all streamed at 150 chars/s), not
+  the sprite's hooks or stale credentials (ruled out by a config dir of
+  the server's own, which stays). The CLI left to itself thinks at high
+  effort with no bound, and an 80 KB "write a whole unit" prompt is a task
+  it will think about indefinitely. Every call now names `--effort`
+  (medium; `CHIRON_CLI_EFFORT`) and caps `MAX_THINKING_TOKENS`
+  (`CHIRON_THINKING_TOKENS`); at low effort the stalled call finished in
+  82 s. How to see it next time: replay a hung process's argv and
+  environment from /proc by hand with `--output-format stream-json
+  --include-partial-messages` and count text deltas per 30 s.
 
