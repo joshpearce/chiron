@@ -1,0 +1,159 @@
+# Unit-local misconception bank for u0 (Placement Check).
+#
+# The calibration series spans bands 1-5 across the whole spine, so its
+# low-band items test arithmetic and object-recognition errors that the
+# global bank (M1-M19, all conceptual and unit-specific) does not name.
+# These ids are cited by distractors in u0/questions.yaml only. High-band
+# u0 items cite the global bank directly.
+
+misconceptions:
+
+- id: u0-m1
+  name: bps-percent-slip
+  wrong_model: A basis point is a hundredth of a percent, but in practice the conversion gets applied
+    once too many or once too few times, so a 550 bps spread is read as 0.55% or as 55% rather than
+    5.50%.
+  why_appealing: The conversion is trivial in isolation and therefore done from memory rather than on
+    paper, and both 0.55% and 55% are numbers that appear elsewhere in credit conversation (a fee, a
+    recovery rate), so neither looks obviously absurd on the page.
+  failing_prediction: Predicts an all-in yield built from a 5% base rate and a 550 bps spread of roughly
+    5.55% or roughly 60%, neither of which is anywhere near a market direct lending coupon.
+  correction: 100 bps = 1.00%, so 550 bps = 5.50% and a 5% base rate plus a 550 bps spread is a 10.5%
+    coupon. Sanity-check every spread number against the 8-12% all-in range that senior direct loans
+    have actually cleared at.
+  units:
+  - u0
+
+- id: u0-m2
+  name: spread-is-the-all-in-yield
+  wrong_model: A loan quoted at 'S + 550' yields 5.5%; the quoted spread is the yield, and the base
+    rate is a reference detail rather than part of the coupon.
+  why_appealing: The spread is the number the lender negotiates and the only number that varies deal
+    to deal, so it is what gets said out loud, and in a zero-rate world the base rate really was close
+    to nothing.
+  failing_prediction: Predicts a direct lending fund's gross portfolio yield should be unchanged when
+    the base rate moves from 0% to 5%, since the spread did not move.
+  correction: The contractual coupon is base rate plus spread. S + 550 with SOFR at 5% is a 10.5% coupon,
+    not 5.5%, which is precisely why floating-rate loan income roughly doubled through the 2022-2023
+    hiking cycle with no change in credit terms.
+  units:
+  - u0
+
+- id: u0-m3
+  name: gross-portfolio-yield-is-lp-return
+  wrong_model: If the loans in the book yield 11%, the LP earns roughly 11%; fees, credit losses, and
+    uninvested cash are second-order adjustments rather than the difference between the two numbers.
+  why_appealing: Portfolio yield is the number a GP has at hand and the one that appears on a page of
+    deal stats, and for a par-priced, fully-invested, loss-free book it really would be close to the
+    LP's return.
+  failing_prediction: Predicts net LP returns in the CDLI and in fund-level data should sit within a
+    few tens of basis points of contractual portfolio yield across vintages.
+  correction: Gross yield minus realized credit losses minus management fee and carry minus the drag
+    of undrawn commitments and cash is the LP number, and the gap has historically run in the hundreds
+    of basis points. Levering the book widens the gap in both directions.
+  units:
+  - u0
+
+- id: u0-m4
+  name: default-rate-is-loss-rate
+  wrong_model: The default rate and the loss rate are the same statistic - a 3% annual default rate means
+    the portfolio lost 3%.
+  why_appealing: 'Default' is the event everyone tracks and the word that carries the emotional weight,
+    and equating the two removes the need to have a recovery assumption at all.
+  failing_prediction: Predicts cumulative loss experience in senior secured middle market loans should
+    equal cumulative default experience, so a book with a 3% default rate should show a 3% loss rate.
+  correction: Loss rate = default rate x (1 - recovery rate). Senior secured middle market loans have
+    recovered a large fraction of par in workouts, so the loss rate is a fraction of the default rate;
+    reporting one as the other overstates realized credit losses by multiples.
+  units:
+  - u0
+
+- id: u0-m5
+  name: senior-secured-means-full-recovery
+  wrong_model: First lien senior secured position means the lender gets paid in full in a default, so
+    recovery on a first lien direct loan is essentially 100% and loss given default is roughly zero.
+  why_appealing: The collateral package and the top-of-the-stack position are exactly what the lender
+    bargained for, and 'secured' in ordinary usage means the money is safe.
+  failing_prediction: Predicts realized loss rates on first lien portfolios of approximately zero regardless
+    of default frequency, and predicts recovery studies should cluster at par.
+  correction: Enterprise value in a distressed middle market borrower is frequently below the first lien
+    claim, so first lien recoveries cluster well below par - high relative to unsecured claims, not
+    absolute. Seniority raises recovery; it does not eliminate loss given default.
+  units:
+  - u0
+
+- id: u0-m6
+  name: discount-to-nav-off-the-wrong-base
+  wrong_model: The premium or discount to NAV is computed against the share price - a BDC trading at
+    $8.00 against a $10.00 NAV is at a 25% discount because $2 is 25% of $8.
+  why_appealing: Price is the number being looked at and the denominator that percentage moves in a
+    brokerage account are usually quoted off, so it is the base that comes to hand first.
+  failing_prediction: Predicts a discount and the corresponding premium should be arithmetically symmetric,
+    so a stock at $8 against $10 NAV and a stock at $10 against $8 NAV are the same 25% dislocation
+    in opposite directions.
+  correction: Discount to NAV = (price - NAV) / NAV. $8.00 against $10.00 NAV is a 20% discount, not
+    25%. The convention matters because BDC discounts are quoted and compared across the sector, and
+    the wrong base misstates every cross-name comparison.
+  units:
+  - u0
+
+- id: u0-m7
+  name: leverage-turns-are-debt-over-assets
+  wrong_model: '1.0x fund leverage means debt is 100% of assets, and 0.5x means debt is half of assets
+    - leverage turns are stated against the asset base.'
+  why_appealing: Borrowing base and asset coverage tests are written against assets, so the asset base
+    is the salient denominator when thinking about a warehouse line, and 'x' notation does not announce
+    its own denominator.
+  failing_prediction: Predicts a 1.0x levered fund holds no equity at all, and predicts the regulatory
+    2:1 debt-to-equity BDC limit and a '2x levered' fund describe wildly different structures.
+  correction: Fund leverage turns are debt to equity. 1.0x means $1 of debt per $1 of equity - $2 of
+    assets on $1 of equity, or 50% debt to assets. Asset coverage tests translate into the same structure
+    from the other side, and mixing the two denominators misstates equity at risk by a factor of two.
+  units:
+  - u0
+
+- id: u0-m8
+  name: excess-return-not-total-return-in-sharpe
+  wrong_model: A Sharpe ratio is the reported return divided by the reported standard deviation; subtracting
+    a risk-free rate is a refinement that barely moves the answer.
+  why_appealing: Return over volatility is how the ratio is described in casual conversation, and through
+    the 2010s a near-zero cash rate made the subtraction genuinely immaterial.
+  failing_prediction: Predicts a floating-rate strategy's Sharpe ratio should rise when base rates rise,
+    since the coupon and therefore the reported return rise while volatility does not.
+  correction: Sharpe uses excess return over the risk-free rate. For a floating-rate asset most of the
+    base rate increase is passed straight through to the numerator and to cash alike, so a rate-driven
+    return increase adds nothing to Sharpe. This is separate from, and additive to, the smoothing bias
+    of M18.
+  units:
+  - u0
+
+- id: u0-m9
+  name: oid-is-a-fee-outside-the-yield
+  wrong_model: Original issue discount and upfront fees are transaction fees the GP collects, sitting
+    outside the loan's yield the way a closing cost sits outside a mortgage rate.
+  why_appealing: OID is received at closing in a lump, which makes it feel like fee income rather than
+    interest, and it does not appear anywhere in the stated coupon.
+  failing_prediction: Predicts the return on a loan funded at 98 and repaid at 100 should equal its coupon,
+    with the 2 points recorded as fee revenue rather than as yield to the fund.
+  correction: OID is discount to par accrued into income over the expected life of the loan and belongs
+    in the loan's yield to the fund. Two points of OID on an expected three-year life adds roughly 65-70
+    bps of annualized yield, which is exactly the sort of gap between quoted coupon and economic return
+    that M2 is about.
+  units:
+  - u0
+
+- id: u0-m10
+  name: quarterly-marks-annualize-by-four
+  wrong_model: An index reported quarterly is annualized by multiplying the quarterly figure by four,
+    and a multi-year cumulative figure is turned into an annual one by dividing by the number of years.
+  why_appealing: Linear scaling is right to a first approximation at small magnitudes and is the arithmetic
+    everyone does in their head; the compounding correction is small enough at typical quarterly return
+    sizes to look like rounding.
+  failing_prediction: Predicts a compounded annual figure and a 4x quarterly figure should agree, and
+    predicts cumulative loss rates over a ten-year window can be converted to annual loss rates by simple
+    division regardless of the base.
+  correction: Annualizing compounds - $(1+r_q)^4 - 1$, not $4 r_q$ - and cumulative losses annualize
+    geometrically off a declining base. The distinction is what makes headline CDLI annualized returns
+    and cumulative loss statistics non-interchangeable when cited to an LP.
+  units:
+  - u0

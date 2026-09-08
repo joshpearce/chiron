@@ -342,7 +342,13 @@ func dropTopLevelKey(front, key string) string {
 		skipping = false
 		out = append(out, l)
 	}
-	return strings.Join(out, "\n")
+	joined := strings.Join(out, "\n")
+	// The key's block may have been the last thing in the front matter,
+	// taking the closing newline with it; the next key must start a line.
+	if strings.HasSuffix(front, "\n") && !strings.HasSuffix(joined, "\n") {
+		joined += "\n"
+	}
+	return joined
 }
 
 // importItems turns the exercises of the unit's adaptable sources into

@@ -373,3 +373,18 @@ func TestCalibrateGivesABookAPlacementUnit(t *testing.T) {
 		t.Fatal("a second placement unit was allowed")
 	}
 }
+
+// The author sometimes ends its front matter with a sources list of its
+// own. Dropping it must not take the closing newline with it: eleven
+// units of the first PDF-built book had "  - u2sources:" in their front
+// matter, and lost their prerequisites to it.
+func TestPipelineSourcesStartOnTheirOwnLine(t *testing.T) {
+	canon := "---\nunit: u3\nprereqs:\n  - u2\nsources:\n  - private-debt\n---\n\nProse.\n"
+	got := withSources(canon, []sources.Provenance{{Source: "private-debt", Title: "Private Debt"}})
+	if !strings.Contains(got, "prereqs:\n  - u2\nsources:\n") || strings.Contains(got, "u2sources") {
+		t.Errorf("front matter:\n%s", got)
+	}
+	if got := dropTopLevelKey("a: 1\nsources:\n  - x\n", "sources"); got != "a: 1\n" {
+		t.Errorf("dropTopLevelKey = %q", got)
+	}
+}

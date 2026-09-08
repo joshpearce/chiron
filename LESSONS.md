@@ -279,4 +279,14 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   82 s. How to see it next time: replay a hung process's argv and
   environment from /proc by hand with `--output-format stream-json
   --include-partial-messages` and count text deltas per 30 s.
+- **The first PDF-built book would not load: prose in plain YAML scalars
+  (2026-09-08).** Thirteen of eighteen misconception files failed to
+  parse: a value opening with a quotation mark, a colon and space inside
+  a sentence, a continuation line starting with a dash. The prose was
+  fine. `generate.RepairYAMLProse` rewrites such values as block scalars
+  when a written file does not parse, and `corpus-lint -repair` does the
+  same for files on disk; unit-local misconception ids are lowercased
+  everywhere, since the author wrote U11-M1 in one file and u11-m1 in
+  the next. A build that says "generated corpus did not load" is
+  diagnosed by copying the corpus down and running `corpus-lint` on it.
 

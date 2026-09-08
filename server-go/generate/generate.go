@@ -412,6 +412,12 @@ func (g *Generator) authorUnit(u unitPlan, learner, bank, spec string) error {
 		if strings.TrimSpace(body) == "" {
 			return "", fmt.Errorf("%s came back empty", filepath.Base(path))
 		}
+		if strings.HasSuffix(key, "_yaml") {
+			// Prose in plain scalars breaks on a quotation mark or a
+			// colon; a file that does not parse is rewritten with block
+			// scalars before it is kept.
+			body = NormaliseLocalIDs(RepairYAMLProse(body))
+		}
 		return body, os.WriteFile(path, []byte(body), 0o644)
 	}
 
