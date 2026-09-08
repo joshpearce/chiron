@@ -66,6 +66,42 @@ for (const [index, correct, explain, label] of choiceCases) {
     console.log(`FAIL choice ${label}: ${JSON.stringify(g)}`);
   }
 }
-const total = cases.length + choiceCases.length;
-console.log(`${total - failed}/${total} book.js grading cases pass`);
+// The reading position is a fraction of the chapter's scroll, so the same
+// place holds on a phone's narrower page and reads as a percentage.
+sandbox.window.innerHeight = 800;
+sandbox.document.documentElement = { scrollHeight: 4800 };
+const positionCases = [
+  [0, 0, "the top"],
+  [2000, 0.5, "halfway down the scroll"],
+  [4000, 1, "the bottom"],
+  [4800, 1, "overscroll clamps"],
+];
+for (const [scrollY, want, label] of positionCases) {
+  sandbox.window.scrollY = scrollY;
+  const got = sandbox.readingPosition();
+  if (Math.abs(got - want) > 1e-9) {
+    failed++;
+    console.log(`FAIL position ${label}: ${got}, wanted ${want}`);
+  }
+}
+sandbox.document.documentElement.scrollHeight = 600; // fits the window
+sandbox.window.scrollY = 0;
+if (sandbox.readingPosition() !== 0) {
+  failed++;
+  console.log(`FAIL position with nothing to scroll: ${sandbox.readingPosition()}`);
+}
+// Restoring turns the fraction back into a scroll offset; anything that
+// is not a fraction starts at the top.
+sandbox.document.documentElement.scrollHeight = 4800;
+const restoreCases = [[0.5, 2000, "halfway"], [1, 4000, "the bottom"], [0, 0, "the top"],
+                      [undefined, 0, "nothing remembered"], [670, 0, "not a fraction"], [-0.1, 0, "below the top"]];
+for (const [position, want, label] of restoreCases) {
+  const got = sandbox.scrollTop(position);
+  if (got !== want) {
+    failed++;
+    console.log(`FAIL restore ${label}: ${got}, wanted ${want}`);
+  }
+}
+const total = cases.length + choiceCases.length + positionCases.length + 1 + restoreCases.length;
+console.log(`${total - failed}/${total} book.js cases pass`);
 process.exit(failed ? 1 : 0);

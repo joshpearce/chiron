@@ -393,12 +393,12 @@ final class BookSessionTests: XCTestCase {
         fake.onExchange = { [unowned self] _ in self.deliversU1() }
         let s = session()
         await s.open()
-        s.recordPosition(unit: "u1", offset: 1234.5)
+        s.recordPosition(unit: "u1", position: 0.35)
         s.persist()
 
         let s2 = session()
         await s2.open()
-        XCTAssertEqual(s2.position(for: "u1"), 1234.5)
+        XCTAssertEqual(s2.position(for: "u1"), 0.35)
         XCTAssertEqual(s2.position(for: "u2"), 0, "an unread chapter opens at the top")
     }
 

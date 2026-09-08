@@ -20,8 +20,8 @@ function post(msg) {
   }
 }
 
-/* position: the scroll offset to restore, from the native side's memory of
- * where this chapter was left. */
+/* position: where this chapter was left, as a fraction of its scroll,
+ * from the native side's memory. */
 function initChapter(payload, position) {
   CH = payload;
   const root = document.getElementById("chapter");
@@ -35,7 +35,28 @@ function initChapter(payload, position) {
     if (holder) renderBeat(holder, beat);
   }
   renderMathIn(root);
-  window.scrollTo(0, position || 0);
+  window.scrollTo(0, scrollTop(position));
+}
+
+/* How far the page can scroll. */
+function scrollRange() {
+  return document.documentElement.scrollHeight - window.innerHeight;
+}
+
+/* The reading position as a fraction of the chapter's scroll, 0 at the
+ * top and 1 at the bottom, so the same place holds on a phone's narrower
+ * page and reads as a percentage. */
+function readingPosition() {
+  const range = scrollRange();
+  if (!(range > 0)) return 0;
+  return Math.min(1, Math.max(0, window.scrollY / range));
+}
+
+/* The scroll offset for a position; anything that is not a fraction
+ * starts at the top. */
+function scrollTop(position) {
+  if (!(position >= 0 && position <= 1)) return 0;
+  return position * Math.max(0, scrollRange());
 }
 
 /* The native side keeps the reading position; report it as the page
@@ -44,7 +65,7 @@ let scrollTimer = null;
 window.addEventListener("scroll", () => {
   clearTimeout(scrollTimer);
   scrollTimer = setTimeout(() => {
-    post({ type: "scroll", offset: window.scrollY });
+    post({ type: "scroll", position: readingPosition() });
   }, 300);
 });
 

@@ -53,17 +53,28 @@ final class PaletteUITests: XCTestCase {
         }
         XCTAssertEqual(afterContents["contents"] as? Bool, true,
                        "the Contents chrome button toggles; pen frame \(pen.frame) hittable=\(pen.isHittable) enabled=\(pen.isEnabled)")
+        // One dot of the pen's colour beside the pen; the row of colours
+        // opens from it and folds back once a colour is picked.
+        let colour = app.buttons["Pen colour"]
+        XCTAssertTrue(colour.waitForExistence(timeout: 5),
+                      "the colour dot appears beside the pen; tool=\(afterPen["tool"] ?? "?") toolsElementExists=\(app.descendants(matching: .any)["Tools"].exists) penButtons=\(app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'pen'")).count)")
+        XCTAssertFalse(app.buttons["blue pen"].exists, "the row is folded until the dot is tapped")
+        colour.tap()
         let blue = app.buttons["blue pen"]
-        let anyBlue = app.descendants(matching: .any)["blue pen"]
-        XCTAssertTrue(blue.waitForExistence(timeout: 5),
-                      "the colour row appears under the pen; tool=\(afterPen["tool"] ?? "?") anyElementNamedBluePen=\(anyBlue.exists) toolsElementExists=\(app.descendants(matching: .any)["Tools"].exists) penButtons=\(app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'pen'")).count)")
+        XCTAssertTrue(blue.waitForExistence(timeout: 5), "the colour row opens from the dot")
         blue.tap()
         Thread.sleep(forTimeInterval: 0.7)
         let s = try state()
         XCTAssertEqual(s["tool"] as? String, "pen")
         XCTAssertEqual(s["pen_color"] as? String, "blue")
         XCTAssertEqual(s["canvas_pen"] as? String, "pen rgb(0,136,255) w2.5", "the canvas holds the tapped colour")
-        app.buttons["black pen"].tap()
+        XCTAssertTrue(colour.waitForExistence(timeout: 5), "the row folded back into the dot")
+        XCTAssertFalse(app.buttons["blue pen"].exists)
+        XCTAssertEqual(colour.value as? String, "blue", "the dot shows the picked colour")
+        colour.tap()
+        let black = app.buttons["black pen"]
+        XCTAssertTrue(black.waitForExistence(timeout: 5))
+        black.tap()
         Thread.sleep(forTimeInterval: 0.7)
         XCTAssertEqual(try state()["canvas_pen"] as? String, "pen rgb(0,0,0) w2.5")
 

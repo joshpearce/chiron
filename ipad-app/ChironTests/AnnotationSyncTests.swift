@@ -49,7 +49,7 @@ final class AnnotationSyncTests: XCTestCase {
         XCTAssertEqual(put.annotations.marks.count, 2)
         XCTAssertEqual(put.unit, "u1")
         // The stored version is the new base.
-        s.recordPosition(unit: "u1", offset: 0.9)
+        s.recordPosition(unit: "u1", position: 0.9)
         try await settle()
         XCTAssertEqual(fake.annotationPuts.last?.base, 4)
         XCTAssertEqual(fake.annotationPuts.last?.annotations.position, 0.9)
@@ -122,7 +122,7 @@ final class AnnotationSyncTests: XCTestCase {
         openChapter(s)
         try await settle()
         for i in 0..<12 {
-            s.recordPosition(unit: "u1", offset: Double(i) / 100)
+            s.recordPosition(unit: "u1", position: Double(i) / 100)
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         try await settle()

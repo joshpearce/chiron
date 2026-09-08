@@ -14,6 +14,10 @@ struct Palette: View {
     /// along the bottom edge, where there is no margin to spare.
     private var compact: Bool { sizeClass == .compact }
 
+    /// The pen's colours fold into one dot of the current colour beside
+    /// the pen; a tap on the dot opens the row, and a pick closes it.
+    @State private var choosingColour = false
+
     /// Ink needs a Pencil, so a phone's palette has no pen and no eraser.
     static var inkable: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
@@ -47,23 +51,32 @@ struct Palette: View {
             stack {
                 ForEach(tools, id: \.0) { tool, symbol, label in
                     beside {
-                        // The pen's colours beside the pen while it is up,
+                        // The pen's colour beside the pen while it is up,
                         // so the tools below keep their places.
                         if tool == .pen && session.tool == .pen {
-                            ForEach(BookSession.PenColor.allCases, id: \.self) { c in
+                            if choosingColour {
+                                ForEach(BookSession.PenColor.allCases, id: \.self) { c in
+                                    Button {
+                                        session.penColor = c
+                                        choosingColour = false
+                                    } label: {
+                                        dot(c, ringed: session.penColor == c)
+                                    }
+                                    .buttonStyle(.glass)
+                                    .glassEffectID("colour-\(c.rawValue)", in: palette)
+                                    .accessibilityLabel("\(c.rawValue) pen")
+                                    .accessibilityAddTraits(session.penColor == c ? .isSelected : [])
+                                }
+                            } else {
                                 Button {
-                                    session.penColor = c
+                                    choosingColour = true
                                 } label: {
-                                    Circle()
-                                        .fill(Color(c.uiColor))
-                                        .frame(width: 16, height: 16)
-                                        .overlay(Circle().stroke(Color.primary.opacity(session.penColor == c ? 0.9 : 0), lineWidth: 2))
-                                        .frame(width: 22, height: 22)
+                                    dot(session.penColor, ringed: false)
                                 }
                                 .buttonStyle(.glass)
-                                .glassEffectID("colour-\(c.rawValue)", in: palette)
-                                .accessibilityLabel("\(c.rawValue) pen")
-                                .accessibilityAddTraits(session.penColor == c ? .isSelected : [])
+                                .glassEffectID("colour-\(session.penColor.rawValue)", in: palette)
+                                .accessibilityLabel("Pen colour")
+                                .accessibilityValue(session.penColor.rawValue)
                             }
                         }
                         toolButton(tool, symbol, label)
@@ -71,8 +84,17 @@ struct Palette: View {
                 }
             }
         }
+        .onChange(of: session.tool) { choosingColour = false }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Tools")
+    }
+
+    private func dot(_ c: BookSession.PenColor, ringed: Bool) -> some View {
+        Circle()
+            .fill(Color(c.uiColor))
+            .frame(width: 16, height: 16)
+            .overlay(Circle().stroke(Color.primary.opacity(ringed ? 0.9 : 0), lineWidth: 2))
+            .frame(width: 22, height: 22)
     }
 
     @Namespace private var palette

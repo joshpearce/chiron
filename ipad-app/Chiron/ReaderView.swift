@@ -403,8 +403,8 @@ struct ReaderView: UIViewRepresentable {
                     }
                 }
             case "scroll":
-                if let unit = loadedUnit, let offset = body["offset"] as? Double {
-                    Task { @MainActor in self.session.recordPosition(unit: unit, offset: offset) }
+                if let unit = loadedUnit, let position = body["position"] as? Double {
+                    Task { @MainActor in self.session.recordPosition(unit: unit, position: position) }
                 }
             case "tap":
                 Task { @MainActor in self.session.toggleChrome() }

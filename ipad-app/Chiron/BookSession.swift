@@ -60,7 +60,8 @@ final class BookSession: ObservableObject {
     private var beatResponses: [BeatResponse] = []
     private var chapterOpenedAt: Date?
     private var pretestDone = false
-    /// Where the reader left each chapter: scroll offset in CSS pixels.
+    /// Where the reader left each chapter: a fraction of its scroll, 0 at
+    /// the top and 1 at the bottom.
     private var positions: [String: Double] = [:]
     /// The reader's marks on the current chapter: highlights and questions.
     @Published private(set) var marks: [Mark] = []
@@ -521,9 +522,9 @@ final class BookSession: ObservableObject {
 
     /// The reader reports where it is as the page scrolls; the position is
     /// kept per chapter so a book reopens where it was left.
-    func recordPosition(unit: String, offset: Double) {
-        guard positions[unit] != offset else { return }
-        positions[unit] = offset
+    func recordPosition(unit: String, position: Double) {
+        guard positions[unit] != position else { return }
+        positions[unit] = position
         annotationsChanged()
     }
 
