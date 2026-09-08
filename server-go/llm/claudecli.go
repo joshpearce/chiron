@@ -39,8 +39,8 @@ type ClaudeCLI struct {
 // times on the first sourced book.
 var roleTimeouts = map[string]time.Duration{
 	"grader":  5 * time.Minute,
-	"planner": 30 * time.Minute,
-	"author":  30 * time.Minute,
+	"planner": 40 * time.Minute,
+	"author":  40 * time.Minute,
 }
 
 // Per-role model tiers. Grading is a bounded judgement against an explicit
@@ -249,7 +249,14 @@ func tail(s string, n int) string {
 // sprite (see LESSONS), and four author calls once hung at startup on it.
 func cliEnv(configDir string) []string {
 	env := append(os.Environ(), "DISABLE_AUTOUPDATER=1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1",
-		"MAX_THINKING_TOKENS="+thinkingBudget())
+		"MAX_THINKING_TOKENS="+thinkingBudget(),
+		// The CLI gives the API two minutes to send a first byte, then
+		// aborts and retries; a large authoring request can sit in the
+		// API's queue longer than that, and every attempt is then thrown
+		// away (the log showed calls ending at exact even minutes, one
+		// abort per two). Eight minutes for the first byte, twenty-five
+		// for the whole request.
+		"CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS=480000", "API_TIMEOUT_MS=1500000")
 	if configDir != "" {
 		_ = os.MkdirAll(configDir, 0o755)
 		env = append(env, "CLAUDE_CONFIG_DIR="+configDir)

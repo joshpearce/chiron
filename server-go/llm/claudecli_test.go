@@ -197,3 +197,20 @@ func TestCallsKeepADebugFileUnderTheConfigDir(t *testing.T) {
 		t.Error("a debug file with no config dir to hold it")
 	}
 }
+
+// The CLI gives the API two minutes to send a first byte, then aborts
+// and retries; when the API queues a large request for longer than
+// that, every attempt is thrown away and the call only ends at our
+// deadline. The server's calls wait longer for the first byte and for
+// the whole request.
+func TestCallsWaitLongerForTheFirstByte(t *testing.T) {
+	env := strings.Join(cliEnv(""), "\n")
+	for _, want := range []string{"CLAUDE_STREAM_FIRST_BYTE_TIMEOUT_MS=480000", "API_TIMEOUT_MS=1500000"} {
+		if !strings.Contains(env, want) {
+			t.Errorf("env lacks %s", want)
+		}
+	}
+	if roleTimeouts["author"] < 40*time.Minute {
+		t.Errorf("author deadline %v leaves no room for one long first wait and the reply", roleTimeouts["author"])
+	}
+}
