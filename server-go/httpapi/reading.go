@@ -29,7 +29,10 @@ import (
 
 const KindReading = "reading"
 
-const maxReadingBytes = 64 << 20
+// A real book with its figures runs to a hundred megabytes and more; the
+// text in it is a fraction of that, but the file is the reader's and is
+// kept whole.
+const maxReadingBytes = 256 << 20
 
 // Reading is what the shelf and a restart need to know about an imported
 // book. The corpus beside it is what the server reads it through.
@@ -56,15 +59,6 @@ func readingMeta(root, id string) string   { return filepath.Join(root, id, "rea
 // handleReadingImport takes the EPUB itself and lays it out as a subject:
 // one chapter per document of the book's spine, in reading order.
 func (s *Server) handleReadingImport(w http.ResponseWriter, r *http.Request) {
-	data, err := io.ReadAll(io.LimitReader(r.Body, maxReadingBytes+1))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "read body: %v", err)
-		return
-	}
-	if int64(len(data)) > maxReadingBytes {
-		writeError(w, http.StatusRequestEntityTooLarge, "books are at most %d MB", maxReadingBytes>>20)
-		return
-	}
 	var raw [4]byte
 	rand.Read(raw[:])
 	id := "read-" + hex.EncodeToString(raw[:])
@@ -74,9 +68,27 @@ func (s *Server) handleReadingImport(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "keep the book: %v", err)
 		return
 	}
+	// Straight to disk: a book with its figures is a hundred megabytes,
+	// and the server is reading one to someone while this arrives.
 	file := filepath.Join(dir, "book.epub")
-	if err := os.WriteFile(file, data, 0o644); err != nil {
+	f, err := os.Create(file)
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "keep the book: %v", err)
+		return
+	}
+	size, err := io.Copy(f, io.LimitReader(r.Body, maxReadingBytes+1))
+	closeErr := f.Close()
+	if err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		os.RemoveAll(dir)
+		writeError(w, http.StatusBadRequest, "read body: %v", err)
+		return
+	}
+	if size > maxReadingBytes {
+		os.RemoveAll(dir)
+		writeError(w, http.StatusRequestEntityTooLarge, "books are at most %d MB", maxReadingBytes>>20)
 		return
 	}
 
@@ -97,7 +109,7 @@ func (s *Server) handleReadingImport(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "lay the book out: %v", err)
 		return
 	}
-	meta := &Reading{ID: id, Title: title, Chapters: len(chapters), Size: int64(len(data)),
+	meta := &Reading{ID: id, Title: title, Chapters: len(chapters), Size: size,
 		ImportedAt: time.Now().UTC().Format(time.RFC3339)}
 	if err := writeReadingMeta(root, meta); err != nil {
 		os.RemoveAll(dir)
