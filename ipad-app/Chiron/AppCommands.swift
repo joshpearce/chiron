@@ -1,6 +1,47 @@
 import Foundation
+import GameController
 import PencilKit
 import UIKit
+
+#if DEBUG
+/// Why the keyboard is up or down, for the harness and the agent link.
+/// iPadOS shows no software keyboard while a hardware one is attached, and
+/// none for a view that does not hold first responder; both look the same
+/// to a reader who cannot type.
+@MainActor
+final class KeyboardProbe {
+    static let shared = KeyboardProbe()
+    private(set) var up = false
+
+    func start() {
+        let c = NotificationCenter.default
+        c.addObserver(forName: UIResponder.keyboardDidShowNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in KeyboardProbe.shared.up = true }
+        }
+        c.addObserver(forName: UIResponder.keyboardDidHideNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in KeyboardProbe.shared.up = false }
+        }
+    }
+
+    /// A hardware keyboard, which iPadOS lets stand in for the software one.
+    var hardware: Bool { GCKeyboard.coalesced != nil }
+
+    /// What holds first responder, which is what the keyboard follows.
+    var firstResponder: String {
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene }).flatMap(\.windows).first(where: \.isKeyWindow) else { return "no window" }
+        return Self.holder(in: window).map { String(describing: type(of: $0)) } ?? "none"
+    }
+
+    private static func holder(in view: UIView) -> UIView? {
+        if view.isFirstResponder { return view }
+        for sub in view.subviews {
+            if let found = holder(in: sub) { return found }
+        }
+        return nil
+    }
+}
+#endif
 
 /// The verbs a script or the sprite's agent can run against the app. They
 /// drive the same session calls the buttons do, so every screen is reached
@@ -347,6 +388,10 @@ enum AppCommands {
             out["canvas_pen"] = ReaderView.Coordinator.probe?.canvasPen ?? ""
             out["canvas_touches"] = ReaderView.Coordinator.probe?.canvasTouches ?? -1
             out["canvas_hit"] = ReaderView.Coordinator.probe?.canvasHit ?? ""
+            out["keyboard_up"] = KeyboardProbe.shared.up
+            out["keyboard_hardware"] = KeyboardProbe.shared.hardware
+            out["first_responder"] = KeyboardProbe.shared.firstResponder
+            out["page_focus"] = ReaderView.Coordinator.probe?.pageFocus ?? ""
             out["pencil"] = s.lastPencil
             out["canvas_frame"] = ReaderView.Coordinator.probe?.canvasFrame ?? ""
             #endif

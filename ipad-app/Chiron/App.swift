@@ -16,6 +16,7 @@ struct ChironApp: App {
                         await library.sync.probe()
                     }
                     #if DEBUG
+                    KeyboardProbe.shared.start()
                     if Harness.requested {
                         Harness.shared.start(library)
                     }

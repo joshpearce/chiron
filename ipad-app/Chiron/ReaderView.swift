@@ -157,6 +157,8 @@ struct ReaderView: UIViewRepresentable {
         var position: Double = 0
         var pageReady = false
         var appliedMarks: [Mark]?
+        /// What the page last focused, for the harness.
+        private(set) var pageFocus = ""
         private var appliedTool: BookSession.Tool = .none
         private var appliedInk: Data?
         private var loadingInk = false
@@ -450,6 +452,15 @@ struct ReaderView: UIViewRepresentable {
                         self.pageReady = true
                         Task { @MainActor in self.apply(marks: self.session.marks) }
                     }
+                }
+            case "focus":
+                // The keyboard follows first responder. With a tool up the
+                // canvas holds it, so a field the page focused would take
+                // the typing with no keyboard to type on.
+                pageFocus = body["tag"] as? String ?? ""
+                if !pageFocus.isEmpty, canvas.isFirstResponder {
+                    canvas.resignFirstResponder()
+                    web?.becomeFirstResponder()
                 }
             case "controls":
                 if let rects = body["rects"] as? [[Double]] {

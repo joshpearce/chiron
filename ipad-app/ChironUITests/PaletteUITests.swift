@@ -151,6 +151,56 @@ final class InkUITests: XCTestCase {
                       width: out["width"] as? Double ?? 0, height: out["height"] as? Double ?? 0)
     }
 
+    /// The keyboard is the only way into a beat's answer, so a tap on the
+    /// field must bring it up. (The Simulator's hardware keyboard hides
+    /// this: the run turns it off.)
+    func testTappingABeatsFieldBringsUpTheKeyboard() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["harness"]
+        app.launchEnvironment["CHIRON_SERVER"] = ProcessInfo.processInfo.environment["CHIRON_SERVER"] ?? "http://localhost:8084"
+        app.launch()
+        let deadline = Date().addingTimeInterval(20)
+        while Date() < deadline, (try? state()) == nil { Thread.sleep(forTimeInterval: 0.5) }
+        try post("open", ["subject": "ai"])
+        XCTAssertTrue(app.buttons["Pen"].waitForExistence(timeout: 15))
+        Thread.sleep(forTimeInterval: 2)
+        let page = app.webViews.firstMatch
+        let selector = "input[inputmode=decimal]"
+
+        // The field is a beat's only way in, with no tool up and with the
+        // pen up after a stroke, when the ink layer holds the keyboard.
+        for tool in ["none", "pen"] {
+            try post("tool", ["tool": tool])
+            Thread.sleep(forTimeInterval: 0.5)
+            if tool == "pen" {
+                page.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.4))
+                    .press(forDuration: 0.1, thenDragTo: page.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.45)),
+                           withVelocity: .slow, thenHoldForDuration: 0.1)
+                Thread.sleep(forTimeInterval: 1.0)
+            }
+            _ = try eval("document.querySelector('\(selector)').scrollIntoView({block: 'center'}); 'ok'")
+            Thread.sleep(forTimeInterval: 1.0)
+            let field = try rectOf(selector: selector)
+            page.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: field.midX, dy: field.midY)).tap()
+            Thread.sleep(forTimeInterval: 1.5)
+            XCTAssertEqual(try eval("document.activeElement.tagName"), "INPUT", "the field took focus with \(tool) up")
+            // (keyboard_hardware is not asserted: the Simulator reports the
+            // Mac's keyboard whether or not it is connected to it.)
+            let s = try state()
+            XCTAssertEqual(s["page_focus"] as? String, "input", "the page said what it focused")
+            XCTAssertFalse((s["first_responder"] as? String ?? "").contains("Canvas"),
+                           "the ink layer let the keyboard go: first responder is \(s["first_responder"] ?? "?")")
+            XCTAssertTrue(app.keyboards.element.waitForExistence(timeout: 5),
+                          "the keyboard came up with \(tool) up; \(s["first_responder"] ?? "?") holds it")
+            app.typeText("7")
+            Thread.sleep(forTimeInterval: 0.5)
+            XCTAssertEqual(try eval("document.querySelector('\(selector)').value"), "7", "the typing landed with \(tool) up")
+            _ = try eval("var i = document.querySelector('\(selector)'); i.value = ''; i.blur(); 'ok'")
+            Thread.sleep(forTimeInterval: 1.0)
+        }
+    }
+
     func testFingersScrollDrawAndHighlightOverThePage() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

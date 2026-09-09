@@ -60,6 +60,16 @@ function reportControls() {
   }, 100);
 }
 
+/* What the page focused, so the native side can let go of the keyboard:
+ * PencilKit's canvas over the page holds first responder while it is up,
+ * and the keyboard follows first responder, not the DOM. */
+document.addEventListener("focusin", (e) => {
+  post({ type: "focus", tag: (e.target.tagName || "").toLowerCase() });
+});
+document.addEventListener("focusout", () => {
+  post({ type: "focus", tag: "" });
+});
+
 /* The first element matching a selector, for the harness. */
 function elementRect(selector) {
   const el = document.querySelector(selector);

@@ -36,6 +36,9 @@ case "$cmd" in
     echo "$out"
     exit 0 ;;
   test)
+    # The Mac's keyboard stands in for the iPad's while it is connected,
+    # and a test about the software keyboard would never see it.
+    defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
     xcrun simctl bootstatus "$UDID" -b >/dev/null
     # The test host is reinstalled by xcodebuild; on iOS 15.5 that install
     # fails over an existing copy (see below), so clear it first.
