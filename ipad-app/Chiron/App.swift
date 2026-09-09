@@ -225,7 +225,7 @@ struct BookView: View {
                     .accessibilityLabel("Contents")
                     ShellButton()
                 }
-                if case .reading = session.screen, !session.isPrimer, let chapter = session.chapter {
+                if case .reading = session.screen, !session.readsAsIs, let chapter = session.chapter {
                     ToolbarItemGroup(placement: .bottomBar) {
                         if let state = session.bookState, !state.debt.isEmpty {
                             Button {
@@ -301,7 +301,7 @@ struct BookshelfView: View {
                         Button {
                             importingPDF = true
                         } label: {
-                            Label("Import a PDF", systemImage: "doc.badge.plus")
+                            Label("Import a PDF or EPUB", systemImage: "doc.badge.plus")
                         }
                         .disabled(!library.sync.connected)
                         .accessibilityHint("A PDF from Files goes on the shelf")
@@ -323,8 +323,16 @@ struct BookshelfView: View {
         }
         .task { await library.refresh() }
         .sheet(isPresented: $showSettings) { ConnectionSettings(store: library.sync.servers) }
-        .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf]) { result in
-            if case .success(let url) = result { Task { await library.importPDF(at: url) } }
+        .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf, .epub]) { result in
+            if case .success(let url) = result {
+                Task {
+                    if url.pathExtension.lowercased() == "epub" {
+                        await library.importBook(at: url)
+                    } else {
+                        await library.importPDF(at: url)
+                    }
+                }
+            }
         }
         .alert("New shelf", isPresented: $namingShelf) {
             TextField("Name", text: $newShelfName)
@@ -795,12 +803,17 @@ struct ShelfCard: View {
                 // progress the reader can pick up again.
                 HStack(spacing: 4) {
                     if subject.drafting || subject.building { Text("🔨").font(.footnote) }
-                    Image(systemName: subject.isPDF ? "doc.richtext" : (subject.scale == "book" || !subject.isPrimer ? "brain" : "doc.text"))
+                    Image(systemName: subject.isPDF ? "doc.richtext"
+                          : subject.isReading ? "book"
+                          : (subject.scale == "book" || !subject.isPrimer ? "brain" : "doc.text"))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
                 .padding(10)
-                .accessibilityLabel(subject.drafting || subject.building ? "Draft" : (subject.isPDF ? "PDF" : (subject.isPrimer ? "Primer" : "Smart book")))
+                .accessibilityLabel(subject.drafting || subject.building ? "Draft"
+                                    : subject.isPDF ? "PDF"
+                                    : subject.isReading ? "Imported book"
+                                    : (subject.isPrimer ? "Primer" : "Smart book"))
             }
             .opacity(openable ? 1 : 0.55)
         }

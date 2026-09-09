@@ -65,6 +65,9 @@ type Config struct {
 	AuthToken   string        `yaml:"auth_token"`
 	// PrimersDir holds captured primers; empty means <parent>/state/primers.
 	PrimersDir string `yaml:"primers_dir"`
+	// ReadingsDir holds books the reader imported to read as they are;
+	// empty means <parent>/state/readings.
+	ReadingsDir string `yaml:"readings_dir"`
 	// Grade all free-text items of a check in one model call. Off by default:
 	// the per-item path is the one verified end to end, and a check is the
 	// moment a learner is most exposed to a regression.
@@ -231,6 +234,7 @@ func New(cfg *Config, root string) (*Server, error) {
 	}
 	s.Discover()
 	s.loadPrimers()
+	s.loadReadings()
 	if len(cfg.Subjects) > 0 {
 		dir := filepath.Dir(resolve(root, cfg.Subjects[0].StateDir))
 		s.activePath = filepath.Join(dir, "active-subject")
@@ -394,6 +398,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /annotations/{subject}/{unit}", s.handleAnnotationsPut)
 	mux.HandleFunc("POST /annotations/{subject}/{unit}/reconcile", s.handleAnnotationsReconcile)
 	mux.HandleFunc("POST /documents", s.handleDocumentUpload)
+	mux.HandleFunc("POST /readings", s.handleReadingImport)
+	mux.HandleFunc("DELETE /readings/{id}", s.handleReadingDelete)
 	mux.HandleFunc("GET /documents/{doc}", s.handleDocumentGet)
 	mux.HandleFunc("GET /documents/{doc}/file", s.handleDocumentFile)
 	mux.HandleFunc("PUT /documents/{doc}/position", s.handleDocumentPosition)
@@ -538,6 +544,9 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 			CurrentUnit:  sub.Learner.Snapshot().CurrentUnit,
 			Debt:         len(sub.Learner.OpenDebt()),
 			Shelf:        s.shelves.shelfOf(sub.ID),
+		}
+		if sub.Kind == KindReading {
+			r.Kind = KindReading
 		}
 		if sub.Kind == KindPrimer && sub.Primer != nil {
 			r.Kind, r.Status = KindPrimer, sub.Primer.Status

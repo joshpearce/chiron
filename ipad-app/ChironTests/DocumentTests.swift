@@ -112,6 +112,35 @@ final class DocumentTests: XCTestCase {
         XCTAssertEqual(fake.uploads.count, 1, "not a PDF, not sent")
         XCTAssertNotNil(library.shelfError)
     }
+
+    /// An EPUB is a book to read, not a document to page through: it goes
+    /// to the server whole and comes back as a subject whose chapters are
+    /// the book's own.
+    func testImportingAnEPUBSendsItAsABookToRead() async throws {
+        let fake = FakeService()
+        var rows = shelf()
+        fake.onSubjects = { rows }
+        let library = library(fake)
+        await library.refresh()
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("A borrowed book.epub")
+        let epub = Data("PK\u{03}\u{04}not really a zip".utf8)
+        try epub.write(to: url)
+        rows = SubjectsResponse(subjects: rows.subjects + [SubjectInfo(id: "read-1", title: "A borrowed book", kind: "reading")],
+                                active: "ai", shelves: [])
+        await library.importBook(at: url)
+        XCTAssertEqual(fake.readings.map(\.title), ["A borrowed book"])
+        XCTAssertEqual(fake.readings.first?.data, epub)
+        XCTAssertTrue(library.subjects.contains { $0.id == "read-1" }, "the shelf was refreshed")
+        XCTAssertNil(library.shelfError)
+        XCTAssertTrue(library.subjects.first { $0.id == "read-1" }?.isReading == true)
+
+        // A file that is not a book is not sent.
+        let text = FileManager.default.temporaryDirectory.appendingPathComponent("notes.epub")
+        try Data("hello".utf8).write(to: text)
+        await library.importBook(at: text)
+        XCTAssertEqual(fake.readings.count, 1, "not an EPUB, not sent")
+        XCTAssertNotNil(library.shelfError)
+    }
 }
 
 /// Ink on a PDF: what the other device drew comes down with the document,

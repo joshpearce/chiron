@@ -211,6 +211,8 @@ struct SubjectInfo: Codable, Identifiable {
 
     var isPrimer: Bool { kind == "primer" }
     var isPDF: Bool { kind == "pdf" }
+    /// A book the reader imported and reads as it is.
+    var isReading: Bool { kind == "reading" }
     /// The server is writing it: a primer being authored, a book being built.
     var authoring: Bool { isPrimer && (status == "authoring" || status == "building") }
     var failed: Bool { isPrimer && status == "failed" }
@@ -722,6 +724,14 @@ struct ReconciledAnnotations: Codable, Equatable {
         case inkB64 = "ink_b64"
         case inkOtherB64 = "ink_other_b64"
     }
+}
+
+/// A book the reader imported, as the server made it: a subject whose
+/// chapters are the book's own.
+struct ImportedBook: Codable, Equatable {
+    let id: String
+    let title: String
+    let chapters: Int
 }
 
 /// A PDF the server keeps for the shelf, with where the reader is in it.

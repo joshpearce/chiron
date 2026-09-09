@@ -396,7 +396,9 @@ type authorCacheEntry struct {
 }
 
 func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*render.Chapter, error) {
-	if sub.Kind == KindPrimer {
+	// A primer and an imported book are read as they are: the unit's own
+	// prose, whole, with nothing to answer.
+	if sub.Kind == KindPrimer || sub.Kind == KindReading {
 		return s.buildPrimerChapter(sub, unitID)
 	}
 	unit, ok := sub.Corpus.Units[unitID]

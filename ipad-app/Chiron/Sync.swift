@@ -24,6 +24,7 @@ protocol ChironService: AnyObject {
     func putAnnotations(subject: String, unit: String, _ a: Annotations, baseVersion: Int) async throws -> AnnotationsPut
     func reconcileAnnotations(subject: String, unit: String, mine: Annotations, theirs: Annotations) async throws -> ReconciledAnnotations
     func uploadDocument(title: String, pages: Int, data: Data) async throws -> Document
+    func importBook(title: String, data: Data) async throws -> ImportedBook
     func documentData(id: String) async throws -> Data
     func documentPosition(id: String, page: Int, position: Double) async throws
     func deleteDocument(id: String) async throws
@@ -243,6 +244,16 @@ final class Sync: ObservableObject, ChironService {
         var req = try request("/documents" + (parts.string ?? ""), timeout: 300)
         req.httpMethod = "POST"
         req.setValue("application/pdf", forHTTPHeaderField: "Content-Type")
+        req.httpBody = data
+        return try await perform(req)
+    }
+
+    func importBook(title: String, data: Data) async throws -> ImportedBook {
+        var parts = URLComponents()
+        parts.queryItems = [URLQueryItem(name: "title", value: title)]
+        var req = try request("/readings" + (parts.string ?? ""), timeout: 300)
+        req.httpMethod = "POST"
+        req.setValue("application/epub+zip", forHTTPHeaderField: "Content-Type")
         req.httpBody = data
         return try await perform(req)
     }

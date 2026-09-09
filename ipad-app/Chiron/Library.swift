@@ -442,6 +442,28 @@ final class Library: ObservableObject {
 
     /// A PDF from Files or the share sheet goes to the server and onto the
     /// shelf; the title is the file's name unless the sender knew better.
+    /// An EPUB the reader owns: it goes to the server whole, which reads
+    /// it into a subject whose chapters are the book's own. Nothing about
+    /// it is adapted; what the reader adds to it is theirs.
+    func importBook(at url: URL, title: String? = nil) async {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        // Every EPUB is a zip, and every zip starts the same way.
+        guard let data = try? Data(contentsOf: url), data.starts(with: [0x50, 0x4B, 0x03, 0x04]) else {
+            shelfError = "\(url.lastPathComponent) is not an EPUB."
+            return
+        }
+        let name = title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            _ = try await service.importBook(title: (name?.isEmpty == false ? name! : url.deletingPathExtension().lastPathComponent),
+                                             data: data)
+            shelfError = nil
+            await refresh()
+        } catch {
+            shelfError = "The book could not be sent: \(error.localizedDescription)"
+        }
+    }
+
     func importPDF(at url: URL, title: String? = nil) async {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }

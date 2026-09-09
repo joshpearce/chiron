@@ -144,6 +144,9 @@ final class BookSession: ObservableObject {
     /// annotate, and extend from margin notes.
     var kind: String = "book"
     var isPrimer: Bool { kind == "primer" }
+    /// A primer and an imported book are read as they are: their chapters
+    /// are whole and there is nothing to answer at the end of one.
+    var readsAsIs: Bool { kind == "primer" || kind == "reading" }
 
     /// The page, when one is loaded: what a script or a gesture needs from it.
     weak var page: PageBridge?

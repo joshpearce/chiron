@@ -263,3 +263,28 @@ func (b *epubBook) chapter(locator string) (title, markdown string, err error) {
 	}
 	return "", "", fmt.Errorf("no section %q in the book", locator)
 }
+
+// EPUBChapter is one document of an EPUB's spine, as prose.
+type EPUBChapter struct {
+	Title    string
+	Markdown string
+}
+
+// EPUBBook is a reader's own EPUB read into chapters, for anything that
+// wants the text rather than a source to adapt: the book title, then the
+// spine in reading order.
+func EPUBBook(path string) (string, []EPUBChapter, error) {
+	b, err := openEPUB(path)
+	if err != nil {
+		return "", nil, err
+	}
+	out := make([]EPUBChapter, 0, len(b.spine))
+	for _, it := range b.spine {
+		_, md, err := b.chapter(it.path)
+		if err != nil {
+			return "", nil, err
+		}
+		out = append(out, EPUBChapter{Title: it.title, Markdown: md})
+	}
+	return b.title, out, nil
+}

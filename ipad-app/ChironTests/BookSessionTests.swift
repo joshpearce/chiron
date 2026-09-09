@@ -45,6 +45,7 @@ final class FakeService: ChironService {
     var onUploadDocument: (String, Int, Data) throws -> Document = { title, pages, _ in Document(id: "doc-\(title)", title: title, pages: pages) }
     var onDocumentData: (String) throws -> Data = { _ in throw URLError(.cannotConnectToHost) }
     var uploads: [(title: String, pages: Int, data: Data)] = []
+    var readings: [(title: String, data: Data)] = []
     var documentFetches: [String] = []
     var positions: [(id: String, page: Int, position: Double)] = []
     var documentsDeleted: [String] = []
@@ -110,6 +111,10 @@ final class FakeService: ChironService {
     }
     func uploadDocument(title: String, pages: Int, data: Data) async throws -> Document {
         uploads.append((title, pages, data)); return try onUploadDocument(title, pages, data)
+    }
+    func importBook(title: String, data: Data) async throws -> ImportedBook {
+        readings.append((title, data))
+        return ImportedBook(id: "read-1", title: title, chapters: 3)
     }
     func documentData(id: String) async throws -> Data { documentFetches.append(id); return try onDocumentData(id) }
     func documentPosition(id: String, page: Int, position: Double) async throws { positions.append((id, page, position)) }

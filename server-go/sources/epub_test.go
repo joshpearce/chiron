@@ -157,3 +157,24 @@ func TestEPUBTitlesFallBackToTheHeading(t *testing.T) {
 		t.Errorf("file-name title = %q", secs[2].Title)
 	}
 }
+
+// EPUBBook is the whole book as chapters, for the reader who wants to read
+// it rather than build from it.
+func TestEPUBBookReadsEveryChapterInOrder(t *testing.T) {
+	title, chapters, err := EPUBBook(borrowedBook(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if title != "A Borrowed Book" {
+		t.Errorf("title = %q", title)
+	}
+	if len(chapters) != 3 {
+		t.Fatalf("chapters = %d", len(chapters))
+	}
+	if chapters[1].Title != "What Lending Is" {
+		t.Errorf("second chapter = %q", chapters[1].Title)
+	}
+	if !strings.Contains(chapters[2].Markdown, "deposits cost less") {
+		t.Errorf("third chapter's prose:\n%s", chapters[2].Markdown)
+	}
+}
