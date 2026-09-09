@@ -289,4 +289,21 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   everywhere, since the author wrote U11-M1 in one file and u11-m1 in
   the next. A build that says "generated corpus did not load" is
   diagnosed by copying the corpus down and running `corpus-lint` on it.
-
+- **The Simulator borrows the Mac's keyboard (2026-09-08).** A test that
+  taps a text field and types passes whether or not the software keyboard
+  ever appeared: XCUITest types through the hardware keys. Any test about
+  the keyboard needs `defaults write com.apple.iphonesimulator
+  ConnectHardwareKeyboard -bool false` first, which `sim-run.sh test` and
+  `sim-run.sh fast` now do. `GCKeyboard.coalesced` is no help there: the
+  Simulator reports the Mac's keyboard either way. On a device it is the
+  signal, since iPadOS shows no software keyboard while one is attached.
+- **Test runs, not builds, are what cost (2026-09-08).** An incremental
+  simulator build is 3-9 seconds; the full suite is 183. Of that, the 85
+  unit tests are 9 seconds and the 8 UI tests are the rest. `sim-run.sh
+  fast [test id ...]` builds once with `build-for-testing` and then runs
+  `test-without-building` against the built products: 13 seconds for the
+  whole unit target, 39 for one UI test instead of 70. Use it for the
+  red-green loop and keep `sim-run.sh test` for the run before a commit.
+  `test-without-building` writes no bundle into the scheme's log
+  directory, so it must be given `-resultBundlePath`; reading the newest
+  bundle there reports the previous full run's verdict.

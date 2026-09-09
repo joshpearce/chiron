@@ -7,7 +7,14 @@
 #   ./scripts/sim-run.sh selftest [args]    launch the self-test, wait for its
 #                                           verdict, exit 0 on PASS
 #                                           (args: level=1..5 subject=<id> selftestweak)
-#   ./scripts/sim-run.sh test               run the ChironTests unit tests
+#   ./scripts/sim-run.sh test               run every test (unit and UI)
+#   ./scripts/sim-run.sh fast [id ...]      build once, then run only the
+#                                           given tests against that build
+#                                           (an id is ChironTests/SomeTests
+#                                           or .../someTest, repeatable; with
+#                                           no id, the unit target alone).
+#                                           Reuses the built products, so a
+#                                           red-green loop pays the build once.
 #   ./scripts/sim-run.sh shot [name]        screenshot to /tmp/<name>.png
 #
 # DEVICE picks the simulator by name: chiron-ipad (iPad A16, current iPadOS)
@@ -35,6 +42,36 @@ case "$cmd" in
     xcrun simctl io "$UDID" screenshot "$out" >/dev/null 2>&1
     echo "$out"
     exit 0 ;;
+  fast)
+    shift || true
+    xcrun simctl bootstatus "$UDID" -b >/dev/null
+    defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
+    cd "$APPDIR"
+    xcodebuild -project Chiron.xcodeproj -scheme Chiron -skipPackagePluginValidation \
+      -destination "platform=iOS Simulator,id=$UDID" \
+      -derivedDataPath "build-sim" build-for-testing -quiet 2>&1 | grep -vE "^$|objc\[[0-9]+\]: Class" || true
+    # The scheme's own .xctestrun is the one that carries both test targets;
+    # the project-named one has only the unit tests.
+    run=$(ls -t build-sim/Build/Products/Chiron_iphonesimulator*.xctestrun 2>/dev/null | head -1)
+    [ -n "$run" ] || { echo "no xctestrun; build-for-testing failed" >&2; exit 1; }
+    only=()
+    if [ "$#" -eq 0 ]; then
+      only=(-only-testing:ChironTests)
+    else
+      for id in "$@"; do only+=("-only-testing:$id"); done
+    fi
+    # test-without-building writes no bundle into the scheme's log dir, so
+    # it is told where to put one; reading the newest there would report the
+    # last full run's verdict instead of this one's.
+    log="build-sim/fast.xcresult"
+    rm -rf "$log"
+    xcodebuild test-without-building -xctestrun "$run" -resultBundlePath "$log" \
+      -destination "platform=iOS Simulator,id=$UDID" "${only[@]}" -quiet 2>&1 \
+      | grep -vE "^$|objc\[[0-9]+\]: Class" || true
+    [ -d "$log" ] || { echo "no test result bundle" >&2; exit 1; }
+    xcrun xcresulttool get test-results summary --path "$log" 2>/dev/null | grep -E '"(result|totalTestCount|passedTests|failedTests)"' || true
+    xcrun xcresulttool get test-results summary --path "$log" 2>/dev/null | grep -q '"result" : "Passed"'
+    exit $? ;;
   test)
     # The Mac's keyboard stands in for the iPad's while it is connected,
     # and a test about the software keyboard would never see it.
