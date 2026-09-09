@@ -371,3 +371,73 @@ func illustratedEPUB(t *testing.T) []byte {
 	}
 	return buf.Bytes()
 }
+
+// A device takes the whole book: every chapter can be fetched without
+// the book thinking it was read, and the pictures list says what else to
+// bring.
+func TestAWholeBookCanBeTakenWithoutReadingIt(t *testing.T) {
+	s := newServer(t, "")
+	r := httptest.NewRequest("POST", "/readings", bytes.NewReader(illustratedEPUB(t)))
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, r)
+	var made struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &made)
+	if made.ID == "" {
+		t.Fatalf("import: %s", w.Body)
+	}
+
+	// Nothing has been read: the chapter still comes.
+	w = do(t, s, "GET", "/chapter/"+made.ID+"?unit=u1", "", "")
+	var got struct {
+		Chapter *struct {
+			Unit  string `json:"unit"`
+			Title string `json:"title"`
+			HTML  string `json:"html"`
+		} `json:"chapter"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Chapter == nil || got.Chapter.Unit != "u1" {
+		t.Fatalf("chapter: %s", w.Body)
+	}
+	if !strings.Contains(got.Chapter.HTML, "what the exhibit shows") {
+		t.Errorf("the chapter came without its prose:\n%s", got.Chapter.HTML)
+	}
+
+	// And fetching it did not make it the reader's current chapter.
+	w = do(t, s, "GET", "/subjects", "", "")
+	var shelf struct {
+		Subjects []struct {
+			ID           string  `json:"id"`
+			CurrentUnit  *string `json:"current_unit"`
+			UnitsCleared int     `json:"units_cleared"`
+		} `json:"subjects"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &shelf)
+	for _, row := range shelf.Subjects {
+		if row.ID == made.ID && row.CurrentUnit != nil {
+			t.Errorf("taking the book made %s the current chapter", *row.CurrentUnit)
+		}
+	}
+
+	// The pictures are listed, with what each weighs.
+	w = do(t, s, "GET", "/readings/"+made.ID+"/assets", "", "")
+	var list struct {
+		Assets []struct {
+			Name string `json:"name"`
+			Size int64  `json:"size"`
+		} `json:"assets"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Assets) != 1 || list.Assets[0].Size == 0 {
+		t.Fatalf("pictures: %+v", list.Assets)
+	}
+	if !strings.HasSuffix(list.Assets[0].Name, ".jpg") {
+		t.Errorf("picture name: %q", list.Assets[0].Name)
+	}
+}

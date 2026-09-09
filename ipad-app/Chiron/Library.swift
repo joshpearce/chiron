@@ -331,6 +331,7 @@ final class Library: ObservableObject {
             title: info?.title ?? id,
             service: service, storage: storage)
         if let k = info?.kind { s.kind = k }
+        s.assets = bookAssets
         // A passage sent on from inside the book: the card opens over it,
         // naming the book as where the words came from.
         s.onCapture = { [weak self] text in
@@ -341,6 +342,7 @@ final class Library: ObservableObject {
         session = s
         activeSubjectID = id
         await s.open()
+        s.refreshKept()
     }
 
     func closeBook() {

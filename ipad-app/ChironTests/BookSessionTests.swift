@@ -47,6 +47,11 @@ final class FakeService: ChironService {
     var uploads: [(title: String, pages: Int, data: Data)] = []
     var readings: [(title: String, data: Data)] = []
     var assetFetches: [(subject: String, name: String)] = []
+    var chaptersByUnit: [String] = []
+    var onChapterByUnit: (String, String) throws -> ChapterStatus = { _, _ in
+        throw ServiceError.status(404)
+    }
+    var onBookAssetNames: (String) throws -> [String] = { _ in [] }
     var onBookAsset: (String, String) throws -> Data = { _, name in Data("bytes of \(name)".utf8) }
     var documentFetches: [String] = []
     var positions: [(id: String, page: Int, position: Double)] = []
@@ -118,6 +123,11 @@ final class FakeService: ChironService {
         readings.append((title, data))
         return ImportedBook(id: "read-1", title: title, chapters: 3)
     }
+    func chapter(subject: String, unit: String) async throws -> ChapterStatus {
+        chaptersByUnit.append(unit)
+        return try onChapterByUnit(subject, unit)
+    }
+    func bookAssetNames(subject: String) async throws -> [String] { try onBookAssetNames(subject) }
     func bookAsset(subject: String, name: String) async throws -> Data {
         assetFetches.append((subject, name))
         return try onBookAsset(subject, name)

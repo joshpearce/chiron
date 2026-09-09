@@ -358,6 +358,33 @@ struct ContentsList: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                // A book read as it is can be taken whole, so it reads
+                // where there is no server: on a plane, which is what this
+                // is all for.
+                if session.readsAsIs, session.bookState != nil {
+                    Section {
+                        switch session.kept {
+                        case .no:
+                            Button {
+                                Task { await session.keepOnDevice() }
+                            } label: {
+                                Label("Keep on this iPad", systemImage: "arrow.down.circle")
+                            }
+                        case .keeping(let done, let total):
+                            HStack(spacing: 10) {
+                                ProgressView(value: Double(done), total: Double(max(total, 1)))
+                                    .frame(maxWidth: 120)
+                                Text("Keeping \(done) of \(total)")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
+                        case .yes:
+                            Label("Kept on this iPad", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+                    } footer: {
+                        Text("Every chapter and every picture, so the book reads with no server to ask.")
+                    }
+                }
                 if let state = session.bookState {
                     Section("Progress") {
                         ForEach(state.spine) { entry in

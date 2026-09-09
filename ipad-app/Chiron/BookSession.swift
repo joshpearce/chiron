@@ -280,6 +280,68 @@ final class BookSession: ObservableObject {
         persist()
     }
 
+    /// An imported book's pictures, for keeping it on this device.
+    var assets: BookAssets?
+
+    /// How much of a book read as it is this device holds: nothing, some
+    /// of it while it is being fetched, or all of it.
+    enum Kept: Equatable {
+        case no
+        case keeping(done: Int, total: Int)
+        case yes
+    }
+    @Published private(set) var kept: Kept = .no
+
+    private var chaptersDir: URL { dir.appendingPathComponent("chapters", isDirectory: true) }
+    private func chapterFile(_ unit: String) -> URL {
+        chaptersDir.appendingPathComponent("\(unit).json")
+    }
+
+    /// A chapter this device already holds, whatever the server is doing.
+    func storedChapter(_ unit: String) -> ChapterPayload? {
+        guard let d = try? Data(contentsOf: chapterFile(unit)) else { return nil }
+        return try? JSONDecoder().decode(ChapterPayload.self, from: d)
+    }
+
+    /// Take the whole book: every chapter, and every picture in it, so it
+    /// reads with no server to ask. Fetching a chapter does not read it.
+    func keepOnDevice() async {
+        guard readsAsIs, let spine = bookState?.spine, !spine.isEmpty else { return }
+        var names: [String] = (try? await service.bookAssetNames(subject: subjectID)) ?? []
+        names = names.filter { !$0.isEmpty }
+        let total = spine.count + names.count
+        kept = .keeping(done: 0, total: total)
+        try? FileManager.default.createDirectory(at: chaptersDir, withIntermediateDirectories: true)
+        var done = 0
+        for entry in spine {
+            if let status = try? await service.chapter(subject: subjectID, unit: entry.unit),
+               let ch = status.chapter, let data = try? JSONEncoder().encode(ch) {
+                try? data.write(to: chapterFile(entry.unit))
+            }
+            done += 1
+            kept = .keeping(done: done, total: total)
+        }
+        for name in names {
+            _ = try? await assets?.data(subject: subjectID, name: name)
+            done += 1
+            kept = .keeping(done: done, total: total)
+        }
+        kept = heldChapters() >= spine.count ? .yes : .no
+    }
+
+    /// How many of the book's chapters this device holds.
+    func heldChapters() -> Int {
+        (try? FileManager.default.contentsOfDirectory(at: chaptersDir, includingPropertiesForKeys: nil))?
+            .filter { $0.pathExtension == "json" }.count ?? 0
+    }
+
+    /// Whether the whole book is here, checked when it is opened.
+    func refreshKept() {
+        guard readsAsIs, let spine = bookState?.spine, !spine.isEmpty else { kept = .no; return }
+        if case .keeping = kept { return }
+        kept = heldChapters() >= spine.count ? .yes : .no
+    }
+
     /// The chapter after the open one in the book's own order, and the one
     /// before it: what a book read as it is turns between, since it has no
     /// check to carry the reader forward.
@@ -294,9 +356,17 @@ final class BookSession: ObservableObject {
     }
 
     /// Turn to a chapter the reader picked, from the page or the contents.
+    /// With no server to ask, a chapter this device holds is read from
+    /// here: that is what taking the book is for.
     func turnTo(_ entry: SpineEntry?) async {
         guard let entry else { return }
         await start(choice: entry.unit)
+        if case .error = screen, let held = storedChapter(entry.unit) {
+            errorMessage = nil
+            retryAction = nil
+            setChapter(held)
+            show(held)
+        }
     }
 
     func start(choice: String? = nil) async {
@@ -726,6 +796,7 @@ final class BookSession: ObservableObject {
     #if DEBUG
     /// Tests put a chapter in hand without a server round trip.
     func setChapterForTesting(_ ch: ChapterPayload) { setChapter(ch) }
+    func setBookStateForTesting(_ st: BookState) { bookState = st }
     #endif
 
     /// Strokes arrive many times a second; the file is written once the

@@ -6,6 +6,10 @@ protocol ChironService: AnyObject {
     func subjects() async throws -> SubjectsResponse
     func state(subject: String) async throws -> BookState
     func chapter(subject: String) async throws -> ChapterStatus
+    /// One chapter of a book read as it is, without reading it.
+    func chapter(subject: String, unit: String) async throws -> ChapterStatus
+    /// The names of the pictures a book carries.
+    func bookAssetNames(subject: String) async throws -> [String]
     func exchange(_ request: ExchangeRequest) async throws -> ExchangeResponse
     func ink(subject: String, _ submission: InkSubmission) async throws -> ExchangeResponse
     func ask(subject: String, unit: String, quote: String, question: String, history: [QA]) async throws -> AskResponse
@@ -92,6 +96,19 @@ final class Sync: ObservableObject, ChironService {
 
     func chapter(subject: String) async throws -> ChapterStatus {
         try await get("/chapter/\(subject)", timeout: 30)
+    }
+
+    func chapter(subject: String, unit: String) async throws -> ChapterStatus {
+        try await get("/chapter/\(subject)?unit=\(unit)", timeout: 60)
+    }
+
+    func bookAssetNames(subject: String) async throws -> [String] {
+        struct List: Codable {
+            struct Asset: Codable { let name: String }
+            let assets: [Asset]
+        }
+        let list: List = try await get("/readings/\(subject)/assets", timeout: 60)
+        return list.assets.map(\.name)
     }
 
     /// Grading a check is a model call; the timeout is generous but finite

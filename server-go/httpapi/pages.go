@@ -97,6 +97,14 @@ func currentChapter(sub *Subject) (*render.Chapter, error) {
 // screen can open cleared chapters without touching learner state.
 func requestChapter(sub *Subject, r *http.Request) (*render.Chapter, error) {
 	if unit := r.URL.Query().Get("unit"); unit != "" {
+		// A book read as it is has nothing to author and nothing to grade:
+		// any chapter of it can be rendered on request, which is how a
+		// device takes the whole book with it.
+		if sub.Kind == KindReading {
+			if ch, err := verbatimChapter(sub, unit); err == nil {
+				return ch, nil
+			}
+		}
 		return loadChapter(sub, unit)
 	}
 	return currentChapter(sub)

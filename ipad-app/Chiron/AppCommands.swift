@@ -278,6 +278,9 @@ enum AppCommands {
             session.removeMark(id)
         case "undo":
             session.undo()
+        case "keep":
+            // Take the whole book: every chapter and every picture.
+            await session.keepOnDevice()
         case "answer":
             guard let ch = session.chapter else { throw Failure.noBook }
             await session.submitCheck(answers(for: ch, mode: args["mode"] as? String ?? "correct", llm: llm))
@@ -385,6 +388,11 @@ enum AppCommands {
             out["pen_color"] = s.penColor.rawValue
             out["ink_strokes"] = s.inkData.flatMap { try? PKDrawing(data: $0) }?.strokes.count ?? 0
             out["can_undo"] = s.canUndo
+            switch s.kept {
+            case .no: out["kept"] = "no"
+            case .keeping(let done, let total): out["kept"] = "keeping \(done)/\(total)"
+            case .yes: out["kept"] = "yes"
+            }
             out["removing"] = s.removing?.mark.id ?? ""
             out["position"] = s.chapter.map { s.position(for: $0.unit) } ?? 0
             #if DEBUG

@@ -14,6 +14,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/mjbraun/chiron/server/render"
+	"github.com/mjbraun/chiron/server/roles"
 	"github.com/mjbraun/chiron/server/sources"
 )
 
@@ -422,4 +424,36 @@ func slugOf(title, fallback string) string {
 func yamlQuote(s string) string {
 	b, _ := json.Marshal(s)
 	return string(b)
+}
+
+// verbatimChapter renders one chapter of an imported book without
+// touching what the reader has read: no chapter is "started" by being
+// fetched, so a device can take the whole book without the book thinking
+// it was read.
+func verbatimChapter(sub *Subject, unitID string) (*render.Chapter, error) {
+	unit, ok := sub.Corpus.Units[unitID]
+	if !ok {
+		return nil, fmt.Errorf("no chapter %s", unitID)
+	}
+	return render.RenderChapter(unit, roles.VerbatimSections(unit), render.Directives{NextAction: "read"}, nil, nil)
+}
+
+// handleReadingAssetList says what pictures a book has, so a device can
+// take them all before it loses the server.
+func (s *Server) handleReadingAssetList(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	entries, err := os.ReadDir(readingAssets(s.readingsRoot(), id))
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"assets": []any{}})
+		return
+	}
+	assets := []map[string]any{}
+	for _, e := range entries {
+		info, err := e.Info()
+		if err != nil || e.IsDir() {
+			continue
+		}
+		assets = append(assets, map[string]any{"name": e.Name(), "size": info.Size()})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"assets": assets})
 }
