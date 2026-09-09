@@ -92,9 +92,13 @@ whose order the syllabus follows, the rest interleave), or write
 builder searches its index and the open catalogues and picks a spine
 itself. The picks and their reasons are in the book's `sources.yaml`,
 and each chapter ends with what it was adapted from. A book the reader
-owns as a PDF is a source too: copy it to the sprite, add an index entry
-with `fetch: {kind: file, path: /home/sprite/chiron/sources/<name>.pdf}`
-and the licence it was read under, and name it with `-source`. To see
+owns as a PDF or an EPUB is a source too: copy it to the sprite, add an
+index entry with
+`fetch: {kind: file, path: /home/sprite/chiron/sources/<name>.epub}`
+and the licence it was read under, and name it with `-source`. An EPUB
+is split at its spine, one chapter per document, which is where its own
+reader turns the page; a PDF at the pages that open with a chapter
+heading. To see
 the plan before any unit is authored, add `-plan-only`: the job ends at
 stage `planned` with the syllabus at `corpus-<slug>/syllabus.yaml` on the
 sprite; the same command again, without the flag, authors from it.

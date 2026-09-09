@@ -15,8 +15,9 @@ import (
 // fileFetcher reads a document kept on the server's own disk: material
 // the reader has a copy of beside the corpus. A PDF goes through
 // pdftotext and is split into chapters at the pages that open with a
-// chapter heading (a book's "CHAPTER", its number, its title); a
-// Markdown or text file is split at its headings. The index entry
+// chapter heading (a book's "CHAPTER", its number, its title); an EPUB is
+// split at its spine, which is where its own reader would turn the page;
+// a Markdown or text file is split at its headings. The index entry
 // records the licence it was read under, as for any other source.
 type fileFetcher struct{}
 
@@ -30,6 +31,13 @@ func (fileFetcher) contents(ctx context.Context, c *Client, s *Source) ([]Sectio
 			return nil, err
 		}
 		return pdfChapters(pages), nil
+	}
+	if strings.EqualFold(filepath.Ext(s.Fetch.Path), ".epub") {
+		book, err := openEPUB(s.Fetch.Path)
+		if err != nil {
+			return nil, err
+		}
+		return book.sections(), nil
 	}
 	data, err := os.ReadFile(s.Fetch.Path)
 	if err != nil {
@@ -47,6 +55,17 @@ func (fileFetcher) contents(ctx context.Context, c *Client, s *Source) ([]Sectio
 
 func (fileFetcher) fetch(ctx context.Context, c *Client, s *Source, locator string) (fetched, error) {
 	url := "file://" + s.Fetch.Path
+	if strings.EqualFold(filepath.Ext(s.Fetch.Path), ".epub") {
+		book, err := openEPUB(s.Fetch.Path)
+		if err != nil {
+			return fetched{}, err
+		}
+		title, md, err := book.chapter(locator)
+		if err != nil {
+			return fetched{}, fmt.Errorf("%s: %w", s.Fetch.Path, err)
+		}
+		return fetched{title: title, markdown: md, url: url + "#" + locator}, nil
+	}
 	if strings.EqualFold(filepath.Ext(s.Fetch.Path), ".pdf") {
 		from, to, err := pageRange(locator)
 		if err != nil {

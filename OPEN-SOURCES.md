@@ -577,10 +577,12 @@ fetcher and its parameters (`github-raw` with repo, ref and path pattern;
 `openstax-rex` with book uuid; `libretexts` with the book URL; `mediawiki`
 with the site and page prefix; `ocw` with the course id; `gutenberg` with
 the ebook id; `pressbooks` with the network and book slug; `file` with
-the path of a PDF, Markdown or text file on the server's disk, for a
-book the reader owns a copy of and keeps beside the corpus: a PDF is
+the path of a PDF, EPUB, Markdown or text file on the server's disk, for
+a book the reader owns a copy of and keeps beside the corpus: a PDF is
 read through pdftotext and split into chapters at the pages that open
-with "CHAPTER", a number and a title), plus a `contents` recipe for the
+with "CHAPTER", a number and a title; an EPUB is read from its own
+package and split at its spine, one chapter per document, titled from
+its navigation document), plus a `contents` recipe for the
 table of contents and an `exercises` note from 2d. Hand-curated, about 130 entries; a lint checks every A entry has a
 fetch recipe and a licence URL.
 
@@ -738,9 +740,12 @@ humanities brief. Step 5 is open.
 Guardrails throughout: rules 1 to 10 of section 4, one fetch at a time
 per host, and nothing behind a bot wall.
 
-Status 2026-09-07: a `file` source kind reads a PDF the reader owns from
-the sprite's disk (pdftotext, chapters split at the pages that open with
-"CHAPTER", a number and a title), and `chiron teach -plan-only` writes
+Status 2026-09-08: the `file` source kind reads a PDF or an EPUB the
+reader owns from the sprite's disk (a PDF through pdftotext, chapters
+split at the pages that open with "CHAPTER", a number and a title; an
+EPUB through its own package, one chapter per spine document, titled
+from its navigation document or its own first heading), and
+`chiron teach -plan-only` writes
 the syllabus and stops so the plan can be cut before a unit is authored.
 The first such book, Private Debt for Norm Capital, was planned at 21
 units, merged by hand to 17 plus placement, and authored from there.
