@@ -307,3 +307,27 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   `test-without-building` writes no bundle into the scheme's log
   directory, so it must be given `-resultBundlePath`; reading the newest
   bundle there reports the previous full run's verdict.
+- **UI tests: the app is shared, the waits are not fixed (2026-09-08).**
+  Every UI test now builds on `HarnessTestCase`: one app per class rather
+  than one per test, and `waitUntil`/`waitFor` polling the harness instead
+  of `Thread.sleep`. That took the UI target from about 174 seconds to 143
+  and turned bare timeouts into failures that carry the app's state. Two
+  things it uncovered: tests in a class share the page, so a beat's field
+  keeps what an earlier test typed (`openBook` clears it), and an app
+  container with nothing in it cannot reach a server from the launch
+  override alone, since the shelf and the exchange both go to the *saved*
+  server (the base class saves it, as the settings screen would).
+- **A stale app answers for a new one (2026-09-08).** Simulators share the
+  Mac's loopback, so an app left running in any booted simulator holds the
+  harness port and answers a test that just launched its own. Every launch
+  now carries `harness_nonce=` and the state carries it back; the runner
+  terminates the app in every booted simulator first. Without the nonce
+  this shows up as a test that cannot find the palette in an app that
+  looks connected and healthy.
+- **Parallel UI testing does not pay at this size (2026-09-08).**
+  `sim-run.sh parallel` exists and works: a dev server per worker
+  (`sim-server.sh start <port>`, seeded from an existing sim state), a
+  harness port per clone. But with 8 UI tests the clone setup costs about
+  what the split saves (144 seconds either way), and two simulators
+  contending for the Mac drop touches: `canvas_touches` stays 0 and drags
+  never land. Keep it for when the suite is long enough to win.

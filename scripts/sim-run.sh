@@ -8,6 +8,15 @@
 #                                           verdict, exit 0 on PASS
 #                                           (args: level=1..5 subject=<id> selftestweak)
 #   ./scripts/sim-run.sh test               run every test (unit and UI)
+#   ./scripts/sim-run.sh parallel [workers] [id ...]
+#                                           run tests across simulator
+#                                           clones (2 by default), each
+#                                           worker on its own dev server.
+#                                           Not the default: at this suite's
+#                                           size the clones cost about what
+#                                           they save, and two simulators
+#                                           contending drop touches. Here
+#                                           for when the suite is longer.
 #   ./scripts/sim-run.sh fast [id ...]      build once, then run only the
 #                                           given tests against that build
 #                                           (an id is ChironTests/SomeTests
@@ -42,6 +51,42 @@ case "$cmd" in
     xcrun simctl io "$UDID" screenshot "$out" >/dev/null 2>&1
     echo "$out"
     exit 0 ;;
+  parallel)
+    shift || true
+    workers="${1:-2}"
+    case "$workers" in ''|*[!0-9]*) workers=2 ;; *) shift || true ;; esac
+    # One dev server per worker, each with its own state: two apps marking
+    # up the same chapter on one server is the conflict the reader sees
+    # when two devices do it, and it would land mid-test.
+    for i in $(seq 0 $((workers - 1))); do
+      "$SCRIPTS/sim-server.sh" start $((8084 + i)) >/dev/null
+    done
+    # An app left running in any booted simulator holds a harness port,
+    # and every simulator shares the Mac's loopback: a worker would read
+    # the stranger's state.
+    for booted in $(xcrun simctl list devices booted | sed -nE 's/.*\(([0-9A-F-]{36})\).*/\1/p'); do
+      xcrun simctl terminate "$booted" "$BUNDLE" 2>/dev/null || true
+    done
+    xcrun simctl bootstatus "$UDID" -b >/dev/null
+    defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
+    cd "$APPDIR"
+    xcodebuild -project Chiron.xcodeproj -scheme Chiron -skipPackagePluginValidation \
+      -destination "platform=iOS Simulator,id=$UDID" \
+      -derivedDataPath "build-sim" build-for-testing -quiet 2>&1 | grep -vE "^$|objc\[[0-9]+\]: Class" || true
+    run=$(ls -t build-sim/Build/Products/Chiron_iphonesimulator*.xctestrun 2>/dev/null | head -1)
+    [ -n "$run" ] || { echo "no xctestrun; build-for-testing failed" >&2; exit 1; }
+    only=()
+    for id in "$@"; do only+=("-only-testing:$id"); done
+    log="build-sim/parallel.xcresult"
+    rm -rf "$log"
+    xcodebuild test-without-building -xctestrun "$run" -resultBundlePath "$log" \
+      -destination "platform=iOS Simulator,id=$UDID" "${only[@]}" \
+      -parallel-testing-enabled YES -maximum-parallel-testing-workers "$workers" -quiet 2>&1 \
+      | grep -vE "^$|objc\[[0-9]+\]: Class" || true
+    [ -d "$log" ] || { echo "no test result bundle" >&2; exit 1; }
+    xcrun xcresulttool get test-results summary --path "$log" 2>/dev/null | grep -E '"(result|totalTestCount|passedTests|failedTests)"' || true
+    xcrun xcresulttool get test-results summary --path "$log" 2>/dev/null | grep -q '"result" : "Passed"'
+    exit $? ;;
   fast)
     shift || true
     xcrun simctl bootstatus "$UDID" -b >/dev/null

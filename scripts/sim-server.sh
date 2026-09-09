@@ -1,19 +1,23 @@
 #!/bin/bash
-# Ensure an isolated dev server for simulator work on :8082. Same corpus and
-# LM Studio as the real server, but state lives in /tmp/chiron-sim-state so
-# simulator exchanges never touch the real learner state on :8080.
+# Ensure an isolated dev server for simulator work. Same corpus and LM
+# Studio as the real server, but state lives under /tmp/chiron-sim-state-<port>
+# so simulator exchanges never touch the real learner state on :8080.
 #
-#   ./scripts/sim-server.sh          start if not already running
-#   ./scripts/sim-server.sh reset    wipe the throwaway state and restart
+#   ./scripts/sim-server.sh                start if not already running
+#   ./scripts/sim-server.sh reset          wipe the throwaway state and restart
 #   ./scripts/sim-server.sh stop
+#   ./scripts/sim-server.sh start 8085     a second server, its own state:
+#                                          what parallel test workers need,
+#                                          one server each
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-STATE=/tmp/chiron-sim-state
+PORT="${2:-8082}"
+STATE=/tmp/chiron-sim-state-$PORT
 CONF="$STATE/config.yaml"
 LOG="$STATE/server.log"
 PIDFILE="$STATE/server.pid"
-ADDR=:8082
+ADDR=":$PORT"
 
 running() {
   [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null
@@ -27,11 +31,30 @@ stop() {
 case "${1:-start}" in
   stop)  stop; echo "stopped"; exit 0 ;;
   reset) stop; rm -rf "$STATE" ;;
-  start) if running; then echo "already running on $ADDR"; exit 0; fi ;;
-  *) echo "usage: $0 [start|reset|stop]" >&2; exit 1 ;;
+  start)
+    if running; then echo "already running on $ADDR"; exit 0; fi
+    # A server someone else started on this port serves just as well.
+    if curl -s -m 1 "http://localhost:$PORT/ping" >/dev/null 2>&1; then
+      echo "a server already answers on $ADDR"; exit 0
+    fi ;;
+  *) echo "usage: $0 [start|reset|stop] [port]" >&2; exit 1 ;;
 esac
 
 mkdir -p "$STATE/state/ai" "$STATE/state/data"
+
+# A server with nothing in its state cannot open a book without a model
+# behind it: no cached chapter, no learner past the screener. A new one
+# starts where an existing sim server is, so a test that expects a book in
+# progress works on a worker's own server as it does on the first.
+if [ ! -d "$STATE/state/ai/chapters" ]; then
+  donor=$(ls -td /tmp/chiron-sim-state*/state 2>/dev/null | grep -v "^$STATE/" | while read -r d; do
+    [ -d "$d/ai/chapters" ] && echo "$d" && break
+  done)
+  if [ -n "${donor:-}" ]; then
+    cp -R "$donor/." "$STATE/state/"
+    echo "seeded state from $donor"
+  fi
+fi
 
 # The real config, with subject state redirected at the throwaway dir.
 # Everything else (corpus, static, upstreams, session tuning) should stay
@@ -51,7 +74,7 @@ CHIRON_DRIVE=1 "$STATE/chiron-server" -addr "$ADDR" -config "$CONF" >>"$LOG" 2>&
 echo $! > "$PIDFILE"
 
 for _ in $(seq 1 20); do
-  if curl -s -m 1 "http://localhost:8082/ping" >/dev/null 2>&1; then
+  if curl -s -m 1 "http://localhost:$PORT/ping" >/dev/null 2>&1; then
     echo "dev server on $ADDR, state in $STATE"
     exit 0
   fi

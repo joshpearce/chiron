@@ -336,6 +336,9 @@ enum AppCommands {
 
     static func state(_ library: Library) -> [String: Any] {
         var out: [String: Any] = [
+            // Which launch this app is, so a test can tell it apart from
+            // one an earlier run left holding the same port.
+            "nonce": SelfTest.argument("harness_nonce=") ?? "",
             "shelf": library.subjects.map(\.id),
             "active": library.activeSubjectID ?? "",
             "connected": library.sync.connected,
