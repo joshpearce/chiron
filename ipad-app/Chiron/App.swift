@@ -225,6 +225,32 @@ struct BookView: View {
                     .accessibilityLabel("Contents")
                     ShellButton()
                 }
+                // A book read as it is turns pages: it has no check at the
+                // end of a chapter to carry the reader on.
+                if case .reading = session.screen, session.readsAsIs, session.chapter != nil {
+                    ToolbarItemGroup(placement: .bottomBar) {
+                        Button {
+                            Task { await session.turnTo(session.previousChapter) }
+                        } label: {
+                            Label(session.previousChapter?.title ?? "Back", systemImage: "chevron.left")
+                                .lineLimit(1)
+                        }
+                        .disabled(session.previousChapter == nil || session.busy)
+                        .accessibilityLabel("Previous chapter")
+                        Spacer()
+                        Button {
+                            Task { await session.turnTo(session.nextChapter) }
+                        } label: {
+                            Label(session.nextChapter?.title ?? "On", systemImage: "chevron.right")
+                                .labelStyle(.titleAndIcon)
+                                .lineLimit(1)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(session.nextChapter == nil || session.busy)
+                        .keyboardShortcut(.rightArrow, modifiers: .command)
+                        .accessibilityLabel("Next chapter")
+                    }
+                }
                 if case .reading = session.screen, !session.readsAsIs, let chapter = session.chapter {
                     ToolbarItemGroup(placement: .bottomBar) {
                         if let state = session.bookState, !state.debt.isEmpty {

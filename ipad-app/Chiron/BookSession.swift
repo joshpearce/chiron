@@ -280,6 +280,25 @@ final class BookSession: ObservableObject {
         persist()
     }
 
+    /// The chapter after the open one in the book's own order, and the one
+    /// before it: what a book read as it is turns between, since it has no
+    /// check to carry the reader forward.
+    var nextChapter: SpineEntry? { neighbour(+1) }
+    var previousChapter: SpineEntry? { neighbour(-1) }
+
+    private func neighbour(_ step: Int) -> SpineEntry? {
+        guard readsAsIs, let spine = bookState?.spine, let unit = chapter?.unit,
+              let i = spine.firstIndex(where: { $0.unit == unit }) else { return nil }
+        let j = i + step
+        return spine.indices.contains(j) ? spine[j] : nil
+    }
+
+    /// Turn to a chapter the reader picked, from the page or the contents.
+    func turnTo(_ entry: SpineEntry?) async {
+        guard let entry else { return }
+        await start(choice: entry.unit)
+    }
+
     func start(choice: String? = nil) async {
         await run(ExchangeRequest(subject: subjectID, phase: "start", choice: choice), wait: .opening)
     }

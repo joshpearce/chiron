@@ -144,6 +144,15 @@ final class BookSessionTests: XCTestCase {
         try? FileManager.default.removeItem(at: storage)
     }
 
+    /// A chapter as the server sends one, for a book with nothing to answer.
+    private func chapterPayload(_ unit: String, _ title: String) -> ChapterPayload {
+        let json = """
+        {"unit":"\(unit)","title":"\(title)","minutes":9,"html":"<p>prose</p>",
+         "beats":[],"pretest":[],"check":[],"calibration":false,"next_action":"read"}
+        """
+        return try! JSONDecoder().decode(ChapterPayload.self, from: Data(json.utf8))
+    }
+
     private func fixture<T: Decodable>(_ type: T.Type, _ name: String) -> T {
         let url = Bundle(for: FixtureDecodingTests.self)
             .url(forResource: "fixtures", withExtension: nil)!
@@ -621,6 +630,50 @@ final class BookSessionTests: XCTestCase {
         XCTAssertEqual(s3.marks.count, 1)
         s3.addMark(kind: .question, start: 10, end: 40, text: "a model trained to do nothing")
         XCTAssertEqual(s3.marks.count, 2, "a question on a highlighted span is its own mark")
+    }
+
+    /// A book read as it is has no check to carry the reader forward, so
+    /// it turns pages: the next chapter of the book's own order, and the
+    /// one before it.
+    func testABookReadAsItIsTurnsToTheNextChapterAndBack() async {
+        scriptFreshBook()
+        fake.onExchange = { [unowned self] _ in self.deliversU1() }
+        fake.onState = { _ in
+            BookState(spine: [
+                SpineEntry(unit: "u1", title: "Copyright", status: "active", score: nil, inFringe: true),
+                SpineEntry(unit: "u2", title: "Introduction", status: "available", score: nil, inFringe: true),
+                SpineEntry(unit: "u3", title: "Chapter 1", status: "available", score: nil, inFringe: true),
+            ], fringe: ["u1", "u2", "u3"], debt: [], activeMisconceptions: [], summary: "", sessionMinutes: 0)
+        }
+        let s = session()
+        s.kind = "reading"
+        await s.open()
+        await s.refreshState()
+        XCTAssertEqual(s.chapter?.unit, "u1")
+
+        XCTAssertNil(s.previousChapter, "the first chapter has nothing before it")
+        XCTAssertEqual(s.nextChapter?.title, "Introduction")
+        fake.exchanges.removeAll()
+        await s.turnTo(s.nextChapter)
+        XCTAssertEqual(fake.exchanges.last?.choice, "u2", "the next chapter was asked for")
+
+        // From the middle, both ways; from the end, only back.
+        fake.onState = { _ in
+            BookState(spine: [
+                SpineEntry(unit: "u1", title: "Copyright", status: "passed", score: nil, inFringe: true),
+                SpineEntry(unit: "u2", title: "Introduction", status: "active", score: nil, inFringe: true),
+                SpineEntry(unit: "u3", title: "Chapter 1", status: "available", score: nil, inFringe: true),
+            ], fringe: ["u1", "u2", "u3"], debt: [], activeMisconceptions: [], summary: "", sessionMinutes: 0)
+        }
+        fake.onExchange = { [unowned self] _ in
+            var r = self.deliversU1()
+            return ExchangeResponse(results: r.results, gate: r.gate, chapter: self.chapterPayload("u2", "Introduction"),
+                                    state: r.state, breakSuggestion: nil, authoring: nil, resultsDoc: nil)
+        }
+        await s.start(choice: "u2")
+        await s.refreshState()
+        XCTAssertEqual(s.previousChapter?.title, "Copyright")
+        XCTAssertEqual(s.nextChapter?.title, "Chapter 1")
     }
 
     func testClosingTheAskCardPutsTheAskToolDown() async {
