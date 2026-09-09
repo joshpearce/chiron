@@ -24,7 +24,7 @@ final class PaletteUITests: HarnessTestCase {
 
         // One dot of the pen's colour beside the pen; the row of colours
         // opens from it and folds back once a colour is picked.
-        let colour = app.buttons["Pen colour"]
+        let colour = app.buttons["Pen color"]
         XCTAssertTrue(colour.waitForExistence(timeout: 5),
                       "the colour dot appears beside the pen; penButtons=\(app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'pen'")).count)")
         XCTAssertFalse(app.buttons["blue pen"].exists, "the row is folded until the dot is tapped")

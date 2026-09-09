@@ -136,7 +136,7 @@ enum AppCommands {
             let path = PKStrokePath(controlPoints: points.map {
                 PKStrokePoint(location: CGPoint(x: $0[0], y: $0[1]), timeOffset: 0, size: CGSize(width: 3, height: 3), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
             }, creationDate: Date())
-            let stroke = PKStroke(ink: PKInk(.pen, color: .label), path: path)
+            let stroke = PKStroke(ink: PKInk(.pen, color: Ink.onPaper), path: path)
             d.drew(on: page, (d.ink[page] ?? PKDrawing()).appending(PKDrawing(strokes: [stroke])))
         case "move":
             guard let subject = args["subject"] as? String else { throw Failure.badArguments("move needs subject") }

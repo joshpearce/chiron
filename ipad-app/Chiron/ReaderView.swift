@@ -91,6 +91,9 @@ struct ReaderView: UIViewRepresentable {
     let chapter: ChapterPayload
     @EnvironmentObject var session: BookSession
     @Environment(\.sizeCategory) private var sizeCategory
+    /// Read so that evening turning the page re-runs the update: the ink
+    /// is converted for the page it is on.
+    @Environment(\.colorScheme) private var colorScheme
 
     func makeCoordinator() -> Coordinator {
         let c = Coordinator(session: session)
@@ -121,6 +124,9 @@ struct ReaderView: UIViewRepresentable {
 
     func updateUIView(_ web: WKWebView, context: Context) {
         let c = context.coordinator
+        // Evening turns the page: the ink is converted for the page it is
+        // on, so a change of appearance re-shows what is stored.
+        _ = colorScheme
         // A new unit, or the same unit rewritten (a primer that grew from a
         // margin note), is a fresh page; marks re-apply on top.
         if c.loadedUnit != chapter.unit || c.loadedHTML != chapter.html.hashValue {
@@ -262,12 +268,12 @@ struct ReaderView: UIViewRepresentable {
         #endif
 
         func apply(tool: BookSession.Tool, color: UIColor) {
-            guard tool != appliedTool || (tool == .pen && color != appliedColor) else { return }
+            guard tool != appliedTool || (tool == .pen && (color != appliedColor || style != shownStyle)) else { return }
             appliedTool = tool
             appliedColor = color
             switch tool {
             case .pen:
-                canvas.tool = PKInkingTool(.pen, color: color, width: 2.5)
+                canvas.tool = PKInkingTool(.pen, color: Ink.pen(color, on: style), width: 2.5)
                 canvas.isUserInteractionEnabled = true
                 canvas.isScrollEnabled = true
                 selector.isEnabled = false
@@ -311,16 +317,24 @@ struct ReaderView: UIViewRepresentable {
         // MARK: ink
 
         func apply(ink: Data?) {
-            guard ink != appliedInk else { return }
+            guard ink != appliedInk || style != shownStyle else { return }
             appliedInk = ink
+            shownStyle = style
             loadingInk = true
-            canvas.drawing = ink.flatMap { try? PKDrawing(data: $0) } ?? PKDrawing()
+            // Ink is kept as it looks on a light page; the canvas shows it
+            // as the page is now.
+            canvas.drawing = Ink.shown(ink.flatMap { try? PKDrawing(data: $0) } ?? PKDrawing(), in: style)
             loadingInk = false
         }
 
+        /// The appearance the page is in, which the ink has to suit.
+        private var style: UIUserInterfaceStyle { canvas.traitCollection.userInterfaceStyle }
+        private var shownStyle: UIUserInterfaceStyle = .unspecified
+
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
             guard !loadingInk else { return }
-            let data = canvasView.drawing.strokes.isEmpty ? nil : canvasView.drawing.dataRepresentation()
+            let kept = Ink.canonical(canvasView.drawing, drawnIn: style)
+            let data = kept.strokes.isEmpty ? nil : kept.dataRepresentation()
             appliedInk = data
             Task { @MainActor in self.session.saveInk(data) }
         }

@@ -618,6 +618,28 @@ final class BookSessionTests: XCTestCase {
         XCTAssertEqual(s3.marks.count, 2, "a question on a highlighted span is its own mark")
     }
 
+    func testClosingTheAskCardPutsTheAskToolDown() async {
+        scriptFreshBook()
+        fake.onExchange = { [unowned self] _ in self.deliversU1() }
+        let s = session()
+        await s.open()
+        // A question asked and answered: closing the card puts the tool
+        // down, so the next drag scrolls instead of highlighting again.
+        s.tool = .ask
+        let m = s.addMark(kind: .question, start: 10, end: 40, text: "a model trained to do nothing")
+        XCTAssertEqual(s.asking?.mark.id, m.id)
+        s.closeAsking()
+        XCTAssertEqual(s.tool, .none, "the ask tool is down")
+        XCTAssertEqual(s.marks.count, 0, "a question with nothing asked leaves no mark")
+
+        // The same when the card is deleted from, or dismissed after an
+        // answer.
+        s.tool = .ask
+        s.addMark(kind: .question, start: 10, end: 40, text: "a model trained to do nothing")
+        s.deleteAsking()
+        XCTAssertEqual(s.tool, .none)
+    }
+
     func testUndoTakesBackTheLastMarkOrStroke() async {
         scriptFreshBook()
         fake.onExchange = { [unowned self] _ in self.deliversU1() }

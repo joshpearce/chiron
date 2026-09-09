@@ -626,6 +626,9 @@ final class BookSession: ObservableObject {
             removeMark(a.mark.id)
         }
         asking = nil
+        // The tool goes down with the card: leaving it up turns the next
+        // drag, which the reader means as a scroll, into another highlight.
+        if tool == .ask || tool == .note { tool = .none }
     }
 
     /// Send the question with its passage; the answer lands on the mark. A
@@ -670,6 +673,7 @@ final class BookSession: ObservableObject {
     func deleteAsking() {
         guard let a = asking else { return }
         removeMark(a.mark.id)
+        if tool == .ask || tool == .note { tool = .none }
     }
 
     /// A margin note on a primer: the passage and the note go to the

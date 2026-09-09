@@ -496,7 +496,7 @@ struct DeviceKeySection: View {
             Button {
                 Task { await enrol() }
             } label: {
-                Label("Enrol this iPad's key", systemImage: "key")
+                Label("Enroll this iPad's key", systemImage: "key")
             }
             .disabled(sync.serverID == nil || Credentials.token(for: sync.serverID!) == nil)
             if let note {
@@ -533,7 +533,7 @@ struct DeviceKeySection: View {
             note = nil
         } catch ServiceError.status(404) {
             keys = []
-            note = "This server does not enrol keys (a Mac dev server, or the gate is not installed yet)."
+            note = "This server does not enroll keys (a Mac dev server, or the gate is not installed yet)."
         } catch {
             keys = []
             note = nil
@@ -547,7 +547,7 @@ struct DeviceKeySection: View {
             note = r.installed ? "Enrolled as \(r.name)." : "Already enrolled as \(r.name)."
             await load()
         } catch ServiceError.status(let code) {
-            note = code == 404 ? "This server does not enrol keys." : "The server refused the key (\(code))."
+            note = code == 404 ? "This server does not enroll keys." : "The server refused the key (\(code))."
         } catch {
             note = error.localizedDescription
         }

@@ -75,7 +75,7 @@ struct Palette: View {
                                 }
                                 .buttonStyle(.glass)
                                 .glassEffectID("colour-\(session.penColor.rawValue)", in: palette)
-                                .accessibilityLabel("Pen colour")
+                                .accessibilityLabel("Pen color")
                                 .accessibilityValue(session.penColor.rawValue)
                             }
                         }

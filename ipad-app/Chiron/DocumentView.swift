@@ -488,7 +488,9 @@ final class InkOverlay: UIView, PKCanvasViewDelegate {
     func apply(tool: DocumentSession.Tool) {
         switch tool {
         case .select: break  // the page is PDFKit's; the canvas is not hit-tested
-        case .pen: canvas.tool = PKInkingTool(.pen, color: .label, width: 2.5)
+        // A PDF page is white whatever the system is doing, so its ink is
+        // the one that shows on paper, not the one that follows the page.
+        case .pen: canvas.tool = PKInkingTool(.pen, color: Ink.onPaper, width: 2.5)
         case .eraser: canvas.tool = PKEraserTool(.bitmap, width: 24)  // rubs out what it covers, not whole strokes
         }
     }
