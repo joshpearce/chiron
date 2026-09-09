@@ -4,6 +4,10 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"image"
+	"image/color"
+	_ "image/jpeg"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -252,4 +256,118 @@ func TestALongChapterIsCutAtItsHeadingsAndEmptyPagesAreDropped(t *testing.T) {
 	if strings.Contains(string(first), "Who Does It") {
 		t.Errorf("the parts are cut at the headings, not run together")
 	}
+}
+
+// The book's pictures come with it, re-encoded for a screen, and the
+// chapters point at them by the name they are served under.
+func TestABooksPicturesComeWithItAndAreServed(t *testing.T) {
+	s := newServer(t, "")
+	r := httptest.NewRequest("POST", "/readings", bytes.NewReader(illustratedEPUB(t)))
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("import: %d %s", w.Code, w.Body)
+	}
+	var made struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &made)
+
+	w = do(t, s, "POST", "/exchange", `{"subject":"`+made.ID+`","phase":"start"}`, "")
+	var opened struct {
+		Chapter *struct {
+			HTML string `json:"html"`
+		} `json:"chapter"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &opened)
+	if opened.Chapter == nil {
+		t.Fatalf("no chapter: %s", w.Body)
+	}
+	name := regexp.MustCompile(`src="assets/([^"]+)"`).FindStringSubmatch(opened.Chapter.HTML)
+	if name == nil {
+		t.Fatalf("the chapter should show its picture:\n%s", opened.Chapter.HTML)
+	}
+
+	w = do(t, s, "GET", "/readings/"+made.ID+"/assets/"+name[1], "", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("picture: %d %s", w.Code, w.Body)
+	}
+	if got := w.Header().Get("Content-Type"); !strings.HasPrefix(got, "image/") {
+		t.Errorf("content type = %q", got)
+	}
+	// A print-resolution exhibit is not what a screen needs: it comes back
+	// at a size a screen can use, and far smaller than it went in.
+	served, _, err := image.Decode(bytes.NewReader(w.Body.Bytes()))
+	if err != nil {
+		t.Fatalf("the served picture does not decode: %v", err)
+	}
+	if long := max(served.Bounds().Dx(), served.Bounds().Dy()); long != assetLongEdge {
+		t.Errorf("the picture is %dx%d; its long edge should be %d",
+			served.Bounds().Dx(), served.Bounds().Dy(), assetLongEdge)
+	}
+	if w.Body.Len() == 0 || w.Body.Len() > 2<<20 {
+		t.Errorf("served %d bytes", w.Body.Len())
+	}
+
+	// A name that climbs out of the book's own directory is refused.
+	w = do(t, s, "GET", "/readings/"+made.ID+"/assets/..%2Freading.json", "", "")
+	if w.Code == http.StatusOK {
+		t.Errorf("a picture name must stay in the book's directory")
+	}
+}
+
+// illustratedEPUB is a book with one chapter and one exhibit in it, drawn
+// at the size a publisher would: far larger than a screen, and stored
+// barely compressed, as this book's own are.
+func illustratedEPUB(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 2400, 3000))
+	for y := 0; y < 3000; y++ {
+		for x := 0; x < 2400; x++ {
+			shade := uint8((x/40 + y/40) % 2 * 255)
+			img.Set(x, y, color.RGBA{shade, shade, 255, 255})
+		}
+	}
+	var raw bytes.Buffer
+	enc := png.Encoder{CompressionLevel: png.NoCompression}
+	if err := enc.Encode(&raw, img); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	z := zip.NewWriter(&buf)
+	entries := map[string]string{
+		"mimetype": "application/epub+zip",
+		"META-INF/container.xml": `<?xml version="1.0"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
+  <rootfiles><rootfile full-path="OEBPS/package.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>`,
+		"OEBPS/package.opf": `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>An Illustrated Book</dc:title></metadata>
+  <manifest>
+    <item id="c1" href="text/ch01.xhtml" media-type="application/xhtml+xml"/>
+    <item id="fig" href="images/exhibit.png" media-type="image/png"/>
+  </manifest>
+  <spine><itemref idref="c1"/></spine>
+</package>`,
+		"OEBPS/text/ch01.xhtml": `<html><body><h1>The Exhibit</h1>` +
+			`<p>` + strings.Repeat("a sentence about what the exhibit shows. ", 30) + `</p>` +
+			`<p><img src="../images/exhibit.png" alt="Exhibit 1"/></p></body></html>`,
+	}
+	for name, body := range entries {
+		w, err := z.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Write([]byte(body))
+	}
+	w, err := z.Create("OEBPS/images/exhibit.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Write(raw.Bytes())
+	if err := z.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
 }

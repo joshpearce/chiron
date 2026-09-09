@@ -104,7 +104,13 @@ func (s *Server) handleReadingImport(w http.ResponseWriter, r *http.Request) {
 	if title == "" {
 		title = "A book"
 	}
-	if err := writeReadingCorpus(readingCorpus(root, id), title, chapters); err != nil {
+	// The book's pictures come with it: re-encoded for a screen, kept
+	// beside the book, and the chapters point at them by name.
+	pictures, err := storeReadingAssets(root, id, file, chapters)
+	if err != nil {
+		log.Printf("imported book %s: pictures: %v", id, err)
+	}
+	if err := writeReadingCorpus(readingCorpus(root, id), title, withAssetPaths(chapters, pictures)); err != nil {
 		os.RemoveAll(dir)
 		writeError(w, http.StatusInternalServerError, "lay the book out: %v", err)
 		return
@@ -122,6 +128,55 @@ func (s *Server) handleReadingImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, meta)
+}
+
+// storeReadingAssets unpacks the book's pictures beside it, each one
+// re-encoded for a screen, and says what each of the chapters' own paths
+// is now called.
+func storeReadingAssets(root, id, file string, chapters []sources.EPUBChapter) (map[string]string, error) {
+	assets, names, err := sources.EPUBAssets(file, chapters)
+	if err != nil {
+		return nil, err
+	}
+	if len(assets) == 0 {
+		return nil, nil
+	}
+	dir := readingAssets(root, id)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	renamed := map[string]string{}
+	for _, a := range assets {
+		name, data := screenAsset(a.Name, a.Data)
+		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
+			return nil, err
+		}
+		renamed[a.Name] = name
+	}
+	out := map[string]string{}
+	for ref, name := range names {
+		if to, ok := renamed[name]; ok {
+			out[ref] = to
+		}
+	}
+	return out, nil
+}
+
+// withAssetPaths points a chapter's pictures at the book's own asset
+// route, so the reader asks the server for them rather than the archive.
+func withAssetPaths(chapters []sources.EPUBChapter, pictures map[string]string) []sources.EPUBChapter {
+	if len(pictures) == 0 {
+		return chapters
+	}
+	out := make([]sources.EPUBChapter, len(chapters))
+	for i, ch := range chapters {
+		md := ch.Markdown
+		for ref, name := range pictures {
+			md = strings.ReplaceAll(md, "]("+ref+")", "](assets/"+name+")")
+		}
+		out[i] = sources.EPUBChapter{Title: ch.Title, Markdown: md}
+	}
+	return out
 }
 
 func (s *Server) handleReadingDelete(w http.ResponseWriter, r *http.Request) {

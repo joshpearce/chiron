@@ -35,12 +35,14 @@
 		73C9290A5A8E44753FBA4E6B /* Harness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C2E4E249BD2C1C75083AB14 /* Harness.swift */; };
 		7BBA07442818BD5FB8B2120B /* ShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FFE36747AF7BFC39412DFB /* ShellUITests.swift */; };
 		7E27F835DD0D2A3170B49582 /* CaptureCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36CD74CEBED525C2D6612866 /* CaptureCard.swift */; };
+		7EDAA81B3ED4E2B709786898 /* BookAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8756BB134A501E84F831074 /* BookAssets.swift */; };
 		88AD80E868C1EF47C403E25D /* Servers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BD9A46CBDBDDEEAFF860927 /* Servers.swift */; };
 		8A971C981578FB0592F8EA57 /* ShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ECBF91310F511343F4FFC57 /* ShellView.swift */; };
 		8B7415A0D57A05F203D74AE1 /* book.js in Resources */ = {isa = PBXBuildFile; fileRef = 756BF2C5D73A3EFF3BD5C55C /* book.js */; };
 		8C8562A01FFD05DE4D17DD2A /* default-book.json in Resources */ = {isa = PBXBuildFile; fileRef = 4424A63E2C94C4589C4B5A8F /* default-book.json */; };
 		8DBD6D9E13F6B6B1E994DA96 /* fonts in Resources */ = {isa = PBXBuildFile; fileRef = F6474556AF056C444945956F /* fonts */; };
 		8E16A76DB235B59A1982B1C2 /* ConflictCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C60EC85CD36F118C2E61802 /* ConflictCard.swift */; };
+		8E8AC42551FB3E1F452CC803 /* BookAssetsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4016FD1AF1BA6E50155B8765 /* BookAssetsTests.swift */; };
 		8ED6D42621BE0FB6FC4AF42C /* CaptureInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CB9D6BA4C97360F27B08C71 /* CaptureInbox.swift */; };
 		92A27FDF307807755C3BF474 /* InkBox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B2BA152D8A07FC89372909 /* InkBox.swift */; };
 		9A12A71D111DEE5FB1A1265C /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A19EB4693171E14B4F6BAD /* App.swift */; };
@@ -135,6 +137,7 @@
 		34A9FA4F8B8DAA26FA36F1D4 /* PlacementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacementView.swift; sourceTree = "<group>"; };
 		36CD74CEBED525C2D6612866 /* CaptureCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureCard.swift; sourceTree = "<group>"; };
 		3C2E4E249BD2C1C75083AB14 /* Harness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Harness.swift; sourceTree = "<group>"; };
+		4016FD1AF1BA6E50155B8765 /* BookAssetsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookAssetsTests.swift; sourceTree = "<group>"; };
 		402925421173333E62074B75 /* WaitViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitViews.swift; sourceTree = "<group>"; };
 		427722519DFD8825A1A8F8E1 /* Shelves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shelves.swift; sourceTree = "<group>"; };
 		4424A63E2C94C4589C4B5A8F /* default-book.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "default-book.json"; sourceTree = "<group>"; };
@@ -167,6 +170,7 @@
 		8EC655B2BD00B82F94679D36 /* AnnotationSyncTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationSyncTests.swift; sourceTree = "<group>"; };
 		8F75DDE60F862648D8617F59 /* DocumentUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentUITests.swift; sourceTree = "<group>"; };
 		9FAC00EF426832574EAAAD75 /* DeviceSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSetup.swift; sourceTree = "<group>"; };
+		A8756BB134A501E84F831074 /* BookAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookAssets.swift; sourceTree = "<group>"; };
 		A9FA2A394B311F81D46FF299 /* ServerLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerLinkTests.swift; sourceTree = "<group>"; };
 		AD7A860ADDAE2193268BFB3D /* AgentLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLink.swift; sourceTree = "<group>"; };
 		B2E5D9B01B743228E1E20CC2 /* TunnelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelTests.swift; sourceTree = "<group>"; };
@@ -220,6 +224,7 @@
 				FB2C1359916EDCAC2B5CE1DF /* AppCommands.swift */,
 				FBC625AEF8F1DC8BFD298857 /* AskCard.swift */,
 				478BD8C483632C32A1A65736 /* Assets.xcassets */,
+				A8756BB134A501E84F831074 /* BookAssets.swift */,
 				88A8C3D184F56D0B771B098F /* BookSession.swift */,
 				36CD74CEBED525C2D6612866 /* CaptureCard.swift */,
 				FC2FBC78E603889DCE8A7AB8 /* CaptureIntent.swift */,
@@ -301,6 +306,7 @@
 			children = (
 				8EC655B2BD00B82F94679D36 /* AnnotationSyncTests.swift */,
 				02CFD8848E081585E3567328 /* AppCommandsTests.swift */,
+				4016FD1AF1BA6E50155B8765 /* BookAssetsTests.swift */,
 				4EF263EE8ABB8A188DA7D430 /* BookSessionTests.swift */,
 				F506717299A374C8AA31320C /* DeviceKeyTests.swift */,
 				BE752206919F84D991333DB9 /* DocumentTests.swift */,
@@ -496,6 +502,7 @@
 				9A12A71D111DEE5FB1A1265C /* App.swift in Sources */,
 				C0A392398F396033A2452726 /* AppCommands.swift in Sources */,
 				E885811ACFCBA74CC50BAE93 /* AskCard.swift in Sources */,
+				7EDAA81B3ED4E2B709786898 /* BookAssets.swift in Sources */,
 				EF6C9F8A52A8EBC636C5D2C7 /* BookSession.swift in Sources */,
 				7E27F835DD0D2A3170B49582 /* CaptureCard.swift in Sources */,
 				8ED6D42621BE0FB6FC4AF42C /* CaptureInbox.swift in Sources */,
@@ -537,6 +544,7 @@
 			files = (
 				36028800328AA10BD32C4CD1 /* AnnotationSyncTests.swift in Sources */,
 				589DF50C741AFECB3E6FC8C5 /* AppCommandsTests.swift in Sources */,
+				8E8AC42551FB3E1F452CC803 /* BookAssetsTests.swift in Sources */,
 				29364CDF3858A11CA746C64A /* BookSessionTests.swift in Sources */,
 				32CA8ADA55C01966DD6D5E6A /* DeviceKeyTests.swift in Sources */,
 				F4007FE511B8F95685F0238A /* DocumentTests.swift in Sources */,

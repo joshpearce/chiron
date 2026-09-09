@@ -400,6 +400,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /documents", s.handleDocumentUpload)
 	mux.HandleFunc("POST /readings", s.handleReadingImport)
 	mux.HandleFunc("DELETE /readings/{id}", s.handleReadingDelete)
+	mux.HandleFunc("GET /readings/{id}/assets/{name}", s.handleReadingAsset)
 	mux.HandleFunc("GET /documents/{doc}", s.handleDocumentGet)
 	mux.HandleFunc("GET /documents/{doc}/file", s.handleDocumentFile)
 	mux.HandleFunc("PUT /documents/{doc}/position", s.handleDocumentPosition)

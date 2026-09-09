@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"regexp"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -301,4 +302,91 @@ func EPUBBook(path string) (string, []EPUBChapter, error) {
 		out = append(out, EPUBChapter{Title: it.title, Markdown: md})
 	}
 	return b.title, out, nil
+}
+
+// EPUBAsset is a picture the book carries, as it is stored inside it.
+type EPUBAsset struct {
+	// Path is the entry inside the archive; Name is what the chapters
+	// refer to it by once it is unpacked.
+	Path, Name string
+	Data       []byte
+}
+
+// EPUBAssets reads the pictures a book's chapters refer to. A chapter's
+// markdown refers to them by the path they had inside the book, resolved
+// against the document that used them; the name they come back with is
+// unique across the book.
+func EPUBAssets(file string, chapters []EPUBChapter) ([]EPUBAsset, map[string]string, error) {
+	b, err := openEPUB(file)
+	if err != nil {
+		return nil, nil, err
+	}
+	z, err := zip.OpenReader(file)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer z.Close()
+	entries := map[string]*zip.File{}
+	for _, f := range z.File {
+		entries[f.Name] = f
+	}
+	names := map[string]string{}
+	var out []EPUBAsset
+	for i, ch := range chapters {
+		if i >= len(b.spine) {
+			break
+		}
+		dir := path.Dir(b.spine[i].path)
+		for _, ref := range imageRefs(ch.Markdown) {
+			full := path.Clean(path.Join(dir, ref))
+			if _, done := names[ref]; done {
+				continue
+			}
+			f, ok := entries[full]
+			if !ok {
+				continue
+			}
+			r, err := f.Open()
+			if err != nil {
+				continue
+			}
+			data, err := io.ReadAll(r)
+			r.Close()
+			if err != nil {
+				continue
+			}
+			name := assetName(full, names)
+			names[ref] = name
+			out = append(out, EPUBAsset{Path: full, Name: name, Data: data})
+		}
+	}
+	return out, names, nil
+}
+
+var imageRef = regexp.MustCompile(`!\[[^\]]*\]\(([^)]+)\)`)
+
+func imageRefs(md string) []string {
+	var out []string
+	for _, m := range imageRef.FindAllStringSubmatch(md, -1) {
+		if src := strings.TrimSpace(m[1]); src != "" && !strings.Contains(src, "://") {
+			out = append(out, src)
+		}
+	}
+	return out
+}
+
+// assetName is the file's own name, kept readable, and made unique when
+// two folders in the book hold a picture of the same name.
+func assetName(full string, taken map[string]string) string {
+	base := path.Base(full)
+	used := map[string]bool{}
+	for _, n := range taken {
+		used[n] = true
+	}
+	name := base
+	for i := 2; used[name]; i++ {
+		ext := path.Ext(base)
+		name = fmt.Sprintf("%s-%d%s", strings.TrimSuffix(base, ext), i, ext)
+	}
+	return name
 }

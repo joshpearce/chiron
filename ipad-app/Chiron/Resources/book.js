@@ -20,6 +20,21 @@ function post(msg) {
   }
 }
 
+/* Where an imported book's pictures come from. The chapter refers to
+ * them by the name they have beside the book; the native side serves
+ * them, from its own copy when there is no server to ask. */
+let ASSET_BASE = "";
+function setAssetBase(base) { ASSET_BASE = base || ""; }
+
+/* A picture the chapter refers to is beside the book, not beside the
+ * page: point it at whoever is serving the book. */
+function resolveAssets(root) {
+  if (!ASSET_BASE) return;
+  for (const img of root.querySelectorAll('img[src^="assets/"]')) {
+    img.setAttribute("src", ASSET_BASE + img.getAttribute("src").slice("assets/".length));
+  }
+}
+
 /* position: where this chapter was left, as a fraction of its scroll,
  * from the native side's memory. */
 function initChapter(payload, position) {
@@ -34,6 +49,7 @@ function initChapter(payload, position) {
     const holder = root.querySelector(`.beat[data-beat-id="${beat.id}"]`);
     if (holder) renderBeat(holder, beat);
   }
+  resolveAssets(root);
   renderMathIn(root);
   window.scrollTo(0, scrollTop(position));
   reportControls();

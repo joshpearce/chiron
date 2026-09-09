@@ -9,6 +9,9 @@ import PencilKit
 final class Library: ObservableObject {
     /// One shell for the app, kept across books; the sheet shows it.
     let shell = ShellSession()
+    /// An imported book's pictures, fetched once and kept for reading
+    /// where there is no server.
+    private(set) lazy var bookAssets = BookAssets(service: service, storage: storage)
     @Published var shellShown = false
     /// The "set up another device" code, on screen.
     @Published var deviceSetupShown = false

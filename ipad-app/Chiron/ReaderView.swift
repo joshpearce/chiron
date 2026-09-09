@@ -3,6 +3,7 @@ import WebKit
 import PencilKit
 
 struct ReaderContainer: View {
+    @EnvironmentObject var library: Library
     @EnvironmentObject var session: BookSession
     @Environment(\.preferredPencilDoubleTapAction) private var doubleTapAction
     @Environment(\.preferredPencilSqueezeAction) private var squeezeAction
@@ -18,7 +19,7 @@ struct ReaderContainer: View {
         // The page runs under the bars, as the system's bars expect; the
         // web view insets its content by what they cover. The palette and
         // the card stay within the safe area.
-        ReaderView(chapter: chapter)
+        ReaderView(chapter: chapter, assets: library.bookAssets)
             .ignoresSafeArea()
             // A tapped highlight asks before it goes, beside the highlight;
             // a question has its card.
@@ -89,6 +90,8 @@ struct ReaderContainer: View {
 /// tool.
 struct ReaderView: UIViewRepresentable {
     let chapter: ChapterPayload
+    /// Where the open book's pictures come from.
+    let assets: BookAssets?
     @EnvironmentObject var session: BookSession
     @Environment(\.sizeCategory) private var sizeCategory
     /// Read so that evening turning the page re-runs the update: the ink
@@ -110,6 +113,13 @@ struct ReaderView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "bridge")
+        // A book's own pictures answer under a scheme of their own: the
+        // page cannot carry the server's key, and one already on this
+        // device should not need the server at all.
+        if let assets {
+            context.coordinator.assetScheme = BookAssetScheme(assets: assets)
+            config.setURLSchemeHandler(context.coordinator.assetScheme, forURLScheme: BookAssets.scheme)
+        }
         let web = WKWebView(frame: .zero, configuration: config)
         web.isInspectable = true
         web.backgroundColor = .systemBackground
@@ -165,6 +175,9 @@ struct ReaderView: UIViewRepresentable {
         var appliedMarks: [Mark]?
         /// What the page last focused, for the harness.
         private(set) var pageFocus = ""
+        /// Kept alive for as long as the web view is: the configuration
+        /// holds it weakly.
+        var assetScheme: BookAssetScheme?
         private var appliedTool: BookSession.Tool = .none
         private var appliedInk: Data?
         private var loadingInk = false
@@ -461,7 +474,8 @@ struct ReaderView: UIViewRepresentable {
                 if let ch = pendingChapter,
                    let data = try? JSONEncoder().encode(ch),
                    let json = String(data: data, encoding: .utf8) {
-                    web?.evaluateJavaScript("setScale(\(scale)); initChapter(\(json), \(position))") { [weak self] _, _ in
+                    let base = BookAssets.base(subject: self.session.subjectID)
+                    web?.evaluateJavaScript("setScale(\(scale)); setAssetBase('\(base)'); initChapter(\(json), \(position))") { [weak self] _, _ in
                         guard let self else { return }
                         self.pageReady = true
                         Task { @MainActor in self.apply(marks: self.session.marks) }
