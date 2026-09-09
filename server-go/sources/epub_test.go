@@ -178,3 +178,56 @@ func TestEPUBBookReadsEveryChapterInOrder(t *testing.T) {
 		t.Errorf("third chapter's prose:\n%s", chapters[2].Markdown)
 	}
 }
+
+// The book's own table of contents is not one of its chapters.
+func TestEPUBLeavesOutTheNavigationDocument(t *testing.T) {
+	path := writeEPUB(t, map[string]string{
+		"mimetype":               "application/epub+zip",
+		"META-INF/container.xml": epubContainer,
+		"OEBPS/package.opf": strings.Replace(epubPackage,
+			`<spine>`, `<spine><itemref idref="nav"/>`, 1),
+		"OEBPS/nav.xhtml":       epubNav,
+		"OEBPS/cover.xhtml":     `<html><body><p>A Borrowed Book</p></body></html>`,
+		"OEBPS/text/ch01.xhtml": `<html><body><h1>What Lending Is</h1><p>Prose.</p></body></html>`,
+		"OEBPS/text/ch02.xhtml": `<html><body><h1>Who Lends, and Why</h1><p>More.</p></body></html>`,
+	})
+	_, chapters, err := EPUBBook(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chapters) != 3 {
+		t.Fatalf("the contents is not a chapter: %d chapters", len(chapters))
+	}
+	for _, c := range chapters {
+		if strings.Contains(c.Markdown, "What Lending Is](") {
+			t.Errorf("the navigation document was read as a chapter:\n%s", c.Markdown)
+		}
+	}
+}
+
+// A chapter is linked from the contents once for itself and again for
+// each of its sections; the first link is the chapter's own title.
+func TestEPUBTakesTheFirstLinkAsTheChaptersTitle(t *testing.T) {
+	nav := `<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol>
+	  <li><a href="text/ch01.xhtml">What Lending Is</a></li>
+	  <li><a href="text/ch01.xhtml#s2">A Section Of It</a></li>
+	  <li><a href="text/ch01.xhtml#notes">NOTES</a></li>
+	  <li><a href="text/ch02.xhtml">Who Lends, and Why</a></li>
+	</ol></nav></body></html>`
+	path := writeEPUB(t, map[string]string{
+		"mimetype":               "application/epub+zip",
+		"META-INF/container.xml": epubContainer,
+		"OEBPS/package.opf":      epubPackage,
+		"OEBPS/nav.xhtml":        nav,
+		"OEBPS/cover.xhtml":      `<html><body><p>cover</p></body></html>`,
+		"OEBPS/text/ch01.xhtml":  `<html><body><p>Prose.</p></body></html>`,
+		"OEBPS/text/ch02.xhtml":  `<html><body><p>More.</p></body></html>`,
+	})
+	_, chapters, err := EPUBBook(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chapters[1].Title != "What Lending Is" {
+		t.Errorf("chapter title = %q, want the first link's", chapters[1].Title)
+	}
+}

@@ -115,6 +115,11 @@ func openEPUB(file string) (*epubBook, error) {
 		if !ok {
 			continue
 		}
+		// The navigation document is the book's own table of contents.
+		// The reader has one of those already.
+		if p == navPath || p == ncxPath {
+			continue
+		}
 		title := titles[p]
 		if title == "" {
 			title = firstHTMLHeading(b.files[p])
@@ -170,7 +175,13 @@ func (b *epubBook) navTitles(navPath, ncxPath string) map[string]string {
 				if n.Type == html.ElementNode && n.Data == "a" {
 					if h := attr(n, "href"); h != "" {
 						if title := strings.TrimSpace(text(n)); title != "" {
-							out[path.Join(path.Dir(navPath), stripFragment(h))] = title
+							// A chapter is linked once for itself and again
+							// for each of its sections and its notes; the
+							// first link is the chapter.
+							key := path.Join(path.Dir(navPath), stripFragment(h))
+							if _, seen := out[key]; !seen {
+								out[key] = title
+							}
 						}
 					}
 				}
@@ -196,7 +207,10 @@ func (b *epubBook) navTitles(navPath, ncxPath string) map[string]string {
 		if xml.Unmarshal([]byte(src), &ncx) == nil {
 			for _, p := range ncx.Points {
 				if title := strings.TrimSpace(p.Label); title != "" && p.Content.Src != "" {
-					out[path.Join(path.Dir(ncxPath), stripFragment(p.Content.Src))] = title
+					key := path.Join(path.Dir(ncxPath), stripFragment(p.Content.Src))
+					if _, seen := out[key]; !seen {
+						out[key] = title
+					}
 				}
 			}
 		}

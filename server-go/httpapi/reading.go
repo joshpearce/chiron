@@ -109,7 +109,7 @@ func (s *Server) handleReadingImport(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "lay the book out: %v", err)
 		return
 	}
-	meta := &Reading{ID: id, Title: title, Chapters: len(chapters), Size: size,
+	meta := &Reading{ID: id, Title: title, Chapters: len(readingUnits(chapters)), Size: size,
 		ImportedAt: time.Now().UTC().Format(time.RFC3339)}
 	if err := writeReadingMeta(root, meta); err != nil {
 		os.RemoveAll(dir)
@@ -187,22 +187,121 @@ func writeReadingMeta(root string, m *Reading) error {
 	return os.WriteFile(readingMeta(root, m.ID), data, 0o644)
 }
 
+// A chapter of a real book runs past twenty thousand words, which is one
+// scroll the length of a small book and more ink than a canvas wants to
+// hold; over this it is cut at its own headings.
+const longChapterWords = 4000
+
+// A page with almost nothing on it is the cover, a part title, a licence:
+// part of the book, but not a chapter of it.
+const emptyChapterWords = 50
+
+// readingUnit is one unit of an imported book: a chapter, or a part of a
+// chapter that was too long to read in one scroll.
+type readingUnit struct {
+	title    string
+	markdown string
+}
+
+// readingUnits cuts the book into what the reader turns between: whole
+// chapters where they are short enough, and a chapter's own sections
+// where it is not.
+func readingUnits(chapters []sources.EPUBChapter) []readingUnit {
+	var out []readingUnit
+	// A book of short pieces is not a book of covers: the rule that drops
+	// the empty pages only applies where something is left after it.
+	substantial := 0
+	for _, ch := range chapters {
+		if words(stripLeadingHeading(ch.Markdown)) >= emptyChapterWords {
+			substantial++
+		}
+	}
+	for _, ch := range chapters {
+		body := strings.TrimSpace(stripLeadingHeading(ch.Markdown))
+		if body == "" {
+			continue
+		}
+		if substantial > 0 && words(body) < emptyChapterWords {
+			continue
+		}
+		parts := splitAtHeadings(body)
+		if words(body) <= longChapterWords || len(parts) < 2 {
+			out = append(out, readingUnit{title: ch.Title, markdown: body})
+			continue
+		}
+		// The contents should read as the book's own does: the chapter
+		// named once, then its sections under it.
+		for i, p := range parts {
+			title := p.heading
+			switch {
+			case i == 0 && p.heading == "":
+				title = ch.Title
+			case i == 0:
+				title = ch.Title + " · " + p.heading
+			case title == "":
+				title = fmt.Sprintf("%s · part %d", ch.Title, i+1)
+			}
+			out = append(out, readingUnit{title: title, markdown: p.body})
+		}
+	}
+	return out
+}
+
+type headedPart struct {
+	heading string
+	body    string
+}
+
+// splitAtHeadings cuts markdown at its "## " headings, keeping whatever
+// comes before the first with it. A part too short to be worth turning to
+// joins the one before it.
+func splitAtHeadings(md string) []headedPart {
+	var parts []headedPart
+	var heading string
+	var body []string
+	flush := func() {
+		text := strings.TrimSpace(strings.Join(body, "\n"))
+		if text == "" && heading == "" {
+			return
+		}
+		if n := len(parts); n > 0 && words(text) < emptyChapterWords {
+			parts[n-1].body = parts[n-1].body + "\n\n## " + heading + "\n\n" + text
+			return
+		}
+		parts = append(parts, headedPart{heading: heading, body: text})
+	}
+	for _, line := range strings.Split(md, "\n") {
+		if strings.HasPrefix(line, "## ") {
+			flush()
+			heading = strings.TrimSpace(strings.TrimPrefix(line, "## "))
+			body = nil
+			continue
+		}
+		body = append(body, line)
+	}
+	flush()
+	return parts
+}
+
+func words(s string) int { return len(strings.Fields(s)) }
+
 // writeReadingCorpus lays the book out as a corpus: a unit per chapter,
 // in the book's own order, with no prerequisite between them, so the
 // contents opens any of them. There is nothing to answer, so there is no
 // bank and no questions file.
 func writeReadingCorpus(dir, title string, chapters []sources.EPUBChapter) error {
-	if len(chapters) == 0 {
+	units := readingUnits(chapters)
+	if len(units) == 0 {
 		return fmt.Errorf("the book has no chapters")
 	}
 	var syllabus strings.Builder
 	fmt.Fprintf(&syllabus, "title: %s\nunits:\n", yamlQuote(title))
-	for i, ch := range chapters {
+	for i, u := range units {
 		id := fmt.Sprintf("u%d", i+1)
-		slug := slugOf(ch.Title, id)
+		slug := slugOf(u.title, id)
 		fmt.Fprintf(&syllabus, "  - id: %s\n    slug: %s\n    title: %s\n    minutes: %d\n",
-			id, slug, yamlQuote(ch.Title), readingMinutes(ch.Markdown))
-		body := "## " + ch.Title + "\n\n" + strings.TrimSpace(stripLeadingHeading(ch.Markdown)) + "\n"
+			id, slug, yamlQuote(u.title), readingMinutes(u.markdown))
+		body := "## " + u.title + "\n\n" + u.markdown + "\n"
 		unit := filepath.Join(dir, "units", id+"-"+slug)
 		if err := os.MkdirAll(unit, 0o755); err != nil {
 			return err

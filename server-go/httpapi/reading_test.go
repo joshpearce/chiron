@@ -6,8 +6,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/mjbraun/chiron/server/sources"
 )
 
 // epubBytes is the smallest thing that is still an EPUB: a container
@@ -188,5 +193,63 @@ func TestImportedBooksComeBackAfterARestart(t *testing.T) {
 	again := newServerAt(t, s)
 	if _, ok := again.subject(made.ID); !ok {
 		t.Fatalf("%s is not on the shelf after a restart", made.ID)
+	}
+}
+
+// A real book's chapters run to twenty thousand words and more, which is
+// one scroll the length of a small book; they are cut at their own
+// headings. Pages with nothing on them - the cover, a part title, the
+// licence - are not chapters at all.
+func TestALongChapterIsCutAtItsHeadingsAndEmptyPagesAreDropped(t *testing.T) {
+	long := "<h1>Chapter One</h1>"
+	for _, section := range []string{"What It Is", "Who Does It", "What It Costs"} {
+		long += "<h2>" + section + "</h2>"
+		for i := 0; i < 60; i++ {
+			long += "<p>" + strings.Repeat("a sentence about lending and its risks. ", 12) + "</p>"
+		}
+	}
+	chapters := []sources.EPUBChapter{
+		{Title: "Cover", Markdown: "# Cover\n\nCover\n"},
+		{Title: "PART I", Markdown: "# PART I\n\nPART I\n"},
+		{Title: "Chapter One", Markdown: sources.HTMLToMarkdown(long)},
+		{Title: "Afterword", Markdown: "# Afterword\n\n" + strings.Repeat("a closing thought. ", 80)},
+	}
+	dir := t.TempDir()
+	if err := writeReadingCorpus(dir, "A Long Book", chapters); err != nil {
+		t.Fatal(err)
+	}
+	syllabus, err := os.ReadFile(filepath.Join(dir, "syllabus.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	titles := regexp.MustCompile(`(?m)^    title: "(.*)"$`).FindAllStringSubmatch(string(syllabus), -1)
+	var got []string
+	for _, m := range titles {
+		got = append(got, m[1])
+	}
+	want := []string{
+		"Chapter One · What It Is",
+		"Who Does It",
+		"What It Costs",
+		"Afterword",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("units: %q", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("unit %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+	// Each part carries its own prose, under its own heading.
+	first, err := os.ReadFile(filepath.Join(dir, "units", "u1-chapter-one-what-it-is", "canon.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(first), "## Chapter One · What It Is") {
+		t.Errorf("first part:\n%s", string(first)[:80])
+	}
+	if strings.Contains(string(first), "Who Does It") {
+		t.Errorf("the parts are cut at the headings, not run together")
 	}
 }
