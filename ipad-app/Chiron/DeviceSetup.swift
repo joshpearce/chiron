@@ -29,9 +29,10 @@ struct DeviceSetupView: View {
                         Text(link.name).font(Typography.sans(20, weight: .semibold))
                         Text(link.url).font(.footnote.monospaced()).foregroundStyle(.secondary)
                     }
-                    Text("On your other device, point the Camera at this code and open it in Chiron, or use \"Scan a code\" under Add a server.")
+                    Text("On your other device, point the Camera at this code and open it in Chiron, or use \"Scan a code\" under Add a server. A Mac cannot scan: copy the link, and paste it there instead.")
                         .font(.callout)
                         .multilineTextAlignment(.center)
+                    Button("Copy link") { UIPasteboard.general.url = link.asURL }
                     Text(link.key == nil
                          ? "This server has no shared key."
                          : "The code carries the server's shared key. Show it to your own devices only.")
@@ -61,10 +62,20 @@ struct CodeScanner: View {
     let found: (ServerLink) -> Void
     @Environment(\.dismiss) private var dismiss
 
+    /// Whether this device can read a code at all. VisionKit's scanner is
+    /// not built for the Mac, where the link arrives by paste.
+    static var available: Bool {
+#if targetEnvironment(macCatalyst)
+        false
+#else
+        DataScannerViewController.isSupported && DataScannerViewController.isAvailable
+#endif
+    }
+
     var body: some View {
         NavigationStack {
             Group {
-                if DataScannerViewController.isSupported && DataScannerViewController.isAvailable {
+                if Self.available {
                     ScannerView(found: found)
                         .ignoresSafeArea()
                 } else {
@@ -85,6 +96,12 @@ struct CodeScanner: View {
     }
 }
 
+#if targetEnvironment(macCatalyst)
+private struct ScannerView: View {
+    let found: (ServerLink) -> Void
+    var body: some View { EmptyView() }
+}
+#else
 private struct ScannerView: UIViewControllerRepresentable {
     let found: (ServerLink) -> Void
 
@@ -122,3 +139,4 @@ private struct ScannerView: UIViewControllerRepresentable {
         }
     }
 }
+#endif

@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import Security
 
 /// This iPad's ssh identity for a server: an Ed25519 key made on the device,
 /// kept in the Keychain, and enrolled on the server with the shared key. One
@@ -41,32 +40,11 @@ enum DeviceKey {
         authorizedKeysLine(privateKey(for: serverID).publicKey)
     }
 
-    // MARK: - keychain
-
     private static func read(account: String) -> Data? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var out: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &out) == errSecSuccess else { return nil }
-        return out as? Data
+        Keychain.read(service: service, account: account)
     }
 
     private static func write(_ value: Data?, account: String) {
-        let base: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
-        SecItemDelete(base as CFDictionary)
-        guard let value else { return }
-        var add = base
-        add[kSecValueData as String] = value
-        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(add as CFDictionary, nil)
+        Keychain.write(value, service: service, account: account)
     }
 }

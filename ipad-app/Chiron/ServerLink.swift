@@ -28,6 +28,13 @@ struct ServerLink: Equatable {
         self.init(name: fields["name"] ?? "", url: address, key: fields["key"])
     }
 
+    /// The link as text on a clipboard: the way it reaches a Mac, which has
+    /// no camera to scan the code with.
+    init?(pasted text: String) {
+        guard let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)) else { return nil }
+        self.init(url)
+    }
+
     var asURL: URL {
         var c = URLComponents()
         c.scheme = CaptureInbox.scheme

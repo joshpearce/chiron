@@ -28,6 +28,15 @@ final class ServerLinkTests: XCTestCase {
         XCTAssertNil(ServerLink(URL(string: "https://example.com/server?url=x")!), "wrong scheme")
     }
 
+    /// A Mac has no camera to scan with; the link comes over as text,
+    /// pasted from the other device's clipboard.
+    func testAPastedLinkIsReadWithItsWhitespaceForgiven() throws {
+        let link = ServerLink(name: "sprite", url: "https://chiron.example", key: "k1")
+        XCTAssertEqual(ServerLink(pasted: "  \(link.asURL.absoluteString)\n"), link)
+        XCTAssertNil(ServerLink(pasted: "https://chiron.example"), "an address alone is typed in, not pasted as a link")
+        XCTAssertNil(ServerLink(pasted: ""))
+    }
+
     private func store() -> ServerStore {
         let suite = "test-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

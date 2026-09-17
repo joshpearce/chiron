@@ -5,6 +5,7 @@ xcuserdata/
 build/
 DynamicBook.xcodeproj/
 build-sim/
+build-mac/
 build-phone/
 server-go/chiron-server
 server-go/dist/

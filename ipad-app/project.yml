@@ -42,6 +42,8 @@ targets:
     settings:
       base:
         TARGETED_DEVICE_FAMILY: "1,2"        # the iPad reads; the phone captures and reads along
+        SUPPORTS_MACCATALYST: YES            # and the Mac reads and sends passages from other apps
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait"
         CODE_SIGN_STYLE: Automatic
@@ -97,6 +99,8 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Chiron
         TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: YES
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         CURRENT_PROJECT_VERSION: 1
         MARKETING_VERSION: 1.0
     info:
@@ -131,6 +135,8 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+        SUPPORTS_MACCATALYST: YES
+        DEVELOPMENT_TEAM: ${CHIRON_TEAM_ID}       # the Mac signs test bundles too
         TEST_TARGET_NAME: Chiron
   ChironTests:
     type: bundle.unit-test
@@ -146,6 +152,8 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+        SUPPORTS_MACCATALYST: YES
+        DEVELOPMENT_TEAM: ${CHIRON_TEAM_ID}       # the Mac signs test bundles too
 schemes:
   Chiron:
     build:

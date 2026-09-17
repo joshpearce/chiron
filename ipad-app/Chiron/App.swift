@@ -652,13 +652,24 @@ struct ServerEditor: View {
             Form {
                 if server == nil {
                     Section {
+                        if CodeScanner.available {
+                            Button {
+                                scanning = true
+                            } label: {
+                                Label("Scan a code", systemImage: "qrcode.viewfinder")
+                            }
+                        }
                         Button {
-                            scanning = true
+                            if let link = ServerLink(pasted: UIPasteboard.general.string ?? "") {
+                                name = link.name
+                                url = link.url
+                                key = link.key ?? ""
+                            }
                         } label: {
-                            Label("Scan a code", systemImage: "qrcode.viewfinder")
+                            Label("Paste a setup link", systemImage: "doc.on.clipboard")
                         }
                     } footer: {
-                        Text("The code from \"Set up another device\" on a device that already has the server.")
+                        Text("The code, or the copied link, from \"Set up another device\" on a device that already has the server.")
                     }
                 }
                 Section("Name") {
