@@ -176,6 +176,25 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   into Xcode and outside the sandbox. Open the project in Xcode, pick the
   device as the run destination, and Run once: that registers it and
   refreshes the profiles; `xcodebuild` works from then on.
+- **The Mac build is the same target (2026-09-17).** Mac Catalyst on the
+  app, the share extension and the test bundles; `scripts/mac-run.sh`
+  builds, launches and runs the unit suite on the Mac. The whole app
+  compiled first time, one thing excepted: VisionKit's QR scanner is not
+  built for the Mac, so a setup link also travels as pasted text. Three
+  things only showed up at run time. `xcodebuild` signs a Mac build only
+  with an account signed into Xcode plus `-allowProvisioningUpdates
+  -allowProvisioningDeviceRegistration` (the Mac counts as a device); the
+  iOS profiles on disk had hidden that the account was signed out. An
+  Xcode update drops the Metal toolchain that SwiftTerm's shader needs,
+  so every build, Simulator included, fails with "cannot execute tool
+  'metal'" until `xcodebuild -downloadComponent MetalToolchain` (839 MB).
+  And the keychain: macOS has two, and `kSecAttrAccessible` is refused by
+  the file keychain, so `kSecUseDataProtectionKeychain` says which (a
+  no-op on iOS, where there is only the one).
+- **`sim-server.sh` died silently on a fresh /tmp (2026-09-17).** The
+  donor search piped an `ls` of nothing under `set -o pipefail`, so
+  after a reboot the first server never started and printed nothing. The
+  pipeline now tolerates having no donor.
 - **ssh tries IdentityFiles in config order, `Host *` included
   (2026-09-04).** A catch-all with the YubiKey identities above the sprite
   stanza prompted for the YubiKey first. Put specific hosts above `Host *`.

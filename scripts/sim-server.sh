@@ -47,9 +47,11 @@ mkdir -p "$STATE/state/ai" "$STATE/state/data"
 # starts where an existing sim server is, so a test that expects a book in
 # progress works on a worker's own server as it does on the first.
 if [ ! -d "$STATE/state/ai/chapters" ]; then
-  donor=$(ls -td /tmp/chiron-sim-state*/state 2>/dev/null | grep -v "^$STATE/" | while read -r d; do
+  # No other state at all (a fresh /tmp) is not a failure: the pipeline's
+  # empty ls must not take the script down with it.
+  donor=$( (ls -td /tmp/chiron-sim-state*/state 2>/dev/null || true) | grep -v "^$STATE/" | while read -r d; do
     [ -d "$d/ai/chapters" ] && echo "$d" && break
-  done)
+  done || true)
   if [ -n "${donor:-}" ]; then
     cp -R "$donor/." "$STATE/state/"
     echo "seeded state from $donor"

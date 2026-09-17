@@ -48,7 +48,8 @@ You are on the machine that serves the book. Facts that matter:
   `-spec corpus/authoring-spec.md`. A stored chapter of a unit in
   progress is dropped when its bank changes; nothing else to clear.
 - App tests and Simulator walks need the Mac: `scripts/sim-run.sh test`,
-  `scripts/sim-verify.sh`.
+  `scripts/sim-verify.sh`. The Mac runs the same app as a Catalyst build:
+  `scripts/mac-run.sh` (build, run, test, harness).
 - Plans and status: `IPAD-PLAN.md`, `SPRITE-DEV-PLAN.md`. Open material
   the book builder may adapt, with licences and fetch recipes, and the
   design for building from it: `OPEN-SOURCES.md`.

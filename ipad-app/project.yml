@@ -60,6 +60,9 @@ targets:
         # Deliberately not com.fly.* - this is Matt's project living on the
         # company account, not a Fly product.
         PRODUCT_BUNDLE_IDENTIFIER: dev.mjbraun.chiron
+        # The Mac loads an extension only when its version matches the app's.
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.0
     info:
       path: Chiron/Info.plist
       properties:
