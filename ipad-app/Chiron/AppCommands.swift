@@ -447,6 +447,8 @@ enum AppCommands {
     }
 
     /// The window as the reader sees it, as PNG.
+    /// The key window. On the Mac a sheet is hosted outside UIKit's windows,
+    /// so a card up there is seen through accessibility, not here.
     static func screenshot() throws -> Data {
         guard let window = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene }).flatMap(\.windows).first(where: \.isKeyWindow) else {

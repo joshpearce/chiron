@@ -15,6 +15,9 @@ struct ChironApp: App {
                         library.sync.baseURL = server
                         await library.sync.probe()
                     }
+                    #if targetEnvironment(macCatalyst)
+                    MacServices.register()
+                    #endif
                     #if DEBUG
                     KeyboardProbe.shared.start()
                     if Harness.requested {

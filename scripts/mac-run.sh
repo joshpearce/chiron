@@ -36,6 +36,6 @@ case "${1:-run}" in
     for id in "$@"; do only+=(-only-testing:"$id"); done
     [ ${#only[@]} -eq 0 ] && only=(-only-testing:ChironTests)
     xcodebuild test -project Chiron.xcodeproj -scheme Chiron -destination "$DEST" \
-      -derivedDataPath build-mac "${SIGNING[@]}" "${only[@]}" -quiet ;;
+      -derivedDataPath build-mac "${SIGNING[@]}" "${only[@]}" | grep -E "^(Test (Case|Suite)|\s+Executed|.*error:|\*\* TEST)" ;;
   *) echo "usage: $0 [build|run|test [id ...]|harness [port]]" >&2; exit 1 ;;
 esac

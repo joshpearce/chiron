@@ -77,6 +77,12 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: dev.mjbraun.chiron
             CFBundleURLSchemes: [chiron]
+        # "Send to Chiron" in every Mac app's Services menu (MacServices.swift).
+        NSServices:
+          - NSMenuItem: {default: "Send to Chiron"}
+            NSMessage: sendToChiron
+            NSPortName: Chiron
+            NSSendTypes: [public.utf8-plain-text]
         UIAppFonts:
           - fonts/SourceSerif4-Regular.ttf
           - fonts/SourceSerif4-It.ttf

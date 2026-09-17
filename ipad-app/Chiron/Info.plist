@@ -38,6 +38,24 @@
 	<string>Chiron reads the setup code shown on your other device, so you do not have to type the server's address and key.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Chiron connects to the tutor server running on your Mac to grade answers and generate chapters.</string>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Send to Chiron</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>sendToChiron</string>
+			<key>NSPortName</key>
+			<string>Chiron</string>
+			<key>NSSendTypes</key>
+			<array>
+				<string>public.utf8-plain-text</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIAppFonts</key>
 	<array>
 		<string>fonts/SourceSerif4-Regular.ttf</string>
