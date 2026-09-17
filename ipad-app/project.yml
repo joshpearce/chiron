@@ -83,6 +83,7 @@ targets:
             NSMessage: sendToChiron
             NSPortName: Chiron
             NSSendTypes: [public.utf8-plain-text]
+            NSRequiredContext: {}
         UIAppFonts:
           - fonts/SourceSerif4-Regular.ttf
           - fonts/SourceSerif4-It.ttf

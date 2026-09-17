@@ -50,6 +50,8 @@
 			<string>sendToChiron</string>
 			<key>NSPortName</key>
 			<string>Chiron</string>
+			<key>NSRequiredContext</key>
+			<dict/>
 			<key>NSSendTypes</key>
 			<array>
 				<string>public.utf8-plain-text</string>

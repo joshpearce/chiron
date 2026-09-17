@@ -191,6 +191,14 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   And the keychain: macOS has two, and `kSecAttrAccessible` is refused by
   the file keychain, so `kSecUseDataProtectionKeychain` says which (a
   no-op on iOS, where there is only the one).
+- **A service without `NSRequiredContext` is registered and never shown
+  (2026-09-17).** `pbs -dump_pboard` listed "Send to Chiron" with every
+  key it needs, `NSPerformService` ran it, and no app's Services menu
+  offered it, Chrome or TextEdit. The one difference from an entry that
+  shows (Bear's) was an empty `NSRequiredContext = {}`; with it the item
+  appears everywhere. Chrome has no share sheet for a selection at all,
+  so the Services menu is the only way selected text reaches Chiron
+  from it.
 - **`sim-server.sh` died silently on a fresh /tmp (2026-09-17).** The
   donor search piped an `ls` of nothing under `set -o pipefail`, so
   after a reboot the first server never started and printed nothing. The
