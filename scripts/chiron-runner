@@ -29,7 +29,10 @@ case "$verb" in
     # git quotes the path: 'path'. Only the checkout.
     [ -z "$b" ] || refuse "too many arguments"
     path="${a#\'}"; path="${path%\'}"
-    [ "$path" = "$CHECKOUT" ] || refuse "push goes to $CHECKOUT only"
+    case "$path" in
+      "$CHECKOUT"|"~/src/chiron"|"src/chiron") ;;
+      *) refuse "push goes to $CHECKOUT only" ;;
+    esac
     exec git-receive-pack "$CHECKOUT" ;;
   build)
     [ -n "$a" ] && [ -z "$b" ] || refuse "build takes one ref"

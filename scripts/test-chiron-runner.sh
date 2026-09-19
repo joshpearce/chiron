@@ -22,8 +22,11 @@ for c in "ls" "bash" "git-receive-pack /etc" "build main; ls" "fetch b1 ../../.s
   run "$c" >/dev/null && bad "accepted: $c" || ok
 done
 # A push into the checkout is passed to git-receive-pack, nothing else.
-out=$(run "git-receive-pack '$T/src/chiron'" </dev/null) || true
-echo "$out" | grep -q "report-status" && ok || bad "git-receive-pack did not answer: $out"
+for p in "'$T/src/chiron'" "'src/chiron'" "'~/src/chiron'"; do
+  out=$(run "git-receive-pack $p" </dev/null) || true
+  echo "$out" | grep -q "report-status" && ok || bad "git-receive-pack $p did not answer: $out"
+done
+run "git-receive-pack 'src/other'" >/dev/null && bad "push elsewhere accepted" || ok
 # fetch streams a file from a build, by build id and plain file name.
 out=$(run "fetch b1 build.json") && [ "$out" = '{"id":"b1"}' ] && ok || bad "fetch: $out"
 run "fetch nonesuch build.json" >/dev/null && bad "fetch of a missing build accepted" || ok
