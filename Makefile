@@ -6,7 +6,7 @@ GO      := cd server-go && go
 SERVED  := /home/sprite/chiron
 BIN     := $(SERVED)/bin/chiron-server
 
-.PHONY: test lint deploy deploy-gate
+.PHONY: test lint deploy deploy-gate app-build
 
 # On the sprite (which also serves the book, on 8 GB) the suite runs two
 # packages at a time and without browser renders, so a test run never
@@ -46,3 +46,15 @@ deploy-gate:
 	cp $(SERVED)/bin/chiron-gate $(SERVED)/bin/chiron-gate.$$(date +%b%d | tr A-Z a-z) || true
 	mv $(SERVED)/bin/chiron-gate.new $(SERVED)/bin/chiron-gate
 	sprite-env services restart chiron-gate
+
+# The app, built and signed on the MacBook (SPRITE-DEV-PLAN.md phase E):
+# push main there, build it, bring the build back under the served
+# tree's builds/<token>/, where the gate offers it to the devices.
+app-build:
+	git push -q macbook main
+	@id=$$(ssh macbook build main | tail -1) && [ -n "$$id" ] && \
+	  token=$$(ssh macbook fetch $$id build.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])') && \
+	  dir=$(SERVED)/builds/$$token && mkdir -p $$dir && \
+	  for f in build.json manifest.plist Chiron.ipa Chiron-mac.zip build.log; do ssh macbook fetch $$id $$f > $$dir/$$f; done && \
+	  ln -sfn $$token $(SERVED)/builds/latest && \
+	  python3 -c 'import json,sys; b=json.load(open(sys.argv[1])); print("build", b["id"], b["status"], b["version"], "(%d)" % b["build"], "tests", b["tests"])' $$dir/build.json

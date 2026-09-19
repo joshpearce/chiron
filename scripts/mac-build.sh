@@ -77,9 +77,11 @@ if [ "$(conf ui_tests)" = "1" ]; then
   ../scripts/sim-run.sh test >>"$LOG" 2>&1 || fail "UI tests (see build.log)"
 fi
 
+# Debug, as every build on the devices has been: the harness and the
+# agent link the sprite drives the app through live behind #if DEBUG.
 step "archive for iOS"
-xcodebuild -project Chiron.xcodeproj -scheme Chiron -destination 'generic/platform=iOS' \
-  -archivePath "$OUT/Chiron.xcarchive" -allowProvisioningUpdates "${AUTH[@]}" \
+xcodebuild -project Chiron.xcodeproj -scheme Chiron -configuration Debug -destination 'generic/platform=iOS' \
+  -archivePath "$OUT/Chiron.xcarchive" -allowProvisioningUpdates ${AUTH[@]+"${AUTH[@]}"} \
   CURRENT_PROJECT_VERSION="$COUNT" MARKETING_VERSION="$SHORT" archive >>"$LOG" 2>&1 || fail "archive"
 
 step "export a development-signed IPA"
@@ -96,12 +98,12 @@ cat > "$OUT/export.plist" <<PLIST
 </dict></plist>
 PLIST
 xcodebuild -exportArchive -archivePath "$OUT/Chiron.xcarchive" -exportOptionsPlist "$OUT/export.plist" \
-  -exportPath "$OUT/export" -allowProvisioningUpdates "${AUTH[@]}" >>"$LOG" 2>&1 || fail "export"
+  -exportPath "$OUT/export" -allowProvisioningUpdates ${AUTH[@]+"${AUTH[@]}"} >>"$LOG" 2>&1 || fail "export"
 mv "$OUT/export/Chiron.ipa" "$OUT/Chiron.ipa"
 
 step "the Mac app"
 xcodebuild -project Chiron.xcodeproj -scheme Chiron -destination 'platform=macOS,variant=Mac Catalyst' \
-  -derivedDataPath build-mac -allowProvisioningUpdates "${AUTH[@]}" \
+  -derivedDataPath build-mac -allowProvisioningUpdates ${AUTH[@]+"${AUTH[@]}"} \
   CURRENT_PROJECT_VERSION="$COUNT" MARKETING_VERSION="$SHORT" build >>"$LOG" 2>&1 || fail "mac build"
 ditto -c -k --keepParent build-mac/Build/Products/Debug-maccatalyst/Chiron.app "$OUT/Chiron-mac.zip"
 

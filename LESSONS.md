@@ -191,6 +191,17 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   And the keychain: macOS has two, and `kSecAttrAccessible` is refused by
   the file keychain, so `kSecUseDataProtectionKeychain` says which (a
   no-op on iOS, where there is only the one).
+- **The app builds Debug only (2026-09-19).** `xcodebuild archive`
+  defaults to Release, and the Release build has never compiled: the
+  harness under `#if DEBUG` names members that only exist in Debug.
+  Every build on a device has been Debug, which is also where the
+  harness and the agent link live, so `mac-build.sh` archives Debug.
+  Making Release build is a separate job, not a prerequisite.
+- **macOS's `/bin/bash` is 3.2 and an apostrophe inside `${1:?...}`
+  breaks it (2026-09-19)**, and bash 5 too: "unexpected EOF while
+  looking for matching `'`" pointing at a line far below. A double
+  quote inside single quotes inside `$( )` trips 3.2 as well. Scripts a
+  person runs on a Mac get checked with `/bin/bash -n`, not just `bash`.
 - **A service without `NSRequiredContext` is registered and never shown
   (2026-09-17).** `pbs -dump_pboard` listed "Send to Chiron" with every
   key it needs, `NSPerformService` ran it, and no app's Services menu
