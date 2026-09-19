@@ -337,7 +337,12 @@ Settled by Matt on 2026-09-02:
   the Mac, an in-app client on the iPad, one mechanism for both.
 
 Settled by Matt on 2026-09-19: builds happen on the idle MacBook over
-Tailscale, reached only by the sprite (phases E to G).
+Tailscale, reached only by the sprite (phases E to G); the tailnet is
+Matt's personal one; signing is headless with an App Store Connect API
+key; FileVault stays on, so a restart of the MacBook waits for a hand at
+the lid (rare, accepted); `tailscaled` on the sprite freezes and thaws
+with hibernation and reconnects on wake, and the sprite's ssh to the
+MacBook retries its connect for a short while to cover that.
 
 Still open:
 1. Bootstrap timing: `scripts/sprite-bootstrap-ssh.sh` from the Mac with

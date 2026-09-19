@@ -1,0 +1,46 @@
+#!/bin/bash
+# What the sprite's key may do on the MacBook, and nothing else. Installed
+# as the forced command on that key in ~/.ssh/authorized_keys, so every
+# session lands here with the requested command in SSH_ORIGINAL_COMMAND:
+#
+#   git-receive-pack '<checkout>'   a push into ~/src/chiron
+#   build <ref>                     scripts/mac-build.sh <ref> in the checkout
+#   fetch <build-id> <file>         one file of ~/builds/<build-id> on stdout
+#
+# Arguments are matched, never evaluated: a ref is a git ref name, a build
+# id and a file name are single path segments. A shell on the sprite gets
+# a build server out of this, not a Mac.
+set -euo pipefail
+CHECKOUT="$HOME/src/chiron"
+BUILDS="$HOME/builds"
+
+refuse() { echo "chiron-runner: $1" >&2; exit 2; }
+
+cmd="${SSH_ORIGINAL_COMMAND:-}"
+[ -n "$cmd" ] || refuse "no command; this key runs the build runner only"
+
+# Split on single spaces; nothing here takes an argument with a space.
+read -r verb a b rest <<<"$cmd"
+[ -z "$rest" ] || refuse "too many arguments"
+
+segment='^[A-Za-z0-9][A-Za-z0-9._-]*$'
+case "$verb" in
+  git-receive-pack)
+    # git quotes the path: 'path'. Only the checkout.
+    [ -z "$b" ] || refuse "too many arguments"
+    path="${a#\'}"; path="${path%\'}"
+    [ "$path" = "$CHECKOUT" ] || refuse "push goes to $CHECKOUT only"
+    exec git-receive-pack "$CHECKOUT" ;;
+  build)
+    [ -n "$a" ] && [ -z "$b" ] || refuse "build takes one ref"
+    [[ "$a" =~ ^[A-Za-z0-9][A-Za-z0-9./_-]*$ ]] || refuse "not a ref: $a"
+    cd "$CHECKOUT"
+    exec scripts/mac-build.sh "$a" ;;
+  fetch)
+    [ -n "$a" ] && [ -n "$b" ] || refuse "fetch takes a build id and a file"
+    [[ "$a" =~ $segment ]] && [[ "$b" =~ $segment ]] || refuse "not a build id and a file name"
+    f="$BUILDS/$a/$b"
+    [ -f "$f" ] || refuse "no such file in build $a: $b"
+    exec cat "$f" ;;
+  *) refuse "not a runner verb: $verb" ;;
+esac
