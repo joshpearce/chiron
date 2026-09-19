@@ -366,6 +366,7 @@ final class Library: ObservableObject {
             service: service, storage: storage)
         if let k = info?.kind { s.kind = k }
         s.assets = bookAssets
+        s.localTutor = LocalTutor.ifAvailable
         // A passage sent on from inside the book: the card opens over it,
         // naming the book as where the words came from.
         s.onCapture = { [weak self] text in

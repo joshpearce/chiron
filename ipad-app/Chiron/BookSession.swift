@@ -106,8 +106,10 @@ final class BookSession: ObservableObject {
     }
     /// A question being asked or answered, shown in the ask card.
     @Published var asking: Asking?
-    /// The device's own model, asked only when the tutor cannot be reached.
-    var localTutor: PassageAnswerer? = LocalTutor.ifAvailable
+    /// The device's own model, asked only when the tutor cannot be
+    /// reached. The library sets it; a session made bare has none, so a
+    /// test's "tutor away" is the same on a Mac with a model and without.
+    var localTutor: PassageAnswerer?
 
     struct Asking: Equatable {
         var mark: Mark
