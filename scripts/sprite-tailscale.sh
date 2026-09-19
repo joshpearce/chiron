@@ -4,6 +4,10 @@
 #
 #   scripts/sprite-tailscale.sh <macbook-tailnet-name> <macbook-user>
 #
+# The MacBook must already be on the tailnet: its address is looked up
+# there and written into the sprite's ssh stanza, because the sprite's
+# resolv.conf is read-only and MagicDNS cannot take hold.
+#
 # The auth key comes from 1Password at run time (TS_AUTHKEY_REF, default
 # op://<vault>/<item>/credential): a tagged, pre-approved
 # key, used once; tailscaled keeps the node identity it earns in
@@ -26,18 +30,30 @@ if ssh "$SPRITE" 'sudo tailscale status >/dev/null 2>&1'; then
   echo "==> already on the tailnet"
 else
   echo "==> joining (the key is read from 1Password and passed on stdin)"
-  op read --account my "$REF" | ssh "$SPRITE" 'sudo tailscale up --auth-key="$(cat)" --hostname chiron-sprite --accept-dns=true --ssh=false'
+  # No MagicDNS: the sprite's /etc/resolv.conf is read-only, so names
+  # are looked up below and the address goes into the ssh stanza.
+  op read --account my "$REF" | ssh "$SPRITE" 'sudo tailscale up --auth-key="$(cat)" --hostname chiron-sprite --accept-dns=false --ssh=false'
 fi
 ssh "$SPRITE" 'sudo tailscale status | head -5'
+ADDR=$(ssh "$SPRITE" "sudo tailscale status --json" | python3 -c '
+import json, sys
+name = sys.argv[1].rstrip(".") + "."
+for p in json.load(sys.stdin)["Peer"].values():
+    if p["DNSName"] == name:
+        print(p["TailscaleIPs"][0]); break
+' "$MACBOOK")
+[ -n "$ADDR" ] || { echo "$MACBOOK is not on the tailnet yet (tailscale status on the sprite does not list it)" >&2; exit 1; }
+echo "==> $MACBOOK is $ADDR"
 
 echo "==> the sprite's key to the MacBook"
 ssh "$SPRITE" '[ -f ~/.ssh/macbook_ed25519 ] || ssh-keygen -q -t ed25519 -N "" -C chiron-sprite-runner -f ~/.ssh/macbook_ed25519'
-ssh "$SPRITE" "python3 - '$MACBOOK' '$MACUSER'" <<'PY'
+ssh "$SPRITE" "python3 - '$ADDR' '$MACUSER' '$MACBOOK'" <<'PY'
 import os, re, sys
-name, user = sys.argv[1], sys.argv[2]
+addr, user, name = sys.argv[1], sys.argv[2], sys.argv[3]
 path = os.path.expanduser("~/.ssh/config")
 stanza = f"""Host macbook
-  HostName {name}
+  # {name}, by address: the sprite has no MagicDNS.
+  HostName {addr}
   User {user}
   IdentityFile ~/.ssh/macbook_ed25519
   IdentitiesOnly yes
