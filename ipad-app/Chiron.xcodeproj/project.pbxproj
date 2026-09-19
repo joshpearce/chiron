@@ -36,6 +36,7 @@
 		6DFAE5171310C9CA93D24B36 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = FB840DC1DA1441BC90473907 /* SwiftTerm */; };
 		71EC2EC88B2349C813774D2C /* DeviceSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FAC00EF426832574EAAAD75 /* DeviceSetup.swift */; };
 		73C9290A5A8E44753FBA4E6B /* Harness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C2E4E249BD2C1C75083AB14 /* Harness.swift */; };
+		744F0AE9B5C473CA55E54453 /* LocalTutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB45BC733630ABDDAD825FC6 /* LocalTutor.swift */; };
 		7BBA07442818BD5FB8B2120B /* ShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FFE36747AF7BFC39412DFB /* ShellUITests.swift */; };
 		7E27F835DD0D2A3170B49582 /* CaptureCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36CD74CEBED525C2D6612866 /* CaptureCard.swift */; };
 		7EDAA81B3ED4E2B709786898 /* BookAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8756BB134A501E84F831074 /* BookAssets.swift */; };
@@ -185,6 +186,7 @@
 		C4FFE36747AF7BFC39412DFB /* ShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellUITests.swift; sourceTree = "<group>"; };
 		C70DED1F5DFABB56685FE366 /* ShelvesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelvesTests.swift; sourceTree = "<group>"; };
 		C8E1C5648D62DB91C6D0526E /* PaletteUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaletteUITests.swift; sourceTree = "<group>"; };
+		CB45BC733630ABDDAD825FC6 /* LocalTutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTutor.swift; sourceTree = "<group>"; };
 		CB60DFC4669040946A96657D /* MacServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacServices.swift; sourceTree = "<group>"; };
 		DEE5BEC3075A333377FEE436 /* DeviceKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceKey.swift; sourceTree = "<group>"; };
 		DF7A7AA69D4E3E6C07183050 /* MathText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathText.swift; sourceTree = "<group>"; };
@@ -249,6 +251,7 @@
 				89B2BA152D8A07FC89372909 /* InkBox.swift */,
 				A7F564E8E19BBCC90A699876 /* Keychain.swift */,
 				59D9E626478A65422345A2F1 /* Library.swift */,
+				CB45BC733630ABDDAD825FC6 /* LocalTutor.swift */,
 				CB60DFC4669040946A96657D /* MacServices.swift */,
 				DF7A7AA69D4E3E6C07183050 /* MathText.swift */,
 				6CE4AEBB512C66BBEEE9B508 /* Models.swift */,
@@ -534,6 +537,7 @@
 				92A27FDF307807755C3BF474 /* InkBox.swift in Sources */,
 				483FAA83A9A34284E9022FEC /* Keychain.swift in Sources */,
 				C4B40CBDCAA3019109786987 /* Library.swift in Sources */,
+				744F0AE9B5C473CA55E54453 /* LocalTutor.swift in Sources */,
 				2E8972F07D0C8C8ADF7FC2FD /* MacServices.swift in Sources */,
 				F2ECDC1E394FEBDB5B86B36F /* MathText.swift in Sources */,
 				AF29D4E2D309DDDCBC3C20E1 /* Models.swift in Sources */,

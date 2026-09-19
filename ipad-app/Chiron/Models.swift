@@ -18,6 +18,20 @@ struct ChapterPayload: Codable, Identifiable {
 
     var id: String { unit }
     var isCalibration: Bool { calibration == true }
+
+    /// The chapter as words: tags gone, blocks kept as paragraph breaks,
+    /// entities decoded. What a model reads when it stands in for the tutor.
+    var plainText: String {
+        var s = html.replacingOccurrences(of: "(?is)<(script|style)\\b.*?</\\1>", with: "", options: .regularExpression)
+        s = s.replacingOccurrences(of: "(?i)</(p|div|h[1-6]|li|blockquote|pre|tr|section|article)>", with: "\n\n", options: .regularExpression)
+        s = s.replacingOccurrences(of: "(?i)<br\\s*/?>", with: "\n", options: .regularExpression)
+        s = s.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        for (entity, char) in [("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&#39;", "'"), ("&nbsp;", " ")] {
+            s = s.replacingOccurrences(of: entity, with: char)
+        }
+        s = s.replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
+        return s.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
     /// The placement screener travels as a one-item calibration chapter.
     var screener: CheckItem? {
         check.count == 1 && check[0].check == "screener" ? check[0] : nil

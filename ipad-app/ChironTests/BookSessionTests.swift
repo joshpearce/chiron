@@ -816,6 +816,60 @@ final class BookSessionTests: XCTestCase {
         XCTAssertNil(s2.asking?.mark.answer)
         XCTAssertEqual(s2.marks.count, 2)
     }
+
+    /// With the tutor out of reach and a model on the device, the device
+    /// answers from the chapter, and says that it did.
+    func testTheDeviceAnswersWhenTheTutorIsAway() async {
+        scriptFreshBook()
+        fake.onExchange = { [unowned self] _ in self.deliversU1() }
+        let s = session()
+        await s.open()
+        let local = FakeAnswerer()
+        local.answer = "Because the chapter says so."
+        s.localTutor = local
+        fake.onAsk = { _, _, _ in throw URLError(.cannotConnectToHost) }
+        s.addMark(kind: .question, start: 1, end: 5, text: "One")
+        await s.ask("why?")
+        XCTAssertNil(s.asking?.error)
+        let answer = s.asking?.mark.answer ?? ""
+        XCTAssertTrue(answer.hasPrefix("Because the chapter says so."), answer)
+        XCTAssertTrue(answer.contains("on this device"), "the reader is told who answered: \(answer)")
+        XCTAssertEqual(local.questions, ["why?"])
+        XCTAssertEqual(local.quotes, ["One"])
+        XCTAssertFalse(local.chapters[0].isEmpty, "the chapter is the context")
+        XCTAssertNil(local.chapters[0].range(of: "</?(p|h2|div|em)>", options: .regularExpression), "as text, not markup")
+        XCTAssertFalse(local.chapters[0].contains("&gt;"), "entities decoded")
+        XCTAssertTrue(local.chapters[0].contains("> est"), "the chapter's &gt; is a greater-than sign")
+
+        // The tutor back: the device is not asked.
+        fake.onAsk = { unit, _, _ in AskResponse(unit: unit, answerMd: "From the tutor.") }
+        s.addMark(kind: .question, start: 6, end: 9, text: "Two")
+        await s.ask("and?")
+        XCTAssertEqual(s.asking?.mark.answer, "From the tutor.")
+        XCTAssertEqual(local.questions.count, 1)
+
+        // Both away: the old message.
+        fake.onAsk = { _, _, _ in throw URLError(.cannotConnectToHost) }
+        local.fails = true
+        s.addMark(kind: .question, start: 10, end: 14, text: "Three")
+        await s.ask("so?")
+        XCTAssertNotNil(s.asking?.error)
+        XCTAssertNil(s.asking?.mark.answer)
+    }
+}
+
+/// A device model that answers whatever it is asked.
+final class FakeAnswerer: PassageAnswerer {
+    var answer = ""
+    var fails = false
+    var questions: [String] = []
+    var quotes: [String] = []
+    var chapters: [String] = []
+    func answer(question: String, about quote: String, in chapter: String, history: [QA]) async throws -> String {
+        questions.append(question); quotes.append(quote); chapters.append(chapter)
+        if fails { throw URLError(.unknown) }
+        return answer
+    }
 }
 
 @MainActor

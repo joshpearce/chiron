@@ -106,6 +106,8 @@ final class BookSession: ObservableObject {
     }
     /// A question being asked or answered, shown in the ask card.
     @Published var asking: Asking?
+    /// The device's own model, asked only when the tutor cannot be reached.
+    var localTutor: PassageAnswerer? = LocalTutor.ifAvailable
 
     struct Asking: Equatable {
         var mark: Mark
@@ -745,12 +747,21 @@ final class BookSession: ObservableObject {
         }
         asking = a
         do {
-            let reply = try await service.ask(subject: subjectID, unit: unit, quote: a.mark.text, question: q, history: history)
+            let answer: String
+            do {
+                answer = try await service.ask(subject: subjectID, unit: unit, quote: a.mark.text, question: q, history: history).answerMd
+            } catch let away {
+                // The tutor out of reach: the device answers from the
+                // chapter, and the reader is told so.
+                guard let local = localTutor, let chapter else { throw away }
+                let text = try await local.answer(question: q, about: a.mark.text, in: chapter.plainText, history: history)
+                answer = text + "\n\n" + LocalTutor.signature
+            }
             if followUp, var thread = a.mark.thread, !thread.isEmpty {
-                thread[thread.count - 1].answer = reply.answerMd
+                thread[thread.count - 1].answer = answer
                 a.mark.thread = thread
             } else {
-                a.mark.answer = reply.answerMd
+                a.mark.answer = answer
             }
         } catch {
             a.error = "The tutor can't be reached. Try again."
