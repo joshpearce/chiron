@@ -150,7 +150,7 @@ enum AppCommands {
         case "capture":
             guard let prompt = args["prompt"] as? String else { throw Failure.badArguments("capture needs prompt") }
             let scale = CaptureScale(rawValue: args["scale"] as? String ?? "primer")
-            guard let scale else { throw Failure.badArguments("scale must be summary, description, primer or book") }
+            guard let scale else { throw Failure.badArguments("scale must be summary, detail, primer or book") }
             let c = Capture(text: args["text"] as? String ?? "", sourceURL: args["url"] as? String, sourceApp: args["app"] as? String)
             let reply = try await library.submitCapture(c, prompt: prompt, scale: scale)
             var out = state(library)

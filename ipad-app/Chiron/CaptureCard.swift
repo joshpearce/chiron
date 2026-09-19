@@ -3,7 +3,7 @@ import Combine
 
 /// "What do you want to know about this?" A capture arrives with its text
 /// or image; the reader adds the question and says how much they want
-/// back. A summary or a description is answered here in the card; a
+/// back. A summary or a detail is answered here in the card; a
 /// primer or a smart book goes on to its planning conversation. From the
 /// shelf's Capture button the text is the reader's to paste.
 struct CaptureCard: View {
@@ -110,7 +110,7 @@ struct CaptureCard: View {
     private var submitLabel: String {
         switch scale {
         case .summary: return "Summarise"
-        case .description: return "Describe"
+        case .detail: return "Go into detail"
         case .primer: return "Plan a primer"
         case .book: return "Plan a book"
         }

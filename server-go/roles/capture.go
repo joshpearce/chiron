@@ -7,14 +7,14 @@ import (
 	"github.com/mjbraun/chiron/server/llm"
 )
 
-// The capture card's scales. A summary or a description is answered on
+// The capture card's scales. A summary or a detail is answered on
 // the spot; a primer or a book is planned first, in a short conversation,
 // and written from the brief that comes out of it.
 const (
-	ScaleSummary     = "summary"
-	ScaleDescription = "description"
-	ScalePrimer      = "primer"
-	ScaleBook        = "book"
+	ScaleSummary = "summary"
+	ScaleDetail  = "detail"
+	ScalePrimer  = "primer"
+	ScaleBook    = "book"
 )
 
 var captureAnswerSchema = map[string]any{
@@ -33,13 +33,13 @@ const captureAnswerSystem = `You answer one reader's question about material the
 ` + acronymRule
 
 const summaryRule = "- Length: one paragraph, at most 120 words. The answer and nothing else.\n"
-const descriptionRule = "- Length: two or three paragraphs, 200 to 350 words: the answer, then what the reader needs to make sense of it.\n"
+const detailRule = "- Length: two or three paragraphs, 200 to 350 words: the answer, then what the reader needs to make sense of it. More than a summary, well short of a primer.\n"
 
-// AnswerCapture answers the question at the summary or description scale.
+// AnswerCapture answers the question at the summary or detail scale.
 func AnswerCapture(chain llm.Chain, cap Capture, scale string) (string, error) {
 	system := captureAnswerSystem + summaryRule
-	if scale == ScaleDescription {
-		system = captureAnswerSystem + descriptionRule
+	if scale == ScaleDetail {
+		system = captureAnswerSystem + detailRule
 	}
 	var out struct {
 		Markdown string `json:"markdown"`

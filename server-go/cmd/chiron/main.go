@@ -28,7 +28,7 @@ import (
 const usage = `usage:
   chiron shelf                         every subject on the shelf and where it stands
   chiron capture -scale S -prompt Q [-title T] [-url U] [-app A] [-text T | -file F]
-                                       send a passage in; S is summary, description,
+                                       send a passage in; S is summary, detail,
                                        primer or book; the passage is stdin when neither
                                        -text nor -file is given
   chiron plan ID [-say TEXT]           a draft's planning conversation; -say answers
@@ -270,7 +270,7 @@ func textOf(text, file string, stdin io.Reader) (string, error) {
 
 func (c *client) capture(args []string, stdin io.Reader) (string, error) {
 	fs := flags("capture", args)
-	scale := fs.String("scale", "", "summary, description, primer or book")
+	scale := fs.String("scale", "", "summary, detail, primer or book")
 	prompt := fs.String("prompt", "", "what you want to know, or what to make of it")
 	title := fs.String("title", "", "a title for the primer or the book")
 	url := fs.String("url", "", "where the passage came from")

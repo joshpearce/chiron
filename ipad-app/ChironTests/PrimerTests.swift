@@ -51,6 +51,15 @@ final class PrimerTests: XCTestCase {
         XCTAssertEqual(obj["scale"] as? String, "primer", "a primer unless the reader picks otherwise")
     }
 
+    /// The scale between a summary and a primer is "detail": more than a
+    /// sentence or two, not yet a document. The server knows it by that name.
+    func testTheDetailScaleIsNamedForWhatItGives() {
+        XCTAssertEqual(CaptureScale.detail.rawValue, "detail")
+        XCTAssertEqual(CaptureScale.detail.label, "Detail")
+        XCTAssertTrue(CaptureScale.detail.immediate)
+        XCTAssertEqual(CaptureScale.allCases.map(\.rawValue), ["summary", "detail", "primer", "book"])
+    }
+
     func testCaptureInboxRoundTrip() throws {
         var c = Capture(text: "captured words", sourceApp: "Notes")
         c.imagePNG = Data([1, 2, 3])

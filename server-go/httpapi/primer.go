@@ -19,7 +19,7 @@ import (
 )
 
 // Primers: the reader captures something anywhere on the iPad, asks a
-// question, and says how much they want back. A summary or a description
+// question, and says how much they want back. A summary or a detail
 // is answered in the card. A primer or a smart book is a draft first: a
 // short planning conversation the reader can leave and come back to, then
 // a build. A primer is a one-unit subject with no check that margin notes
@@ -85,7 +85,7 @@ type captureRequest struct {
 	SourceApp string `json:"source_app"`
 	Prompt    string `json:"prompt"`
 	Title     string `json:"title"`
-	// Scale is summary, description, primer or book; a primer without one.
+	// Scale is summary, detail, primer or book; a primer without one.
 	Scale string `json:"scale"`
 }
 
@@ -105,9 +105,9 @@ func (s *Server) handlePrimerCapture(w http.ResponseWriter, r *http.Request) {
 		req.Scale = roles.ScalePrimer
 	}
 	switch req.Scale {
-	case roles.ScaleSummary, roles.ScaleDescription, roles.ScalePrimer, roles.ScaleBook:
+	case roles.ScaleSummary, roles.ScaleDetail, roles.ScalePrimer, roles.ScaleBook:
 	default:
-		writeError(w, http.StatusUnprocessableEntity, "scale must be summary, description, primer or book")
+		writeError(w, http.StatusUnprocessableEntity, "scale must be summary, detail, primer or book")
 		return
 	}
 	var png []byte
@@ -134,7 +134,7 @@ func (s *Server) handlePrimerCapture(w http.ResponseWriter, r *http.Request) {
 	}
 	cap := roles.Capture{Text: req.Text, URL: req.SourceURL, App: req.SourceApp, Prompt: req.Prompt}
 
-	if req.Scale == roles.ScaleSummary || req.Scale == roles.ScaleDescription {
+	if req.Scale == roles.ScaleSummary || req.Scale == roles.ScaleDetail {
 		md, err := roles.AnswerCapture(s.chain, cap, req.Scale)
 		if err != nil && driveEnabled() && !s.chain.Status().Connected {
 			md, err = fmt.Sprintf("[stub %s] You asked: %s\n\nAbout: %s", req.Scale, cap.Prompt, clipText(cap.Text, 300)), nil

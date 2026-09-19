@@ -1,6 +1,6 @@
 ---
 name: chiron
-description: Send work to Matt's Chiron bookshelf - a summary or description of a passage, a primer, or a smart book - and read what it wrote. Use when asked to "send to Chiron", "make a primer about", "create a smart book on", or to check the bookshelf.
+description: Send work to Matt's Chiron bookshelf - a summary or detail of a passage, a primer, or a smart book - and read what it wrote. Use when asked to "send to Chiron", "make a primer about", "create a smart book on", or to check the bookshelf.
 allowed-tools: Bash, Read, Write
 user-invocable: true
 ---
@@ -41,11 +41,11 @@ anywhere.
 | scale | what comes back | where |
 |---|---|---|
 | `summary` | a few paragraphs answering the prompt | printed, in the reply's `answer_md` |
-| `description` | a page or so | printed, in `answer_md` |
+| `detail` | a few paragraphs, more than a summary and short of a primer | printed, in `answer_md` |
 | `primer` | a short self-contained document | the bookshelf, after a build |
 | `book` | a smart book with units and checks | the bookshelf, after a build; takes tens of minutes |
 
-A summary or description is done when the command returns. A primer or
+A summary or detail is done when the command returns. A primer or
 book comes back as a **draft** in `planning`: the reply carries its
 `subject` id and the tutor's first question in `reply_md`. The draft is
 built when you say so, with a brief.
@@ -121,7 +121,7 @@ there.
 
 For "send this to Chiron" with text in hand (a file, a page, a quote),
 capture it unchanged at the scale asked for, with `-url` and `-app`
-naming where it came from if known. A summary or description prints
+naming where it came from if known. A summary or detail prints
 the answer; relay it in full.
 
 ## Care

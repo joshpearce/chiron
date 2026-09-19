@@ -70,11 +70,11 @@ const epubNav = `<?xml version="1.0" encoding="utf-8"?>
 
 func borrowedBook(t *testing.T) string {
 	return writeEPUB(t, map[string]string{
-		"mimetype":                 "application/epub+zip",
-		"META-INF/container.xml":   epubContainer,
-		"OEBPS/package.opf":        epubPackage,
-		"OEBPS/nav.xhtml":          epubNav,
-		"OEBPS/cover.xhtml":        `<html><body><p>A Borrowed Book</p></body></html>`,
+		"mimetype":               "application/epub+zip",
+		"META-INF/container.xml": epubContainer,
+		"OEBPS/package.opf":      epubPackage,
+		"OEBPS/nav.xhtml":        epubNav,
+		"OEBPS/cover.xhtml":      `<html><body><p>A Borrowed Book</p></body></html>`,
 		"OEBPS/text/ch01.xhtml": `<html><body><h1>What Lending Is</h1>` +
 			`<p>A loan is money now against money later, and the <em>later</em> is the whole risk.</p>` +
 			`<p>Two questions follow: who pays, and what happens when they do not.</p></body></html>`,

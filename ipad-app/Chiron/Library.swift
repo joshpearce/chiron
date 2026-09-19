@@ -26,7 +26,7 @@ final class Library: ObservableObject {
     let agent = AgentLink()
     /// A capture waiting for its question; the capture card shows it.
     @Published var pendingCapture: Capture?
-    /// A summary or a description, answered in the capture card.
+    /// A summary or a detail, answered in the capture card.
     @Published var captureAnswer: String?
     /// A draft being planned in conversation; the planning card shows it.
     @Published var planning: PlanState?
@@ -113,7 +113,7 @@ final class Library: ObservableObject {
     }
 
     /// A capture with its question and its scale: a summary or a
-    /// description comes back into the card; a primer or a book opens its
+    /// detail comes back into the card; a primer or a book opens its
     /// planning conversation.
     @discardableResult
     func submitCapture(_ c: Capture, prompt: String, scale: CaptureScale = .primer) async throws -> CaptureResponse {

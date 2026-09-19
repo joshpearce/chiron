@@ -270,24 +270,24 @@ struct PrimerSource: Codable, Equatable {
 
 /// How much a capture asks for.
 enum CaptureScale: String, CaseIterable, Codable {
-    case summary, description, primer, book
+    case summary, detail, primer, book
 
     var label: String {
         switch self {
         case .summary: return "Summary"
-        case .description: return "Description"
+        case .detail: return "Detail"
         case .primer: return "Primer"
         case .book: return "Smart book"
         }
     }
 
     /// Answered in the card, or planned and built.
-    var immediate: Bool { self == .summary || self == .description }
+    var immediate: Bool { self == .summary || self == .detail }
 
     var footer: String {
         switch self {
         case .summary: return "A paragraph answering the question, here in the card."
-        case .description: return "A few paragraphs: the answer and what it rests on, here in the card."
+        case .detail: return "A few paragraphs, here in the card: more than a summary, without waiting for a primer."
         case .primer: return "A short document on the shelf. The tutor asks a question or two first, so it is the primer you meant; margin notes extend it later."
         case .book: return "A whole book with checks, as \"Teach me something else\" makes. The tutor asks what you want from it first; writing it takes a while."
         }
@@ -314,7 +314,7 @@ struct CaptureRequest: Codable {
 }
 
 /// The capture's reply, and each planning turn's: an answer for a summary
-/// or a description; for a draft, the tutor's line, and the brief once
+/// or a detail; for a draft, the tutor's line, and the brief once
 /// the tutor has one.
 struct CaptureResponse: Codable {
     var scale: String?

@@ -10,7 +10,7 @@ import (
 	"github.com/mjbraun/chiron/server/primer"
 )
 
-// The capture card offers four scales. A summary or a description is
+// The capture card offers four scales. A summary or a detail is
 // answered in the card and leaves nothing on the shelf; a primer or a
 // smart book is planned first, in a conversation the reader can leave
 // and come back to, and built when they say so.
@@ -80,9 +80,9 @@ func TestASummaryIsAnsweredInTheCard(t *testing.T) {
 	if got := len(shelf(t, s)); got != before {
 		t.Fatalf("a summary landed on the shelf: %d rows, was %d", got, before)
 	}
-	rep = captureScaled(t, s, `{"text":"Content-Signal: search=yes","prompt":"what is this?","scale":"description"}`)
-	if rep.AnswerMD == "" || rep.Scale != "description" {
-		t.Fatalf("description reply = %+v", rep)
+	rep = captureScaled(t, s, `{"text":"Content-Signal: search=yes","prompt":"what is this?","scale":"detail"}`)
+	if rep.AnswerMD == "" || rep.Scale != "detail" {
+		t.Fatalf("detail reply = %+v", rep)
 	}
 }
 
