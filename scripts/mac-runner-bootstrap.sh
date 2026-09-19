@@ -3,12 +3,15 @@
 # a folder holding this script and chiron-runner side by side (copy both
 # over from the main Mac); safe to run again.
 #
-#   ./mac-runner-bootstrap.sh <sprite-pubkey-line>
+#   ./mac-runner-bootstrap.sh <sprite-pubkey-line> [admin-pubkey-file ...]
 #
 # The pubkey line is what scripts/sprite-tailscale.sh prints: the key the
 # sprite will ssh in with. It lands in ~/.ssh/authorized_keys bound to
 # ~/bin/chiron-runner as its forced command, so that key can push, build
-# and fetch, and nothing else. Also done here: Remote Login on, no sleep
+# and fetch, and nothing else. Any admin pubkey files after it are
+# installed plainly, for a person's own shell over the LAN or the
+# tailnet: the YubiKey keys, and chiron_ed25519 so a Claude Code session
+# on the main Mac gets in without a touch. Also done here: Remote Login on, no sleep
 # with the lid closed on power, an empty checkout at ~/src/chiron that a
 # push fills, Xcode's iOS platform and Metal toolchain, xcodegen, the
 # Simulator the tests use, and the runner's config with the App Store
@@ -20,6 +23,9 @@
 # once and accept the licence.
 set -euo pipefail
 PUBKEY="${1:?the public key line the sprite will use}"
+shift
+ADMIN_KEYS=("$@")
+for k in ${ADMIN_KEYS[@]+"${ADMIN_KEYS[@]}"}; do [ -f "$k" ] || { echo "no such key file: $k" >&2; exit 1; }; done
 HERE="$(cd "$(dirname "$0")" && pwd)"
 [ -f "$HERE/chiron-runner" ] || { echo "chiron-runner must sit beside this script" >&2; exit 1; }
 
@@ -50,7 +56,12 @@ touch ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys
 KEY=$(awk '{print $1, $2}' <<<"$PUBKEY")
 grep -vF "$KEY" ~/.ssh/authorized_keys > ~/.ssh/authorized_keys.new || true
 echo "command=\"$HOME/bin/chiron-runner\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty $PUBKEY" >> ~/.ssh/authorized_keys.new
+for k in ${ADMIN_KEYS[@]+"${ADMIN_KEYS[@]}"}; do
+  line=$(head -1 "$k"); id=$(awk '{print $1, $2}' <<<"$line")
+  grep -qF "$id" ~/.ssh/authorized_keys.new || echo "$line" >> ~/.ssh/authorized_keys.new
+done
 mv ~/.ssh/authorized_keys.new ~/.ssh/authorized_keys
+echo "    this Mac answers to $(scutil --get LocalHostName).local on the LAN"
 
 echo "==> the checkout a push fills"
 if [ ! -d ~/src/chiron/.git ]; then
