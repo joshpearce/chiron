@@ -35,6 +35,35 @@ final class LibraryTests: XCTestCase {
         }
     }
 
+    /// A build the MacBook made is offered when it is newer than the app
+    /// running, by build number; the same or older says nothing, and a
+    /// server with no build, or none reachable, says nothing either.
+    func testANewerBuildIsOffered() async throws {
+        let fake = FakeService()
+        fake.onSubjects = { [unowned self] in self.subjects("ready") }
+        let library = library(fake)
+        library.sync.baseURL = "https://chiron.example"
+        library.runningBuild = 295
+        fake.onLatestBuild = { throw URLError(.cannotConnectToHost) }
+        await library.checkForBuild()
+        XCTAssertNil(library.availableBuild)
+
+        fake.onLatestBuild = { AppBuild(version: "2026.9.19", build: 295, commit: "c97416a", status: "ready", manifestPath: "/builds/ab/manifest.plist", macPath: "/builds/ab/Chiron-mac.zip") }
+        await library.checkForBuild()
+        XCTAssertNil(library.availableBuild, "the build already running")
+
+        fake.onLatestBuild = { AppBuild(version: "2026.9.20", build: 301, commit: "d00d1e5", status: "ready", manifestPath: "/builds/cd/manifest.plist", macPath: "/builds/cd/Chiron-mac.zip") }
+        await library.checkForBuild()
+        XCTAssertEqual(library.availableBuild?.build, 301)
+        XCTAssertEqual(library.availableBuild?.label, "Chiron 2026.9.20 (301)")
+        XCTAssertEqual(library.installURL?.absoluteString,
+                       "itms-services://?action=download-manifest&url=https://chiron.example/builds/cd/manifest.plist")
+
+        fake.onLatestBuild = { AppBuild(version: "2026.9.20", build: 302, commit: "bad", status: "failed", manifestPath: "", macPath: "") }
+        await library.checkForBuild()
+        XCTAssertNil(library.availableBuild, "a failed build is not offered")
+    }
+
     /// Launch lands on the shelf: the active book is known, and its card
     /// says so, but the book is not opened for the reader.
     func testLaunchStaysOnTheShelf() async throws {

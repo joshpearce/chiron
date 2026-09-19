@@ -142,7 +142,8 @@ if [ "$SERVER" = "http://localhost:8082" ]; then
 fi
 
 xcrun simctl bootstatus "$UDID" -b >/dev/null
-open -a Simulator
+# Xcode 27 ships no Simulator.app to open; the device runs headless then.
+open -a Simulator 2>/dev/null || true
 
 cd "$APPDIR"
 xcodebuild -project Chiron.xcodeproj -scheme Chiron -skipPackagePluginValidation \

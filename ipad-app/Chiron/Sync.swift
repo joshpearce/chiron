@@ -36,6 +36,7 @@ protocol ChironService: AnyObject {
     func deleteDocument(id: String) async throws
     func documentInk(id: String) async throws -> [Int: PageInk]
     func putDocumentInk(id: String, page: Int, inkB64: String, baseVersion: Int) async throws -> PageInkPut
+    func latestBuild() async throws -> AppBuild
 }
 
 enum ServiceError: Error {
@@ -290,6 +291,11 @@ final class Sync: ObservableObject, ChironService {
         let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
         guard code == 200 else { throw ServiceError.status(code) }
         return data
+    }
+
+    /// The build of the app the MacBook made last (SPRITE-DEV-PLAN.md phase F).
+    func latestBuild() async throws -> AppBuild {
+        try await get("/builds/latest", timeout: 10)
     }
 
     func documentPosition(id: String, page: Int, position: Double) async throws {

@@ -68,6 +68,10 @@ type Config struct {
 	// ReadingsDir holds books the reader imported to read as they are;
 	// empty means <parent>/state/readings.
 	ReadingsDir string `yaml:"readings_dir"`
+	// BuildsDir holds app builds the MacBook made, one directory per
+	// build named by its token, `latest` a link to the current one;
+	// empty means <parent>/builds.
+	BuildsDir string `yaml:"builds_dir"`
 	// Grade all free-text items of a check in one model call. Off by default:
 	// the per-item path is the one verified end to end, and a check is the
 	// moment a learner is most exposed to a regression.
@@ -161,6 +165,8 @@ func (sub *Subject) buildStatus() (bool, string) {
 type Server struct {
 	cfg  *Config
 	root string // directory config.yaml lives in
+	// buildsDir is where app builds are offered from (Config.BuildsDir resolved).
+	buildsDir string
 	// transcribe overrides the ink vision transcriber; tests inject one.
 	transcribe func(hint string, png []byte) (string, error)
 	chain      llm.Chain
@@ -209,6 +215,7 @@ func New(cfg *Config, root string) (*Server, error) {
 	s := &Server{
 		cfg:            cfg,
 		root:           root,
+		buildsDir:      buildsRoot(cfg, root),
 		token:          token,
 		authorizedKeys: strings.TrimSpace(os.Getenv("CHIRON_AUTHORIZED_KEYS")),
 		hub:            agent.NewHub(),
@@ -402,6 +409,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /readings/{id}", s.handleReadingDelete)
 	mux.HandleFunc("GET /readings/{id}/assets", s.handleReadingAssetList)
 	mux.HandleFunc("GET /readings/{id}/assets/{name}", s.handleReadingAsset)
+	mux.HandleFunc("GET /builds/latest", s.handleBuildLatest)
+	mux.HandleFunc("GET /builds/{token}/{file}", s.handleBuildFile)
 	mux.HandleFunc("GET /documents/{doc}", s.handleDocumentGet)
 	mux.HandleFunc("GET /documents/{doc}/file", s.handleDocumentFile)
 	mux.HandleFunc("PUT /documents/{doc}/position", s.handleDocumentPosition)
@@ -455,7 +464,7 @@ func (s *Server) Handler() http.Handler {
 // model budget.
 func (s *Server) requireToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.token != "" && r.URL.Path != "/ping" && !auth.Authorized(r, s.token) {
+		if s.token != "" && r.URL.Path != "/ping" && !buildFileOpen(r.URL.Path) && !auth.Authorized(r, s.token) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"detail": "unauthorized"})
 			return
 		}

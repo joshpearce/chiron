@@ -57,6 +57,7 @@ final class FakeService: ChironService {
     var positions: [(id: String, page: Int, position: Double)] = []
     var documentsDeleted: [String] = []
     var onDocumentInk: (String) throws -> [Int: PageInk] = { _ in [:] }
+    var onLatestBuild: () throws -> AppBuild = { throw URLError(.cannotConnectToHost) }
     var onPutDocumentInk: (Int, String, Int) throws -> PageInkPut = { _, ink, base in .stored(PageInk(version: base + 1, inkB64: ink)) }
     var inkPuts: [(page: Int, inkB64: String, base: Int)] = []
 
@@ -136,6 +137,7 @@ final class FakeService: ChironService {
     func documentPosition(id: String, page: Int, position: Double) async throws { positions.append((id, page, position)) }
     func deleteDocument(id: String) async throws { documentsDeleted.append(id) }
     func documentInk(id: String) async throws -> [Int: PageInk] { try onDocumentInk(id) }
+    func latestBuild() async throws -> AppBuild { try onLatestBuild() }
     func putDocumentInk(id: String, page: Int, inkB64: String, baseVersion: Int) async throws -> PageInkPut {
         inkPuts.append((page, inkB64, baseVersion)); return try onPutDocumentInk(page, inkB64, baseVersion)
     }

@@ -291,6 +291,33 @@ struct BookView: View {
 /// The library: the shelves the reader has made, then every book and
 /// primer on no shelf, the open one marked. A shelf opens on its own
 /// screen; a card dragged onto a shelf is filed there.
+/// A newer build of the app, made on the MacBook, ready to install over
+/// this one. Install hands the manifest to iOS, which asks and installs;
+/// the Mac gets the zip.
+struct BuildBanner: View {
+    let build: AppBuild
+    let url: URL
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.down.app")
+                .font(.title2)
+                .foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(build.label) is ready").font(Typography.sans(16, weight: .semibold))
+                Text("commit \(build.commit)").font(.footnote.monospaced()).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Install") { UIApplication.shared.open(url) }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(14)
+        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 16))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(build.label) is ready to install")
+    }
+}
+
 struct BookshelfView: View {
     @EnvironmentObject var library: Library
     @State private var showSettings = false
@@ -385,6 +412,9 @@ struct BookshelfView: View {
                     Text("Library")
                         .font(Typography.serifItalic(20))
                         .foregroundStyle(.secondary)
+                }
+                if let build = library.availableBuild, let url = library.installURL {
+                    BuildBanner(build: build, url: url)
                 }
                 VStack(spacing: 12) {
                     ForEach(library.shelves) { shelf in

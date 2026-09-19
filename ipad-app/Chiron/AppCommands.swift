@@ -351,6 +351,7 @@ enum AppCommands {
             "last_url": library.lastOpenedURL ?? "",
             "agent": library.agent.connected,
             "capture_card": library.pendingCapture != nil,
+            "build_offered": library.availableBuild?.label ?? "",
             "capture_answer": library.captureAnswer ?? "",
             "shelf_rows": library.subjects.map { ["id": $0.id, "kind": $0.kind ?? "book", "status": $0.status ?? "", "scale": $0.scale ?? "", "progress": $0.progress ?? "", "shelf": $0.shelf ?? ""] },
             "shelves": library.shelves.map { ["id": $0.id, "name": $0.name, "subjects": $0.subjects] },

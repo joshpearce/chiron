@@ -191,6 +191,13 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   And the keychain: macOS has two, and `kSecAttrAccessible` is refused by
   the file keychain, so `kSecUseDataProtectionKeychain` says which (a
   no-op on iOS, where there is only the one).
+- **Xcode 27 has no Simulator.app where it was (2026-09-19).** `open -a
+  Simulator` fails, and under `set -e` that took `sim-run.sh` down after
+  a successful build. Simulators boot and run headless without it; the
+  open is now best effort. The sim server also kept readings and
+  primers beside /tmp rather than under its own state dir, since the
+  server's defaults are relative to the config's parent: the throwaway
+  config now names all three directories.
 - **The app builds Debug only (2026-09-19).** `xcodebuild archive`
   defaults to Release, and the Release build has never compiled: the
   harness under `#if DEBUG` names members that only exist in Debug.

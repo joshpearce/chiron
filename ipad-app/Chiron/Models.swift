@@ -776,3 +776,22 @@ enum PageInkPut: Equatable {
     case stored(PageInk)
     case conflict(server: PageInk)
 }
+
+/// A build of this app made on the MacBook and offered by the server:
+/// what it is, and where an installer finds it.
+struct AppBuild: Codable, Equatable {
+    var version: String
+    var build: Int
+    var commit: String
+    var status: String
+    var manifestPath: String
+    var macPath: String
+
+    enum CodingKeys: String, CodingKey {
+        case version, build, commit, status
+        case manifestPath = "manifest_path"
+        case macPath = "mac_path"
+    }
+
+    var label: String { "Chiron \(version) (\(build))" }
+}

@@ -60,11 +60,44 @@ final class Library: ObservableObject {
     private var sessions: [String: BookSession] = [:]
     let storage: URL
 
+    /// A newer build of the app than the one running, when the server has
+    /// one; the shelf offers it.
+    @Published var availableBuild: AppBuild?
+    /// This app's own build number, CFBundleVersion.
+    var runningBuild: Int = Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0
+
     init(storage: URL? = nil, service: ChironService? = nil) {
         self.storage = storage ?? Library.defaultStorage()
         self.service = service ?? sync
         agent.attach(self)
         loadShelfCache()
+    }
+
+    /// Ask the server for its latest build and offer it if it is newer
+    /// than this one and finished; nothing to say otherwise.
+    func checkForBuild() async {
+        guard let latest = try? await service.latestBuild(), latest.status == "ready", latest.build > runningBuild else {
+            availableBuild = nil
+            return
+        }
+        availableBuild = latest
+    }
+
+    /// What a tap on Install opens: on iOS the itms-services link that
+    /// has the system install over this app; on the Mac the zip itself.
+    var installURL: URL? {
+        guard let b = availableBuild, var base = URL(string: sync.baseURL) else { return nil }
+        #if targetEnvironment(macCatalyst)
+        base.append(path: b.macPath)
+        return base
+        #else
+        base.append(path: b.manifestPath)
+        var c = URLComponents()
+        c.scheme = "itms-services"
+        c.host = ""
+        c.queryItems = [URLQueryItem(name: "action", value: "download-manifest"), URLQueryItem(name: "url", value: base.absoluteString)]
+        return c.url
+        #endif
     }
 
     /// Per-subject caches live in Application Support, not Documents: they
@@ -93,6 +126,7 @@ final class Library: ObservableObject {
             saveShelfCache(shelf)
             // The server is back: whatever was marked up while it was away goes up.
             await session?.pushAnnotations()
+            await checkForBuild()
         } catch {
             shelfError = subjects.isEmpty ? BookSession.unreachable : Library.offline
         }

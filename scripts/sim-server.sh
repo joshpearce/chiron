@@ -67,6 +67,9 @@ sed -e "s|corpus_dir: ../corpus|corpus_dir: $ROOT/corpus|" \
     -e "s|katex_dir: ../ipad-app|katex_dir: $ROOT/ipad-app|" \
     -e "s|fonts_dir: ../assets|fonts_dir: $ROOT/assets|" \
     "$ROOT/server/config.yaml" > "$CONF"
+# Everything the server keeps beside its subjects, under the same
+# throwaway dir rather than beside /tmp.
+printf 'primers_dir: %s\nreadings_dir: %s\nbuilds_dir: %s\n' "$STATE/state/primers" "$STATE/state/readings" "$STATE/builds" >> "$CONF"
 
 (cd "$ROOT/server-go" && go build -o "$STATE/chiron-server" ./cmd/chiron-server)
 
