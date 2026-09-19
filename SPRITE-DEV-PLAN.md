@@ -202,11 +202,116 @@ moment later.
   placement, series, results and a marked passage, screenshots landing on
   the sprite.
 
-**Phase E: builds without the Mac (later).**
-- An iPad app needs Xcode and macOS to build and sign; nothing on the
-  sprite can produce a `.app`. A macOS runner that builds and signs on a
-  push, and TestFlight for install. Until then, app changes made on the
-  sprite are pulled and built on the Mac.
+**Phase E: a Mac the sprite can build on.** Designed 2026-09-19. An
+iPad app needs Xcode and macOS to build and sign; nothing on the sprite
+can produce a `.app`. The runner is Matt's idle MacBook (macOS 27, Xcode
+27), lid closed, reachable from the sprite over Tailscale. The sprite
+starts the conversation, so nothing holds the sprite awake between
+builds.
+
+- **Network.** Tailscale on both ends, one personal tailnet. The MacBook
+  runs the Tailscale app. The sprite runs `tailscaled` as a `sprite-env`
+  service (the sprite has `/dev/net/tun`, so kernel mode, no userspace
+  proxy), joined once with a tagged, pre-authorised auth key from
+  1Password (`op read` at bootstrap, never on disk; the node key it
+  leaves in `/var/lib/tailscale` is the sprite's own identity and stays).
+  The tailnet ACL allows exactly one flow: `tag:chiron-sprite` to the
+  MacBook on port 22. Nothing else on the tailnet is reachable from the
+  sprite, and the sprite accepts nothing inbound. The sprite is the only
+  node that ever connects; `tailscaled` idles quietly and the sprite's
+  hibernation is unaffected by a DERP keepalive (to be measured at
+  bootstrap; if it is not, `tailscaled` is started for the build and
+  stopped after).
+- **The runner.** On the MacBook, Remote Login (sshd) on, sleep off with
+  the lid closed (`pmset -c disablesleep 1` on power, plus `caffeinate`
+  under launchd), automatic login of Matt's user so the login keychain
+  (where the signing certificate lives) is unlocked after a restart;
+  FileVault therefore off on this machine, or a reboot waits for a hand.
+  Xcode 27 with the Metal toolchain, `xcodegen`, the Simulator runtime,
+  and the repo at `~/src/chiron` with the sprite as its only remote.
+  Signing without a person: an App Store Connect API key
+  (`xcodebuild -authenticationKeyPath ... -allowProvisioningUpdates`)
+  rather than an Apple ID session that expires; the key file lives in
+  `~/.private_keys` on the MacBook only.
+- **The sprite's way in.** A dedicated Ed25519 key on the sprite
+  (`~/.ssh/macbook_ed25519`), installed in the MacBook's
+  `authorized_keys` with a forced command, `~/bin/chiron-runner`, that
+  accepts three verbs and nothing else: `git-receive-pack` into the
+  checkout (`receive.denyCurrentBranch=updateInstead`), `build <ref>`,
+  and `fetch <build-id>` which streams the artefact back. A shell on the
+  sprite therefore gets a build server, not a Mac. `ssh macbook` from the
+  sprite is a `~/.ssh/config` stanza over the Tailscale address.
+- **A build.** `scripts/mac-build.sh` on the MacBook, run by the
+  runner's `build` verb: `xcodegen`, the unit suite in the Simulator
+  (`sim-run.sh fast`; the UI walk is opt-in, it is minutes), then
+  `xcodebuild archive` and `-exportArchive` with method `development`
+  (the team's development profile carries the registered devices) to an
+  IPA, plus the Catalyst app as a zip. Output under
+  `~/builds/<build-id>/` with `manifest.plist`, `Chiron.ipa`,
+  `Chiron-mac.zip`, `build.json` (commit, version, timestamp, test
+  counts) and the log. From the sprite, `make app-build` is: push
+  `main` to the MacBook, run `build`, fetch the artefacts into
+  `/home/sprite/chiron/builds/<build-id>/`. A build is `CFBundleVersion`
+  = the commit count on main, `CFBundleShortVersionString` = the date,
+  so every build is ordered and named.
+- Exit: `make app-build` on a cold sprite produces an IPA on the sprite
+  from the current `main`, with the unit suite green in the MacBook's
+  Simulator, in under ten minutes.
+
+**Phase F: builds reach the devices.**
+- **Serving.** The gate serves `/builds/<token>/manifest.plist` and
+  `/builds/<token>/Chiron.ipa` without the bearer header, because iOS
+  fetches an OTA install with its own downloader and cannot send one.
+  The token is 32 random bytes per build, the directory is unlisted, and
+  the IPA holds no secret (the server key lives in the Keychain, never
+  in the bundle). `GET /builds/latest` (bearer) returns the build's
+  version, commit, summary and the manifest URL.
+- **Installing.** The app polls `/builds/latest` when it comes to the
+  front and shows "Chiron 2026-09-19 (312) is ready" with **Install**;
+  the tap opens
+  `itms-services://?action=download-manifest&url=<manifest URL>` and iOS
+  installs over the running app, keeping its data. The Mac app offers
+  the zip the same way and relaunches from it. The Simulator build and
+  the harness keep working exactly as now.
+- Exit: a build made on the MacBook, fetched to the sprite, installs on
+  the iPad and the iPhone from a tap, with nothing plugged in.
+
+**Phase G: the request button.**
+- **In the app.** "Request a change" on the shelf and in the reader: a
+  text (dictation works), optionally the current screenshot and the
+  harness state, `POST /dev/requests`. A **Requests** list shows each
+  request's state: queued, working (with the agent's last line), testing,
+  building, ready (with Install), failed (with the reason), and the
+  agent's summary of what it changed.
+- **On the sprite.** `chiron-dev-agent`, a `sprite-env` service, takes
+  requests one at a time. For each: a worktree off `main`, Claude Code
+  (`claude -p --model claude-fable-5-1`) with the request, the app's
+  state and screenshot, and a brief that names the rules (TDD,
+  `LESSONS.md`, Simulator before devices, no push to GitHub); `make
+  test`; on green, fast-forward `main`, `make deploy` if the server
+  changed, `make app-build`; the request becomes ready. The tap on the
+  button is the permission for that deploy: the plan says so, and the
+  agent's `CLAUDE.md` on the sprite says so. On red, the request fails
+  with the agent's report and the worktree is kept for a person. One
+  request at a time, because the box serves the book.
+- **Merging back.** `main` on the sprite advances; GitHub does not,
+  until Matt pushes with the YubiKey as today. The MacBook's checkout
+  and the sprite's `main` are always the same commit after a build.
+- Exit: a request typed on the iPad becomes a commit on the sprite, a
+  green suite, a build, and an Install button on the same iPad, with no
+  Mac opened.
+
+**Security, phases E to G.** The sprite gains two secrets: its Tailscale
+node identity and the MacBook key, and the MacBook key opens only the
+runner's three verbs. The tailnet ACL is the second wall. A compromise of
+the sprite through port 8080 (the bearer key) yields: the book, the
+repo, the Anthropic token, the PAT, and now the ability to build the
+app and offer it to the devices. The last is the new exposure: an
+installed build runs on Matt's devices, so `/builds/latest` is bearer
+gated, the app shows the commit it is about to install, and the runner
+signs only what it built from the checkout it holds. The request
+endpoint is bearer gated like everything else; the agent runs with the
+same standing as the Claude Code session Matt already runs on the box.
 
 ## 4. Security notes
 
@@ -230,6 +335,9 @@ Settled by Matt on 2026-09-02:
   this repo.
 - Shell transport: real SSH tunnelled over the book port; `chiron-dev` on
   the Mac, an in-app client on the iPad, one mechanism for both.
+
+Settled by Matt on 2026-09-19: builds happen on the idle MacBook over
+Tailscale, reached only by the sprite (phases E to G).
 
 Still open:
 1. Bootstrap timing: `scripts/sprite-bootstrap-ssh.sh` from the Mac with
