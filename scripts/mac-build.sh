@@ -21,6 +21,9 @@
 # named. Everything an installer needs is in the build directory:
 # manifest.plist, Chiron.ipa, Chiron-mac.zip, build.json, build.log.
 set -euo pipefail
+# A forced-command ssh session carries the system PATH alone; Homebrew
+# (xcodegen) lives beside it.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 REF="${1:?a ref to build}"
 cd "$(dirname "$0")/.."
 ROOT=$PWD
