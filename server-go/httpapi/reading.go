@@ -44,8 +44,11 @@ type Reading struct {
 	Chapters   int    `json:"chapters"`
 	Size       int64  `json:"size"`
 	ImportedAt string `json:"imported_at"`
-	// URL is where a page came from; a book imported as a file has none.
+	// URL is where a page or a feed came from; a book imported as a file
+	// has none.
 	URL string `json:"url,omitempty"`
+	// Feed marks a blog the reader follows, whose chapters are its posts.
+	Feed bool `json:"feed,omitempty"`
 }
 
 func (s *Server) readingsRoot() string {
@@ -230,9 +233,13 @@ func (s *Server) registerReading(m *Reading) error {
 	if err := s.register(m.ID, m.Title, readingCorpus(root, m.ID), readingState(root, m.ID)); err != nil {
 		return err
 	}
+	kind := KindReading
+	if m.Feed {
+		kind = KindFeed
+	}
 	s.mu.Lock()
 	if sub := s.subjects[m.ID]; sub != nil {
-		sub.Kind = KindReading
+		sub.Kind = kind
 	}
 	s.mu.Unlock()
 	return nil

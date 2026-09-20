@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -102,27 +103,40 @@ func (s *Server) handleReadingPage(w http.ResponseWriter, r *http.Request) {
 // A picture that will not come is left where it is: the words are the
 // point, and the page still reads with a gap in it.
 func storePageAssets(ctx context.Context, c *sources.Client, root, id string, urls []string) map[string]string {
+	return storeWebAssets(ctx, c, readingAssets(root, id), id, urls)
+}
+
+// storeWebAssets keeps pictures from the web beside what shows them,
+// each re-encoded for a screen, and says what each of their URLs is now
+// called. A picture that will not come is left where it is: the words
+// are the point, and the page still reads with a gap in it. A picture
+// already kept is not asked for again, since a blog shows the same
+// portrait on every post.
+func storeWebAssets(ctx context.Context, c *sources.Client, dir, id string, urls []string) map[string]string {
 	if len(urls) == 0 {
 		return nil
 	}
 	if len(urls) > maxPagePictures {
 		urls = urls[:maxPagePictures]
 	}
-	dir := readingAssets(root, id)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		log.Printf("page %s: pictures: %v", id, err)
+		log.Printf("%s: pictures: %v", id, err)
 		return nil
 	}
 	out := map[string]string{}
-	for i, raw := range urls {
-		data, err := c.Get(ctx, raw)
-		if err != nil {
-			log.Printf("page %s: picture %s: %v", id, raw, err)
+	for _, raw := range urls {
+		if name, ok := keptAsset(dir, raw); ok {
+			out[raw] = name
 			continue
 		}
-		name, encoded := screenAsset(pictureName(i, raw), data)
+		data, err := c.Get(ctx, raw)
+		if err != nil {
+			log.Printf("%s: picture %s: %v", id, raw, err)
+			continue
+		}
+		name, encoded := screenAsset(pictureName(raw), data)
 		if err := os.WriteFile(filepath.Join(dir, name), encoded, 0o644); err != nil {
-			log.Printf("page %s: picture %s: %v", id, raw, err)
+			log.Printf("%s: picture %s: %v", id, raw, err)
 			continue
 		}
 		out[raw] = name
@@ -130,10 +144,26 @@ func storePageAssets(ctx context.Context, c *sources.Client, root, id string, ur
 	return out
 }
 
-// pictureName is what a picture is called once it is the page's own: its
-// place on the page, its name where the URL gives one, and nothing that
-// could be read as a path.
-func pictureName(i int, raw string) string {
+// keptAsset finds a picture already kept, whatever it was re-encoded as.
+func keptAsset(dir, raw string) (string, bool) {
+	name := pictureName(raw)
+	stem := strings.TrimSuffix(name, filepath.Ext(name))
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", false
+	}
+	for _, e := range entries {
+		if strings.TrimSuffix(e.Name(), filepath.Ext(e.Name())) == stem {
+			return e.Name(), true
+		}
+	}
+	return "", false
+}
+
+// pictureName is what a picture is called once it is kept here: its own
+// name where the URL gives one, under a stamp of the URL itself, so the
+// same picture is always the same file and nothing reads as a path.
+func pictureName(raw string) string {
 	name, ext := "picture", ""
 	if u, err := url.Parse(raw); err == nil {
 		base := path.Base(u.Path)
@@ -145,5 +175,6 @@ func pictureName(i int, raw string) string {
 	if ext = slugOf(ext, ""); ext == "" || len(ext) > 4 {
 		ext = "img"
 	}
-	return fmt.Sprintf("%d-%s.%s", i+1, name, ext)
+	stamp := sha256.Sum256([]byte(raw))
+	return fmt.Sprintf("%s-%s.%s", hex.EncodeToString(stamp[:4]), name, ext)
 }

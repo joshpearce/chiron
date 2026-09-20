@@ -192,6 +192,11 @@ type Server struct {
 	mu       sync.RWMutex
 	subjects map[string]*Subject
 
+	// One check of the blogs at a time: every device asks for one when
+	// the reader opens it, and they would otherwise take the same post
+	// twice.
+	feedMu sync.Mutex
+
 	// The book the reader last had open, so the client can reopen on it.
 	// Persisted beside the subject state dirs: the client has no writable
 	// storage and the server suspends between sessions.
@@ -414,6 +419,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /documents", s.handleDocumentUpload)
 	mux.HandleFunc("POST /readings", s.handleReadingImport)
 	mux.HandleFunc("POST /readings/page", s.handleReadingPage)
+	mux.HandleFunc("POST /feeds", s.handleFeedFollow)
+	mux.HandleFunc("GET /feeds", s.handleFeedList)
+	mux.HandleFunc("POST /feeds/refresh", s.handleFeedRefresh)
+	mux.HandleFunc("POST /readings/{id}/read", s.handleReadingRead)
 	mux.HandleFunc("DELETE /readings/{id}", s.handleReadingDelete)
 	mux.HandleFunc("GET /readings/{id}/assets", s.handleReadingAssetList)
 	mux.HandleFunc("GET /readings/{id}/assets/{name}", s.handleReadingAsset)
@@ -537,6 +546,7 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 		ID           string  `json:"id"`
 		Title        string  `json:"title"`
 		Kind         string  `json:"kind"`
+		Unread       int     `json:"unread,omitempty"`
 		UnitsTotal   int     `json:"units_total"`
 		UnitsCleared int     `json:"units_cleared"`
 		CurrentUnit  *string `json:"current_unit"`
@@ -567,8 +577,11 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 			Debt:         len(sub.Learner.OpenDebt()),
 			Shelf:        s.shelves.shelfOf(sub.ID),
 		}
-		if sub.Kind == KindReading {
-			r.Kind = KindReading
+		if sub.Kind == KindReading || sub.Kind == KindFeed {
+			r.Kind = sub.Kind
+		}
+		if sub.Kind == KindFeed {
+			r.Unread = s.unreadFor(s.readingsRoot(), sub.ID)
 		}
 		if sub.Kind == KindPrimer && sub.Primer != nil {
 			r.Kind, r.Status = KindPrimer, sub.Primer.Status

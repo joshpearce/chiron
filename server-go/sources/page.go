@@ -77,6 +77,25 @@ func ParsePage(rawURL, src string) (*Page, error) {
 
 func words(s string) int { return len(strings.Fields(s)) }
 
+// EntryContent turns the HTML a feed carries for one entry into the
+// Markdown the reader reads, with its links and its pictures pointing at
+// where they really are. Unlike a page, an entry is already the writing
+// and nothing has to be found in it.
+func EntryContent(base, src string) (string, []string) {
+	doc, err := html.Parse(strings.NewReader(src))
+	if err != nil {
+		return "", nil
+	}
+	if u, err := url.Parse(base); err == nil {
+		absolutize(doc, u)
+	}
+	body := elementOf(doc, atom.Body)
+	if body == nil {
+		return "", nil
+	}
+	return strings.TrimSpace(HTMLFragmentToMarkdown(body)), imagesIn(body)
+}
+
 // withoutTitle drops the heading the article opens with when it is the
 // title: the piece is titled where it is read, at whatever level the
 // site chose to write it.
