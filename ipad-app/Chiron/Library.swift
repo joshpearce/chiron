@@ -34,6 +34,8 @@ final class Library: ObservableObject {
     @Published var planBusy = false
     @Published var planError: String?
     private var shelfPoller: Task<Void, Never>?
+    /// The check of the followed blogs in flight, so the shelf asks once.
+    private var feedCheck: Task<Void, Never>?
     /// How often the shelf checks back while a primer is being written.
     var shelfPollInterval: TimeInterval = 4
     /// The primer the reader just asked for: it opens on its own once the
@@ -158,6 +160,7 @@ final class Library: ObservableObject {
             // The server is back: whatever was marked up while it was away goes up.
             await session?.pushAnnotations()
             await checkForBuild()
+            checkFeeds()
         } catch {
             shelfError = subjects.isEmpty ? BookSession.unreachable : Library.offline
         }
@@ -400,6 +403,10 @@ final class Library: ObservableObject {
         s.localTutor = LocalTutor.ifAvailable
         // A passage sent on from inside the book: the card opens over it,
         // naming the book as where the words came from.
+        // A post opened in a followed blog stops counting as unread.
+        if info?.isFeed == true {
+            s.onChapterRead = { [weak self] unit in self?.markRead(subject: id, unit: unit) }
+        }
         s.onCapture = { [weak self] text in
             self?.captureAnswer = nil
             self?.pendingCapture = Capture(text: text, sourceApp: s.title)
@@ -535,22 +542,67 @@ final class Library: ObservableObject {
         }
     }
 
+    /// A blog to follow: the feed goes up, the server reads its posts in
+    /// as chapters, and it lands on the shelf with a count of what has
+    /// not been read.
+    func followFeed(_ link: String) async {
+        guard let url = webLink(link) else {
+            shelfError = "That is not a link Chiron can follow."
+            return
+        }
+        loadingShelf = true
+        defer { loadingShelf = false }
+        do {
+            let blog = try await service.followFeed(url: url)
+            shelfError = nil
+            pendingCapture = nil
+            captureAnswer = nil
+            await refresh()
+            await open(blog.id)
+        } catch {
+            shelfError = "That blog could not be followed: \(error.localizedDescription)"
+        }
+    }
+
+    /// Nothing polls on the server: it sleeps between readers. Opening
+    /// the app is what asks the blogs what is new, and what came back
+    /// goes on the shelf straight away.
+    func checkFeeds() {
+        guard feedCheck == nil, subjects.contains(where: \.isFeed) else { return }
+        feedCheck = Task { [weak self] in
+            guard let self else { return }
+            defer { self.feedCheck = nil }
+            guard let check = try? await self.service.checkFeeds(), check.added > 0 else { return }
+            await self.refresh()
+        }
+    }
+
+    /// A post the reader has opened is read, on every device.
+    func markRead(subject: String, unit: String) {
+        Task { try? await service.markRead(subject: subject, unit: unit) }
+    }
+
+    private func webLink(_ link: String) -> String? {
+        let trimmed = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https", url.host != nil else { return nil }
+        return trimmed
+    }
+
     /// A page the reader is reading somewhere else: the link goes up, the
     /// server fetches the article and keeps it with its pictures, and it
     /// opens here as a reading. What is read is the writer's own words,
     /// so a highlight in it asks about the piece, not about a fragment
     /// of it.
     func readPage(_ link: String) async {
-        let trimmed = link.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
-              scheme == "http" || scheme == "https", url.host != nil else {
+        guard let url = webLink(link) else {
             shelfError = "That is not a link Chiron can read."
             return
         }
         loadingShelf = true
         defer { loadingShelf = false }
         do {
-            let page = try await service.readPage(url: trimmed)
+            let page = try await service.readPage(url: url)
             shelfError = nil
             pendingCapture = nil
             captureAnswer = nil

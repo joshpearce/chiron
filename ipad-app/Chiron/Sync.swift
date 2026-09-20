@@ -31,6 +31,13 @@ protocol ChironService: AnyObject {
     func importBook(title: String, data: Data) async throws -> ImportedBook
     /// A page on the web, read as its article and kept as a reading.
     func readPage(url: String) async throws -> ImportedBook
+    /// A blog to follow: its feed becomes a card whose chapters are posts.
+    func followFeed(url: String) async throws -> ImportedBook
+    /// Ask the followed blogs what is new. The server does the fetching;
+    /// this is what wakes it to do it.
+    func checkFeeds() async throws -> FeedCheck
+    /// A chapter the reader has seen, on every device.
+    func markRead(subject: String, unit: String) async throws
     /// One of an imported book's pictures, as bytes.
     func bookAsset(subject: String, name: String) async throws -> Data
     func documentData(id: String) async throws -> Data
@@ -290,6 +297,28 @@ final class Sync: ObservableObject, ChironService {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONSerialization.data(withJSONObject: ["url": url])
         return try await perform(req)
+    }
+
+    func followFeed(url: String) async throws -> ImportedBook {
+        var req = try request("/feeds", timeout: 300)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["url": url])
+        return try await perform(req)
+    }
+
+    func checkFeeds() async throws -> FeedCheck {
+        var req = try request("/feeds/refresh", timeout: 300)
+        req.httpMethod = "POST"
+        return try await perform(req)
+    }
+
+    func markRead(subject: String, unit: String) async throws {
+        var req = try request("/readings/\(subject)/read", timeout: 30)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["unit": unit])
+        _ = try await URLSession.shared.data(for: req)
     }
 
     func bookAsset(subject: String, name: String) async throws -> Data {

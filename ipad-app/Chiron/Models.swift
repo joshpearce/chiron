@@ -210,23 +210,28 @@ struct SubjectInfo: Codable, Identifiable {
     /// Documents only: pages in the PDF and the page last read.
     let pages: Int?
     let page: Int?
+    /// Followed blogs only: posts not opened on any device.
+    let unread: Int?
 
     init(id: String, title: String, unitsTotal: Int? = nil, unitsCleared: Int? = nil, currentUnit: String? = nil,
          debt: Int? = nil, kind: String? = nil, status: String? = nil, error: String? = nil,
          source: PrimerSource? = nil, capturedAt: String? = nil, scale: String? = nil, book: String? = nil,
-         progress: String? = nil, shelf: String? = nil, pages: Int? = nil, page: Int? = nil) {
+         progress: String? = nil, shelf: String? = nil, pages: Int? = nil, page: Int? = nil,
+         unread: Int? = nil) {
         self.id = id; self.title = title; self.unitsTotal = unitsTotal; self.unitsCleared = unitsCleared
         self.currentUnit = currentUnit; self.debt = debt; self.kind = kind; self.status = status
         self.error = error; self.source = source; self.capturedAt = capturedAt
         self.scale = scale; self.book = book; self.progress = progress
         self.shelf = shelf.flatMap { $0.isEmpty ? nil : $0 }
-        self.pages = pages; self.page = page
+        self.pages = pages; self.page = page; self.unread = unread
     }
 
     var isPrimer: Bool { kind == "primer" }
     var isPDF: Bool { kind == "pdf" }
     /// A book the reader imported and reads as it is.
     var isReading: Bool { kind == "reading" }
+    /// A blog the reader follows, whose chapters are its posts.
+    var isFeed: Bool { kind == "feed" }
     /// The server is writing it: a primer being authored, a book being built.
     var authoring: Bool { isPrimer && (status == "authoring" || status == "building") }
     var failed: Bool { isPrimer && status == "failed" }
@@ -244,6 +249,11 @@ struct SubjectInfo: Codable, Identifiable {
         if drafting { return "Planning the \(scale == "book" ? "book" : "primer") · \(sourceLine)" }
         if building { return progress.map { "Building the book · \($0)" } ?? "Building the book" }
         if isPrimer { return sourceLine }
+        if isFeed {
+            let posts = unitsTotal ?? 0
+            guard let n = unread, n > 0 else { return "\(posts) posts · all read" }
+            return "\(n) unread of \(posts)"
+        }
         var parts: [String] = []
         if let c = unitsCleared, let t = unitsTotal { parts.append("\(c)/\(t) units") }
         if let u = currentUnit { parts.append("reading \(u)") }
@@ -268,7 +278,7 @@ struct SubjectInfo: Codable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, debt, kind, status, error, source, scale, book, progress, shelf, pages, page
+        case id, title, debt, kind, status, error, source, scale, book, progress, shelf, pages, page, unread
         case unitsTotal = "units_total"
         case unitsCleared = "units_cleared"
         case currentUnit = "current_unit"
@@ -746,6 +756,12 @@ struct ImportedBook: Codable, Equatable {
     let id: String
     let title: String
     let chapters: Int
+}
+
+/// What a check of the followed blogs came back with.
+struct FeedCheck: Codable, Equatable {
+    let checked: Int
+    let added: Int
 }
 
 /// A PDF the server keeps for the shelf, with where the reader is in it.

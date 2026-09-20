@@ -20,6 +20,7 @@
 		349B6A5B8F9063BFCBFF7270 /* MacServicesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AD00AB754F33362BD0B344B /* MacServicesTests.swift */; };
 		36028800328AA10BD32C4CD1 /* AnnotationSyncTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC655B2BD00B82F94679D36 /* AnnotationSyncTests.swift */; };
 		3769CB216DED3B8C1AC9C861 /* PlanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CA421A578F067BB18B014B8 /* PlanCard.swift */; };
+		3BE4A2CEB76702EDB82D3768 /* FeedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47DCD83FB030A70F4907458A /* FeedTests.swift */; };
 		3F19963DB080F3508ECC7EBF /* fixtures in Resources */ = {isa = PBXBuildFile; fileRef = 2A02C9562B8ECB9AF3BB69E3 /* fixtures */; };
 		3FF7749AEF519CF6182B78F5 /* ShelvesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70DED1F5DFABB56685FE366 /* ShelvesTests.swift */; };
 		447F160110B9562D6CFC7164 /* DeviceKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEE5BEC3075A333377FEE436 /* DeviceKey.swift */; };
@@ -152,6 +153,7 @@
 		4424A63E2C94C4589C4B5A8F /* default-book.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "default-book.json"; sourceTree = "<group>"; };
 		473534689097CF5B3E8E2EE0 /* FixtureDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureDecodingTests.swift; sourceTree = "<group>"; };
 		478BD8C483632C32A1A65736 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		47DCD83FB030A70F4907458A /* FeedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedTests.swift; sourceTree = "<group>"; };
 		4E21F930C36788EA6466D67F /* CheckViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckViews.swift; sourceTree = "<group>"; };
 		4EF263EE8ABB8A188DA7D430 /* BookSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookSessionTests.swift; sourceTree = "<group>"; };
 		4FDBD0C79377E20146856D09 /* Sync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sync.swift; sourceTree = "<group>"; };
@@ -328,6 +330,7 @@
 				4EF263EE8ABB8A188DA7D430 /* BookSessionTests.swift */,
 				F506717299A374C8AA31320C /* DeviceKeyTests.swift */,
 				BE752206919F84D991333DB9 /* DocumentTests.swift */,
+				47DCD83FB030A70F4907458A /* FeedTests.swift */,
 				473534689097CF5B3E8E2EE0 /* FixtureDecodingTests.swift */,
 				85823DBB15473CEFC96DD73D /* InkAppearanceTests.swift */,
 				E347972378D536A7BD101A28 /* KeychainTests.swift */,
@@ -577,6 +580,7 @@
 				29364CDF3858A11CA746C64A /* BookSessionTests.swift in Sources */,
 				32CA8ADA55C01966DD6D5E6A /* DeviceKeyTests.swift in Sources */,
 				F4007FE511B8F95685F0238A /* DocumentTests.swift in Sources */,
+				3BE4A2CEB76702EDB82D3768 /* FeedTests.swift in Sources */,
 				59F1078E57D0CDF81127B805 /* FixtureDecodingTests.swift in Sources */,
 				FCACF53A6CD9324FE77F7444 /* InkAppearanceTests.swift in Sources */,
 				A6C6D1042EFBEB692227E670 /* KeychainTests.swift in Sources */,

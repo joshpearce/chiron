@@ -372,10 +372,10 @@ struct BookshelfView: View {
                             link = UIPasteboard.general.url?.absoluteString ?? ""
                             readingLink = true
                         } label: {
-                            Label("Read a link", systemImage: "link.badge.plus")
+                            Label("Read a link or follow a blog", systemImage: "link.badge.plus")
                         }
                         .disabled(!library.sync.connected)
-                        .accessibilityHint("A page on the web is read here, and can be asked about")
+                        .accessibilityHint("A page on the web is read here; a feed is followed as a card")
                     }
                     ToolbarSpacer(.fixed, placement: .topBarTrailing)
                     ToolbarItemGroup(placement: .topBarTrailing) {
@@ -411,9 +411,10 @@ struct BookshelfView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
             Button("Read it") { Task { await library.readPage(link) } }
+            Button("Follow the blog") { Task { await library.followFeed(link) } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The page is fetched and kept here, to read and to ask about.")
+            Text("A page is kept here to read and ask about. A feed is followed: its posts become chapters, newest first.")
         }
         .alert("New shelf", isPresented: $namingShelf) {
             TextField("Name", text: $newShelfName)
@@ -899,6 +900,7 @@ struct ShelfCard: View {
                 HStack(spacing: 4) {
                     if subject.drafting || subject.building { Text("🔨").font(.footnote) }
                     Image(systemName: subject.isPDF ? "doc.richtext"
+                          : subject.isFeed ? "dot.radiowaves.up.forward"
                           : subject.isReading ? "book"
                           : (subject.scale == "book" || !subject.isPrimer ? "brain" : "doc.text"))
                         .font(.footnote)
@@ -907,6 +909,7 @@ struct ShelfCard: View {
                 .padding(10)
                 .accessibilityLabel(subject.drafting || subject.building ? "Draft"
                                     : subject.isPDF ? "PDF"
+                                    : subject.isFeed ? "Followed blog"
                                     : subject.isReading ? "Imported book"
                                     : (subject.isPrimer ? "Primer" : "Smart book"))
             }

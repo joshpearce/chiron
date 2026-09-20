@@ -147,10 +147,13 @@ final class BookSession: ObservableObject {
     /// "book" or "primer". A primer has no check; its loop is read,
     /// annotate, and extend from margin notes.
     var kind: String = "book"
+    /// Told which chapter is now open, for a blog that counts what the
+    /// reader has not seen.
+    var onChapterRead: ((String) -> Void)?
     var isPrimer: Bool { kind == "primer" }
     /// A primer and an imported book are read as they are: their chapters
     /// are whole and there is nothing to answer at the end of one.
-    var readsAsIs: Bool { kind == "primer" || kind == "reading" }
+    var readsAsIs: Bool { kind == "primer" || kind == "reading" || kind == "feed" }
 
     /// The page, when one is loaded: what a script or a gesture needs from it.
     weak var page: PageBridge?
@@ -613,6 +616,7 @@ final class BookSession: ObservableObject {
 
     private func setChapter(_ ch: ChapterPayload) {
         chapter = ch
+        onChapterRead?(ch.unit)
         beatResponses = []
         pretestDone = false
         chapterOpenedAt = nil

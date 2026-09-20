@@ -162,6 +162,17 @@ enum AppCommands {
             guard let url = args["url"] as? String else { throw Failure.badArguments("read needs url") }
             await library.readPage(url)
             if let error = library.shelfError { throw Failure.badArguments(error) }
+        case "follow":
+            // "Follow the blog", as the shelf sends it.
+            guard let url = args["url"] as? String else { throw Failure.badArguments("follow needs url") }
+            await library.followFeed(url)
+            if let error = library.shelfError { throw Failure.badArguments(error) }
+        case "feeds":
+            // What the app asks the server when the reader opens it.
+            let check = try await library.service.checkFeeds()
+            await library.refresh()
+            return ["checked": check.checked, "added": check.added,
+                    "unread": library.subjects.filter(\.isFeed).reduce(0) { $0 + ($1.unread ?? 0) }]
         case "draft/open":
             guard let id = args["id"] as? String else { throw Failure.badArguments("draft/open needs id") }
             await library.openDraft(id)
