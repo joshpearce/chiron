@@ -56,8 +56,15 @@ final class LibraryTests: XCTestCase {
         await library.checkForBuild()
         XCTAssertEqual(library.availableBuild?.build, 301)
         XCTAssertEqual(library.availableBuild?.label, "Chiron 2026.9.20 (301)")
+        // The Mac installs a zip it can unpack; the iPad installs through
+        // the manifest, which is the only way an app reaches it.
+        #if targetEnvironment(macCatalyst)
+        XCTAssertEqual(library.installURL?.absoluteString,
+                       "https://chiron.example/builds/cd/Chiron-mac.zip")
+        #else
         XCTAssertEqual(library.installURL?.absoluteString,
                        "itms-services://?action=download-manifest&url=https://chiron.example/builds/cd/manifest.plist")
+        #endif
 
         fake.onLatestBuild = { AppBuild(version: "2026.9.20", build: 302, commit: "bad", status: "failed", manifestPath: "", macPath: "") }
         await library.checkForBuild()
