@@ -705,3 +705,71 @@ skill: the agent writes the notes and the brief, captures, builds, waits,
 reads, and reports the title. A title given at capture now stays through
 the plan and the writing (`Meta.Named`). Deploy needed for the brief on
 build and the kept title; the rest works against the live server today.
+
+## 14. Blogs on the shelf (design, 2026-09-20)
+
+Matt reads blogs to keep up with his work, and the reason to have them in
+Chiron is not the reading: it is that a highlight in a post should reach
+the tutor with the whole post behind it, and that what he read and asked
+stays in the learner record. A passage shared in from another reader
+arrives alone; the tutor answers a fragment, the device model cannot
+answer at all, and nothing is kept. So a followed blog belongs on the
+shelf, next to the books.
+
+This is not an RSS reader. No folders, no OPML, no discovery, no starring,
+no read-state sync with another client, no two hundred feeds. A handful of
+blogs read closely; everything else stays in NetNewsWire, which can still
+share a page to Chiron.
+
+**A feed is a reading.** An imported EPUB already becomes a subject with
+one chapter per spine document, read as it is, highlighted, inked, synced
+(13.5, and the reading routes in `httpapi/reading.go`). A feed is the same
+thing with entries for spine documents: each post is a chapter, newest
+first, its HTML through `sources.HTMLToMarkdown`, its images kept as a
+reading's assets are. Short entries - Simon Willison's links and
+quotations run a paragraph each - are folded into one chapter a week
+("Links, week of 14 September") so the list is essays and digests rather
+than forty one-liners.
+
+**The client pokes; the sprite fetches.** The sprite hibernates, so
+nothing can run on a timer there. It wakes on an inbound request, and the
+app already makes one on foreground and on pull-to-refresh. That request
+carries the refresh: the server fetches the feeds it has not checked in
+the last hour, adds the new entries as chapters, and answers with the
+shelf and the unread counts. The client never parses a feed. Feed
+parsing, HTML cleanup, asset rewriting and entry dedupe stay in Go, where
+the EPUB path already has them, instead of being written again in Swift
+for three platforms; and dedupe by entry id makes two devices refreshing
+at once harmless. The cost is that a new post is noticed when Chiron is
+opened, not before. A background refresh task that pokes the server can
+move the badge later; iOS schedules those when it likes, so it is not
+where to start.
+
+**The UX.** Add on the shelf takes a feed URL as well as an EPUB. The
+feed becomes a shelf card with the blog's name and a badge for unopened
+posts. The card opens a list of posts, newest first, unread marked, each
+with title, date and first line. A post opens in the reader with nothing
+Chiron-authored on the page: the post, its headings, its code, its
+images, pages turning, Pencil ink. Highlight gives the capture card as
+everywhere else - Ask, Detail, Primer - and the tutor has the post, so
+the on-device model can answer it too when the server is out of reach. A
+primer lands on the shelf and remembers the post it came from. Opening a
+post clears its mark for every device.
+
+**Server.** A feed source beside the EPUB one: subscribe
+(`POST /feeds` with the URL, which fetches once and names the shelf entry
+from the feed's title), refresh as part of the sync the app already does,
+`entry_id` kept per chapter for dedupe, `last_checked` per feed, unread
+per entry in the learner record. Atom and RSS in `encoding/xml`; both
+carry full content for the feeds worth following, and one that carries
+only a summary gets its page fetched through the client that already
+fetches sources.
+
+**App.** The shelf card and its badge, the post list, and the feed URL in
+Add. The reader, capture card, ink, sync and learner record are
+untouched. Harness verbs for the list and the unread counts.
+
+**Order.** "Read in Chiron" for a single URL first: share a page, the
+server fetches it, it becomes a one-chapter reading and opens. That is
+the piece a feed poller calls once per entry, and it pays off on its own
+for any page. Then the feed on top of it.
