@@ -407,3 +407,20 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   cannot decode webp, so it keeps them as they came - and the asset route
   answered `image/jpeg` for everything it did not recognise, which the
   reader will not draw. `contentTypeOf` now names webp and avif.
+- **A feed reader's unread count is about the chapter, not the post
+  (2026-09-20).** The obvious rule - a post is unread until you open it,
+  compare the read time to the post's date - is wrong the moment several
+  short posts share a chapter: the week of notes gains a note that was
+  published before you last read the week, and the count stays at zero.
+  Each chapter carries `updated`, set whenever anything is written into
+  it, and unread is "read before it last changed". The marks and the
+  stamps are RFC3339Nano and compared as times, not as strings: nano
+  timestamps drop trailing zeros, so ".5Z" sorts after ".50001Z".
+- **Atom and RSS are one struct (2026-09-20).** They name the same
+  things differently (`entry`/`item`, `updated`/`pubDate`,
+  `content`/`content:encoded`/`description`, `id`/`guid`), so one struct
+  with both spellings side by side reads either, taking whichever field
+  is there. The catch: leave `XMLName` off the root struct or the
+  decoder refuses `<rss>` while expecting `<feed>`, and set
+  `Strict = false` with a pass-through `CharsetReader`, since feeds in
+  the wild declare encodings Go does not carry.

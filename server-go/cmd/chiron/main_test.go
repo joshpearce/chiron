@@ -40,6 +40,16 @@ func (f *fake) serve(w http.ResponseWriter, r *http.Request) {
 				{"id": "primer-why", "title": "Why?", "kind": "primer", "status": status, "scale": "primer", "progress": "writing"},
 			},
 		})
+	case r.URL.Path == "/readings/page":
+		json.NewEncoder(w).Encode(map[string]any{"id": "read-1", "title": "Prompt injection in 2026", "chapters": 1})
+	case r.URL.Path == "/feeds" && r.Method == "POST":
+		json.NewEncoder(w).Encode(map[string]any{"id": "read-2", "title": "A Weblog", "chapters": 17, "feed": true})
+	case r.URL.Path == "/feeds" && r.Method == "GET":
+		json.NewEncoder(w).Encode(map[string]any{"feeds": []map[string]any{
+			{"id": "read-2", "title": "A Weblog", "url": "https://ablog.example/atom/", "chapters": 17},
+		}})
+	case r.URL.Path == "/feeds/refresh":
+		json.NewEncoder(w).Encode(map[string]any{"checked": 1, "added": 2})
 	case r.URL.Path == "/primer/capture":
 		json.NewEncoder(w).Encode(map[string]any{"subject": "primer-why", "status": "planning", "reply_md": "Which part?", "done": false})
 	case strings.HasSuffix(r.URL.Path, "/build"):
@@ -185,5 +195,48 @@ func TestAServerErrorIsItsDetail(t *testing.T) {
 	_, err := run(c, "discard", []string{"nothing"}, nil)
 	if err == nil || !strings.Contains(err.Error(), "no such thing") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// A page and a blog reach the shelf from a shell, which is how an agent
+// hands the reader something to read.
+func TestAPageAndABlogGoOnTheShelfFromTheShell(t *testing.T) {
+	f, c := newFake(t)
+
+	out, err := run(c, "page", []string{"https://simonwillison.net/2026/Sep/20/injection/"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.last.path != "/readings/page" || f.last.body["url"] != "https://simonwillison.net/2026/Sep/20/injection/" {
+		t.Errorf("asked %s %s %v", f.last.method, f.last.path, f.last.body)
+	}
+	if !strings.Contains(out, "read-1") || !strings.Contains(out, "Prompt injection in 2026") {
+		t.Errorf("printed %q", out)
+	}
+
+	if _, err := run(c, "follow", []string{"https://simonwillison.net/atom/everything/"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if f.last.path != "/feeds" || f.last.body["url"] != "https://simonwillison.net/atom/everything/" {
+		t.Errorf("asked %s %s %v", f.last.method, f.last.path, f.last.body)
+	}
+
+	out, err = run(c, "feeds", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.last.method != "GET" || f.last.path != "/feeds" || !strings.Contains(out, "A Weblog") {
+		t.Errorf("asked %s %s, printed %q", f.last.method, f.last.path, out)
+	}
+
+	out, err = run(c, "feeds", []string{"-check"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.last.method != "POST" || f.last.path != "/feeds/refresh?force=1" {
+		t.Errorf("asked %s %s", f.last.method, f.last.path)
+	}
+	if !strings.Contains(out, "2") {
+		t.Errorf("printed %q", out)
 	}
 }

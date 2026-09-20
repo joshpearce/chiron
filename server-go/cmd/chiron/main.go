@@ -39,6 +39,11 @@ const usage = `usage:
   chiron status ID                     a draft's plan, a book job, or the shelf row
   chiron wait ID [-timeout D]          until ID is ready or failed; prints the row
   chiron read ID [-unit U]             the text of a primer, or of a book's unit
+  chiron page URL                      read a page on the web here: its article goes
+                                       on the shelf, to highlight and ask about
+  chiron follow URL                    follow a blog by its Atom or RSS feed; its
+                                       posts become the chapters of a shelf card
+  chiron feeds [-check]                the blogs followed; -check asks them what is new
   chiron teach -title T (-brief B | -brief-file F) [-slug S] [-source NAME ...]
                                        a book from a brief; -source names the open
                                        text to start from (first) and to interleave
@@ -99,6 +104,12 @@ func run(c *client, cmd string, args []string, stdin io.Reader) (string, error) 
 		return c.wait(args)
 	case "read":
 		return c.read(args)
+	case "page":
+		return c.page(args)
+	case "follow":
+		return c.follow(args)
+	case "feeds":
+		return c.feeds(args)
 	case "teach":
 		return c.teach(args)
 	default:
@@ -512,6 +523,49 @@ func plain(h string) string {
 		lines[i] = strings.TrimSpace(l)
 	}
 	return strings.TrimSpace(blanks.ReplaceAllString(strings.Join(lines, "\n"), "\n\n"))
+}
+
+// page sends a URL to be read here, and prints the card it became.
+func (c *client) page(args []string) (string, error) {
+	return c.sendLink("page", "/readings/page", args)
+}
+
+// follow subscribes to a blog, and prints the card it became.
+func (c *client) follow(args []string) (string, error) {
+	return c.sendLink("follow", "/feeds", args)
+}
+
+func (c *client) sendLink(name, path string, args []string) (string, error) {
+	fs := flags(name, args)
+	url, err := idOf(fs, args)
+	if err != nil {
+		return "", fmt.Errorf("%w: %s needs a URL", errUsage, name)
+	}
+	var out json.RawMessage
+	if err := c.call("POST", path, map[string]any{"url": url}, &out); err != nil {
+		return "", err
+	}
+	return pretty(out), nil
+}
+
+// feeds lists the blogs followed, or asks them what is new.
+func (c *client) feeds(args []string) (string, error) {
+	fs := flags("feeds", args)
+	check := fs.Bool("check", false, "ask every blog what is new, now")
+	if err := fs.Parse(args); err != nil {
+		return "", err
+	}
+	var out json.RawMessage
+	if *check {
+		if err := c.call("POST", "/feeds/refresh?force=1", nil, &out); err != nil {
+			return "", err
+		}
+		return pretty(out), nil
+	}
+	if err := c.call("GET", "/feeds", nil, &out); err != nil {
+		return "", err
+	}
+	return pretty(out), nil
 }
 
 func (c *client) read(args []string) (string, error) {
