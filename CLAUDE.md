@@ -62,5 +62,6 @@ You are on the machine that serves the book. Facts that matter:
   design for building from it: `OPEN-SOURCES.md`.
 - `chiron` (`go install ./cmd/chiron` from `server-go`) drives the live
   server from a shell: shelf, captures at every scale, plan, build, wait,
-  read. `skills/chiron/SKILL.md` is the agent skill that uses it; link it
+  read, `page URL` (a page on the web read here), `follow URL` (a blog by
+  its feed) and `feeds [-check]`. `skills/chiron/SKILL.md` is the agent skill that uses it; link it
   with `ln -sfn $PWD/skills/chiron ~/.claude/skills/chiron`.

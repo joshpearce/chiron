@@ -861,6 +861,14 @@ struct ShelfCard: View {
 
     private var openable: Bool { subject.drafting || (!subject.authoring && !subject.failed) }
 
+    /// The line under the title. The book last open says so; a blog says
+    /// so and still says how much of it is waiting.
+    private var openLine: String {
+        guard subject.id == library.activeSubjectID else { return subject.progressLine }
+        if subject.isFeed, let n = subject.unread, n > 0 { return "Open now · \(n) unread" }
+        return "Open now"
+    }
+
     var body: some View {
         Button {
             Task {
@@ -883,7 +891,7 @@ struct ShelfCard: View {
                         Text(subject.error ?? "The primer could not be written.")
                             .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.red)
                     } else {
-                        Text(subject.id == library.activeSubjectID ? "Open now" : subject.progressLine)
+                        Text(openLine)
                             .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.secondary)
                     }
                 }

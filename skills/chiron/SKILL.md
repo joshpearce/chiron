@@ -24,6 +24,13 @@ chiron teach -title T -brief-file F [-slug S] [-source NAME ...] [-plan-only]
                                       a book from a brief; -source names an
                                       open text to build from (repeat for
                                       interleaves), else the builder finds them
+chiron page URL                       a page on the web, read here as its own
+                                      article: on the shelf, to highlight and
+                                      ask about
+chiron follow URL                     a blog by its Atom or RSS feed: its posts
+                                      become the chapters of a shelf card
+chiron feeds [-check]                 the blogs followed; -check asks them all
+                                      what is new
 ```
 
 `chiron` with no arguments prints this usage. Replies are JSON except
@@ -35,6 +42,10 @@ a 1Password reference resolved with `op read` at run time; if a command
 sits for more than a few seconds with no output, `op` is waiting for
 Matt's approval - tell him rather than retrying. Never copy the key
 anywhere.
+
+`page` and `follow` put something to read on the shelf rather than
+something written for him: use them when Matt asks to read a post or to
+follow a blog, and a capture when he wants it explained.
 
 ## The four scales
 
