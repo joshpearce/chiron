@@ -159,7 +159,7 @@ func TestTheBriefCarriesWhatTheAgentNeeds(t *testing.T) {
 	a, store := agent(t, &fakeExec{})
 	r, _ := store.Create("the pen is too thin", json.RawMessage(`{"screen":"reading","unit":"u3"}`), []byte("PNG"))
 	p := a.prompt(r)
-	for _, want := range []string{"the pen is too thin", `"unit":"u3"`, r.Screenshot, "LESSONS.md", "make test", "git commit", "push"} {
+	for _, want := range []string{"the pen is too thin", `"unit":"u3"`, r.Screenshot, "LESSONS.md", "Do not run the whole suite", "git commit", "push"} {
 		if !strings.Contains(p, want) {
 			t.Errorf("brief lacks %q:\n%s", want, p)
 		}

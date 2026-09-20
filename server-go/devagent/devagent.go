@@ -166,8 +166,8 @@ func (a *Agent) prompt(r *devreq.Request) string {
 	}
 	b.WriteString(`You are in a git worktree on a branch off main, in the Chiron repo. Read CLAUDE.md and LESSONS.md first. Rules:
 - TDD: a failing test first, then the smallest change that passes it. Never delete a failing test.
-- Run make test (the Go suite and the page script) before you finish; the app's own unit suite runs on the build Mac afterwards, so keep app changes compilable and covered.
-- Commit your work with git commit and a message saying what changed and why, in the voice of the log. Never push; never deploy: the agent that runs you does both once the suite is green.
+- Run the tests of the package you touched (go test ./<package>, or node scripts/test-book-js.mjs for the page script). Do not run the whole suite (make test): the runner does that after you, and on this machine it takes a long time. The app's own unit suite runs on the build Mac afterwards, so keep app changes compilable and covered.
+- Before your final message, commit your work with git commit and a message saying what changed and why, in the voice of the log. A request whose work is left uncommitted is committed on your behalf under a poorer message. Never push; never deploy: the runner does both once the suite is green.
 - Never use em or en dashes, only hyphens. No attribution lines in commits.
 - If the request is unclear or unsafe, make no change and say why in your final message.
 When done, your final message is a short summary of what you changed and why, for Matt to read on the iPad.`)
