@@ -44,6 +44,8 @@ type Reading struct {
 	Chapters   int    `json:"chapters"`
 	Size       int64  `json:"size"`
 	ImportedAt string `json:"imported_at"`
+	// URL is where a page came from; a book imported as a file has none.
+	URL string `json:"url,omitempty"`
 }
 
 func (s *Server) readingsRoot() string {

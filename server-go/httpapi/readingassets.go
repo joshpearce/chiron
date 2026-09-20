@@ -127,6 +127,10 @@ func contentTypeOf(name string) string {
 		return "image/gif"
 	case ".svg":
 		return "image/svg+xml"
+	case ".webp":
+		return "image/webp"
+	case ".avif":
+		return "image/avif"
 	default:
 		return "image/jpeg"
 	}

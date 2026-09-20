@@ -413,6 +413,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /annotations/{subject}/{unit}/reconcile", s.handleAnnotationsReconcile)
 	mux.HandleFunc("POST /documents", s.handleDocumentUpload)
 	mux.HandleFunc("POST /readings", s.handleReadingImport)
+	mux.HandleFunc("POST /readings/page", s.handleReadingPage)
 	mux.HandleFunc("DELETE /readings/{id}", s.handleReadingDelete)
 	mux.HandleFunc("GET /readings/{id}/assets", s.handleReadingAssetList)
 	mux.HandleFunc("GET /readings/{id}/assets/{name}", s.handleReadingAsset)
