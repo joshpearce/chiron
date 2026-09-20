@@ -577,6 +577,20 @@ final class Library: ObservableObject {
         }
     }
 
+    /// Off the shelf: a blog no longer followed, a page or an imported
+    /// book no longer wanted. What the reader wrote on it goes with it.
+    func forget(_ id: String) async {
+        if session?.subjectID == id { closeBook() }
+        sessions[id] = nil
+        do {
+            try await service.forgetReading(id: id)
+            shelfError = nil
+        } catch {
+            shelfError = "That could not be taken off the shelf: \(error.localizedDescription)"
+        }
+        await refresh()
+    }
+
     /// A post the reader has opened is read, on every device.
     func markRead(subject: String, unit: String) {
         Task { try? await service.markRead(subject: subject, unit: unit) }

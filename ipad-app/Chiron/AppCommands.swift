@@ -173,6 +173,10 @@ enum AppCommands {
             await library.refresh()
             return ["checked": check.checked, "added": check.added,
                     "unread": library.subjects.filter(\.isFeed).reduce(0) { $0 + ($1.unread ?? 0) }]
+        case "forget":
+            guard let subject = args["subject"] as? String else { throw Failure.badArguments("forget needs subject") }
+            await library.forget(subject)
+            if let error = library.shelfError { throw Failure.badArguments(error) }
         case "draft/open":
             guard let id = args["id"] as? String else { throw Failure.badArguments("draft/open needs id") }
             await library.openDraft(id)

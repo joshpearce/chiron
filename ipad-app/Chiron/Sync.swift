@@ -38,6 +38,8 @@ protocol ChironService: AnyObject {
     func checkFeeds() async throws -> FeedCheck
     /// A chapter the reader has seen, on every device.
     func markRead(subject: String, unit: String) async throws
+    /// Take an imported book, a page or a followed blog off the shelf.
+    func forgetReading(id: String) async throws
     /// One of an imported book's pictures, as bytes.
     func bookAsset(subject: String, name: String) async throws -> Data
     func documentData(id: String) async throws -> Data
@@ -319,6 +321,13 @@ final class Sync: ObservableObject, ChironService {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONSerialization.data(withJSONObject: ["unit": unit])
         _ = try await URLSession.shared.data(for: req)
+    }
+
+    func forgetReading(id: String) async throws {
+        var req = try request("/readings/\(id)", timeout: 60)
+        req.httpMethod = "DELETE"
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
     }
 
     func bookAsset(subject: String, name: String) async throws -> Data {

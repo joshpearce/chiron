@@ -105,6 +105,23 @@ final class FeedTests: XCTestCase {
         XCTAssertEqual(fake.readMarks.first?.subject, "read-7")
     }
 
+    /// A blog no longer followed goes off the shelf.
+    func testUnfollowingABlogTakesItOffTheShelf() async {
+        let fake = FakeService()
+        var rows = [SubjectInfo(id: "read-7", title: "A Weblog", unitsTotal: 9, kind: "feed", unread: 2)]
+        fake.onSubjects = { SubjectsResponse(subjects: rows, active: nil, shelves: []) }
+        fake.onCheckFeeds = { FeedCheck(checked: 1, added: 0) }
+        let library = library(fake)
+        await library.refresh()
+
+        rows = []
+        await library.forget("read-7")
+
+        XCTAssertEqual(fake.forgotten, ["read-7"])
+        XCTAssertTrue(library.subjects.isEmpty)
+        XCTAssertNil(library.shelfError)
+    }
+
     /// Something that is not an address is not sent at all.
     func testSomethingThatIsNotALinkIsNotFollowed() async {
         let fake = FakeService()

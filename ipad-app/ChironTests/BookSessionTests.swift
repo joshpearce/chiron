@@ -127,6 +127,8 @@ final class FakeService: ChironService {
         readings.append((title, data))
         return ImportedBook(id: "read-1", title: title, chapters: 3)
     }
+    var forgotten: [String] = []
+    func forgetReading(id: String) async throws { forgotten.append(id) }
     var feedsFollowed: [String] = []
     var onFollowFeed: (String) throws -> ImportedBook = { _ in throw URLError(.cannotConnectToHost) }
     func followFeed(url: String) async throws -> ImportedBook {

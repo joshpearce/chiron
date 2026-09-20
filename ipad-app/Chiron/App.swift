@@ -940,6 +940,13 @@ struct ShelfCard: View {
                     .disabled(subject.shelf == shelf.id)
                 }
             }
+            if subject.isFeed || subject.isReading {
+                Button(role: .destructive) {
+                    Task { await library.forget(subject.id) }
+                } label: {
+                    Label(subject.isFeed ? "Unfollow" : "Take off the shelf", systemImage: "trash")
+                }
+            }
         }
     }
 }
