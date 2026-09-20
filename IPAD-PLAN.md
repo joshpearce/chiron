@@ -787,6 +787,35 @@ it in Chiron" on the card a shared page opens, `Library.readPage`, and
 the harness verb `read {url}`. Tests: `sources/page_test.go`,
 `httpapi/readingpage_test.go`, `ChironTests/ReadPageTests`.
 
-What is left for the feed: subscribe and poll on refresh, entries to
-chapters with dedupe by entry id, the weekly fold of short entries, and
-the unread count on the shelf card.
+### 14.2 Following a blog (done 2026-09-20)
+
+`POST /feeds` takes `{"url"}` of an Atom or RSS feed and puts the blog on
+the shelf as a reading of kind `feed`: `sources.Feed` reads both kinds as
+the same handful of facts per entry, and each entry becomes a chapter,
+newest first. A post shorter than 120 words is a note - a link, a
+quotation, a sighting - and joins the week that holds it ("Notes, week of
+14 September"), which keeps a shelf of essays rather than a stream; a
+week is as new as its last note. Unit ids are given once and kept, so a
+post already read never changes chapter. An entry that carries no content
+has its page fetched as "Read in Chiron" does; pictures are kept beside
+the blog, named by a stamp of their URL so the portrait on every post is
+fetched once.
+
+`POST /feeds/refresh` is the check, and nothing on the server polls: the
+app asks for it when the shelf refreshes, which is the request that woke
+the sprite. A blog is not asked again within the hour unless `?force=1`.
+`POST /readings/{id}/read` marks a chapter seen, `read.json` holds when,
+and the card counts what has not been seen as it now is - so a week that
+gains a note is unread again. `DELETE /readings/{id}` unfollows.
+
+In the app: "Read a link or follow a blog" on the shelf offers both, the
+card shows "3 unread of 17" and wears the feed mark, opening a post marks
+it read on every device, and the card's menu unfollows a blog or takes a
+reading off the shelf. Harness: `follow {url}`, `feeds`, `forget
+{subject}`. Tests: `sources/feed_test.go`, `httpapi/feeds_test.go`,
+`ChironTests/FeedTests`.
+
+Not built, and only if the reading asks for it: a feed that carries
+truncated content on purpose (the page is fetched only when the entry
+carries nothing at all), OPML, and a background refresh that moves the
+count while the app is closed.
