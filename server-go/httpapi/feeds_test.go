@@ -8,12 +8,17 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // blog is a feed that gains entries between one check and the next.
 type blog struct {
 	mu      sync.Mutex
+	base    string
 	entries []string
+	// pages are what the posts look like on the site itself, for a feed
+	// that carries only a teaser of each.
+	pages map[string]string
 }
 
 func (b *blog) add(entry string) {
@@ -25,9 +30,18 @@ func (b *blog) add(entry string) {
 func (b *blog) atom() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return `<?xml version="1.0" encoding="utf-8"?>
+	feed := `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom"><title>A Weblog</title>
 <link href="https://ablog.example/"/>` + strings.Join(b.entries, "\n") + `</feed>`
+	return strings.ReplaceAll(feed, "https://ablog.example", b.base)
+}
+
+// teaserEntry is how a feed that keeps its readers on the site writes an
+// entry: a sentence of the piece, and a link to the rest.
+func teaserEntry(id, title, date string) string {
+	return fmt.Sprintf(`<entry><title>%s</title><link href="https://ablog.example/%s/"/>
+<id>%s</id><updated>%sT11:00:00Z</updated>
+<description>%s - read the rest on the site.</description></entry>`, title, id, id, date, title)
 }
 
 func longEntry(id, title, date string) string {
@@ -52,9 +66,17 @@ func feedSite(t *testing.T, b *blog) *httptest.Server {
 			fmt.Fprint(w, b.atom())
 			return
 		}
+		b.mu.Lock()
+		page, ok := b.pages[strings.Trim(r.URL.Path, "/")]
+		b.mu.Unlock()
+		if ok {
+			fmt.Fprint(w, page)
+			return
+		}
 		http.NotFound(w, r)
 	}))
 	t.Cleanup(srv.Close)
+	b.base = srv.URL
 	return srv
 }
 
@@ -155,7 +177,7 @@ func TestABlogIsFollowedAsAShelfCard(t *testing.T) {
 	if notes.Chapter == nil {
 		t.Fatalf("the notes did not open: %s", w.Body)
 	}
-	for _, want := range []string{"Quoting someone", "Quoting someone else", "https://ablog.example/quote-1/"} {
+	for _, want := range []string{"Quoting someone", "Quoting someone else", site.URL + "/quote-1/"} {
 		if !strings.Contains(notes.Chapter.HTML, want) {
 			t.Errorf("the week of notes is missing %q:\n%s", want, notes.Chapter.HTML)
 		}
@@ -316,4 +338,77 @@ func unreadOf(t *testing.T, s *Server, id string) int {
 	}
 	t.Fatalf("%s is not on the shelf", id)
 	return 0
+}
+
+// A feed that carries a teaser and keeps the piece on the site is still a
+// blog of pieces: the post itself is fetched, so an essay is a chapter
+// and not a line in a week of notes.
+func TestAFeedOfTeasersBringsThePostsThemselves(t *testing.T) {
+	s := newServer(t, "")
+	s.cfg.ReadingsDir = t.TempDir()
+	b := &blog{pages: map[string]string{
+		"how-to-write": `<html><head><meta property="og:title" content="How To Write With An LLM"></head>
+<body><article><h1>How To Write With An LLM</h1><p>` +
+			strings.Repeat("Rule number one is that you may not use a single word the model suggests to you. ", 20) +
+			`</p></article></body></html>`,
+	}}
+	b.add(teaserEntry("how-to-write", "How To Write With An LLM", "2026-09-17"))
+	site := feedSite(t, b)
+
+	w := do(t, s, "POST", "/feeds", `{"url":"`+site.URL+`/atom/"}`, "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("follow: %d %s", w.Code, w.Body)
+	}
+	var made struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &made)
+	spine := spineOf(t, s, made.ID)
+	if len(spine) != 1 || spine[0].Title != "How To Write With An LLM" {
+		t.Fatalf("the essay is not a chapter of its own: %+v", spine)
+	}
+	w = do(t, s, "POST", "/exchange", `{"subject":"`+made.ID+`","phase":"start","choice":"`+spine[0].Unit+`"}`, "")
+	var opened struct {
+		Chapter *struct {
+			HTML string `json:"html"`
+		} `json:"chapter"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &opened)
+	if opened.Chapter == nil || !strings.Contains(opened.Chapter.HTML, "may not use a single word") {
+		t.Errorf("the chapter is the teaser, not the piece: %s", w.Body)
+	}
+}
+
+// Notes from the same week of a different year are told apart on the
+// contents, which is where an archive of a feed shows up.
+func TestAWeekOfNotesFromAnotherYearSaysWhichYear(t *testing.T) {
+	s := newServer(t, "")
+	s.cfg.ReadingsDir = t.TempDir()
+	b := &blog{}
+	b.add(shortEntry("old", "An old quotation", "2024-08-20"))
+	b.add(shortEntry("new", "A recent quotation", strings.Replace(time.Now().UTC().Format("2006-01-02"), "", "", 1)))
+	site := feedSite(t, b)
+	w := do(t, s, "POST", "/feeds", `{"url":"`+site.URL+`/atom/"}`, "")
+	var made struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &made)
+	spine := spineOf(t, s, made.ID)
+	if len(spine) != 2 {
+		t.Fatalf("two weeks, not %d: %+v", len(spine), spine)
+	}
+	var old string
+	for _, e := range spine {
+		if strings.Contains(e.Title, "2024") {
+			old = e.Title
+		}
+	}
+	if old == "" {
+		t.Errorf("a week from another year does not say so: %+v", spine)
+	}
+	for _, e := range spine {
+		if e.Title != old && strings.Contains(e.Title, fmt.Sprint(time.Now().Year())) {
+			t.Errorf("this year is written out as if it needed saying: %q", e.Title)
+		}
+	}
 }

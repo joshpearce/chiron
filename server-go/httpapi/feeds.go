@@ -272,17 +272,22 @@ func (sub *Subscription) weekItem(week string) *FeedItem {
 // where it is a piece, the week's chapter where it is a note.
 func (s *Server) takeEntry(ctx context.Context, c *sources.Client, root string, sub *Subscription, e sources.FeedEntry) error {
 	md, pictures := sources.EntryContent(e.Link, e.HTML)
+	// A feed that carries nothing, or a sentence and "read the rest on
+	// the site": the piece is on the site, so the post is fetched like
+	// any other page. A feed whose short entries are genuinely short -
+	// a link, a quotation - gets its own words back and keeps them.
+	if words(md) < shortEntryWords && e.Link != "" {
+		if page, err := c.Page(ctx, e.Link); err == nil && words(page.Markdown) > words(md) {
+			md, pictures = page.Markdown, page.Images
+		} else if strings.TrimSpace(md) == "" {
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("nothing to read and nothing at %s", e.Link)
+		}
+	}
 	if strings.TrimSpace(md) == "" {
-		// A feed that carries only a teaser: the post itself is the
-		// piece, so it is fetched like any other page.
-		if e.Link == "" {
-			return fmt.Errorf("nothing to read and nowhere to read it")
-		}
-		page, err := c.Page(ctx, e.Link)
-		if err != nil {
-			return err
-		}
-		md, pictures = page.Markdown, page.Images
+		return fmt.Errorf("nothing to read and nowhere to read it")
 	}
 	kept := storeWebAssets(ctx, c, readingAssets(root, sub.ID), sub.ID, pictures)
 	for ref, name := range kept {
@@ -351,10 +356,16 @@ func weekOf(t time.Time) string {
 	return fmt.Sprintf("%d-W%02d", year, week)
 }
 
+// weekTitle names the week a note fell in. A week of another year says
+// which: a feed brings its archive with it, and a contents with three
+// "week of 17 August" in it says nothing.
 func weekTitle(t time.Time) string {
 	monday := t.UTC()
 	for monday.Weekday() != time.Monday {
 		monday = monday.AddDate(0, 0, -1)
+	}
+	if monday.Year() != time.Now().UTC().Year() {
+		return "Notes, week of " + monday.Format("2 January 2006")
 	}
 	return "Notes, week of " + monday.Format("2 January")
 }
