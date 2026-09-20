@@ -26,6 +26,7 @@ import (
 	"github.com/mjbraun/chiron/server/agent"
 	"github.com/mjbraun/chiron/server/auth"
 	"github.com/mjbraun/chiron/server/corpus"
+	"github.com/mjbraun/chiron/server/devreq"
 	"github.com/mjbraun/chiron/server/llm"
 	"github.com/mjbraun/chiron/server/pages"
 	"github.com/mjbraun/chiron/server/primer"
@@ -68,6 +69,9 @@ type Config struct {
 	// ReadingsDir holds books the reader imported to read as they are;
 	// empty means <parent>/state/readings.
 	ReadingsDir string `yaml:"readings_dir"`
+	// RequestsDir holds change requests from the app for the agent;
+	// empty means <parent>/state/requests.
+	RequestsDir string `yaml:"requests_dir"`
 	// BuildsDir holds app builds the MacBook made, one directory per
 	// build named by its token, `latest` a link to the current one;
 	// empty means <parent>/builds.
@@ -167,6 +171,8 @@ type Server struct {
 	root string // directory config.yaml lives in
 	// buildsDir is where app builds are offered from (Config.BuildsDir resolved).
 	buildsDir string
+	// requests is the change-request queue the app fills and the agent drains.
+	requests *devreq.Store
 	// transcribe overrides the ink vision transcriber; tests inject one.
 	transcribe func(hint string, png []byte) (string, error)
 	chain      llm.Chain
@@ -216,6 +222,7 @@ func New(cfg *Config, root string) (*Server, error) {
 		cfg:            cfg,
 		root:           root,
 		buildsDir:      buildsRoot(cfg, root),
+		requests:       devreq.Open(requestsRoot(cfg, root)),
 		token:          token,
 		authorizedKeys: strings.TrimSpace(os.Getenv("CHIRON_AUTHORIZED_KEYS")),
 		hub:            agent.NewHub(),
@@ -409,6 +416,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /readings/{id}", s.handleReadingDelete)
 	mux.HandleFunc("GET /readings/{id}/assets", s.handleReadingAssetList)
 	mux.HandleFunc("GET /readings/{id}/assets/{name}", s.handleReadingAsset)
+	mux.HandleFunc("POST /dev/requests", s.handleRequestCreate)
+	mux.HandleFunc("GET /dev/requests", s.handleRequestList)
+	mux.HandleFunc("GET /dev/requests/{id}", s.handleRequestGet)
 	mux.HandleFunc("GET /builds/latest", s.handleBuildLatest)
 	mux.HandleFunc("GET /builds/{token}/{file}", s.handleBuildFile)
 	mux.HandleFunc("GET /documents/{doc}", s.handleDocumentGet)
