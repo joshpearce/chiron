@@ -209,6 +209,14 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   looking for matching `'`" pointing at a line far below. A double
   quote inside single quotes inside `$( )` trips 3.2 as well. Scripts a
   person runs on a Mac get checked with `/bin/bash -n`, not just `bash`.
+- **The development agent on the sprite handled its first request end
+  to end (2026-09-20).** A tap on "Request a change" in the app queues a
+  file under `state/requests/`; `chiron-dev-agent` makes a worktree off
+  main under `~/src/work`, runs Claude Code on the request there, then
+  `make test`, fast-forwards main, `make deploy` if the server changed
+  and `make app-build` if the app did. A docs-only request needs neither
+  deploy nor build: the suite passes and main moves, and that is the
+  whole loop.
 - **A service without `NSRequiredContext` is registered and never shown
   (2026-09-17).** `pbs -dump_pboard` listed "Send to Chiron" with every
   key it needs, `NSPerformService` ran it, and no app's Services menu
