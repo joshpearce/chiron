@@ -384,3 +384,26 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   what the split saves (144 seconds either way), and two simulators
   contending for the Mac drop touches: `canvas_touches` stays 0 and drags
   never land. Keep it for when the suite is long enough to win.
+- **A blog post is not marked up as an article (2026-09-20).** Reading a
+  page in Chiron meant pulling the writing out of the page, and the
+  obvious route, `<article>` or `<main>`, is not there on most sites:
+  simonwillison.net has neither (its post is a `div.entry`), so the first
+  cut returned the masthead, the sponsor line and the box of recent
+  posts along with the piece. What works is the old readability trick,
+  in `sources/page.go`: score every container by the prose in it (a
+  paragraph is worth 1, plus its length and its commas, and half of that
+  to the grandparent), discount by link density so a list of other posts
+  loses, then lift or sink it by what the site calls it (`entry`, `post`,
+  `content` up; `sponsor`, `recent`, `footer` down), and prune the named
+  furniture out of whatever wins. Two smaller things fell out of it: a
+  page's title comes from its own `h1` before `og:title`, since `og:title`
+  often carries the site's name too, and the heading the article repeats
+  has to be dropped at whatever level it is written or the chapter shows
+  its title twice. Pages that render their body in JavaScript (Mintlify
+  docs, say) still come back nearly empty; that needs a headless browser,
+  not a better heuristic.
+- **A picture kept from the web is often a webp (2026-09-20).** The
+  imported-book path re-encodes pictures with Go's image package, which
+  cannot decode webp, so it keeps them as they came - and the asset route
+  answered `image/jpeg` for everything it did not recognise, which the
+  reader will not draw. `contentTypeOf` now names webp and avif.
