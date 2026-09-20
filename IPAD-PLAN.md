@@ -773,3 +773,20 @@ untouched. Harness verbs for the list and the unread counts.
 server fetches it, it becomes a one-chapter reading and opens. That is
 the piece a feed poller calls once per entry, and it pays off on its own
 for any page. Then the feed on top of it.
+
+### 14.1 Read in Chiron (done 2026-09-20)
+
+`POST /readings/page` takes `{"url"}`, fetches the page, and lays the
+article out as a reading: `sources.Page` finds the writing on the page by
+scoring its containers for prose and against links and furniture (few
+sites mark up an `<article>`), turns it into Markdown, and the server
+keeps its pictures beside it the way an imported book's are kept, so the
+page reads offline. Refused with 422 if there is no article on it. In the
+app: "Read a link" on the shelf (the pasteboard's URL is offered), "Read
+it in Chiron" on the card a shared page opens, `Library.readPage`, and
+the harness verb `read {url}`. Tests: `sources/page_test.go`,
+`httpapi/readingpage_test.go`, `ChironTests/ReadPageTests`.
+
+What is left for the feed: subscribe and poll on refresh, entries to
+chapters with dedupe by entry id, the weekly fold of short entries, and
+the unread count on the shelf card.
