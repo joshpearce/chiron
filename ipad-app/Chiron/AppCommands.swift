@@ -157,6 +157,11 @@ enum AppCommands {
             out["subject"] = reply.subject ?? ""
             out["answer"] = reply.answerMd ?? ""
             return out
+        case "read":
+            // "Read a link", as the shelf and a shared page send it.
+            guard let url = args["url"] as? String else { throw Failure.badArguments("read needs url") }
+            await library.readPage(url)
+            if let error = library.shelfError { throw Failure.badArguments(error) }
         case "draft/open":
             guard let id = args["id"] as? String else { throw Failure.badArguments("draft/open needs id") }
             await library.openDraft(id)

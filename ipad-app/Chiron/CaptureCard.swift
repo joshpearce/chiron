@@ -36,6 +36,20 @@ struct CaptureCard: View {
                         Text("The answer")
                     }
                 }
+                // A whole page was shared, not a passage from one: the
+                // question worth asking is usually of the page itself.
+                if let url = capture.sourceURL, library.captureAnswer == nil {
+                    Section {
+                        Button {
+                            Task { await library.readPage(url) }
+                        } label: {
+                            Label("Read it in Chiron", systemImage: "book")
+                        }
+                        .disabled(sending)
+                    } footer: {
+                        Text("The page goes on the shelf, to read here and highlight as you go.")
+                    }
+                }
                 Section {
                     if let png = capture.imagePNG, let image = UIImage(data: png) {
                         Image(uiImage: image)

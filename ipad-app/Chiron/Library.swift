@@ -535,6 +535,32 @@ final class Library: ObservableObject {
         }
     }
 
+    /// A page the reader is reading somewhere else: the link goes up, the
+    /// server fetches the article and keeps it with its pictures, and it
+    /// opens here as a reading. What is read is the writer's own words,
+    /// so a highlight in it asks about the piece, not about a fragment
+    /// of it.
+    func readPage(_ link: String) async {
+        let trimmed = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https", url.host != nil else {
+            shelfError = "That is not a link Chiron can read."
+            return
+        }
+        loadingShelf = true
+        defer { loadingShelf = false }
+        do {
+            let page = try await service.readPage(url: trimmed)
+            shelfError = nil
+            pendingCapture = nil
+            captureAnswer = nil
+            await refresh()
+            await open(page.id)
+        } catch {
+            shelfError = "That page could not be read: \(error.localizedDescription)"
+        }
+    }
+
     func importPDF(at url: URL, title: String? = nil) async {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }

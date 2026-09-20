@@ -29,6 +29,8 @@ protocol ChironService: AnyObject {
     func reconcileAnnotations(subject: String, unit: String, mine: Annotations, theirs: Annotations) async throws -> ReconciledAnnotations
     func uploadDocument(title: String, pages: Int, data: Data) async throws -> Document
     func importBook(title: String, data: Data) async throws -> ImportedBook
+    /// A page on the web, read as its article and kept as a reading.
+    func readPage(url: String) async throws -> ImportedBook
     /// One of an imported book's pictures, as bytes.
     func bookAsset(subject: String, name: String) async throws -> Data
     func documentData(id: String) async throws -> Data
@@ -277,6 +279,16 @@ final class Sync: ObservableObject, ChironService {
         req.httpMethod = "POST"
         req.setValue("application/epub+zip", forHTTPHeaderField: "Content-Type")
         req.httpBody = data
+        return try await perform(req)
+    }
+
+    func readPage(url: String) async throws -> ImportedBook {
+        // The server fetches the page and its pictures, which takes as
+        // long as the site does.
+        var req = try request("/readings/page", timeout: 180)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["url": url])
         return try await perform(req)
     }
 

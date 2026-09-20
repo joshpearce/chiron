@@ -71,10 +71,26 @@ func ParsePage(rawURL, src string) (*Page, error) {
 	if words(md) < leastArticle {
 		return nil, fmt.Errorf("this page has no article on it")
 	}
-	return &Page{URL: rawURL, Title: pageTitle(doc, body), Markdown: md, Images: imagesIn(body)}, nil
+	title := pageTitle(doc, body)
+	return &Page{URL: rawURL, Title: title, Markdown: withoutTitle(md, title), Images: imagesIn(body)}, nil
 }
 
 func words(s string) int { return len(strings.Fields(s)) }
+
+// withoutTitle drops the heading the article opens with when it is the
+// title: the piece is titled where it is read, at whatever level the
+// site chose to write it.
+func withoutTitle(md, title string) string {
+	line, rest, _ := strings.Cut(md, "\n")
+	heading := strings.TrimLeft(line, "#")
+	if len(heading) == len(line) {
+		return md
+	}
+	if !strings.EqualFold(strings.Join(strings.Fields(heading), " "), strings.Join(strings.Fields(title), " ")) {
+		return md
+	}
+	return strings.TrimLeft(rest, "\n")
+}
 
 // articleOf is the element the page's own words are in. Few sites mark
 // it up, so it is found the way a person finds it: the container holding

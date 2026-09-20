@@ -329,6 +329,8 @@ struct BookshelfView: View {
     @State private var namingShelf = false
     @State private var importingPDF = false
     @State private var newShelfName = ""
+    @State private var readingLink = false
+    @State private var link = ""
 
     var body: some View {
         NavigationStack(path: $library.shelfPath) {
@@ -366,6 +368,14 @@ struct BookshelfView: View {
                         }
                         .disabled(!library.sync.connected)
                         .accessibilityHint("A PDF from Files goes on the shelf")
+                        Button {
+                            link = UIPasteboard.general.url?.absoluteString ?? ""
+                            readingLink = true
+                        } label: {
+                            Label("Read a link", systemImage: "link.badge.plus")
+                        }
+                        .disabled(!library.sync.connected)
+                        .accessibilityHint("A page on the web is read here, and can be asked about")
                     }
                     ToolbarSpacer(.fixed, placement: .topBarTrailing)
                     ToolbarItemGroup(placement: .topBarTrailing) {
@@ -395,6 +405,15 @@ struct BookshelfView: View {
                     }
                 }
             }
+        }
+        .alert("Read a link", isPresented: $readingLink) {
+            TextField("https://", text: $link)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            Button("Read it") { Task { await library.readPage(link) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The page is fetched and kept here, to read and to ask about.")
         }
         .alert("New shelf", isPresented: $namingShelf) {
             TextField("Name", text: $newShelfName)

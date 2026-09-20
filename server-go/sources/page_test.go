@@ -48,6 +48,11 @@ func TestAPageComesInAsItsArticle(t *testing.T) {
 			t.Errorf("the site's furniture came with it (%q):\n%s", unwanted, p.Markdown)
 		}
 	}
+	// The piece is titled where it is read, so the heading over it does
+	// not come twice.
+	if strings.HasPrefix(p.Markdown, "# Prompt injection in 2026") {
+		t.Errorf("the article carries its own title:\n%s", p.Markdown[:80])
+	}
 	if len(p.Images) != 1 || p.Images[0] != host.URL+"/static/2026/trifecta.png" {
 		t.Errorf("pictures = %v", p.Images)
 	}
@@ -82,6 +87,33 @@ func TestAPageWithoutAnArticleIsStillRead(t *testing.T) {
 	}
 	if strings.Contains(p.Markdown, "The Fly Blog") {
 		t.Errorf("the site's masthead came with it:\n%s", p.Markdown)
+	}
+}
+
+// Some sites head the piece with an h2, or repeat the title inside the
+// article. Whatever level it is written at, the title is not part of the
+// body.
+func TestAnArticlesOwnTitleIsNotPartOfIt(t *testing.T) {
+	const post = `<html><head><meta property="og:title" content="Generating running routes"></head><body>
+<div class="entry">
+  <h2>Generating running routes</h2>
+  <p>Here is a neat thing I had the model do this morning, which took it
+  twenty seven minutes and came back as a map and a GPX file.</p>
+  <p>The route it found loops from the house and comes back along the harbour.</p>
+</div></body></html>`
+	host := fakeHost(t, map[string]string{"/routes/": post})
+	p, err := client(t).Page(context.Background(), host.URL+"/routes/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Title != "Generating running routes" {
+		t.Fatalf("title = %q", p.Title)
+	}
+	if strings.Contains(p.Markdown, "# Generating running routes") {
+		t.Errorf("the title is in the body as well:\n%s", p.Markdown)
+	}
+	if !strings.Contains(p.Markdown, "loops from the house") {
+		t.Errorf("the body is missing:\n%s", p.Markdown)
 	}
 }
 
