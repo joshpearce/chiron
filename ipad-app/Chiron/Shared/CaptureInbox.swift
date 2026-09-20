@@ -13,6 +13,18 @@ struct Capture: Codable, Identifiable, Equatable {
     var pdfFile: String?
 
     var isEmpty: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imagePNG == nil && pdfFile == nil }
+
+    /// The page this capture is of, where there is one: the page it was
+    /// shared from, or an address sent on its own - which is what a link
+    /// copied out of a browser and sent to Chiron looks like.
+    var link: String? {
+        if let url = sourceURL, !url.isEmpty { return url }
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.contains(where: \.isWhitespace), let url = URL(string: text),
+              let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+              url.host != nil else { return nil }
+        return text
+    }
 }
 
 /// The hand-off between the share extension and the app. Extensions run in

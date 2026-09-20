@@ -386,7 +386,7 @@ enum AppCommands {
             "build_offered": library.availableBuild?.label ?? "",
             "requests_card": library.requestsShown,
             "capture_answer": library.captureAnswer ?? "",
-            "shelf_rows": library.subjects.map { ["id": $0.id, "kind": $0.kind ?? "book", "status": $0.status ?? "", "scale": $0.scale ?? "", "progress": $0.progress ?? "", "shelf": $0.shelf ?? ""] },
+            "shelf_rows": library.subjects.map { ["id": $0.id, "kind": $0.kind ?? "book", "status": $0.status ?? "", "scale": $0.scale ?? "", "progress": $0.progress ?? "", "shelf": $0.shelf ?? "", "unread": $0.unread ?? 0] },
             "shelves": library.shelves.map { ["id": $0.id, "name": $0.name, "subjects": $0.subjects] },
             "open_shelf": library.shelfPath.last ?? "",
             "shelf_error": library.shelfError ?? "",

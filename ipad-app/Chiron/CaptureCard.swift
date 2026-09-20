@@ -38,7 +38,7 @@ struct CaptureCard: View {
                 }
                 // A whole page was shared, not a passage from one: the
                 // question worth asking is usually of the page itself.
-                if let url = capture.sourceURL, library.captureAnswer == nil {
+                if let url = capture.link, library.captureAnswer == nil {
                     Section {
                         Button {
                             Task { await library.readPage(url) }
@@ -46,8 +46,14 @@ struct CaptureCard: View {
                             Label("Read it in Chiron", systemImage: "book")
                         }
                         .disabled(sending)
+                        Button {
+                            Task { await library.followFeed(url) }
+                        } label: {
+                            Label("Follow this blog", systemImage: "dot.radiowaves.up.forward")
+                        }
+                        .disabled(sending)
                     } footer: {
-                        Text("The page goes on the shelf, to read here and highlight as you go.")
+                        Text("A page goes on the shelf to read and highlight. A feed is followed: its posts arrive as chapters.")
                     }
                 }
                 Section {

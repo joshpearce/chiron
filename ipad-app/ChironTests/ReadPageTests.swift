@@ -51,6 +51,18 @@ final class ReadPageTests: XCTestCase {
         XCTAssertNil(library.captureAnswer)
     }
 
+    /// A link sent on its own - copied out of a browser, sent through the
+    /// Mac's Services menu - is a page to read, though nothing said so.
+    func testALinkSentAsTextIsStillALink() {
+        XCTAssertEqual(Capture(text: "https://simonwillison.net/2026/Sep/20/injection/").link,
+                       "https://simonwillison.net/2026/Sep/20/injection/")
+        XCTAssertEqual(Capture(text: "  https://fly.io/blog/  ").link, "https://fly.io/blog/")
+        XCTAssertNil(Capture(text: "a sentence about https://fly.io/blog/ in passing").link)
+        XCTAssertNil(Capture(text: "not a link at all").link)
+        XCTAssertEqual(Capture(text: "some words", sourceURL: "https://fly.io/blog/sprites/").link,
+                       "https://fly.io/blog/sprites/")
+    }
+
     /// A link that is not a page to read leaves the shelf as it was and
     /// says why.
     func testALinkThatCannotBeReadSaysSo() async {
