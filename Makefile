@@ -65,15 +65,18 @@ app-build:
 # The development agent (SPRITE-DEV-PLAN.md phase G) as a service: it
 # needs the toolchain and claude on its PATH, and runs as the sprite user
 # whose Claude Code login and MacBook key it uses.
+# Claude Code on the sprite signs in with the same token the book server
+# holds (its login of its own expires); the token is read from the
+# server's service definition here and never printed. The service is
+# recreated each time, so a token change reaches it.
 AGENT_PATH := /.sprite/bin:/home/sprite/go/bin:/home/sprite/.local/bin:/usr/local/bin:/usr/bin:/bin
 deploy-agent:
 	$(GO) build -ldflags="-s -w" -o $(SERVED)/bin/chiron-dev-agent ./cmd/chiron-dev-agent
-	@if sprite-env services list | grep -q '"chiron-dev-agent"'; then \
-	  sprite-env services restart chiron-dev-agent; \
-	else \
-	  sprite-env services create chiron-dev-agent --cmd $(SERVED)/bin/chiron-dev-agent \
-	    --args "-repo,/home/sprite/src/chiron,-served,$(SERVED)" \
-	    --env "PATH=$(AGENT_PATH),HOME=/home/sprite"; \
-	fi
+	@token=$$(sprite-env services list | python3 -c 'import json,sys; print(next(s["env"].get("ANTHROPIC_AUTH_TOKEN","") for s in json.load(sys.stdin) if s["name"]=="chiron-server"))'); \
+	[ -n "$$token" ] || { echo "chiron-server carries no ANTHROPIC_AUTH_TOKEN" >&2; exit 1; }; \
+	sprite-env services list | grep -q '"chiron-dev-agent"' && sprite-env services delete chiron-dev-agent >/dev/null; \
+	sprite-env services create chiron-dev-agent --cmd $(SERVED)/bin/chiron-dev-agent \
+	  --args "-repo,/home/sprite/src/chiron,-served,$(SERVED)" \
+	  --env "PATH=$(AGENT_PATH),HOME=/home/sprite,ANTHROPIC_AUTH_TOKEN=$$token" >/dev/null
 	sleep 2
 	@tail -3 /.sprite/logs/services/chiron-dev-agent.log
