@@ -6,7 +6,7 @@ GO      := cd server-go && go
 SERVED  := /home/sprite/chiron
 BIN     := $(SERVED)/bin/chiron-server
 
-.PHONY: test lint deploy deploy-gate app-build
+.PHONY: test lint deploy deploy-gate deploy-agent app-build
 
 # On the sprite (which also serves the book, on 8 GB) the suite runs two
 # packages at a time and without browser renders, so a test run never
@@ -28,6 +28,9 @@ deploy: test
 	$(GO) build -ldflags="-s -w" -o $(BIN).new ./cmd/chiron-server
 	[ -f $(BIN) ] && cp $(BIN) $(BIN).$$(date +%b%d | tr A-Z a-z) || true
 	mv $(BIN).new $(BIN)
+	# The development agent's binary goes with it; its service picks the
+	# new one up on its next restart (make deploy-agent), never mid-request.
+	$(GO) build -ldflags="-s -w" -o $(SERVED)/bin/chiron-dev-agent ./cmd/chiron-dev-agent
 	# The served corpus is a copy, not the checkout: the files the server
 	# reads at build time (the authoring contract, the source index) go
 	# with the binary. Unit files stay: they are the live book.
@@ -58,3 +61,19 @@ app-build:
 	  for f in build.json manifest.plist Chiron.ipa Chiron-mac.zip build.log; do ssh macbook fetch $$id $$f > $$dir/$$f; done && \
 	  ln -sfn $$token $(SERVED)/builds/latest && \
 	  python3 -c 'import json,sys; b=json.load(open(sys.argv[1])); print("build", b["id"], b["status"], b["version"], "(%d)" % b["build"], "tests", b["tests"])' $$dir/build.json
+
+# The development agent (SPRITE-DEV-PLAN.md phase G) as a service: it
+# needs the toolchain and claude on its PATH, and runs as the sprite user
+# whose Claude Code login and MacBook key it uses.
+AGENT_PATH := /.sprite/bin:/home/sprite/go/bin:/home/sprite/.local/bin:/usr/local/bin:/usr/bin:/bin
+deploy-agent:
+	$(GO) build -ldflags="-s -w" -o $(SERVED)/bin/chiron-dev-agent ./cmd/chiron-dev-agent
+	@if sprite-env services list | grep -q '"chiron-dev-agent"'; then \
+	  sprite-env services restart chiron-dev-agent; \
+	else \
+	  sprite-env services create chiron-dev-agent --cmd $(SERVED)/bin/chiron-dev-agent \
+	    --args "-repo,/home/sprite/src/chiron,-served,$(SERVED)" \
+	    --env "PATH=$(AGENT_PATH),HOME=/home/sprite"; \
+	fi
+	sleep 2
+	@tail -3 /.sprite/logs/services/chiron-dev-agent.log
