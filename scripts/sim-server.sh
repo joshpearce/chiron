@@ -69,7 +69,7 @@ sed -e "s|corpus_dir: ../corpus|corpus_dir: $ROOT/corpus|" \
     "$ROOT/server/config.yaml" > "$CONF"
 # Everything the server keeps beside its subjects, under the same
 # throwaway dir rather than beside /tmp.
-printf 'primers_dir: %s\nreadings_dir: %s\nbuilds_dir: %s\n' "$STATE/state/primers" "$STATE/state/readings" "$STATE/builds" >> "$CONF"
+printf 'primers_dir: %s\nreadings_dir: %s\nrequests_dir: %s\nbuilds_dir: %s\n' "$STATE/state/primers" "$STATE/state/readings" "$STATE/state/requests" "$STATE/builds" >> "$CONF"
 
 (cd "$ROOT/server-go" && go build -o "$STATE/chiron-server" ./cmd/chiron-server)
 

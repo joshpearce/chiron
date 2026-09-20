@@ -18,7 +18,7 @@ func TestAChangeRequestIsQueuedAndListed(t *testing.T) {
 
 	png := base64.StdEncoding.EncodeToString([]byte("PNG"))
 	w := do(t, s, "POST", "/dev/requests", `{"text":"the pen is too thin","state":{"screen":"reading","unit":"u3"},"screenshot_png_b64":"`+png+`"}`, "sekrit")
-	if w.Code != 201 {
+	if w.Code != 200 {
 		t.Fatalf("create: %d %s", w.Code, w.Body)
 	}
 	var r devreq.Request

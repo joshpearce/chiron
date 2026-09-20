@@ -795,3 +795,32 @@ struct AppBuild: Codable, Equatable {
 
     var label: String { "Chiron \(version) (\(build))" }
 }
+
+/// A change asked of the development agent on the sprite, and what it
+/// has done about it so far (SPRITE-DEV-PLAN.md phase G).
+struct ChangeRequest: Codable, Identifiable, Equatable {
+    var id: String
+    var text: String
+    var status: String
+    var createdAt: String
+    var log: [String]
+    var last: String?
+    var summary: String?
+    var reason: String?
+    var commit: String?
+    var build: Build?
+
+    struct Build: Codable, Equatable {
+        var version: String
+        var build: Int
+        var token: String
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, text, status, log, last, summary, reason, commit, build
+        case createdAt = "created_at"
+    }
+
+    /// Still in the agent's hands.
+    var open: Bool { status != "ready" && status != "failed" }
+}

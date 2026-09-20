@@ -13,6 +13,7 @@ final class Library: ObservableObject {
     /// where there is no server.
     private(set) lazy var bookAssets = BookAssets(service: service, storage: storage)
     @Published var shellShown = false
+    @Published var requestsShown = false
     /// The "set up another device" code, on screen.
     @Published var deviceSetupShown = false
     /// The shelves of the library, and the one open (a path of one id).
@@ -71,6 +72,36 @@ final class Library: ObservableObject {
         self.service = service ?? sync
         agent.attach(self)
         loadShelfCache()
+    }
+
+    /// Change requests, newest first, as the server last told them.
+    @Published var requests: [ChangeRequest] = []
+    @Published var requestError: String?
+
+    /// Ask the agent on the sprite for a change, with where the reader is
+    /// (the harness state and, if wanted, a screenshot) so it can see what
+    /// was meant. Returns the queued request, or nil with requestError set.
+    @discardableResult
+    func requestChange(_ text: String, withPicture: Bool) async -> ChangeRequest? {
+        var state: [String: Any] = [:]
+        var png: Data?
+        #if DEBUG
+        state = AppCommands.state(self).filter { JSONSerialization.isValidJSONObject([$0.key: $0.value]) }
+        if withPicture { png = try? AppCommands.screenshot() }
+        #endif
+        do {
+            let r = try await service.requestChange(text: text, state: state, screenshotPNG: png)
+            requestError = nil
+            await refreshRequests()
+            return r
+        } catch {
+            requestError = "The sprite did not take the request. Try again."
+            return nil
+        }
+    }
+
+    func refreshRequests() async {
+        if let list = try? await service.changeRequests() { requests = list }
     }
 
     /// Ask the server for its latest build and offer it if it is newer

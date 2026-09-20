@@ -64,6 +64,36 @@ final class LibraryTests: XCTestCase {
         XCTAssertNil(library.availableBuild, "a failed build is not offered")
     }
 
+    /// "Request a change": the words go up with where the reader was (the
+    /// harness state and a screenshot), the request comes back queued
+    /// and joins the list, and the list is what the server says it is.
+    func testAChangeRequestGoesUpWithWhereTheReaderWas() async throws {
+        let fake = FakeService()
+        fake.onSubjects = { [unowned self] in self.subjects("ready") }
+        fake.onRequestChange = { text, state, png in
+            ChangeRequest(id: "req-1", text: text, status: "queued", createdAt: "2026-09-20T10:00:00Z", log: [], last: nil, summary: nil, reason: nil, commit: nil, build: nil)
+        }
+        fake.onChangeRequests = { [ChangeRequest(id: "req-1", text: "the pen is too thin", status: "working", createdAt: "2026-09-20T10:00:00Z", log: ["working on req/req-1"], last: "working on req/req-1", summary: nil, reason: nil, commit: nil, build: nil)] }
+        let library = library(fake)
+        await library.launch()
+        let sent = await library.requestChange("the pen is too thin", withPicture: true)
+        XCTAssertEqual(sent?.id, "req-1")
+        XCTAssertEqual(fake.requests.count, 1)
+        XCTAssertEqual(fake.requests[0].text, "the pen is too thin")
+        XCTAssertEqual(fake.requests[0].state["screen"] as? String, "bookshelf", "the harness state travels")
+        XCTAssertNotNil(fake.requests[0].png, "and a screenshot")
+        XCTAssertEqual(library.requests.first?.status, "working", "the list is refreshed after sending")
+        XCTAssertNil(library.requestError)
+
+        _ = await library.requestChange("no picture", withPicture: false)
+        XCTAssertNil(fake.requests[1].png)
+
+        fake.onRequestChange = { _, _, _ in throw URLError(.cannotConnectToHost) }
+        let lost = await library.requestChange("lost", withPicture: false)
+        XCTAssertNil(lost)
+        XCTAssertNotNil(library.requestError)
+    }
+
     /// Launch lands on the shelf: the active book is known, and its card
     /// says so, but the book is not opened for the reader.
     func testLaunchStaysOnTheShelf() async throws {

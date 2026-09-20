@@ -79,6 +79,10 @@ struct ContentView: View {
         // Without this the stack shrinks to its content and the badge drifts
         // into the middle of the page on short screens.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $library.requestsShown) {
+            RequestsCard()
+                .environmentObject(library)
+        }
         .sheet(isPresented: $library.shellShown) {
             ShellView(shell: library.shell)
                 .environmentObject(library)
@@ -226,6 +230,7 @@ struct BookView: View {
                     }
                     .keyboardShortcut("c", modifiers: [.command, .shift])
                     .accessibilityLabel("Contents")
+                    RequestButton()
                     ShellButton()
                 }
                 // A book read as it is turns pages: it has no check at the
@@ -370,6 +375,7 @@ struct BookshelfView: View {
                         Button {
                             showSettings = true
                         } label: { Label("Server", systemImage: "gearshape") }
+                        RequestButton()
                         ShellButton()
                     }
                 }

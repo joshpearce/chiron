@@ -172,6 +172,18 @@ enum AppCommands {
             let c = Capture(text: args["text"] as? String ?? "", sourceURL: args["url"] as? String, sourceApp: args["app"] as? String)
             try CaptureInbox.write(c)
             library.receiveCapture(id: c.id)
+        case "request":
+            // "Request a change", as the card sends it.
+            guard let text = args["text"] as? String else { throw Failure.badArguments("request needs text") }
+            guard let r = await library.requestChange(text, withPicture: args["picture"] as? Bool ?? true) else {
+                throw Failure.badArguments(library.requestError ?? "the request was not taken")
+            }
+            return ["id": r.id, "status": r.status]
+        case "requests/card":
+            library.requestsShown = args["open"] as? Bool ?? true
+        case "requests":
+            await library.refreshRequests()
+            return ["requests": library.requests.map { ["id": $0.id, "status": $0.status, "last": $0.last ?? "", "summary": $0.summary ?? ""] }]
         case "capture/close":
             library.pendingCapture = nil
             library.captureAnswer = nil
@@ -352,6 +364,7 @@ enum AppCommands {
             "agent": library.agent.connected,
             "capture_card": library.pendingCapture != nil,
             "build_offered": library.availableBuild?.label ?? "",
+            "requests_card": library.requestsShown,
             "capture_answer": library.captureAnswer ?? "",
             "shelf_rows": library.subjects.map { ["id": $0.id, "kind": $0.kind ?? "book", "status": $0.status ?? "", "scale": $0.scale ?? "", "progress": $0.progress ?? "", "shelf": $0.shelf ?? ""] },
             "shelves": library.shelves.map { ["id": $0.id, "name": $0.name, "subjects": $0.subjects] },

@@ -37,6 +37,8 @@ protocol ChironService: AnyObject {
     func documentInk(id: String) async throws -> [Int: PageInk]
     func putDocumentInk(id: String, page: Int, inkB64: String, baseVersion: Int) async throws -> PageInkPut
     func latestBuild() async throws -> AppBuild
+    func requestChange(text: String, state: [String: Any], screenshotPNG: Data?) async throws -> ChangeRequest
+    func changeRequests() async throws -> [ChangeRequest]
 }
 
 enum ServiceError: Error {
@@ -296,6 +298,17 @@ final class Sync: ObservableObject, ChironService {
     /// The build of the app the MacBook made last (SPRITE-DEV-PLAN.md phase F).
     func latestBuild() async throws -> AppBuild {
         try await get("/builds/latest", timeout: 10)
+    }
+
+    /// "Request a change": the words, where the reader was, and a picture.
+    func requestChange(text: String, state: [String: Any], screenshotPNG: Data?) async throws -> ChangeRequest {
+        var body: [String: Any] = ["text": text, "state": state]
+        if let png = screenshotPNG { body["screenshot_png_b64"] = png.base64EncodedString() }
+        return try await post("/dev/requests", body: try JSONSerialization.data(withJSONObject: body), timeout: 30)
+    }
+
+    func changeRequests() async throws -> [ChangeRequest] {
+        try await get("/dev/requests", timeout: 10)
     }
 
     func documentPosition(id: String, page: Int, position: Double) async throws {

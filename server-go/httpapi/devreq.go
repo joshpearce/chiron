@@ -44,7 +44,7 @@ func (s *Server) handleRequestCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "%v", err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, req)
+	writeJSON(w, http.StatusOK, req)
 }
 
 // GET /dev/requests

@@ -44,6 +44,7 @@
 		8A971C981578FB0592F8EA57 /* ShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ECBF91310F511343F4FFC57 /* ShellView.swift */; };
 		8B7415A0D57A05F203D74AE1 /* book.js in Resources */ = {isa = PBXBuildFile; fileRef = 756BF2C5D73A3EFF3BD5C55C /* book.js */; };
 		8C8562A01FFD05DE4D17DD2A /* default-book.json in Resources */ = {isa = PBXBuildFile; fileRef = 4424A63E2C94C4589C4B5A8F /* default-book.json */; };
+		8DBC4439860128C4F39E904F /* RequestsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02F70F0D208B290BE4DC72D2 /* RequestsCard.swift */; };
 		8DBD6D9E13F6B6B1E994DA96 /* fonts in Resources */ = {isa = PBXBuildFile; fileRef = F6474556AF056C444945956F /* fonts */; };
 		8E16A76DB235B59A1982B1C2 /* ConflictCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C60EC85CD36F118C2E61802 /* ConflictCard.swift */; };
 		8E8AC42551FB3E1F452CC803 /* BookAssetsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4016FD1AF1BA6E50155B8765 /* BookAssetsTests.swift */; };
@@ -123,6 +124,7 @@
 
 /* Begin PBXFileReference section */
 		02CFD8848E081585E3567328 /* AppCommandsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommandsTests.swift; sourceTree = "<group>"; };
+		02F70F0D208B290BE4DC72D2 /* RequestsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestsCard.swift; sourceTree = "<group>"; };
 		09BB0CC993F9898C0640FD10 /* Palette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Palette.swift; sourceTree = "<group>"; };
 		0C60EC85CD36F118C2E61802 /* ConflictCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictCard.swift; sourceTree = "<group>"; };
 		0F7D0A3E7087398F8D4FC327 /* DocumentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentView.swift; sourceTree = "<group>"; };
@@ -259,6 +261,7 @@
 				34A9FA4F8B8DAA26FA36F1D4 /* PlacementView.swift */,
 				8CA421A578F067BB18B014B8 /* PlanCard.swift */,
 				8BD571F77D5FE9104A4A17F3 /* ReaderView.swift */,
+				02F70F0D208B290BE4DC72D2 /* RequestsCard.swift */,
 				79FB25B2A0E99E8DF4A73477 /* ResultsView.swift */,
 				87AA842BA32080A6287EB9A6 /* SelfTest.swift */,
 				EF594A6B2BBA592AD908C66A /* ServerLink.swift */,
@@ -545,6 +548,7 @@
 				EA6D6DFB6801ED51ECF51D49 /* PlacementView.swift in Sources */,
 				3769CB216DED3B8C1AC9C861 /* PlanCard.swift in Sources */,
 				B512708502B49BDBA48396AE /* ReaderView.swift in Sources */,
+				8DBC4439860128C4F39E904F /* RequestsCard.swift in Sources */,
 				F05899EFFD330B9C8D2E40DE /* ResultsView.swift in Sources */,
 				5C223EEF7AE0AF48A9942AE5 /* SelfTest.swift in Sources */,
 				5C5177486F73797B65AEC2F6 /* ServerLink.swift in Sources */,

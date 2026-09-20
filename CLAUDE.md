@@ -34,6 +34,13 @@ You are on the machine that serves the book. Facts that matter:
   `curl -fsSL https://claude.ai/install.sh | bash` instead.
 - Never push to GitHub unless Matt asks in the conversation, even though
   the credential here allows it.
+- `chiron-dev-agent` (a service; `make deploy-agent`) takes change
+  requests the app sends (`state/requests/`) and runs Claude Code on them
+  in a worktree under `~/src/work`, then `make test`, fast-forwards
+  `main`, `make deploy` if the server changed, `make app-build` if the
+  app did. Matt's tap on "Request a change" is the permission for that
+  deploy. A failed request keeps its worktree for a person; `git
+  worktree list` shows them.
 
 ## Everywhere
 
