@@ -134,6 +134,7 @@ struct BookView: View {
             get: { !sidebar && session.contentsShown },
             set: { session.contentsShown = $0 })) {
             ContentsView()
+                .environmentObject(session)
         }
         .sheet(item: $session.conflict) { c in
             ConflictCard(conflict: c)
@@ -325,7 +326,7 @@ struct BuildBanner: View {
 
 struct BookshelfView: View {
     @EnvironmentObject var library: Library
-    @State private var showSettings = false
+
     @State private var namingShelf = false
     @State private var importingPDF = false
     @State private var newShelfName = ""
@@ -383,7 +384,7 @@ struct BookshelfView: View {
                             Task { await library.refresh() }
                         } label: { Label("Refresh the library", systemImage: "arrow.clockwise") }
                         Button {
-                            showSettings = true
+                            library.settingsShown = true
                         } label: { Label("Server", systemImage: "gearshape") }
                         RequestButton()
                         ShellButton()
@@ -394,7 +395,14 @@ struct BookshelfView: View {
                 }
         }
         .task { await library.refresh() }
-        .sheet(isPresented: $showSettings) { ConnectionSettings(store: library.sync.servers) }
+        // Every sheet carries the objects its view asks the environment
+        // for. A sheet is its own presentation, and on the Mac its own
+        // window: what the presenting view holds does not reach it, and a
+        // view that asks for what is not there stops the app.
+        .sheet(isPresented: $library.settingsShown) {
+            ConnectionSettings(store: library.sync.servers)
+                .environmentObject(library)
+        }
         .fileImporter(isPresented: $importingPDF, allowedContentTypes: [.pdf, .epub]) { result in
             if case .success(let url) = result {
                 Task {
@@ -555,6 +563,7 @@ struct ConnectionSettings: View {
         }
         .sheet(isPresented: $settingUp) {
             DeviceSetupView()
+                .environmentObject(library)
         }
     }
 

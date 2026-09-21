@@ -59,6 +59,7 @@ struct ReaderContainer: View {
             set: { if !$0 { session.closeAsking() } })) {
             AskCard(sheet: true)
                 .environmentObject(session)
+                .environmentObject(session)
                 .presentationDetents([.medium, .large])
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }

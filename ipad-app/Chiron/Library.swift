@@ -16,6 +16,7 @@ final class Library: ObservableObject {
     @Published var requestsShown = false
     /// The "set up another device" code, on screen.
     @Published var deviceSetupShown = false
+    @Published var settingsShown = false
     /// The shelves of the library, and the one open (a path of one id).
     @Published var shelves: [ShelfInfo] = []
     @Published var shelfPath: [String] = []

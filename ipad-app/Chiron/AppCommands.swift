@@ -83,6 +83,8 @@ enum AppCommands {
                 throw Failure.badArguments("server/url needs a chiron://server?url=... link")
             }
             await library.adopt(link)
+        case "settings":
+            library.settingsShown = args["open"] as? Bool ?? true
         case "server/setup":
             library.deviceSetupShown = args["shown"] as? Bool ?? true
         case "shelf/create":
@@ -385,6 +387,7 @@ enum AppCommands {
             "capture_card": library.pendingCapture != nil,
             "build_offered": library.availableBuild?.label ?? "",
             "requests_card": library.requestsShown,
+            "settings_card": library.settingsShown,
             "capture_answer": library.captureAnswer ?? "",
             "shelf_rows": library.subjects.map { ["id": $0.id, "kind": $0.kind ?? "book", "status": $0.status ?? "", "scale": $0.scale ?? "", "progress": $0.progress ?? "", "shelf": $0.shelf ?? "", "unread": $0.unread ?? 0] },
             "shelves": library.shelves.map { ["id": $0.id, "name": $0.name, "subjects": $0.subjects] },

@@ -424,3 +424,18 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   decoder refuses `<rss>` while expecting `<feed>`, and set
   `Strict = false` with a pass-through `CharsetReader`, since feeds in
   the wild declare encodings Go does not carry.
+- **A sheet is its own environment, and on the Mac its own window
+  (2026-09-21).** `ConnectionSettings` read `@EnvironmentObject var
+  library`, and the sheet that presents it never handed it one. On the
+  iPad that works - the sheet inherits the screen's environment - so it
+  went unnoticed for weeks; on Mac Catalyst the sheet is hosted
+  separately, the lookup fails, and SwiftUI traps: `EXC_BREAKPOINT` in
+  `EnvironmentObject.error()`, with nothing in the backtrace but the
+  view's own `body`. The gear icon killed the app on the Mac, and so
+  would the setup sheet inside it and the reader's contents. Every
+  presentation now hands over what its view asks for. The guard is
+  `ChironUITests/SheetsUITests`, which opens each sheet and asserts the
+  app is still running - and it only catches this **on Catalyst**:
+  `xcodebuild test -destination 'platform=macOS,variant=Mac Catalyst'
+  -only-testing:ChironUITests/SheetsUITests`. In the Simulator it passes
+  either way.
