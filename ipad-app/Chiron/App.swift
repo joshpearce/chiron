@@ -964,12 +964,13 @@ struct ShelfCard: View {
                     .disabled(subject.shelf == shelf.id)
                 }
             }
-            if subject.isFeed || subject.isReading {
+            if subject.isFeed || subject.isReading || subject.isPrimer {
                 Button(role: .destructive) {
                     Task { await library.forget(subject.id) }
                 } label: {
                     Label(subject.isFeed ? "Unfollow" : "Take off the shelf", systemImage: "trash")
                 }
+                .disabled(subject.authoring || subject.building)
             }
         }
     }

@@ -461,6 +461,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /primer/{subject}/plan", s.handlePrimerPlanTurn)
 	mux.HandleFunc("POST /primer/{subject}/build", s.handlePrimerBuild)
 	mux.HandleFunc("POST /primer/{subject}/discard", s.handlePrimerDiscard)
+	mux.HandleFunc("DELETE /primer/{subject}", s.handlePrimerDelete)
 	mux.HandleFunc("POST /primer/{subject}/extend", s.handlePrimerExtend)
 	mux.HandleFunc("POST /agent/pubkey", s.handleEnrolKey)
 	mux.HandleFunc("GET /agent/keys", s.handleListKeys)

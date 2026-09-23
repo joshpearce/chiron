@@ -129,6 +129,8 @@ final class FakeService: ChironService {
     }
     var forgotten: [String] = []
     func forgetReading(id: String) async throws { forgotten.append(id) }
+    var primersDeleted: [String] = []
+    func deletePrimer(id: String) async throws { primersDeleted.append(id) }
     var feedsFollowed: [String] = []
     var onFollowFeed: (String) throws -> ImportedBook = { _ in throw URLError(.cannotConnectToHost) }
     func followFeed(url: String) async throws -> ImportedBook {

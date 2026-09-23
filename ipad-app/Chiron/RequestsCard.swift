@@ -143,12 +143,8 @@ struct RequestRow: View {
             }
         }
         .padding(.vertical, 4)
-        .contextMenu {
-            Button {
-                UIPasteboard.general.string = [request.text, request.summary, request.last]
-                    .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n\n")
-            } label: { Label("Copy", systemImage: "doc.on.doc") }
-        }
+        // See PlanCard: a context menu here would swallow the long press
+        // that starts a selection.
         .accessibilityElement(children: .combine)
     }
 }

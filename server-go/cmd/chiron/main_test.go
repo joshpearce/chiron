@@ -40,6 +40,8 @@ func (f *fake) serve(w http.ResponseWriter, r *http.Request) {
 				{"id": "primer-why", "title": "Why?", "kind": "primer", "status": status, "scale": "primer", "progress": "writing"},
 			},
 		})
+	case r.Method == "DELETE" && strings.HasPrefix(r.URL.Path, "/primer/"):
+		json.NewEncoder(w).Encode(map[string]any{"subject": strings.TrimPrefix(r.URL.Path, "/primer/"), "deleted": true})
 	case r.URL.Path == "/readings/page":
 		json.NewEncoder(w).Encode(map[string]any{"id": "read-1", "title": "Prompt injection in 2026", "chapters": 1})
 	case r.URL.Path == "/feeds" && r.Method == "POST":
@@ -237,6 +239,21 @@ func TestAPageAndABlogGoOnTheShelfFromTheShell(t *testing.T) {
 		t.Errorf("asked %s %s", f.last.method, f.last.path)
 	}
 	if !strings.Contains(out, "2") {
+		t.Errorf("printed %q", out)
+	}
+}
+
+// A primer the reader is done with goes from the shell too.
+func TestAPrimerCanBeDeletedFromTheShell(t *testing.T) {
+	f, c := newFake(t)
+	out, err := run(c, "delete", []string{"primer-why"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.last.method != "DELETE" || f.last.path != "/primer/primer-why" {
+		t.Errorf("asked %s %s", f.last.method, f.last.path)
+	}
+	if !strings.Contains(out, "deleted") {
 		t.Errorf("printed %q", out)
 	}
 }

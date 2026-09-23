@@ -139,11 +139,9 @@ struct PlanCard: View {
                 .frame(maxWidth: .infinity, alignment: m.role == "learner" ? .trailing : .leading)
             if m.role != "learner" { Spacer(minLength: 60) }
         }
-        .contextMenu {
-            Button {
-                UIPasteboard.general.string = m.text
-            } label: { Label("Copy", systemImage: "doc.on.doc") }
-        }
+        // No .contextMenu here: its long press wins over the text view's
+        // own, and the text view's is the one that puts handles on the
+        // ends. Its menu carries Copy and Select All anyway.
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(m.role == "learner" ? "You" : "Tutor"): \(m.text)")
     }

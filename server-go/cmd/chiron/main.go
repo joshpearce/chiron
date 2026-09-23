@@ -36,6 +36,7 @@ const usage = `usage:
                                        write the primer or start the book, with the
                                        brief the plan settled on or the one given here
   chiron discard ID                    drop a draft
+  chiron delete ID                     take a primer off the shelf, written or not
   chiron status ID                     a draft's plan, a book job, or the shelf row
   chiron wait ID [-timeout D]          until ID is ready or failed; prints the row
   chiron read ID [-unit U]             the text of a primer, or of a book's unit
@@ -98,6 +99,8 @@ func run(c *client, cmd string, args []string, stdin io.Reader) (string, error) 
 		return c.build(args)
 	case "discard":
 		return c.discard(args)
+	case "delete":
+		return c.delete(args)
 	case "status":
 		return c.status(args)
 	case "wait":
@@ -392,6 +395,20 @@ func (c *client) discard(args []string) (string, error) {
 // status: the shelf decides what the id is. A draft shows its plan, a
 // book being generated its job, anything else its row; the shelf is asked
 // first so a wrong guess does not log a miss on the server.
+// delete takes a primer off the shelf for good.
+func (c *client) delete(args []string) (string, error) {
+	fs := flags("delete", args)
+	id, err := idOf(fs, args)
+	if err != nil {
+		return "", err
+	}
+	var out json.RawMessage
+	if err := c.call("DELETE", "/primer/"+id, nil, &out); err != nil {
+		return "", err
+	}
+	return pretty(out), nil
+}
+
 func (c *client) status(args []string) (string, error) {
 	fs := flags("status", args)
 	id, err := idOf(fs, args)

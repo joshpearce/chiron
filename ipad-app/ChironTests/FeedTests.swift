@@ -132,3 +132,25 @@ final class FeedTests: XCTestCase {
         XCTAssertNotNil(library.shelfError)
     }
 }
+
+/// A primer that missed the point goes off the shelf the same way a blog
+/// does, but through the route that takes primers.
+@MainActor
+final class ForgetPrimerTests: XCTestCase {
+    func testAFinishedPrimerIsDeletedThroughThePrimerRoute() async {
+        let fake = FakeService()
+        var rows = [SubjectInfo(id: "primer-x", title: "A primer", kind: "primer", status: "ready")]
+        fake.onSubjects = { SubjectsResponse(subjects: rows, active: nil, shelves: []) }
+        let library = Library(storage: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString),
+                              service: fake)
+        await library.refresh()
+
+        rows = []
+        await library.forget("primer-x")
+
+        XCTAssertEqual(fake.primersDeleted, ["primer-x"])
+        XCTAssertTrue(fake.forgotten.isEmpty, "a primer is not a reading")
+        XCTAssertTrue(library.subjects.isEmpty)
+        XCTAssertNil(library.shelfError)
+    }
+}

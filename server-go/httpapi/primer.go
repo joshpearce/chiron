@@ -485,6 +485,29 @@ func (s *Server) uniqueSlug(base string) string {
 }
 
 // A draft the reader does not want after all.
+// handlePrimerDelete takes a primer off the shelf for good: the written
+// one as well as the draft. Discard only ever took drafts, which left a
+// primer that missed the point with nowhere to go.
+func (s *Server) handlePrimerDelete(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("subject")
+	s.primersMu.Lock()
+	m := s.primers[id]
+	s.primersMu.Unlock()
+	if m == nil {
+		writeError(w, http.StatusNotFound, "no primer %q", id)
+		return
+	}
+	if m.Status == primer.StatusBuilding {
+		writeError(w, http.StatusConflict, "%q is being built; it can go when that is done", id)
+		return
+	}
+	s.mu.Lock()
+	delete(s.subjects, id)
+	s.mu.Unlock()
+	s.dropDraft(m)
+	writeJSON(w, http.StatusOK, map[string]any{"subject": id, "deleted": true})
+}
+
 func (s *Server) handlePrimerDiscard(w http.ResponseWriter, r *http.Request) {
 	m, ok := s.draft(r.PathValue("subject"))
 	if !ok {

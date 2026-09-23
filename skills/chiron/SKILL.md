@@ -17,6 +17,7 @@ chiron capture -scale S -prompt Q [-title T] [-url U] [-app A] [-text T | -file 
 chiron plan ID [-say TEXT]            the planning conversation of a draft
 chiron build ID [-brief B | -brief-file F]
 chiron discard ID                     drop a draft (only drafts)
+chiron delete ID                      take a primer off the shelf, written or not
 chiron status ID                      plan, job, or shelf row as JSON
 chiron wait ID [-timeout D]           until ready or failed; prints the row
 chiron read ID [-unit U]              the text of a primer or a book unit

@@ -40,6 +40,8 @@ protocol ChironService: AnyObject {
     func markRead(subject: String, unit: String) async throws
     /// Take an imported book, a page or a followed blog off the shelf.
     func forgetReading(id: String) async throws
+    /// Take a primer off the shelf, written or still a draft.
+    func deletePrimer(id: String) async throws
     /// One of an imported book's pictures, as bytes.
     func bookAsset(subject: String, name: String) async throws -> Data
     func documentData(id: String) async throws -> Data
@@ -325,6 +327,13 @@ final class Sync: ObservableObject, ChironService {
 
     func forgetReading(id: String) async throws {
         var req = try request("/readings/\(id)", timeout: 60)
+        req.httpMethod = "DELETE"
+        let (_, resp) = try await URLSession.shared.data(for: req)
+        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+    }
+
+    func deletePrimer(id: String) async throws {
+        var req = try request("/primer/\(id)", timeout: 60)
         req.httpMethod = "DELETE"
         let (_, resp) = try await URLSession.shared.data(for: req)
         guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }

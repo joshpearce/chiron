@@ -594,9 +594,15 @@ final class Library: ObservableObject {
     /// book no longer wanted. What the reader wrote on it goes with it.
     func forget(_ id: String) async {
         if session?.subjectID == id { closeBook() }
+        if planning?.id == id { planning = nil }
         sessions[id] = nil
+        let primer = subjects.first(where: { $0.id == id })?.isPrimer == true
         do {
-            try await service.forgetReading(id: id)
+            if primer {
+                try await service.deletePrimer(id: id)
+            } else {
+                try await service.forgetReading(id: id)
+            }
             shelfError = nil
         } catch {
             shelfError = "That could not be taken off the shelf: \(error.localizedDescription)"
