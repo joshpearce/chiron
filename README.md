@@ -1,16 +1,51 @@
 # Chiron
 
-An adaptive textbook. You read a chapter, work the exercises inside it, take a
-comprehension check, and the next chapter is written for the learner the check
-says you are.
+Chiron is an adaptive textbook that teaches from whatever you want to learn
+about. It writes books and primers to order, reads the things you already
+wanted to read - imported EPUBs, PDFs, web pages, blogs you follow - and keeps
+all of it on one shelf. The point of putting them together is the highlight: a
+passage you mark in anything on that shelf reaches the tutor with the whole
+chapter behind it, so the answer is about the argument you are reading rather
+than a sentence torn out of it. What it writes for you is shaped by what you
+have read and answered, which it remembers.
 
-The first subject teaches how large language models work, from next-token
-prediction to mixture-of-experts, with the real equations. It was built to be
-read on a plane, offline, in one sitting.
+A server holds the material and the learner record; apps for iPad, iPhone and
+the Mac read from it and sync, so a chapter you mark up on one device is marked
+up on the others. Reading works with the server out of reach, and on recent
+Apple hardware a question asked offline is answered by the on-device model from
+the chapter alone rather than not at all.
 
 <p align="center">
   <img src="ipad-app/Chiron/Assets.xcassets/Logo.imageset/logo.png" width="180" alt="">
 </p>
+
+## What it looks like
+
+| | |
+|---|---|
+| <img src="docs/screenshots/library.png" alt="The library: two authored books, a followed blog with unread posts, and a web page saved to read"> | <img src="docs/screenshots/reading-a-page.png" alt="A web page read as a chapter, with the pen and highlight palette"> |
+| **The library.** Books it wrote, blogs followed by feed, pages and documents saved to read - all as cards on one shelf. | **A page read in Chiron.** Any URL comes in as its own article, with its code and pictures kept, ready to highlight. |
+| <img src="docs/screenshots/capture.png" alt="The capture card: captured text, a question field, and how much to ask for"> | <img src="docs/screenshots/placement.png" alt="The placement screener that runs before a book begins"> |
+| **Capture.** Highlight anything, ask a question, and say how much you want back: a summary, more detail, a primer, or a whole book. A shared link can instead be read here or followed as a blog. | **Before a book begins.** A short screener places you, so the first chapter is written for the reader you actually are. |
+
+## How it works
+
+You feed it something - a passage, a file of notes, a link, a question - and
+say how much you want back. A **summary** or a bit more **detail** comes back
+in the card. A **primer** or a **book** goes through a short planning
+conversation first, then a brief, and then a model writes it; it lands on the
+shelf as real chapters with exercises and checks. Books are taught rather than
+just displayed: you read a chapter, work the beats inside it, take a
+cumulative check, and what comes next depends on how that went.
+
+Everything else on the shelf is read as it is, with nothing invented on top. An
+EPUB keeps its own chapters, a PDF its pages, a web page its article, a
+followed blog its posts - and all of them accept highlights, questions, and
+Pencil annotations that sync between devices.
+
+The same server can be driven from a shell (`chiron capture`, `chiron page`,
+`chiron follow`), which is how an agent does a piece of research and hands the
+result to the shelf.
 
 ## Why it is built this way
 
@@ -53,13 +88,14 @@ UI construction principles - each learned from a real failure - live in
 
 ```mermaid
 flowchart LR
-    subgraph iPad
+    subgraph Clients["iPad · iPhone · Mac"]
         R[Reader<br/>WKWebView + KaTeX]
-        C[Check UI<br/>confidence before reveal]
-        B[(Bundled offline book)]
+        C[Capture and checks<br/>confidence before reveal]
+        K[(kept on device:<br/>chapters, pictures, marks)]
+        D[on-device model<br/>when the server is away]
     end
-    subgraph Server["chiron-server (Go)"]
-        E[/exchange/]
+    subgraph Server["chiron-server (Go), on a Fly sprite"]
+        E[/exchange · capture · readings · feeds/]
         RO[grader / planner / author]
         ST[(event-sourced<br/>learner state)]
     end
@@ -71,27 +107,29 @@ flowchart LR
     R --> C --> E
     E --> RO --> ST
     RO --> L & CC & A
-    B -.->|nothing reachable| R
+    K -.-> R
+    D -.-> R
 ```
 
-Reading is fully detached. The app talks to the server only at a chapter
-boundary: everything that happened goes up in one request, and grades, the gate
-result, the next chapter and updated state come back. Three transports, in
-order of preference: Wi-Fi, a USB bridge through `usbmuxd`, and - if nothing is
-reachable at all - a book bundled into the app with the checks graded in
-JavaScript.
+Reading is detached by design. Chapters, their pictures and the reader's own
+marks are kept on the device, so a book opens and turns with no server at all;
+what happened goes up when there is one again. When a question is asked with
+the server out of reach, Apple's on-device model answers it from the chapter
+alone and says that is what it did.
 
 ## Layout
 
 | Path | What it is |
 |---|---|
-| `corpus/` | The authored subject: 11 units, each with canon, three depth variants, a question bank and unit-local misconceptions |
-| `server-go/` | The service. Nine packages, one static binary |
+| `corpus/`, `corpus-v2/` | Authored subjects: units with canon, three depth variants, a question bank and unit-local misconceptions |
+| `server-go/` | The service, and the `chiron` command that drives it from a shell. One static binary |
 | `server/` | The original Python implementation, kept as the reference the Go port was proven against |
-| `ipad-app/` | SwiftUI client, built with xcodegen |
-| `scripts/` | Flight-day runbook scripts and sprite deployment |
-| `FLIGHT.md` | Operational runbook and status |
-| `DESIGN-v2-sprite.md` | The hosted-tutor design and what is built |
+| `ipad-app/` | SwiftUI client for iPad, iPhone and the Mac (Catalyst), built with xcodegen |
+| `skills/chiron/` | The agent skill: how a coding agent sends work to the shelf and reads it back |
+| `scripts/` | Simulator and Mac test runners, dev servers, sprite deployment |
+| `IPAD-PLAN.md` | What the app does and what is planned, section by section |
+| `DESIGN-v2-sprite.md`, `SPRITE-DEV-PLAN.md` | The hosted-tutor design, and moving development onto the sprite |
+| `LESSONS.md` | Everything that cost more than ten minutes to learn, with the fix |
 
 ## Running it
 
@@ -103,8 +141,10 @@ cd ../server && ../bin/chiron-server -addr 0.0.0.0:8080 -config config.yaml
 # check the corpus
 go build -o ../bin/corpus-lint ./cmd/corpus-lint && ../bin/corpus-lint corpus
 
-# the app
+# the app: Simulator, or the same app on the Mac
 cd ipad-app && xcodegen generate && open Chiron.xcodeproj
+./scripts/sim-run.sh          # build, install and launch in the Simulator
+./scripts/mac-run.sh          # the same app as a Mac Catalyst build
 ```
 
 `server/config.yaml` picks the engine with `provider:` - omit it for an
@@ -176,5 +216,7 @@ equation, the flag that made a model discard its own work.
 
 ## Licence and credits
 
-Personal project, no licence granted yet. The centaur logo is a placeholder and
-is not cleared for redistribution. KaTeX is bundled under the MIT licence.
+Personal project; no licence is granted for reuse. **The centaur logo is a
+placeholder and is not cleared for redistribution.** KaTeX is bundled under the
+MIT licence; Source Sans and Source Serif under the SIL Open Font Licence, whose
+text is beside them in `assets/fonts/`.
