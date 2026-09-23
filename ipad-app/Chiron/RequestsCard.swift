@@ -120,8 +120,7 @@ struct RequestRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(request.text).font(Typography.sans(16, weight: .semibold))
-                    .textSelection(.enabled)
+                SelectableText(text: request.text, font: Typography.uiSans(16, weight: .semibold))
                 Spacer()
                 StatusPill(status: request.status)
             }
@@ -129,7 +128,7 @@ struct RequestRow: View {
                 Text(last).font(.callout).foregroundStyle(.secondary).lineLimit(3)
             }
             if let summary = request.summary, !summary.isEmpty, !request.open {
-                Text(summary).font(.callout).textSelection(.enabled)
+                SelectableText(text: summary, font: Typography.uiSans(15), colour: .secondaryLabel)
             }
             if let reason = request.reason, request.status == "failed" {
                 Text(reason).font(.footnote.monospaced()).foregroundStyle(.red).lineLimit(6)

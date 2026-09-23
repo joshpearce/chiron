@@ -84,8 +84,7 @@ struct PlanCard: View {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(4)
                             }
-                            Text(s.prompt).font(Typography.serif(17, weight: .semibold))
-                                .textSelection(.enabled)
+                            SelectableText(text: s.prompt, font: Typography.uiSerif(17, weight: .semibold))
                         }
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -96,8 +95,7 @@ struct PlanCard: View {
                         if s.done, let brief = s.brief, !brief.isEmpty {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("The brief").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                                Text(brief).font(Typography.serif(16))
-                                    .textSelection(.enabled)
+                                SelectableText(text: brief, font: Typography.uiSerif(16))
                                 Button {
                                     UIPasteboard.general.string = brief
                                 } label: { Label("Copy the brief", systemImage: "doc.on.doc") }
@@ -134,9 +132,7 @@ struct PlanCard: View {
     private func bubble(_ m: PlanMessage) -> some View {
         HStack {
             if m.role == "learner" { Spacer(minLength: 60) }
-            Text(m.text)
-                .font(Typography.serif(16))
-                .textSelection(.enabled)
+            SelectableText(text: m.text, font: Typography.uiSerif(16))
                 .padding(12)
                 .background(m.role == "learner" ? AnyShapeStyle(Color.accentColor.opacity(0.15)) : AnyShapeStyle(.fill.tertiary),
                             in: .rect(cornerRadius: 16))
