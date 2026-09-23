@@ -6,7 +6,7 @@
 # with Xcode, the repo, and ~/.config/chiron-runner/config:
 #
 #   team_id = ${CHIRON_TEAM_ID}
-#   builds_url = https://chiron.example/builds
+#   builds_url = https://<your-sprite>.sprites.app/builds
 #   asc_key_id = ABC123          # App Store Connect API key, for signing
 #   asc_issuer_id = <uuid>       # with no Apple ID session to expire;
 #   asc_key_path = ~/.private_keys/AuthKey_ABC123.p8
@@ -29,8 +29,10 @@ cd "$(dirname "$0")/.."
 ROOT=$PWD
 CONF="$HOME/.config/chiron-runner/config"
 conf() { [ -f "$CONF" ] && sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$CONF" | head -1 | sed "s|^~|$HOME|" || true; }
-TEAM=$(conf team_id); TEAM=${TEAM:-${CHIRON_TEAM_ID}}
-BUILDS_URL=$(conf builds_url); BUILDS_URL=${BUILDS_URL:-https://chiron.example/builds}
+TEAM=$(conf team_id); TEAM=${TEAM:-${CHIRON_TEAM_ID:-}}
+[ -n "$TEAM" ] || { echo "set team_id in ~/.config/chiron-runner/config (or CHIRON_TEAM_ID)" >&2; exit 1; }
+BUILDS_URL=$(conf builds_url); BUILDS_URL=${BUILDS_URL:-${CHIRON_BUILDS_URL:-}}
+[ -n "$BUILDS_URL" ] || { echo "set builds_url in ~/.config/chiron-runner/config (or CHIRON_BUILDS_URL)" >&2; exit 1; }
 AUTH=()
 if [ -n "$(conf asc_key_id)" ]; then
   AUTH=(-authenticationKeyPath "$(conf asc_key_path)" -authenticationKeyID "$(conf asc_key_id)" -authenticationKeyIssuerID "$(conf asc_issuer_id)")

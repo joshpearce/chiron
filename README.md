@@ -216,7 +216,24 @@ equation, the flag that made a model discard its own work.
 
 ## Licence and credits
 
-Personal project; no licence is granted for reuse. **The centaur logo is a
-placeholder and is not cleared for redistribution.** KaTeX is bundled under the
-MIT licence; Source Sans and Source Serif under the SIL Open Font Licence, whose
-text is beside them in `assets/fonts/`.
+The code is under the MIT licence; see [LICENSE](LICENSE). That covers the code
+only - the bundled third-party material keeps its own terms, and the artwork is
+not mine to license:
+
+- KaTeX, under the MIT licence, in `ipad-app/Chiron/Resources/katex/`.
+- Source Sans and Source Serif, under the SIL Open Font Licence, with its text
+  beside them in `assets/fonts/`.
+- **The centaur logo and app icon are a watermarked stock placeholder and are
+  not cleared for redistribution or use.** Replace them before you build
+  anything you intend to ship.
+
+## Building it yourself
+
+Two things are read from the environment rather than kept in the repo:
+`CHIRON_TEAM_ID`, the Apple developer team the app is signed with, which
+XcodeGen writes into the project at generate time; and the address of your own
+server, which the app takes from its settings screen and the build scripts take
+from `~/.config/chiron-runner/config`. The Xcode project itself is generated
+(`xcodegen generate`) and is not tracked. Scripts that reach 1Password take the
+reference to use from an environment variable - they name no vault or item of
+their own.

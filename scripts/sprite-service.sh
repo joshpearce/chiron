@@ -20,7 +20,7 @@ SPRITE="${SPRITE:-chiron}"
 # ANTHROPIC_AUTH_TOKEN (Bearer); ANTHROPIC_API_KEY gets 401. The 1Password
 # item carries stray whitespace, hence the tr.
 sprite_anthropic_token() {
-  op read 'op://<vault>/<item>/credential' --account my 2>/dev/null | tr -d ' \n\t'
+  op read "${CHIRON_TOKEN_REF:?the 1Password reference for the model token, e.g. op://<vault>/<item>/credential}" --account "${OP_ACCOUNT:-my}" 2>/dev/null | tr -d ' \n\t'
 }
 
 # The model runs through headless Claude Code (`claude -p`) on the sprite,

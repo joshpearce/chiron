@@ -84,9 +84,9 @@ echo "==> the runner's config"
 mkdir -p ~/.config/chiron-runner ~/.private_keys
 chmod 700 ~/.private_keys
 if [ ! -f ~/.config/chiron-runner/config ]; then
-  cat > ~/.config/chiron-runner/config <<'CONF'
-team_id = ${CHIRON_TEAM_ID}
-builds_url = https://chiron.example/builds
+  cat > ~/.config/chiron-runner/config <<CONF
+team_id = ${CHIRON_TEAM_ID:-<your Apple team id>}
+builds_url = ${CHIRON_BUILDS_URL:-https://<your-sprite>.sprites.app/builds}
 # App Store Connect API key (Users and Access > Integrations): signing
 # without an Apple ID session. The .p8 goes in ~/.private_keys.
 asc_key_id =

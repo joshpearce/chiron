@@ -9,7 +9,7 @@
 # resolv.conf is read-only and MagicDNS cannot take hold.
 #
 # The auth key comes from 1Password at run time (TS_AUTHKEY_REF, default
-# op://<vault>/<item>/credential): a tagged, pre-approved
+# op://<vault>/<tailscale item>/credential): a tagged, pre-approved
 # key, used once; tailscaled keeps the node identity it earns in
 # /var/lib/tailscale from then on. Also made here: the sprite's own key
 # to the MacBook (~/.ssh/macbook_ed25519) and a `Host macbook` stanza
@@ -18,7 +18,7 @@
 set -euo pipefail
 MACBOOK="${1:?the name of the MacBook on the tailnet}"
 MACUSER="${2:?the user on the MacBook}"
-REF="${TS_AUTHKEY_REF:-op://<vault>/<item>/credential}"
+REF="${TS_AUTHKEY_REF:?the 1Password reference for a tagged Tailscale auth key, e.g. op://<vault>/<item>/credential}"
 SPRITE="${SPRITE:-chiron2}"
 
 echo "==> tailscale on $SPRITE"

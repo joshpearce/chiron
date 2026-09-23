@@ -4,6 +4,7 @@ __pycache__/
 xcuserdata/
 build/
 DynamicBook.xcodeproj/
+ipad-app/Chiron.xcodeproj/
 build-sim/
 build-mac/
 build-phone/
