@@ -33,7 +33,7 @@ func (s *Server) primersRoot() string {
 	if s.cfg.PrimersDir != "" {
 		return resolve(s.root, s.cfg.PrimersDir)
 	}
-	return filepath.Join(filepath.Dir(s.root), "state", "primers")
+	return filepath.Join(s.dataRoot(), "primers")
 }
 
 // loadPrimers registers the ready ones at boot. One caught mid-authoring

@@ -1,0 +1,12 @@
+.git
+.codex
+.design-sync
+.venv
+build*
+bin
+ipad-app
+rmpp
+server
+state
+**/.DS_Store
+**/*_test.go

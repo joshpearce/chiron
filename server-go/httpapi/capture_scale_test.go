@@ -124,11 +124,15 @@ func TestAPrimerCaptureIsPlannedThenBuilt(t *testing.T) {
 	}
 
 	// A restart keeps the draft and its conversation.
+	s.renders.Wait()
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
 	s2, err := New(s.cfg, s.root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(s2.renders.Wait)
+	t.Cleanup(func() { s2.renders.Wait(); _ = s2.Close() })
 	s2.chain = chain
 	p = planOf(t, s2, rep.Subject)
 	if len(p.Plan) != 3 || !p.Done || p.Brief == "" || p.Title != "Content-Signal for AI crawlers" || p.Status != "planning" {

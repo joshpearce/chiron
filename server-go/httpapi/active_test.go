@@ -20,6 +20,7 @@ func newTwoSubjectServer(t *testing.T, stateRoot string) *Server {
 	}
 	corpusDir := filepath.Join("..", "corpus")
 	cfg := &Config{
+		DataDir:    stateRoot,
 		PrimersDir: t.TempDir(),
 		Subjects: []SubjectSpec{
 			{ID: "ai", Title: "How AI Works",
@@ -42,7 +43,7 @@ func newTwoSubjectServer(t *testing.T, stateRoot string) *Server {
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}
-	t.Cleanup(s.renders.Wait)
+	t.Cleanup(func() { s.renders.Wait(); _ = s.Close() })
 	return s
 }
 
@@ -88,6 +89,9 @@ func TestActiveSubjectFollowsTheReaderAndSurvivesRestart(t *testing.T) {
 	}
 
 	s.renders.Wait()
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
 	s2 := newTwoSubjectServer(t, stateRoot)
 	if got := activeSubjectOf(t, s2); got != "ai" {
 		t.Fatalf("after restart, active = %q, want ai", got)

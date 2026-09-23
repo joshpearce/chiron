@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -111,6 +113,80 @@ func NewClient(cache string) *Client {
 		Now:        time.Now,
 		Catalogues: DefaultCatalogues,
 	}
+}
+
+// NewPublicClient returns a client for URLs supplied by a reader. Its dialer
+// refuses every non-public destination, including after redirects, so page,
+// feed and image imports cannot be used to reach services inside the host or
+// homelab. Curated source recipes use NewClient because local file/test and
+// deliberately private mirrors are administrator-controlled.
+func NewPublicClient(cache string) *Client {
+	c := NewClient(cache)
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = publicDialContext
+	c.HTTP.Transport = transport
+	return c
+}
+
+func publicDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("%s has no addresses", host)
+	}
+	for _, addr := range addrs {
+		if !publicIP(addr.IP) {
+			return nil, fmt.Errorf("refusing non-public address for %s", host)
+		}
+	}
+	dialer := &net.Dialer{}
+	var last error
+	for _, addr := range addrs {
+		conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(addr.IP.String(), port))
+		if err == nil {
+			return conn, nil
+		}
+		last = err
+	}
+	return nil, last
+}
+
+func publicIP(ip net.IP) bool {
+	addr, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return false
+	}
+	addr = addr.Unmap()
+	if !addr.IsGlobalUnicast() || addr.IsPrivate() {
+		return false
+	}
+	// IsGlobalUnicast deliberately includes several special-purpose ranges.
+	// They are not legitimate reader-facing origins and some (notably CGNAT)
+	// can reach infrastructure that is private to the host's network.
+	for _, prefix := range nonPublicPrefixes {
+		if prefix.Contains(addr) {
+			return false
+		}
+	}
+	return true
+}
+
+var nonPublicPrefixes = []netip.Prefix{
+	netip.MustParsePrefix("0.0.0.0/8"),
+	netip.MustParsePrefix("100.64.0.0/10"),
+	netip.MustParsePrefix("192.0.0.0/24"),
+	netip.MustParsePrefix("192.0.2.0/24"),
+	netip.MustParsePrefix("198.18.0.0/15"),
+	netip.MustParsePrefix("198.51.100.0/24"),
+	netip.MustParsePrefix("203.0.113.0/24"),
+	netip.MustParsePrefix("240.0.0.0/4"),
+	netip.MustParsePrefix("2001:db8::/32"),
 }
 
 // ErrRestricted is returned for a source the rules say not to fetch.

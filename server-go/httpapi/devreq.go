@@ -15,6 +15,9 @@ func requestsRoot(cfg *Config, root string) string {
 	if cfg.RequestsDir != "" {
 		return resolve(root, cfg.RequestsDir)
 	}
+	if cfg.DataDir != "" {
+		return filepath.Join(resolve(root, cfg.DataDir), "requests")
+	}
 	return filepath.Join(filepath.Dir(root), "state", "requests")
 }
 

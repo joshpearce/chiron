@@ -385,8 +385,8 @@ func (s *Server) nextUnit(sub *Subject, choice string) string {
 // adaptivity for speed - UI runs replay a previously authored chapter
 // instantly instead of waiting on the model - so it exists only in drive
 // (test) mode and never on a real learner's server.
-func authorCachePath(subjectID, unitID string) string {
-	return filepath.Join(os.TempDir(), "chiron-author-cache",
+func (s *Server) authorCachePath(subjectID, unitID string) string {
+	return filepath.Join(s.cacheRoot(), "author",
 		subjectID+"-"+unitID+".json")
 }
 
@@ -406,7 +406,7 @@ func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*rende
 		return nil, fmt.Errorf("unit %s not authored", unitID)
 	}
 	if driveEnabled() && !unit.IsCalibration() {
-		if data, err := os.ReadFile(authorCachePath(sub.ID, unitID)); err == nil {
+		if data, err := os.ReadFile(s.authorCachePath(sub.ID, unitID)); err == nil {
 			var entry authorCacheEntry
 			if json.Unmarshal(data, &entry) == nil && entry.Chapter != nil {
 				log.Printf("author cache hit: %s/%s", sub.ID, unitID)
@@ -468,8 +468,8 @@ func (s *Server) buildChapter(sub *Subject, unitID, checkSummary string) (*rende
 		pretest, items)
 	if err == nil && driveEnabled() && !unit.IsCalibration() {
 		if data, merr := json.Marshal(authorCacheEntry{Chapter: ch, Summary: d.Summary}); merr == nil {
-			_ = os.MkdirAll(filepath.Dir(authorCachePath(sub.ID, unitID)), 0o755)
-			_ = os.WriteFile(authorCachePath(sub.ID, unitID), data, 0o644)
+			_ = os.MkdirAll(filepath.Dir(s.authorCachePath(sub.ID, unitID)), 0o755)
+			_ = os.WriteFile(s.authorCachePath(sub.ID, unitID), data, 0o644)
 		}
 	}
 	return ch, err

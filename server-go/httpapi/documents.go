@@ -32,10 +32,7 @@ type Document struct {
 const maxDocumentBytes = 200 << 20
 
 func (s *Server) documentsDir() string {
-	if s.activePath != "" {
-		return filepath.Join(filepath.Dir(s.activePath), "documents")
-	}
-	return filepath.Join(s.root, "state", "documents")
+	return filepath.Join(s.dataRoot(), "documents")
 }
 
 func (s *Server) documentPath(id string) string {

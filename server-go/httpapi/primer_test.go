@@ -149,11 +149,15 @@ func TestACaptureBecomesAPrimerOnTheShelf(t *testing.T) {
 	}
 
 	// A restart finds it on disk, ready, with the extension.
+	s.renders.Wait()
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
 	s2, err := New(s.cfg, s.root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(s2.renders.Wait)
+	t.Cleanup(func() { s2.renders.Wait(); _ = s2.Close() })
 	row2, ok := shelf(t, s2)[rep.Subject]
 	if !ok || row2.Status != "ready" || row2.Kind != "primer" {
 		t.Fatalf("after restart: %+v", row2)
