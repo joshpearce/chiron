@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -95,14 +96,32 @@ func captureLink(text, sourceURL string) string {
 	return webAddress(text)
 }
 
+// webAddress is the page a single token names, if it names one. A link is
+// as often pasted without its scheme as with it - that is how a newsletter
+// prints one - so a bare host and path counts, and is read over https.
 func webAddress(s string) string {
 	s = strings.TrimSpace(s)
-	u, err := url.Parse(s)
-	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+	if s == "" || strings.ContainsAny(s, " \t\n") {
 		return ""
 	}
-	return s
+	if u, err := url.Parse(s); err == nil && u.Host != "" {
+		if u.Scheme == "http" || u.Scheme == "https" {
+			return s
+		}
+		// Some other scheme entirely: a file, a chiron:// link, a mailto.
+		if u.Scheme != "" {
+			return ""
+		}
+	}
+	if !schemeless.MatchString(s) {
+		return ""
+	}
+	return "https://" + s
 }
+
+// A host with a real top-level domain, then anything: uber.com/blog/x, but
+// not notes.md, not 1.25, and not a sentence.
+var schemeless = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.(com|org|net|edu|gov|io|dev|ai|app|co|sh|me|blog|news|xyz|info|to|uk|us|ca|de|fr|jp|au|eu)(/[^ ]*)?$`)
 
 type captureRequest struct {
 	Text      string `json:"text"`
@@ -155,10 +174,14 @@ func (s *Server) handlePrimerCapture(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case err != nil:
 			// Still a capture: the tutor is told the address and that the
-			// page would not come, which is better than silence.
+			// page would not come, which is better than silence. Unless the
+			// text was never meant as a link - something that merely looked
+			// like a host - in which case it is left as it was written.
 			log.Printf("capture %s: %v", link, err)
-			req.Text = strings.TrimSpace(req.Text + "\n\n" + link +
-				"\n\n(This page could not be fetched, so only its address was captured.)")
+			if strings.HasPrefix(strings.TrimSpace(req.Text), "http") || strings.TrimSpace(req.Text) == "" {
+				req.Text = strings.TrimSpace(req.Text + "\n\n" + link +
+					"\n\n(This page could not be fetched, so only its address was captured.)")
+			}
 		default:
 			if req.Title == "" {
 				req.Title = page.Title

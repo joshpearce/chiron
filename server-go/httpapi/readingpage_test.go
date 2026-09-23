@@ -251,3 +251,29 @@ func TestACaptureOfALinkThatWillNotComeIsStillACapture(t *testing.T) {
 		t.Errorf("the link itself is not in the capture: %q", plan.Source.Text)
 	}
 }
+
+// What counts as "this capture is a link and nothing else". A link is often
+// pasted without its scheme, which is how a newsletter prints it.
+func TestWhatCountsAsACaptureOfALinkAlone(t *testing.T) {
+	for _, tc := range []struct{ text, source, want string }{
+		{"https://uber.com/blog/agents/", "", "https://uber.com/blog/agents/"},
+		{"http://uber.com/blog/agents/", "", "http://uber.com/blog/agents/"},
+		{"uber.com/us/en/blog/solving-the-agent-identity-crisis/?utm_source=tldrsec.com", "",
+			"https://uber.com/us/en/blog/solving-the-agent-identity-crisis/?utm_source=tldrsec.com"},
+		{"  https://uber.com/blog/agents/  ", "", "https://uber.com/blog/agents/"},
+		{"", "https://uber.com/blog/agents/", "https://uber.com/blog/agents/"},
+		// A passage quoted from a page is the capture; the page is provenance.
+		{"Agent identity is the hard part.", "https://uber.com/blog/agents/", ""},
+		// Prose, file names and versions are not addresses.
+		{"See uber.com/blog/agents/ for the details", "", ""},
+		{"notes.md", "", ""},
+		{"1.25", "", ""},
+		{"", "", ""},
+		{"", "file:///etc/passwd", ""},
+		{"file:///etc/passwd", "", ""},
+	} {
+		if got := captureLink(tc.text, tc.source); got != tc.want {
+			t.Errorf("captureLink(%q, %q) = %q, wanted %q", tc.text, tc.source, got, tc.want)
+		}
+	}
+}
