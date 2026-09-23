@@ -34,6 +34,23 @@ struct SelectableText: UIViewRepresentable {
 
     func updateUIView(_ view: UITextView, context: Context) { show(in: view) }
 
+    /// Left to itself a UITextView tells SwiftUI it is one line tall however
+    /// much it holds, and the rest of the passage is simply not drawn. So it
+    /// is measured here, against the width SwiftUI is offering.
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        guard let width = proposal.width, width > 0, width.isFinite else { return nil }
+        show(in: uiView)
+        return CGSize(width: width, height: height(forWidth: width, using: uiView))
+    }
+
+    /// How tall this text is in a column of the given width.
+    func height(forWidth width: CGFloat, using view: UITextView? = nil) -> CGFloat {
+        let view = view ?? Self.textView()
+        show(in: view)
+        let fits = view.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        return ceil(fits.height)
+    }
+
     func show(in view: UITextView) {
         if view.text != text { view.text = text }
         view.font = font
