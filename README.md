@@ -278,16 +278,14 @@ equation, the flag that made a model discard its own work.
 
 ## Licence and credits
 
-The code is under the MIT licence; see [LICENSE](LICENSE). That covers the code
-only - the bundled third-party material keeps its own terms, and the artwork is
-not mine to license:
+The code and the artwork are under the MIT licence; see [LICENSE](LICENSE).
+The bundled third-party material keeps its own terms:
 
 - KaTeX, under the MIT licence, in `ipad-app/Chiron/Resources/katex/`.
 - Source Sans and Source Serif, under the SIL Open Font Licence, with its text
   beside them in `assets/fonts/`.
-- **The centaur logo and app icon are a watermarked stock placeholder and are
-  not cleared for redistribution or use.** Replace them before you build
-  anything you intend to ship.
+- The centaur logo and app icon were generated for this project and are
+  covered by the licence above.
 
 Nothing in the repo carries an account of its own: the Apple team comes from
 `CHIRON_TEAM_ID` at generate time, your server's address from the app's
