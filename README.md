@@ -131,29 +131,91 @@ alone and says that is what it did.
 | `DESIGN-v2-sprite.md`, `SPRITE-DEV-PLAN.md` | The hosted-tutor design, and moving development onto the sprite |
 | `LESSONS.md` | Everything that cost more than ten minutes to learn, with the fix |
 
-## Running it
+## Getting set up
+
+### What you need
+
+| | For what | Notes |
+|---|---|---|
+| macOS with Xcode 26+ | The iPad, iPhone and Mac apps | The server alone needs no Mac |
+| Go 1.26+ | The server and the `chiron` command | |
+| [XcodeGen](https://github.com/yonaskolb/XcodeGen) | Generating the Xcode project | `brew install xcodegen`; the project is not tracked |
+| A model to write with | Everything the tutor authors | One of: [LM Studio](https://lmstudio.ai) running locally (free, offline), an Anthropic API key, or Claude Code on a subscription |
+| A [Fly.io](https://fly.io) account with sprites | Hosting the server so devices reach it anywhere | Optional - a laptop on the same Wi-Fi works |
+| An Apple Developer account | Installing on your own iPhone or iPad | Free accounts sign for 7 days; a paid one is needed for over-the-air installs |
+| [Tailscale](https://tailscale.com) and a spare Mac | The self-building loop, where the app builds itself | Optional, and the last thing to set up |
+| The [1Password CLI](https://developer.1password.com/docs/cli/) | The sprite scripts, which read tokens by reference | Optional - they take any `op://` reference you give them |
+
+### Run it on your own machine
 
 ```bash
-# the service
+git clone <this repo> && cd chiron
 cd server-go && go build -o ../bin/chiron-server ./cmd/chiron-server
-cd ../server && ../bin/chiron-server -addr 0.0.0.0:8080 -config config.yaml
-
-# check the corpus
-go build -o ../bin/corpus-lint ./cmd/corpus-lint && ../bin/corpus-lint corpus
-
-# the app: Simulator, or the same app on the Mac
-cd ipad-app && xcodegen generate && open Chiron.xcodeproj
-./scripts/sim-run.sh          # build, install and launch in the Simulator
-./scripts/mac-run.sh          # the same app as a Mac Catalyst build
+cd ../server && ../../bin/chiron-server -addr 0.0.0.0:8080 -config config.yaml
 ```
 
-`server/config.yaml` picks the engine with `provider:` - omit it for an
-OpenAI-compatible endpoint (LM Studio), `claude-cli` for headless Claude Code on
-a subscription, `anthropic` for the API. `CHIRON_PROVIDER` overrides it without
-editing the file.
+Point `server/config.yaml` at a model before the tutor can write anything:
+leave `provider:` unset for any OpenAI-compatible endpoint (LM Studio's default
+is already in the file), set `claude-cli` to use Claude Code on a subscription,
+or `anthropic` with `ANTHROPIC_API_KEY` in the environment. `CHIRON_PROVIDER`
+overrides the file without editing it.
 
-Bind to `0.0.0.0`. A loopback bind leaves the tablet unable to reach the server,
-which presents as the app hanging rather than as a server problem.
+Bind to `0.0.0.0`, not loopback: a tablet cannot reach a loopback bind, and it
+presents as the app hanging rather than as a server problem.
+
+### Build the apps
+
+```bash
+export CHIRON_TEAM_ID=XXXXXXXXXX      # your Apple developer team
+cd ipad-app && xcodegen generate
+../scripts/sim-run.sh                 # iPad Simulator
+../scripts/mac-run.sh                 # the same app on the Mac
+```
+
+On first launch, open **Server** (the gear) and add the address the server is
+listening on. A second device takes the same settings from a QR code, or from a
+`chiron://server?...` link pasted into **Paste a setup link**.
+
+### Host it on a sprite
+
+A [sprite](https://fly.io/docs/sprites/) is a persistent Fly microVM, which is
+what makes the server reachable from a phone on cellular data without running a
+laptop at home.
+
+```bash
+scripts/sprite-bootstrap-ssh.sh       # ssh in, a checkout, the landing shell
+scripts/sprite-set-key.sh             # the shared client key, from stdin
+scripts/sprite-set-auth.sh            # the model token, from stdin
+make deploy                           # build, copy, restart, verify
+```
+
+Both key scripts read from standard input, so pipe them from wherever you keep
+secrets (`op read 'op://<vault>/<item>/credential' | scripts/sprite-set-key.sh`)
+rather than typing them where a shell history can catch them. The server
+listens on loopback behind `chiron-gate`, which is what the public URL reaches.
+
+### The self-building loop
+
+The last piece, and entirely optional: a change-request button in the app that
+ends with a new build on your devices. It needs a Mac with Xcode that stays
+awake, reachable from the sprite over Tailscale, and an App Store Connect API
+key so it can sign without a signed-in Xcode:
+
+```bash
+scripts/sprite-tailscale.sh <mac-tailnet-name> <user>   # the sprite joins your tailnet
+scripts/mac-runner-bootstrap.sh <sprite-pubkey>         # on the build Mac, once
+make deploy-agent                                       # the agent that takes requests
+```
+
+`SPRITE-DEV-PLAN.md` has the whole design, including what each half is trusted
+to do. Nothing else in this repo depends on it.
+
+## Checking a corpus
+
+```bash
+cd server-go && go build -o ../bin/corpus-lint ./cmd/corpus-lint
+../bin/corpus-lint ../corpus
+```
 
 ## Tests
 
@@ -227,13 +289,7 @@ not mine to license:
   not cleared for redistribution or use.** Replace them before you build
   anything you intend to ship.
 
-## Building it yourself
-
-Two things are read from the environment rather than kept in the repo:
-`CHIRON_TEAM_ID`, the Apple developer team the app is signed with, which
-XcodeGen writes into the project at generate time; and the address of your own
-server, which the app takes from its settings screen and the build scripts take
-from `~/.config/chiron-runner/config`. The Xcode project itself is generated
-(`xcodegen generate`) and is not tracked. Scripts that reach 1Password take the
-reference to use from an environment variable - they name no vault or item of
-their own.
+Nothing in the repo carries an account of its own: the Apple team comes from
+`CHIRON_TEAM_ID` at generate time, your server's address from the app's
+settings screen and `~/.config/chiron-runner/config`, and every 1Password
+reference from an environment variable.
