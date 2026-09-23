@@ -29,7 +29,11 @@ upstreams:
 llm:
   api_key_file: /run/secrets/deepinfra_api_key
   temperature: 0.7
-  timeout_s: 600
+  # Mi Dinero production liveness envelope: allow a long generation turn,
+  # but fail a request whose response never starts and retire idle keepalives.
+  response_header_timeout_s: 120
+  idle_conn_timeout_s: 180
+  timeout_s: 1800
   max_tokens:
     grader: 900
     planner: 1200

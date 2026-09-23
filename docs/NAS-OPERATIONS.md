@@ -49,9 +49,34 @@ docker run --name chiron --restart unless-stopped --read-only \
   REGISTRY/chiron@sha256:DIGEST
 ```
 
-Do not set an ingress response timeout below 15 minutes: text authoring is
-configured for ten-minute upstream calls and whole-subject work continues in
-background jobs. Graceful shutdown allows 30 seconds for an in-flight exchange.
+The production OpenAI-compatible upstream is
+`https://api.deepinfra.com/v1/openai`, pinned for both structured text and image
+input to `deepseek-ai/DeepSeek-V4-Flash-0731`. Its liveness envelope allows 120
+seconds for response headers, retires idle pooled connections after 180 seconds,
+and permits at most 1800 seconds for one complete call. Do not set an ingress
+response timeout below 30 minutes; whole-subject work continues in background
+jobs. Graceful shutdown allows 30 seconds for an in-flight exchange.
+
+To validate the provider contract without putting a token in the repository or
+process arguments, point the validator at the mounted secret (or set
+`CHIRON_LLM_API_KEY_FILE`):
+
+```sh
+CHIRON_LLM_API_KEY_FILE=/run/secrets/deepinfra_api_key \
+  scripts/validate-deepinfra.sh
+```
+
+The check makes representative grader and generation JSON-schema calls, then an
+image-input transcription call, all with the production model. A provider
+rejection of image input is reported as an incompatibility; the validator never
+substitutes a vision model.
+
+Provider validation on 2026-09-23 confirmed structured grading and generation,
+but DeepInfra returned HTTP 405 for the image call: this model does not accept
+image input. Chiron therefore keeps the required model pin and surfaces
+handwriting transcription as an upstream failure; handwriting is unavailable
+with this production model unless the provider adds vision support. No other
+model is selected silently.
 
 ## Checks and recovery
 

@@ -53,6 +53,12 @@ type Chain interface {
 
 const healthTimeout = 3 * time.Second
 
+const (
+	defaultResponseHeaderTimeout = 120 * time.Second
+	defaultIdleConnTimeout       = 180 * time.Second
+	defaultRequestTimeout        = 10 * time.Minute
+)
+
 type Upstream struct {
 	Name    string `yaml:"name"`
 	BaseURL string `yaml:"base_url"`
@@ -61,9 +67,11 @@ type Upstream struct {
 }
 
 type Config struct {
-	Temperature float64        `yaml:"temperature"`
-	TimeoutS    int            `yaml:"timeout_s"`
-	MaxTokens   map[string]int `yaml:"max_tokens"`
+	Temperature            float64        `yaml:"temperature"`
+	TimeoutS               int            `yaml:"timeout_s"`
+	ResponseHeaderTimeoutS int            `yaml:"response_header_timeout_s"`
+	IdleConnTimeoutS       int            `yaml:"idle_conn_timeout_s"`
+	MaxTokens              map[string]int `yaml:"max_tokens"`
 	// APIKeyFile is preferred for hosted OpenAI-compatible services so a
 	// credential can be mounted as a secret instead of copied into YAML or an
 	// environment variable. APIKey is populated at boot and never serialized.
@@ -90,15 +98,28 @@ func NewOpenAIChain(upstreams []Upstream, cfg Config) *OpenAIChain {
 			enabled = append(enabled, u)
 		}
 	}
-	timeout := time.Duration(cfg.TimeoutS) * time.Second
-	if timeout == 0 {
-		timeout = 240 * time.Second
-	}
 	return &OpenAIChain{
 		upstreams: enabled,
 		cfg:       cfg,
-		client:    &http.Client{Timeout: timeout},
+		client:    openAIHTTPClient(cfg),
 	}
+}
+
+func openAIHTTPClient(cfg Config) *http.Client {
+	timeout := durationSeconds(cfg.TimeoutS, defaultRequestTimeout)
+	responseHeaderTimeout := durationSeconds(cfg.ResponseHeaderTimeoutS, defaultResponseHeaderTimeout)
+	idleConnTimeout := durationSeconds(cfg.IdleConnTimeoutS, defaultIdleConnTimeout)
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = responseHeaderTimeout
+	transport.IdleConnTimeout = idleConnTimeout
+	return &http.Client{Transport: transport, Timeout: timeout}
+}
+
+func durationSeconds(seconds int, fallback time.Duration) time.Duration {
+	if seconds <= 0 {
+		return fallback
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 func (c *OpenAIChain) healthy() *Upstream {

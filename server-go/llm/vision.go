@@ -60,7 +60,7 @@ func TranscribeWithKey(baseURL, model, tag, apiKey string, pngData []byte) (stri
 	}
 	// Hosted multimodal models can cold-start; keep this aligned with the
 	// multi-minute text path rather than letting an ingress-sized timeout win.
-	client := &http.Client{Timeout: 10 * time.Minute}
+	client := openAIHTTPClient(Config{TimeoutS: int((10 * time.Minute).Seconds())})
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost,
 		baseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
