@@ -11,8 +11,8 @@
 # and fetch, and nothing else. Any admin pubkey files after it are
 # installed plainly, for a person's own shell over the LAN or the
 # tailnet: the YubiKey keys, and chiron_ed25519 so a Claude Code session
-# on the main Mac gets in without a touch. Also done here: Remote Login on, no sleep
-# with the lid closed on power, an empty checkout at ~/src/chiron that a
+# on the main Mac gets in without a touch. Also done here: Remote Login on, and a
+# daemon that lets the lid be closed without sleeping while on power, an empty checkout at ~/src/chiron that a
 # push fills, Xcode's iOS platform and Metal toolchain, xcodegen, the
 # Simulator the tests use, and the runner's config with the App Store
 # Connect key still to fill in.
@@ -29,24 +29,34 @@ for k in ${ADMIN_KEYS[@]+"${ADMIN_KEYS[@]}"}; do [ -f "$k" ] || { echo "no such 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 [ -f "$HERE/chiron-runner" ] || { echo "chiron-runner must sit beside this script" >&2; exit 1; }
 
-echo "==> Remote Login and no sleep on power with the lid closed"
+echo "==> Remote Login, and no sleep with the lid closed while on power"
 sudo systemsetup -setremotelogin on >/dev/null
 sudo pmset -c sleep 0 disksleep 0 displaysleep 5
-sudo pmset -a disablesleep 1
-# Belt and braces: a user agent that holds the machine awake while on power.
-mkdir -p ~/Library/LaunchAgents
-cat > ~/Library/LaunchAgents/dev.mjbraun.chiron.awake.plist <<'PLIST'
+# The lid is the awkward one. pmset's disablesleep is what makes a laptop
+# ignore its lid, and it is system-wide: set it once and the machine will not
+# sleep on battery either, which empties it in a bag. A daemon watches the
+# power source instead and sets it only while plugged in.
+sudo install -m 755 "$HERE/mac-awake" /usr/local/bin/chiron-awake
+sudo tee /Library/LaunchDaemons/dev.mjbraun.chiron.awake.plist >/dev/null <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>dev.mjbraun.chiron.awake</string>
-  <key>ProgramArguments</key><array><string>/usr/bin/caffeinate</string><string>-s</string></array>
+  <key>ProgramArguments</key><array><string>/usr/local/bin/chiron-awake</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/var/log/chiron-awake.log</string>
+  <key>StandardErrorPath</key><string>/var/log/chiron-awake.log</string>
 </dict></plist>
 PLIST
+sudo chown root:wheel /Library/LaunchDaemons/dev.mjbraun.chiron.awake.plist
+sudo chmod 644 /Library/LaunchDaemons/dev.mjbraun.chiron.awake.plist
+sudo launchctl bootout system/dev.mjbraun.chiron.awake 2>/dev/null || true
+sudo launchctl bootstrap system /Library/LaunchDaemons/dev.mjbraun.chiron.awake.plist
+# An earlier version of this script held the machine awake with a caffeinate
+# agent and a blanket `pmset -a disablesleep 1`; both are gone now.
 launchctl unload ~/Library/LaunchAgents/dev.mjbraun.chiron.awake.plist 2>/dev/null || true
-launchctl load ~/Library/LaunchAgents/dev.mjbraun.chiron.awake.plist
+rm -f ~/Library/LaunchAgents/dev.mjbraun.chiron.awake.plist
 
 echo "==> the runner and the sprite's key"
 mkdir -p ~/bin ~/builds ~/src ~/.ssh

@@ -1,0 +1,39 @@
+#!/bin/bash
+# Keep this Mac awake with its lid shut, but only while it is plugged in.
+#
+# macOS has one switch for "ignore the lid": pmset's disablesleep. It is
+# undocumented and system-wide - there is no per-power-source form of it, the
+# way sleep and displaysleep have -b and -c - so leaving it on means a laptop
+# that never sleeps on battery either, and drains itself shut in a bag.
+#
+# So something has to watch the power source and set it. `pmset -g pslog`
+# prints the current source and then a line each time it changes, which is
+# that something. Root, because disablesleep needs it; a LaunchDaemon, because
+# it must run whether or not anyone is logged in.
+set -u
+
+# What a line of pslog means for the lid: 1 to ignore it, 0 to obey it, and
+# nothing at all for the battery-percentage lines in between.
+lid_setting() {
+  case "$1" in
+    *"'AC Power'"*)      echo 1 ;;
+    *"'Battery Power'"*) echo 0 ;;
+    *"'UPS Power'"*)     echo 0 ;;
+  esac
+}
+
+say() { echo "$(date -u +%FT%TZ) $*"; }
+
+# Sourced by its test, which wants the functions and not the loop.
+[ "${MAC_AWAKE_LIB:-}" = 1 ] && return 0
+
+pmset -g pslog | while IFS= read -r line; do
+  want=$(lid_setting "$line")
+  [ -n "$want" ] || continue
+  if pmset -a disablesleep "$want"; then
+    [ "$want" = 1 ] && say "on power: the lid no longer sleeps this Mac" \
+                    || say "on battery: the lid sleeps this Mac again"
+  else
+    say "could not set disablesleep=$want"
+  fi
+done
