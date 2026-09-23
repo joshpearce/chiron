@@ -182,3 +182,72 @@ func TestAPageThatIsNotThereIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// A capture that is only a link is a link to something worth reading: the
+// server fetches the page and captures the article, rather than handing the
+// tutor a URL and letting it write around the gap.
+func TestACaptureOfALinkAloneBringsTheArticle(t *testing.T) {
+	t.Setenv("CHIRON_DRIVE", "1")
+	s := newServer(t, "")
+	s.cfg.ReadingsDir = t.TempDir()
+	site := pageSite(t)
+	post := site.URL + "/2026/Sep/20/injection/"
+
+	for _, tc := range []struct{ what, body string }{
+		{"the link as the captured text", `{"prompt":"What is the shape of this?","scale":"primer","text":"` + post + `"}`},
+		{"a tracked link, as a newsletter sends it", `{"prompt":"What is the shape of this?","scale":"primer","text":"` + post + `?utm_source=tldrsec&utm_campaign=issue-346"}`},
+		{"the link as where a share came from", `{"prompt":"What is the shape of this?","scale":"primer","text":"","source_url":"` + post + `","image_png_b64":""}`},
+	} {
+		w := do(t, s, "POST", "/primer/capture", tc.body, "")
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", tc.what, w.Code, w.Body)
+		}
+		var made struct {
+			Subject string `json:"subject"`
+		}
+		json.Unmarshal(w.Body.Bytes(), &made)
+		w = do(t, s, "GET", "/primer/"+made.Subject+"/plan", "", "")
+		var plan struct {
+			Source struct {
+				Text string `json:"text"`
+				URL  string `json:"url"`
+			} `json:"source"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &plan); err != nil {
+			t.Fatalf("%s: %v %s", tc.what, err, w.Body)
+		}
+		if !strings.Contains(plan.Source.Text, "the words it reads are the words it obeys") {
+			t.Errorf("%s: the article did not come with it: %q", tc.what, plan.Source.Text)
+		}
+		if plan.Source.URL != post && !strings.HasPrefix(plan.Source.URL, post) {
+			t.Errorf("%s: the link was not kept as where it came from: %q", tc.what, plan.Source.URL)
+		}
+	}
+}
+
+// A link that will not come back is still a capture: the tutor is told the
+// link and that the page could not be read, rather than the whole thing
+// failing.
+func TestACaptureOfALinkThatWillNotComeIsStillACapture(t *testing.T) {
+	t.Setenv("CHIRON_DRIVE", "1")
+	s := newServer(t, "")
+	s.cfg.ReadingsDir = t.TempDir()
+	site := pageSite(t)
+	w := do(t, s, "POST", "/primer/capture",
+		`{"prompt":"What is this?","scale":"primer","text":"`+site.URL+`/nothing-here/"}`, "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("capture: %d %s", w.Code, w.Body)
+	}
+	var made struct {
+		Subject string `json:"subject"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &made)
+	w = do(t, s, "GET", "/primer/"+made.Subject+"/plan", "", "")
+	var plan struct {
+		Source struct{ Text, URL string } `json:"source"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &plan)
+	if !strings.Contains(plan.Source.Text, site.URL+"/nothing-here/") {
+		t.Errorf("the link itself is not in the capture: %q", plan.Source.Text)
+	}
+}

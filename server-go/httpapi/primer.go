@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/mjbraun/chiron/server/primer"
 	"github.com/mjbraun/chiron/server/render"
 	"github.com/mjbraun/chiron/server/roles"
+	"github.com/mjbraun/chiron/server/sources"
 )
 
 // Primers: the reader captures something anywhere on the iPad, asks a
@@ -78,6 +80,30 @@ func (s *Server) registerPrimer(m *primer.Meta) error {
 	return nil
 }
 
+// captureLink is the page a capture is of, when the capture is a link and
+// nothing else: the text is one address, or there is no text at all and the
+// capture says where it came from. A passage quoted from a page is not this -
+// the passage is the capture, and the URL is only its provenance.
+func captureLink(text, sourceURL string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return webAddress(sourceURL)
+	}
+	if strings.ContainsAny(text, " \t\n") {
+		return ""
+	}
+	return webAddress(text)
+}
+
+func webAddress(s string) string {
+	s = strings.TrimSpace(s)
+	u, err := url.Parse(s)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return ""
+	}
+	return s
+}
+
 type captureRequest struct {
 	Text      string `json:"text"`
 	ImagePNG  string `json:"image_png_b64"`
@@ -116,6 +142,28 @@ func (s *Server) handlePrimerCapture(w http.ResponseWriter, r *http.Request) {
 		if png, err = base64.StdEncoding.DecodeString(req.ImagePNG); err != nil {
 			writeError(w, http.StatusBadRequest, "image_png_b64 is not base64: %v", err)
 			return
+		}
+	}
+	// A capture that is only a link is a link to something worth reading.
+	// Fetch it and capture the article: a tutor handed a bare URL cannot
+	// read it, and writes around the gap instead of from the piece.
+	if link := captureLink(req.Text, req.SourceURL); link != "" {
+		if req.SourceURL == "" {
+			req.SourceURL = link
+		}
+		page, err := sources.NewClient("").Page(r.Context(), link)
+		switch {
+		case err != nil:
+			// Still a capture: the tutor is told the address and that the
+			// page would not come, which is better than silence.
+			log.Printf("capture %s: %v", link, err)
+			req.Text = strings.TrimSpace(req.Text + "\n\n" + link +
+				"\n\n(This page could not be fetched, so only its address was captured.)")
+		default:
+			if req.Title == "" {
+				req.Title = page.Title
+			}
+			req.Text = page.Markdown
 		}
 	}
 	if req.Text == "" && len(png) == 0 {
