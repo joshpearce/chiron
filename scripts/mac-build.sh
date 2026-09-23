@@ -5,7 +5,7 @@
 # from. Run by the runner's `build` verb on the MacBook; runs on any Mac
 # with Xcode, the repo, and ~/.config/chiron-runner/config:
 #
-#   team_id = ${CHIRON_TEAM_ID}
+#   team_id = <your Apple team id>
 #   builds_url = https://<your-sprite>.sprites.app/builds
 #   asc_key_id = ABC123          # App Store Connect API key, for signing
 #   asc_issuer_id = <uuid>       # with no Apple ID session to expire;

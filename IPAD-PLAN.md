@@ -10,7 +10,7 @@ Design lessons that carry over from the e-ink client: `DESIGN-ui.md`.
 
 **There is already an iPad app.** `ipad-app/` is a SwiftUI app (xcodegen
 project, `project.yml`, deployment target iOS 15.0, iPad only, bundle id
-`dev.mjbraun.chiron`, signed by the Fly.io team `${CHIRON_TEAM_ID}`). About 2,300
+`dev.mjbraun.chiron`, signed by the developer team in `CHIRON_TEAM_ID`). About 2,300
 lines in eleven files:
 
 | file | what it owns |
@@ -364,7 +364,7 @@ remains is UI and policy, in this order when the time comes:
 ## 10. Status (2026-09-06)
 
 Phases 0 through 5 are built. The app runs on the iPad Air 13" (M4) and
-the iPhone 16 against the sprite (`https://chiron.example`,
+the iPhone 16 against the sprite (its public `sprites.app` address,
 Anthropic-backed), set up from a QR code; every change is tested in the
 Simulator (`scripts/sim-run.sh test`, 80 tests, plus the harness walks)
 before it goes on a device, and the server deploys with `make deploy`
