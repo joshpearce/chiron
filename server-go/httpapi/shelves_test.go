@@ -120,10 +120,13 @@ func TestShelvesRefuseWhatMakesNoSense(t *testing.T) {
 func newServerAt(t *testing.T, prev *Server) *Server {
 	t.Helper()
 	prev.renders.Wait()
+	if err := prev.Close(); err != nil {
+		t.Fatal(err)
+	}
 	s, err := New(prev.cfg, prev.root)
 	if err != nil {
 		t.Fatalf("restart: %v", err)
 	}
-	t.Cleanup(s.renders.Wait)
+	t.Cleanup(func() { s.renders.Wait(); _ = s.Close() })
 	return s
 }

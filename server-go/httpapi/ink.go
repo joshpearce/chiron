@@ -89,7 +89,7 @@ func (s *Server) transcriberFor() transcriber {
 		model = "google/gemma-3-4b"
 	}
 	return func(hint string, png []byte) (string, error) {
-		return llm.Transcribe(base, model, hint, png)
+		return llm.TranscribeWithKey(base, model, hint, s.cfg.LLM.APIKey, png)
 	}
 }
 

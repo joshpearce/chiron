@@ -53,7 +53,7 @@ func (s *Server) handleReadingPage(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), pageFetchTimeout)
 	defer cancel()
-	client := sources.NewClient("")
+	client := s.newPublicClient("")
 	page, err := client.Page(ctx, raw)
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, "this page did not come back to be read: %v", err)

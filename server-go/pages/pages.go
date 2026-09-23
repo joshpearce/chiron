@@ -97,6 +97,8 @@ type Renderer struct {
 	// CacheDir receives one subdirectory per rendered chapter, keyed by
 	// content hash.
 	CacheDir string
+	// TempDir is the explicit scratch root. Empty uses the OS default.
+	TempDir string
 	// PrintLayout renders answer scaffolding ON the page - confidence
 	// pills, IDK tick rows, MCQ tick squares - for clients that are real
 	// paper (the rmapi flow). The default interactive layout leaves those
@@ -304,7 +306,12 @@ func (r *Renderer) renderDoc(name, doc, hash string) (Result, error) {
 		return res, fmt.Errorf("pdftoppm not installed: %w", err)
 	}
 
-	work, err := os.MkdirTemp("", "chiron-pages-*")
+	if r.TempDir != "" {
+		if err := os.MkdirAll(r.TempDir, 0o755); err != nil {
+			return res, err
+		}
+	}
+	work, err := os.MkdirTemp(r.TempDir, "chiron-pages-*")
 	if err != nil {
 		return res, err
 	}

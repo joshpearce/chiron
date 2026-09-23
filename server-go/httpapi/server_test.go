@@ -4,9 +4,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mjbraun/chiron/server/llm"
+	"github.com/mjbraun/chiron/server/sources"
 )
 
 // The API contract the iPad app depends on. Everything here runs against the
@@ -21,6 +25,7 @@ func newServer(t *testing.T, token string) *Server {
 		t.Fatal(err)
 	}
 	cfg := &Config{
+		DataDir: t.TempDir(),
 		Subjects: []SubjectSpec{{
 			ID: "ai", Title: "How AI Works",
 			CorpusDir: filepath.Join("..", "corpus"),
@@ -38,9 +43,12 @@ func newServer(t *testing.T, token string) *Server {
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}
+	// HTTP fixtures listen on loopback. Production page/feed imports use the
+	// public-only client and reject these addresses to prevent SSRF.
+	s.newPublicClient = sources.NewClient
 	// Eager page renders run in the background; the state dir is a TempDir,
 	// so cleanup must not race them.
-	t.Cleanup(s.renders.Wait)
+	t.Cleanup(func() { s.renders.Wait(); _ = s.Close() })
 	return s
 }
 
@@ -94,6 +102,67 @@ func TestNoTokenLeavesTheServerOpen(t *testing.T) {
 	if got := do(t, s, "GET", "/health", "", "").Code; got != http.StatusOK {
 		t.Errorf("open server rejected an unauthenticated request: %d", got)
 	}
+}
+
+func TestFileSecretsAndExplicitPersistentRoots(t *testing.T) {
+	root := t.TempDir()
+	data := filepath.Join(root, "persistent")
+	auth := filepath.Join(root, "auth")
+	llmKey := filepath.Join(root, "llm")
+	if err := os.WriteFile(auth, []byte(" bearer-key\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(llmKey, []byte(" provider-key\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &Config{
+		DataDir: data, GeneratedCorporaDir: filepath.Join(data, "corpora"),
+		AuthTokenFile: auth, PrimersDir: "", ReadingsDir: "", RequestsDir: "", BuildsDir: "",
+		LLM: llm.Config{APIKeyFile: llmKey},
+	}
+	s, err := New(cfg, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	if s.token != "bearer-key" || cfg.LLM.APIKey != "provider-key" {
+		t.Fatalf("file secrets were not loaded")
+	}
+	for got, want := range map[string]string{
+		s.readingsRoot():         filepath.Join(data, "readings"),
+		s.primersRoot():          filepath.Join(data, "primers"),
+		s.requests.Dir():         filepath.Join(data, "requests"),
+		s.buildsDir:              filepath.Join(data, "builds"),
+		s.documentsDir():         filepath.Join(data, "documents"),
+		s.generatedCorporaRoot(): filepath.Join(data, "corpora"),
+		s.cacheRoot():            filepath.Join(data, "cache"),
+		s.tempRoot():             filepath.Join(data, "tmp"),
+	} {
+		if got != want {
+			t.Errorf("path %q, want %q", got, want)
+		}
+	}
+}
+
+func TestDataRootAllowsOnlyOneServerWriter(t *testing.T) {
+	root := t.TempDir()
+	cfg := &Config{DataDir: filepath.Join(root, "data")}
+	first, err := New(cfg, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := New(&Config{DataDir: cfg.DataDir}, root); err == nil ||
+		!strings.Contains(err.Error(), "already has a Chiron writer") {
+		t.Fatalf("second server error = %v", err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	second, err := New(&Config{DataDir: cfg.DataDir}, root)
+	if err != nil {
+		t.Fatalf("lock was not released: %v", err)
+	}
+	t.Cleanup(func() { _ = second.Close() })
 }
 
 func TestUnknownSubjectIs404(t *testing.T) {

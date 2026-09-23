@@ -55,7 +55,7 @@ func (s *Server) readingsRoot() string {
 	if s.cfg.ReadingsDir != "" {
 		return resolve(s.root, s.cfg.ReadingsDir)
 	}
-	return filepath.Join(filepath.Dir(s.root), "state", "readings")
+	return filepath.Join(s.dataRoot(), "readings")
 }
 
 func readingDir(root, id string) string    { return filepath.Join(root, id) }

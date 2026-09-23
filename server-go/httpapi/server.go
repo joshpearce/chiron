@@ -30,7 +30,9 @@ import (
 	"github.com/mjbraun/chiron/server/llm"
 	"github.com/mjbraun/chiron/server/pages"
 	"github.com/mjbraun/chiron/server/primer"
+	"github.com/mjbraun/chiron/server/sources"
 	"github.com/mjbraun/chiron/server/state"
+	"golang.org/x/sys/unix"
 )
 
 type SubjectSpec struct {
@@ -53,6 +55,16 @@ type SessionConfig struct {
 type Config struct {
 	Subjects  []SubjectSpec `yaml:"subjects"`
 	StaticDir string        `yaml:"static_dir"`
+	// DataDir is the explicit persistent root for container deployments.
+	// Empty preserves the historical layout beside config.yaml.
+	DataDir string `yaml:"data_dir"`
+	// GeneratedCorporaDir is where Teach-me writes and discovers corpus-*
+	// directories. Empty preserves the historical layout beside config.yaml.
+	GeneratedCorporaDir string `yaml:"generated_corpora_dir"`
+	// CacheDir contains reproducible caches which may be deleted and rebuilt.
+	CacheDir string `yaml:"cache_dir"`
+	// TempDir contains per-render scratch directories.
+	TempDir string `yaml:"temp_dir"`
 	// KatexDir points at the KaTeX assets used when rendering chapters to
 	// page images for e-ink clients (the same files the iPad bundles).
 	KatexDir string `yaml:"katex_dir"`
@@ -61,9 +73,10 @@ type Config struct {
 	FontsDir string `yaml:"fonts_dir"`
 	// VisionModel transcribes handwritten ink submissions (loaded on demand
 	// by the same OpenAI-compatible server as the text upstream).
-	VisionModel string        `yaml:"vision_model"`
-	Session     SessionConfig `yaml:"session"`
-	AuthToken   string        `yaml:"auth_token"`
+	VisionModel   string        `yaml:"vision_model"`
+	Session       SessionConfig `yaml:"session"`
+	AuthToken     string        `yaml:"auth_token"`
+	AuthTokenFile string        `yaml:"auth_token_file"`
 	// PrimersDir holds captured primers; empty means <parent>/state/primers.
 	PrimersDir string `yaml:"primers_dir"`
 	// ReadingsDir holds books the reader imported to read as they are;
@@ -177,6 +190,9 @@ type Server struct {
 	transcribe func(hint string, png []byte) (string, error)
 	chain      llm.Chain
 	token      string
+	// writerLock is held for the process lifetime. It prevents two replicas
+	// from mutating the same NAS-backed data root.
+	writerLock *os.File
 	// authorizedKeys is sshd's file on the sprite; empty means device keys
 	// cannot be enrolled here.
 	authorizedKeys string
@@ -196,6 +212,10 @@ type Server struct {
 	// the reader opens it, and they would otherwise take the same post
 	// twice.
 	feedMu sync.Mutex
+	// User-supplied page and feed URLs use the public client, which rejects
+	// requests into loopback, link-local and private networks. Tests replace
+	// this with the unrestricted client for their local HTTP fixtures.
+	newPublicClient func(string) *sources.Client
 
 	// The book the reader last had open, so the client can reopen on it.
 	// Persisted beside the subject state dirs: the client has no writable
@@ -221,19 +241,46 @@ func New(cfg *Config, root string) (*Server, error) {
 	// the service environment rather than in a file on disk.
 	token := strings.TrimSpace(os.Getenv("CHIRON_AUTH_TOKEN"))
 	if token == "" {
-		token = strings.TrimSpace(cfg.AuthToken)
+		file := strings.TrimSpace(os.Getenv("CHIRON_AUTH_TOKEN_FILE"))
+		if file == "" {
+			file = cfg.AuthTokenFile
+		}
+		if file != "" {
+			var err error
+			token, err = readSecret(resolve(root, file))
+			if err != nil {
+				return nil, fmt.Errorf("auth token file: %w", err)
+			}
+		} else {
+			token = strings.TrimSpace(cfg.AuthToken)
+		}
+	}
+	if key := strings.TrimSpace(os.Getenv("CHIRON_LLM_API_KEY")); key != "" {
+		cfg.LLM.APIKey = key
+	} else if file := firstNonEmpty(os.Getenv("CHIRON_LLM_API_KEY_FILE"), cfg.LLM.APIKeyFile); file != "" {
+		key, err := readSecret(resolve(root, file))
+		if err != nil {
+			return nil, fmt.Errorf("LLM API key file: %w", err)
+		}
+		cfg.LLM.APIKey = key
+	}
+	lock, err := acquireWriterLock(filepath.Join(dataRoot(cfg, root), ".chiron-writer.lock"))
+	if err != nil {
+		return nil, err
 	}
 	s := &Server{
-		cfg:            cfg,
-		root:           root,
-		buildsDir:      buildsRoot(cfg, root),
-		requests:       devreq.Open(requestsRoot(cfg, root)),
-		token:          token,
-		authorizedKeys: strings.TrimSpace(os.Getenv("CHIRON_AUTHORIZED_KEYS")),
-		hub:            agent.NewHub(),
-		rng:            rand.New(rand.NewSource(time.Now().UnixNano())),
-		subjects:       map[string]*Subject{},
-		jobs:           map[string]*Job{},
+		cfg:             cfg,
+		root:            root,
+		buildsDir:       buildsRoot(cfg, root),
+		requests:        devreq.Open(requestsRoot(cfg, root)),
+		token:           token,
+		writerLock:      lock,
+		authorizedKeys:  strings.TrimSpace(os.Getenv("CHIRON_AUTHORIZED_KEYS")),
+		hub:             agent.NewHub(),
+		rng:             rand.New(rand.NewSource(time.Now().UnixNano())),
+		newPublicClient: sources.NewPublicClient,
+		subjects:        map[string]*Subject{},
+		jobs:            map[string]*Job{},
 
 		primers: map[string]*primer.Meta{},
 		chain: llm.New(llm.FactoryConfig{
@@ -248,15 +295,20 @@ func New(cfg *Config, root string) (*Server, error) {
 	for _, spec := range cfg.Subjects {
 		if err := s.register(spec.ID, spec.Title,
 			resolve(root, spec.CorpusDir), resolve(root, spec.StateDir)); err != nil {
+			s.Close()
 			return nil, fmt.Errorf("subject %s: %w", spec.ID, err)
 		}
 	}
 	s.Discover()
 	s.loadPrimers()
 	s.loadReadings()
-	if len(cfg.Subjects) > 0 {
+	if cfg.DataDir != "" {
+		s.activePath = filepath.Join(s.dataRoot(), "active-subject")
+	} else if len(cfg.Subjects) > 0 {
 		dir := filepath.Dir(resolve(root, cfg.Subjects[0].StateDir))
 		s.activePath = filepath.Join(dir, "active-subject")
+	}
+	if s.activePath != "" {
 		if raw, err := os.ReadFile(s.activePath); err == nil {
 			if id := strings.TrimSpace(string(raw)); id != "" {
 				if _, ok := s.subject(id); ok {
@@ -267,6 +319,85 @@ func New(cfg *Config, root string) (*Server, error) {
 	}
 	s.shelves = loadShelves(shelvesPath(s.activePath))
 	return s, nil
+}
+
+func acquireWriterLock(path string) (*os.File, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, fmt.Errorf("data directory: %w", err)
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("writer lock: %w", err)
+	}
+	if err := unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("data directory already has a Chiron writer: %w", err)
+	}
+	return f, nil
+}
+
+// Close releases the data-volume writer lease. Call it only after HTTP and
+// background rendering have stopped.
+func (s *Server) Close() error {
+	if s.writerLock == nil {
+		return nil
+	}
+	err := s.writerLock.Close()
+	s.writerLock = nil
+	return err
+}
+
+func readSecret(path string) (string, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	secret := strings.TrimSpace(string(raw))
+	if secret == "" {
+		return "", fmt.Errorf("%s is empty", path)
+	}
+	return secret, nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func (s *Server) dataRoot() string {
+	return dataRoot(s.cfg, s.root)
+}
+
+func dataRoot(cfg *Config, root string) string {
+	if cfg.DataDir != "" {
+		return resolve(root, cfg.DataDir)
+	}
+	return filepath.Join(filepath.Dir(root), "state")
+}
+
+func (s *Server) cacheRoot() string {
+	if s.cfg.CacheDir != "" {
+		return resolve(s.root, s.cfg.CacheDir)
+	}
+	return filepath.Join(s.dataRoot(), "cache")
+}
+
+func (s *Server) tempRoot() string {
+	if s.cfg.TempDir != "" {
+		return resolve(s.root, s.cfg.TempDir)
+	}
+	return filepath.Join(s.dataRoot(), "tmp")
+}
+
+func (s *Server) generatedCorporaRoot() string {
+	if s.cfg.GeneratedCorporaDir != "" {
+		return resolve(s.root, s.cfg.GeneratedCorporaDir)
+	}
+	return filepath.Dir(s.root)
 }
 
 // markActive records id as the open book. Best-effort persistence: a failed
@@ -321,7 +452,8 @@ func (s *Server) register(id, title, corpusDir, stateDir string) error {
 			Off:      renderOff(),
 			KatexDir: resolve(s.root, s.cfg.KatexDir),
 			FontsDir: fonts,
-			CacheDir: filepath.Join(stateDir, "pages"),
+			CacheDir: filepath.Join(s.cacheRoot(), "pages", id),
+			TempDir:  s.tempRoot(),
 		}}
 	s.mu.Unlock()
 	return nil
@@ -338,7 +470,7 @@ func (s *Server) register(id, title, corpusDir, stateDir string) error {
 // planning finishes, so a half-generated subject would otherwise appear in the
 // library as a book whose chapters are missing.
 func (s *Server) Discover() []string {
-	parent := filepath.Dir(s.root)
+	parent := s.generatedCorporaRoot()
 	entries, err := filepath.Glob(filepath.Join(parent, "corpus-*"))
 	if err != nil {
 		return nil
@@ -379,7 +511,7 @@ func (s *Server) Discover() []string {
 		if title == "" {
 			title = strings.Title(strings.ReplaceAll(id, "-", " ")) //nolint:staticcheck
 		}
-		if err := s.register(id, title, dir, filepath.Join(parent, "state", id)); err != nil {
+		if err := s.register(id, title, dir, filepath.Join(s.dataRoot(), "subjects", id)); err != nil {
 			continue
 		}
 		found = append(found, id)

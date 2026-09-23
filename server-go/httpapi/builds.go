@@ -21,6 +21,9 @@ func buildsRoot(cfg *Config, root string) string {
 	if cfg.BuildsDir != "" {
 		return resolve(root, cfg.BuildsDir)
 	}
+	if cfg.DataDir != "" {
+		return filepath.Join(resolve(root, cfg.DataDir), "builds")
+	}
 	return filepath.Join(filepath.Dir(root), "builds")
 }
 

@@ -92,7 +92,7 @@ func (s *Server) handleFeedFollow(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), pageFetchTimeout)
 	defer cancel()
-	client := sources.NewClient("")
+	client := s.newPublicClient("")
 	feed, err := client.Feed(ctx, raw)
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, "this is not a feed to follow: %v", err)
@@ -140,7 +140,7 @@ func (s *Server) handleFeedRefresh(w http.ResponseWriter, r *http.Request) {
 	s.feedMu.Lock()
 	defer s.feedMu.Unlock()
 	root := s.readingsRoot()
-	client := sources.NewClient("")
+	client := s.newPublicClient("")
 	checked, added := 0, 0
 	blogs := []map[string]any{}
 	for _, sub := range s.subscriptions() {

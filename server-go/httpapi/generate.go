@@ -16,8 +16,9 @@ import (
 // planOnly it stops at the syllabus, done, so the plan can be read before
 // a second request authors from it.
 func (s *Server) generate(slug, title, brief string, named []string, planOnly bool) {
-	parent := filepath.Dir(s.root)
+	parent := s.generatedCorporaRoot()
 	outDir := filepath.Join(parent, "corpus-"+slug)
+	contentRoot := filepath.Dir(s.root)
 
 	fail := func(msg string) {
 		s.updateJob(slug, func(j *Job) {
@@ -28,17 +29,17 @@ func (s *Server) generate(slug, title, brief string, named []string, planOnly bo
 
 	g := &generate.Generator{
 		Chain:    s.chain,
-		SpecPath: filepath.Join(parent, "corpus", "authoring-spec.md"),
+		SpecPath: filepath.Join(contentRoot, "corpus", "authoring-spec.md"),
 		OutDir:   outDir,
 		Workers:  authorWorkers(),
 	}
 	// The open sources the book may be built from. A missing or broken
 	// index is logged, and the book is written from the brief alone.
-	if idx, err := sources.LoadIndex(filepath.Join(parent, "corpus", "sources", "index.yaml")); err != nil {
+	if idx, err := sources.LoadIndex(filepath.Join(contentRoot, "corpus", "sources", "index.yaml")); err != nil {
 		log.Printf("teach %s: source index: %v", slug, err)
 	} else if !driveEnabled() {
 		g.Index = idx
-		g.Fetch = sources.NewClient(filepath.Join(filepath.Dir(s.activePath), "sources"))
+		g.Fetch = sources.NewClient(filepath.Join(s.dataRoot(), "sources"))
 	}
 
 	s.updateJob(slug, func(j *Job) { j.Stage = "planning" })

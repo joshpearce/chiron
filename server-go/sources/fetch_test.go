@@ -138,6 +138,23 @@ func TestTheCacheAnswersTheSecondTime(t *testing.T) {
 	}
 }
 
+func TestPublicClientRejectsPrivateDestinations(t *testing.T) {
+	for _, raw := range []string{
+		"http://127.0.0.1/secret",
+		"http://[::1]/secret",
+		"http://169.254.169.254/latest/meta-data/",
+		"http://10.0.0.1/secret",
+		"http://100.64.0.1/secret",
+	} {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		_, err := NewPublicClient("").Get(ctx, raw)
+		cancel()
+		if err == nil || !strings.Contains(err.Error(), "refusing non-public address") {
+			t.Errorf("GET %s -> %v, want non-public-address refusal", raw, err)
+		}
+	}
+}
+
 func TestARestrictedSourceIsNeverFetched(t *testing.T) {
 	c := client(t)
 	s := &Source{ID: "feynman", Title: "The Feynman Lectures", Verdict: Restricted, Fetch: Recipe{Kind: "github", Repo: "x/y", Path: "{locator}"}}

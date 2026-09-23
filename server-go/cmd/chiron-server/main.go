@@ -37,6 +37,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("start: %v", err)
 	}
+	defer srv.Close()
 
 	server := &http.Server{
 		Addr:    *addr,
