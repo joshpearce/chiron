@@ -1,3 +1,4 @@
+import PhotosUI
 import SwiftUI
 
 /// "Request a change": what the reader wants different, sent to the
@@ -9,7 +10,10 @@ struct RequestsCard: View {
     @State private var text = ""
     @State private var withPicture = true
     @State private var sending = false
+    @State private var picked: PhotosPickerItem?
+    @State private var picture: Data?
     @FocusState private var typing: Bool
+    @Environment(\.horizontalSizeClass) private var width
 
     var body: some View {
         NavigationStack {
@@ -20,6 +24,27 @@ struct RequestsCard: View {
                         .focused($typing)
                         .accessibilityLabel("The change you want")
                     Toggle("Send a picture of this screen", isOn: $withPicture)
+                        .disabled(picture != nil)
+                    // A screenshot from elsewhere, a photo of the thing, a
+                    // sketch of what it should look like: often the clearest
+                    // way to say what is wrong.
+                    PhotosPicker(selection: $picked, matching: .images) {
+                        Label(picture == nil ? "Attach a picture" : "Change the picture", systemImage: "photo")
+                    }
+                    if let picture, let image = UIImage(data: picture) {
+                        HStack {
+                            Image(uiImage: image)
+                                .resizable().scaledToFit()
+                                .frame(maxHeight: 140)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            Spacer()
+                            Button(role: .destructive) {
+                                self.picture = nil
+                                picked = nil
+                            } label: { Label("Remove", systemImage: "xmark.circle") }
+                            .labelStyle(.iconOnly)
+                        }
+                    }
                     if let err = library.requestError {
                         Text(err).foregroundStyle(.red).font(.callout)
                     }
@@ -62,7 +87,14 @@ struct RequestsCard: View {
                     await library.checkForBuild()
                 }
             }
-            .onAppear { typing = true }
+            .onChange(of: picked) { _, item in
+                guard let item else { return }
+                Task { picture = try? await item.loadTransferable(type: Data.self) }
+            }
+            // On a phone the keyboard covers everything below the field, and
+            // what is below is the list of requests and where they have got
+            // to. Let the reader see that first and tap to type.
+            .onAppear { typing = width != .compact }
         }
         .presentationSizing(.form)
     }
@@ -71,7 +103,11 @@ struct RequestsCard: View {
         let t = text
         sending = true
         Task {
-            if await library.requestChange(t, withPicture: withPicture) != nil { text = "" }
+            if await library.requestChange(t, withPicture: withPicture, picture: picture) != nil {
+                text = ""
+                picture = nil
+                picked = nil
+            }
             sending = false
         }
     }
@@ -85,6 +121,7 @@ struct RequestRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(request.text).font(Typography.sans(16, weight: .semibold))
+                    .textSelection(.enabled)
                 Spacer()
                 StatusPill(status: request.status)
             }
@@ -92,7 +129,7 @@ struct RequestRow: View {
                 Text(last).font(.callout).foregroundStyle(.secondary).lineLimit(3)
             }
             if let summary = request.summary, !summary.isEmpty, !request.open {
-                Text(summary).font(.callout)
+                Text(summary).font(.callout).textSelection(.enabled)
             }
             if let reason = request.reason, request.status == "failed" {
                 Text(reason).font(.footnote.monospaced()).foregroundStyle(.red).lineLimit(6)
@@ -107,6 +144,12 @@ struct RequestRow: View {
             }
         }
         .padding(.vertical, 4)
+        .contextMenu {
+            Button {
+                UIPasteboard.general.string = [request.text, request.summary, request.last]
+                    .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "\n\n")
+            } label: { Label("Copy", systemImage: "doc.on.doc") }
+        }
         .accessibilityElement(children: .combine)
     }
 }

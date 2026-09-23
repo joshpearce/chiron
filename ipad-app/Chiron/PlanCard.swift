@@ -28,6 +28,15 @@ struct PlanCard: View {
                     Button("Later") { library.planning = nil }
                         .accessibilityHint("Keeps the draft on the shelf to come back to")
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    // What was said here is often wanted elsewhere: handed to
+                    // another agent, pasted into a note, kept.
+                    Button {
+                        if let s = state { UIPasteboard.general.string = s.transcript }
+                    } label: { Label("Copy the conversation", systemImage: "doc.on.doc") }
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
+                    .disabled(state == nil)
+                }
                 ToolbarItem(placement: .destructiveAction) {
                     Button {
                         confirmingDiscard = true
@@ -76,6 +85,7 @@ struct PlanCard: View {
                                     .lineLimit(4)
                             }
                             Text(s.prompt).font(Typography.serif(17, weight: .semibold))
+                                .textSelection(.enabled)
                         }
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -87,6 +97,12 @@ struct PlanCard: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("The brief").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                                 Text(brief).font(Typography.serif(16))
+                                    .textSelection(.enabled)
+                                Button {
+                                    UIPasteboard.general.string = brief
+                                } label: { Label("Copy the brief", systemImage: "doc.on.doc") }
+                                    .font(.footnote)
+                                    .buttonStyle(.bordered)
                             }
                             .padding(14)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -120,11 +136,17 @@ struct PlanCard: View {
             if m.role == "learner" { Spacer(minLength: 60) }
             Text(m.text)
                 .font(Typography.serif(16))
+                .textSelection(.enabled)
                 .padding(12)
                 .background(m.role == "learner" ? AnyShapeStyle(Color.accentColor.opacity(0.15)) : AnyShapeStyle(.fill.tertiary),
                             in: .rect(cornerRadius: 16))
                 .frame(maxWidth: .infinity, alignment: m.role == "learner" ? .trailing : .leading)
             if m.role != "learner" { Spacer(minLength: 60) }
+        }
+        .contextMenu {
+            Button {
+                UIPasteboard.general.string = m.text
+            } label: { Label("Copy", systemImage: "doc.on.doc") }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(m.role == "learner" ? "You" : "Tutor"): \(m.text)")

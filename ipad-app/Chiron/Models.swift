@@ -429,6 +429,23 @@ struct PlanState: Codable, Identifiable {
     var book: String?
 
     var isBook: Bool { scale == "book" }
+
+    /// The whole conversation as plain text: what was captured, what was
+    /// asked, everything said since, and the brief if there is one. This is
+    /// what goes on the clipboard, so it has to stand on its own in another
+    /// app - or in another agent's prompt - with no Chiron around it.
+    var transcript: String {
+        var out = [title]
+        if let url = source?.url, !url.isEmpty { out.append(url) }
+        if let text = source?.text, !text.isEmpty { out.append("\nCaptured:\n" + text) }
+        out.append("\nAsked:\n" + prompt)
+        if !plan.isEmpty {
+            out.append("")
+            for m in plan { out.append((m.role == "tutor" ? "Tutor: " : "You: ") + m.text) }
+        }
+        if let brief, !brief.isEmpty { out.append("\nThe brief:\n" + brief) }
+        return out.joined(separator: "\n")
+    }
 }
 
 /// POST /primer/{id}/build: what the draft is becoming.

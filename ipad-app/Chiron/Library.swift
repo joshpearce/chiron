@@ -93,12 +93,15 @@ final class Library: ObservableObject {
     /// (the harness state and, if wanted, a screenshot) so it can see what
     /// was meant. Returns the queued request, or nil with requestError set.
     @discardableResult
-    func requestChange(_ text: String, withPicture: Bool) async -> ChangeRequest? {
+    /// A change for the agent on the sprite. The picture is whatever shows
+    /// the problem best: one the reader picked, or failing that a picture of
+    /// where they were when they asked.
+    func requestChange(_ text: String, withPicture: Bool, picture: Data? = nil) async -> ChangeRequest? {
         var state: [String: Any] = [:]
-        var png: Data?
+        var png: Data? = picture
         #if DEBUG
         state = AppCommands.state(self).filter { JSONSerialization.isValidJSONObject([$0.key: $0.value]) }
-        if withPicture { png = try? AppCommands.screenshot() }
+        if png == nil, withPicture { png = try? AppCommands.screenshot() }
         #endif
         do {
             let r = try await service.requestChange(text: text, state: state, screenshotPNG: png)
