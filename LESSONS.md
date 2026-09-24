@@ -182,9 +182,13 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
   from outside. The only thing that kept it running was a live `sprite
   exec` session printing a line every ten seconds. The frozen time still
   counts on the wall clock, so `go test`'s ten-minute limit fired in
-  `httpapi` (621 s) and failed a request that had not touched Go. Until
-  the agent holds a session open itself, a request only progresses
-  while someone is connected.
+  `httpapi` (621 s) and failed a request that had not touched Go. The
+  runtime has a documented hold for exactly this: a task, made on
+  `/.sprite/api.sock` (`sprite-env curl -X POST /v1/tasks -d
+  '{"name":"x","expire":900}'`, at most an hour, renewed with PUT,
+  dropped with DELETE, expiring on its own if the holder dies). The
+  agent holds one per request (`devagent/awake.go`). Short HTTP pings
+  do not count as activity between them; a task does.
 - **The agent's Swift is never compiled on the sprite (2026-09-24).**
   The sprite has no Xcode, so `make test` there proves the Go side only.
   Request 1 came back with a main-actor `static var` used as a default

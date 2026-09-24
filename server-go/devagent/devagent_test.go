@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mjbraun/chiron/server/devreq"
 )
@@ -15,6 +16,7 @@ type fakeExec struct {
 	calls  []string
 	answer map[string]string // "git log" -> output; "!make test" -> fails with that output
 	stream []string          // claude's stream-json lines
+	pause  time.Duration     // how long claude takes
 }
 
 func (f *fakeExec) key(name string, args []string) string {
@@ -39,6 +41,7 @@ func (f *fakeExec) Run(dir, name string, args ...string) (string, error) {
 
 func (f *fakeExec) Stream(dir, name string, args []string, onLine func(string)) error {
 	f.calls = append(f.calls, name+" ...")
+	time.Sleep(f.pause)
 	for _, l := range f.stream {
 		onLine(l)
 	}

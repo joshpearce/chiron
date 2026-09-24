@@ -24,12 +24,17 @@ func main() {
 	model := flag.String("model", "claude-fable-5-1", "the model Claude Code works with")
 	every := flag.Duration("every", 10*time.Second, "how often to look for a request")
 	once := flag.Bool("once", false, "take one request, or none, and exit")
+	spriteAPI := flag.String("sprite-api", "/.sprite/api.sock", "the sprite runtime's API, which holds the sprite awake")
 	flag.Parse()
 
 	a := &devagent.Agent{
 		Repo: *repo, Work: *work, Served: *served,
 		Store: devreq.Open(filepath.Join(*served, "state", "requests")),
 		Model: *model, Exec: devagent.Shell{},
+	}
+	// On a sprite the runtime's API holds it awake while a request runs.
+	if _, err := os.Stat(*spriteAPI); err == nil {
+		a.Awake = devagent.SpriteTasks{Socket: *spriteAPI}
 	}
 	os.MkdirAll(*work, 0o755)
 	log.Printf("chiron-dev-agent: %s, requests in %s, %s", *repo, a.Store.Dir(), *model)

@@ -40,7 +40,10 @@ You are on the machine that serves the book. Facts that matter:
   `main`, `make deploy` if the server changed, `make app-build` if the
   app did. Matt's tap on "Request a change" is the permission for that
   deploy. A failed request keeps its worktree for a person; `git
-  worktree list` shows them.
+  worktree list` shows them. While it works a request, the agent holds
+  the sprite awake with a runtime task (`sprite-env curl /v1/tasks`
+  lists it as `request-<id>`); nothing else keeps a sprite from pausing
+  when no one is connected.
 
 ## Everywhere
 

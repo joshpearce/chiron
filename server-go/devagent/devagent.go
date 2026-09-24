@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mjbraun/chiron/server/devreq"
 )
@@ -29,6 +30,11 @@ type Agent struct {
 	Store              *devreq.Store
 	Model              string
 	Exec               Exec
+	// Awake holds the sprite awake while a request is worked; nil holds
+	// nothing. RenewEvery is how often the hold is renewed (five minutes
+	// when zero).
+	Awake      Keeper
+	RenewEvery time.Duration
 }
 
 // Once takes the oldest queued request and sees it through. It reports
@@ -53,6 +59,7 @@ func (a *Agent) handle(r *devreq.Request) {
 		r.Reason = reason
 		say("failed: %s", firstLine(reason))
 	}
+	defer a.keepAwake(r.ID)()
 	branch := "req/" + r.ID
 	wt := filepath.Join(a.Work, r.ID)
 
