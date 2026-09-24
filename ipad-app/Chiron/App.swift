@@ -380,6 +380,13 @@ struct BookshelfView: View {
                     }
                     ToolbarSpacer(.fixed, placement: .topBarTrailing)
                     ToolbarItemGroup(placement: .topBarTrailing) {
+                        Menu {
+                            ShelfOrderPicker()
+                        } label: {
+                            Label("Sort the library", systemImage: "arrow.up.arrow.down")
+                        }
+                        .accessibilityLabel("Sort the library")
+                        .accessibilityHint("Most recent first, or by title; shelves stay on top")
                         Button {
                             Task { await library.refresh() }
                         } label: { Label("Refresh the library", systemImage: "arrow.clockwise") }

@@ -204,6 +204,8 @@ type Server struct {
 	active     string
 	activePath string
 	shelves    *shelves
+	// When each subject was last opened, for ordering the shelf by recency.
+	opened *opened
 
 	jobsMu sync.Mutex
 	jobs   map[string]*Job
@@ -266,12 +268,14 @@ func New(cfg *Config, root string) (*Server, error) {
 		}
 	}
 	s.shelves = loadShelves(shelvesPath(s.activePath))
+	s.opened = loadOpened(s.activePath)
 	return s, nil
 }
 
 // markActive records id as the open book. Best-effort persistence: a failed
 // write only costs the reopen-on-last-book nicety after a restart.
 func (s *Server) markActive(id string) {
+	s.opened.mark(id)
 	s.activeMu.Lock()
 	defer s.activeMu.Unlock()
 	if s.active == id {
@@ -566,6 +570,8 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 		Page  int `json:"page,omitempty"`
 		// The shelf it is on, if any.
 		Shelf string `json:"shelf,omitempty"`
+		// When it last changed or was last opened, for ordering by recency.
+		UpdatedAt string `json:"updated_at,omitempty"`
 	}
 	out := []row{}
 	for _, sub := range s.allSubjects() {
@@ -576,6 +582,7 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 			CurrentUnit:  sub.Learner.Snapshot().CurrentUnit,
 			Debt:         len(sub.Learner.OpenDebt()),
 			Shelf:        s.shelves.shelfOf(sub.ID),
+			UpdatedAt:    s.subjectUpdated(sub),
 		}
 		if sub.Kind == KindReading || sub.Kind == KindFeed {
 			r.Kind = sub.Kind
@@ -599,11 +606,12 @@ func (s *Server) handleSubjects(w http.ResponseWriter, _ *http.Request) {
 			ID: m.ID, Title: m.Title, Kind: KindPrimer, Status: m.Status, Error: m.Error,
 			Source: &src, CapturedAt: m.CapturedAt.Format(time.RFC3339),
 			Scale: m.Scale, Book: m.Book, Progress: s.progressOf(m),
-			Shelf: s.shelves.shelfOf(m.ID),
+			Shelf: s.shelves.shelfOf(m.ID), UpdatedAt: s.updatedAt(m.ID, m.CapturedAt),
 		})
 	}
 	for _, d := range s.documents() {
-		out = append(out, row{ID: d.ID, Title: d.Title, Kind: "pdf", Pages: d.Pages, Page: d.Page, Shelf: s.shelves.shelfOf(d.ID)})
+		out = append(out, row{ID: d.ID, Title: d.Title, Kind: "pdf", Pages: d.Pages, Page: d.Page, Shelf: s.shelves.shelfOf(d.ID),
+			UpdatedAt: s.updatedAt(d.ID, stamp(d.ImportedAt), mtime(s.documentPath(d.ID)))})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"subjects": out,

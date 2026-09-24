@@ -167,6 +167,7 @@ func (s *Server) handleDocumentFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/pdf")
+	s.markOpened(d.ID)
 	http.ServeFile(w, r, s.documentFile(d.ID))
 }
 
@@ -184,6 +185,7 @@ func (s *Server) handleDocumentPosition(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	d.Page, d.Position = req.Page, req.Position
+	s.markOpened(d.ID)
 	if err := s.writeDocument(d); err != nil {
 		writeError(w, http.StatusInternalServerError, "save position: %v", err)
 		return
@@ -200,6 +202,7 @@ func (s *Server) handleDocumentDelete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "forget document: %v", err)
 		return
 	}
+	s.opened.forget(d.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": d.ID})
 }
 

@@ -70,10 +70,41 @@ final class ShelvesTests: XCTestCase {
         XCTAssertEqual(library.unfiled.count, 3)
     }
 
+    /// The reader picks the order once, and it holds in the library and
+    /// on every shelf: newest first by what last changed or was opened,
+    /// or by title. What has no stamp (an older server) goes by title.
+    func testCardsAreOrderedByRecencyOrByNameEverywhere() async {
+        let fake = FakeService()
+        let filed = ["zebra": "s1", "apple": "s1"]
+        let stamps = ["mango": "2026-09-20T10:00:00Z", "zebra": "2026-09-22T10:00:00Z", "apple": "2026-09-21T10:00:00Z"]
+        fake.onSubjects = {
+            let rows = ["mango", "zebra", "apple", "kiwi"].map { id in
+                SubjectInfo(id: id, title: id.capitalized, kind: "book", shelf: filed[id], updatedAt: stamps[id])
+            }
+            return SubjectsResponse(subjects: rows, active: nil, shelves: [ShelfInfo(id: "s1", name: "Fruit", subjects: ["zebra", "apple"])])
+        }
+        let defaults = UserDefaults(suiteName: "shelves-order-\(UUID().uuidString)")!
+        let storage = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let library = Library(storage: storage, service: fake, defaults: defaults)
+        await library.refresh()
+
+        XCTAssertEqual(library.order, .recent, "newest first unless the reader says otherwise")
+        XCTAssertEqual(library.unfiled.map(\.id), ["mango", "kiwi"], "an unstamped card comes after the stamped, by title")
+        XCTAssertEqual(library.subjects(on: "s1").map(\.id), ["zebra", "apple"])
+
+        library.order = .alphabetical
+        XCTAssertEqual(library.unfiled.map(\.id), ["kiwi", "mango"])
+        XCTAssertEqual(library.subjects(on: "s1").map(\.id), ["apple", "zebra"])
+
+        let later = Library(storage: storage, service: fake, defaults: defaults)
+        XCTAssertEqual(later.order, .alphabetical, "the choice is kept")
+    }
+
     func testAServerWithoutShelvesListsAPlainLibrary() throws {
         let json = #"{"subjects":[{"id":"ai","title":"How AI Works","kind":"book"}],"active":"ai"}"#
         let r = try JSONDecoder().decode(SubjectsResponse.self, from: Data(json.utf8))
         XCTAssertNil(r.shelves)
         XCTAssertNil(r.subjects.first?.shelf)
+        XCTAssertNil(r.subjects.first?.updatedAt)
     }
 }

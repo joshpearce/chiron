@@ -212,18 +212,30 @@ struct SubjectInfo: Codable, Identifiable {
     let page: Int?
     /// Followed blogs only: posts not opened on any device.
     let unread: Int?
+    /// When it last changed or was last opened (RFC3339), for ordering the
+    /// shelf by recency; a server before this sends nothing.
+    let updatedAt: String?
 
     init(id: String, title: String, unitsTotal: Int? = nil, unitsCleared: Int? = nil, currentUnit: String? = nil,
          debt: Int? = nil, kind: String? = nil, status: String? = nil, error: String? = nil,
          source: PrimerSource? = nil, capturedAt: String? = nil, scale: String? = nil, book: String? = nil,
          progress: String? = nil, shelf: String? = nil, pages: Int? = nil, page: Int? = nil,
-         unread: Int? = nil) {
+         unread: Int? = nil, updatedAt: String? = nil) {
         self.id = id; self.title = title; self.unitsTotal = unitsTotal; self.unitsCleared = unitsCleared
         self.currentUnit = currentUnit; self.debt = debt; self.kind = kind; self.status = status
         self.error = error; self.source = source; self.capturedAt = capturedAt
         self.scale = scale; self.book = book; self.progress = progress
         self.shelf = shelf.flatMap { $0.isEmpty ? nil : $0 }
-        self.pages = pages; self.page = page; self.unread = unread
+        self.pages = pages; self.page = page; self.unread = unread; self.updatedAt = updatedAt
+    }
+
+    /// The recency stamp as a moment; nil when the server sent none.
+    var updated: Date? {
+        guard let raw = updatedAt else { return nil }
+        if let date = ISO8601DateFormatter().date(from: raw) { return date }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: raw)
     }
 
     var isPrimer: Bool { kind == "primer" }
@@ -283,6 +295,45 @@ struct SubjectInfo: Codable, Identifiable {
         case unitsCleared = "units_cleared"
         case currentUnit = "current_unit"
         case capturedAt = "captured_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+/// How the cards are ordered, in the library and on every shelf.
+enum ShelfOrder: String, CaseIterable, Identifiable {
+    /// What last changed or was last opened comes first.
+    case recent
+    /// By title.
+    case alphabetical
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .recent: return "Most recent first"
+        case .alphabetical: return "By title"
+        }
+    }
+
+    /// The rows in this order. Recency falls back to the title, so a
+    /// server that sends no stamps still lists by name.
+    func apply(_ rows: [SubjectInfo]) -> [SubjectInfo] {
+        func byTitle(_ a: SubjectInfo, _ b: SubjectInfo) -> Bool {
+            a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
+        }
+        switch self {
+        case .alphabetical:
+            return rows.sorted(by: byTitle)
+        case .recent:
+            return rows.sorted { a, b in
+                switch (a.updated, b.updated) {
+                case let (x?, y?) where x != y: return x > y
+                case (.some, .none): return true
+                case (.none, .some): return false
+                default: return byTitle(a, b)
+                }
+            }
+        }
     }
 }
 

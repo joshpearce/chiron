@@ -200,6 +200,7 @@ func (s *Server) handleReadingDelete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "forget the book: %v", err)
 		return
 	}
+	s.opened.forget(id)
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": id})
 }
 

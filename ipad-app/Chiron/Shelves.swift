@@ -43,6 +43,21 @@ struct ShelfFolderCard: View {
     }
 }
 
+/// The order of the cards, chosen once for the library and every shelf:
+/// a picker for a toolbar menu.
+struct ShelfOrderPicker: View {
+    @EnvironmentObject var library: Library
+
+    var body: some View {
+        Picker("Sort by", selection: $library.order) {
+            ForEach(ShelfOrder.allCases) { order in
+                Text(order.label).tag(order)
+            }
+        }
+        .pickerStyle(.inline)
+    }
+}
+
 /// Rename or delete a shelf: the same two items on the card's menu and
 /// on the shelf's screen. The prompts they raise live on the view that
 /// stays on screen (`ShelfPrompts`); a dialog attached inside a menu is
@@ -165,6 +180,8 @@ struct ShelfContentsView: View {
             if shelf != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        ShelfOrderPicker()
+                        Divider()
                         ShelfMenu(renaming: $renaming, deleting: $deleting)
                     } label: {
                         Label("Shelf", systemImage: "ellipsis.circle")

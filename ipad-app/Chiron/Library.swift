@@ -20,6 +20,12 @@ final class Library: ObservableObject {
     /// The shelves of the library, and the one open (a path of one id).
     @Published var shelves: [ShelfInfo] = []
     @Published var shelfPath: [String] = []
+    /// How the cards are ordered, in the library and on every shelf;
+    /// the reader's choice, kept on the device.
+    @Published var order: ShelfOrder {
+        didSet { defaults.set(order.rawValue, forKey: "shelfOrder") }
+    }
+    private let defaults: UserDefaults
     #if DEBUG
     /// The last URL the app was opened with, for the harness.
     var lastOpenedURL: String?
@@ -70,9 +76,11 @@ final class Library: ObservableObject {
     /// This app's own build number, CFBundleVersion.
     var runningBuild: Int = Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0
 
-    init(storage: URL? = nil, service: ChironService? = nil) {
+    init(storage: URL? = nil, service: ChironService? = nil, defaults: UserDefaults = .standard) {
         self.storage = storage ?? Library.defaultStorage()
         self.service = service ?? sync
+        self.defaults = defaults
+        self.order = ShelfOrder(rawValue: defaults.string(forKey: "shelfOrder") ?? "") ?? .recent
         agent.attach(self)
         loadShelfCache()
     }
@@ -301,11 +309,12 @@ final class Library: ObservableObject {
         activeSubjectID = shelf.activeID
     }
 
-    // The library's shape: what is on no shelf, and what is on one.
+    // The library's shape: what is on no shelf, and what is on one, each
+    // in the reader's order.
 
-    var unfiled: [SubjectInfo] { subjects.filter { $0.shelf == nil } }
+    var unfiled: [SubjectInfo] { order.apply(subjects.filter { $0.shelf == nil }) }
 
-    func subjects(on shelf: String) -> [SubjectInfo] { subjects.filter { $0.shelf == shelf } }
+    func subjects(on shelf: String) -> [SubjectInfo] { order.apply(subjects.filter { $0.shelf == shelf }) }
 
     func shelf(_ id: String) -> ShelfInfo? { shelves.first { $0.id == id } }
 
