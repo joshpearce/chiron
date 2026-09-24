@@ -174,12 +174,14 @@ struct LibraryList: View {
             }
             ForEach(library.listed(in: scope)) { s in
                 LibraryRow(subject: s, showShelf: shelf == nil, dense: dense)
+                    .listRowInsets(EdgeInsets(top: dense ? 3 : 6, leading: 16, bottom: dense ? 3 : 6, trailing: 16))
             }
             if let err = library.shelfError, !library.subjects.isEmpty {
                 Text(err).foregroundStyle(.red).font(.callout)
             }
         }
         .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 36)
         .overlay {
             if library.listed(in: scope).isEmpty && !library.subjects.isEmpty {
                 Text(shelf != nil
@@ -296,7 +298,7 @@ struct LibraryRow: View {
                 }
                 trailing
             }
-            .padding(.vertical, dense ? 1 : 4)
+            .padding(.vertical, dense ? 0 : 2)
             .contentShape(Rectangle())
             .opacity(openable ? 1 : 0.55)
         }
