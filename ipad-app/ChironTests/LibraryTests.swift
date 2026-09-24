@@ -20,7 +20,25 @@ final class LibraryTests: XCTestCase {
         let storage = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let l = Library(storage: storage, service: fake)
         l.shelfPollInterval = 0.05
+        l.requestPollInterval = 0.05
+        l.notices = FakeNotices()
         return l
+    }
+
+    private func fakeNotices(_ library: Library) throws -> FakeNotices {
+        try XCTUnwrap(library.notices as? FakeNotices)
+    }
+
+    private func decode(_ json: String) -> SubjectsResponse {
+        try! JSONDecoder().decode(SubjectsResponse.self, from: Data(json.utf8))
+    }
+
+    private func wait(for what: String, _ done: () -> Bool) async throws {
+        let deadline = Date().addingTimeInterval(3)
+        while !done(), Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertTrue(done(), "waited for \(what)")
     }
 
     private func planned(_ reply: String, done: Bool = false, brief: String? = nil, title: String? = nil) -> CaptureResponse {
@@ -269,5 +287,139 @@ final class LibraryTests: XCTestCase {
         try await Task.sleep(nanoseconds: 300_000_000)
         XCTAssertNil(library.session)
         XCTAssertTrue(library.subjects.contains(where: { $0.id == "primer-why" && $0.failed }))
+        XCTAssertEqual(try fakeNotices(library).sent.map(\.title), ["The primer could not be written"], "and the reader hears why")
     }
+
+    // The reader may put the iPad down while the server writes: a word
+    // when it is done, once, and none before.
+
+    func testTheReaderIsToldWhenThePrimerIsWritten() async throws {
+        let fake = FakeService()
+        fake.onSubjects = { [unowned self] in self.subjects("planning") }
+        fake.onCapture = { [unowned self] _ in self.planned("Which part?", done: true) }
+        fake.onBuild = { id in BuildResponse(subject: id, status: "authoring", title: "Why", book: nil) }
+        let library = library(fake)
+        let notices = try fakeNotices(library)
+        _ = try await library.submitCapture(Capture(text: "words"), prompt: "why?")
+        fake.onSubjects = { [unowned self] in self.subjects("authoring") }
+        await library.buildDraft()
+        XCTAssertEqual(notices.prepared, 1, "the system is asked once there is something coming")
+        XCTAssertTrue(notices.sent.isEmpty, "nothing to say while it is written")
+        XCTAssertTrue(library.awaiting)
+
+        fake.onSubjects = { [unowned self] in self.subjects("ready") }
+        try await waitForSession(library, "primer-why")
+        XCTAssertEqual(notices.sent.map(\.title), ["Your primer is ready"])
+        XCTAssertEqual(notices.sent.first?.body, "Why")
+        XCTAssertEqual(notices.sent.first?.id, "primer-why")
+        await library.refresh()
+        XCTAssertEqual(notices.sent.count, 1, "said once")
+        XCTAssertFalse(library.awaiting)
+    }
+
+    /// A primer written while a book is open still gets its word: the
+    /// shelf keeps checking back for it behind the book.
+    func testAPrimerWrittenBehindAnOpenBookStillGetsItsWord() async throws {
+        let fake = FakeService()
+        fake.onSubjects = { [unowned self] in self.subjects("authoring") }
+        let library = library(fake)
+        let notices = try fakeNotices(library)
+        await library.launch()
+        await library.open("ai")
+        fake.onSubjects = { [unowned self] in self.subjects("ready") }
+        try await wait(for: "the word") { !notices.sent.isEmpty }
+        XCTAssertEqual(notices.sent.map(\.title), ["Your primer is ready"])
+        XCTAssertEqual(library.session?.subjectID, "ai", "the book stays open; the primer was not asked for here")
+    }
+
+    /// A book draft is watched under its book's name: the draft leaves
+    /// the shelf when the book takes its place, and the word names the book.
+    func testTheReaderIsToldWhenTheBookArrives() async throws {
+        let fake = FakeService()
+        fake.onSubjects = { [unowned self] in self.decode("""
+        {"subjects":[{"id":"primer-why","title":"Why","kind":"primer","status":"building","scale":"book","book":"why-book","progress":"writing chapter 2 of 5"}]}
+        """) }
+        let library = library(fake)
+        let notices = try fakeNotices(library)
+        await library.refresh()
+        XCTAssertTrue(notices.sent.isEmpty)
+        fake.onSubjects = { [unowned self] in self.decode("""
+        {"subjects":[{"id":"why-book","title":"Why, the book","kind":"book"}]}
+        """) }
+        try await wait(for: "the word") { !notices.sent.isEmpty }
+        XCTAssertEqual(notices.sent.map(\.title), ["Your book is ready"])
+        XCTAssertEqual(notices.sent.first?.body, "Why, the book")
+        XCTAssertEqual(notices.sent.first?.id, "why-book")
+    }
+
+    func testTheReaderIsToldWhenABookCannotBeBuilt() async throws {
+        let fake = FakeService()
+        fake.onSubjects = { [unowned self] in self.decode("""
+        {"subjects":[{"id":"primer-why","title":"Why","kind":"primer","status":"building","scale":"book","book":"why-book"}]}
+        """) }
+        let library = library(fake)
+        let notices = try fakeNotices(library)
+        await library.refresh()
+        fake.onSubjects = { [unowned self] in self.decode("""
+        {"subjects":[{"id":"primer-why","title":"Why","kind":"primer","status":"failed","error":"the model timed out","scale":"book","book":"why-book"}]}
+        """) }
+        try await wait(for: "the word") { !notices.sent.isEmpty }
+        XCTAssertEqual(notices.sent.map(\.title), ["The book could not be built"])
+        XCTAssertEqual(notices.sent.first?.body, "the model timed out")
+    }
+
+    /// A change request is watched with the card closed, and the word
+    /// comes when the agent is done with it, once; a request that was
+    /// already done when the app looked is not news.
+    func testTheReaderIsToldWhenAChangeIsBuilt() async throws {
+        let fake = FakeService()
+        fake.onSubjects = { [unowned self] in self.subjects("ready") }
+        let old = ChangeRequest(id: "req-0", text: "an older wish", status: "ready", createdAt: "2026-09-19T10:00:00Z", log: [], last: nil, summary: "done", reason: nil, commit: "abc", build: nil)
+        fake.onChangeRequests = { [old] }
+        fake.onRequestChange = { text, _, _ in
+            ChangeRequest(id: "req-1", text: text, status: "queued", createdAt: "2026-09-20T10:00:00Z", log: [], last: nil, summary: nil, reason: nil, commit: nil, build: nil)
+        }
+        let library = library(fake)
+        let notices = try fakeNotices(library)
+        await library.launch()
+        XCTAssertTrue(notices.sent.isEmpty, "what was done before is not news")
+
+        let working = ChangeRequest(id: "req-1", text: "a thicker pen", status: "working", createdAt: "2026-09-20T10:00:00Z", log: [], last: "working", summary: nil, reason: nil, commit: nil, build: nil)
+        fake.onChangeRequests = { [working, old] }
+        _ = await library.requestChange("a thicker pen", withPicture: false)
+        XCTAssertEqual(notices.prepared, 1)
+        XCTAssertTrue(notices.sent.isEmpty, "nothing to say while the agent works")
+        XCTAssertTrue(library.awaiting)
+
+        var built = working
+        built.status = "ready"
+        built.build = ChangeRequest.Build(version: "2026.9.24", build: 310, token: "t")
+        fake.onChangeRequests = { [built, old] }
+        // The card is closed; the library checks back on its own.
+        try await wait(for: "the word") { !notices.sent.isEmpty }
+        XCTAssertEqual(notices.sent.map(\.title), ["Your change is built"])
+        XCTAssertEqual(notices.sent.first?.body, "a thicker pen")
+        await library.refreshRequests()
+        XCTAssertEqual(notices.sent.count, 1, "said once")
+        XCTAssertFalse(library.awaiting)
+
+        var failed = working
+        failed.id = "req-2"
+        failed.text = "the moon"
+        fake.onChangeRequests = { [failed, built, old] }
+        await library.refreshRequests()
+        failed.status = "failed"
+        failed.reason = "tests"
+        fake.onChangeRequests = { [failed, built, old] }
+        try await wait(for: "the second word") { notices.sent.count == 2 }
+        XCTAssertEqual(notices.sent.last?.title, "The change could not be made")
+    }
+}
+
+/// Notices as the tests see them: kept, not shown.
+final class FakeNotices: NoticeSender {
+    var sent: [(id: String, title: String, body: String)] = []
+    var prepared = 0
+    func prepare() { prepared += 1 }
+    func notify(id: String, title: String, body: String) { sent.append((id, title, body)) }
 }

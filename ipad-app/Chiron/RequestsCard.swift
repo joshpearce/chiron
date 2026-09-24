@@ -2,13 +2,14 @@ import PhotosUI
 import SwiftUI
 
 /// "Request a change": what the reader wants different, sent to the
-/// development agent on the sprite with a picture of where they were,
+/// development agent on the sprite with, if they want, a picture of
+/// where they were,
 /// and every request so far with what the agent has done about it. A
 /// ready request whose build is newer than this app offers Install.
 struct RequestsCard: View {
     @EnvironmentObject var library: Library
     @State private var text = ""
-    @State private var withPicture = true
+    @State private var withPicture = false
     @State private var sending = false
     @State private var picked: PhotosPickerItem?
     @State private var picture: Data?

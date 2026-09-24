@@ -36,6 +36,13 @@ struct ChironApp: App {
                     if phase == .inactive || phase == .background {
                         library.session?.persist()
                     }
+                    // Something being written or built for the reader is
+                    // looked for while the app is away, and on its return.
+                    if phase == .background {
+                        library.scheduleBackgroundCheck()
+                    } else if phase == .active {
+                        Task { await library.resume() }
+                    }
                 }
                 // The share extension and the capture intent hand over
                 // through a URL naming a capture in the shared inbox; the
@@ -51,6 +58,9 @@ struct ChironApp: App {
                     }
                 }
                 .onReceive(CaptureRouter.arrivals) { id in library.receiveCapture(id: id) }
+        }
+        .backgroundTask(.appRefresh(Library.backgroundCheckID)) {
+            await library.backgroundCheck()
         }
     }
 }

@@ -1,3 +1,4 @@
+import BackgroundTasks
 import Foundation
 import PDFKit
 import PencilKit
@@ -45,6 +46,17 @@ final class Library: ObservableObject {
     private var feedCheck: Task<Void, Never>?
     /// How often the shelf checks back while a primer is being written.
     var shelfPollInterval: TimeInterval = 4
+    /// A word to the reader when something they asked for is done.
+    var notices: NoticeSender = Notices.shared
+    /// What the server is writing for the reader, as of the last look, by
+    /// the id it will have when done (a book draft under its book's id)
+    /// with the title to name it by.
+    private var writing: [String: String] = [:]
+    /// Change requests in the agent's hands, as of the last look.
+    private var openRequests: Set<String> = []
+    private var requestPoller: Task<Void, Never>?
+    /// How often the requests are checked while one is in the agent's hands.
+    var requestPollInterval: TimeInterval = 15
     /// The primer the reader just asked for: it opens on its own once the
     /// server has written it, as long as the reader is still on the shelf.
     private var awaitedPrimer: String?
@@ -106,6 +118,7 @@ final class Library: ObservableObject {
         do {
             let r = try await service.requestChange(text: text, state: state, screenshotPNG: png)
             requestError = nil
+            notices.prepare()
             await refreshRequests()
             return r
         } catch {
@@ -115,7 +128,92 @@ final class Library: ObservableObject {
     }
 
     func refreshRequests() async {
-        if let list = try? await service.changeRequests() { requests = list }
+        guard let list = try? await service.changeRequests() else { return }
+        requests = list
+        // A request that was in the agent's hands and is out of them now.
+        for r in list where !r.open && openRequests.contains(r.id) {
+            notices.notify(id: "request-\(r.id)",
+                           title: r.status == "ready" ? "Your change is built" : "The change could not be made",
+                           body: r.text)
+        }
+        openRequests = Set(list.filter(\.open).map(\.id))
+        watchRequests()
+    }
+
+    /// While a request is in the agent's hands the app checks back on its
+    /// own, card open or not, so the reader hears when it is done.
+    private func watchRequests() {
+        guard !openRequests.isEmpty, requestPoller == nil else { return }
+        requestPoller = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: UInt64(self.requestPollInterval * 1_000_000_000))
+            self.requestPoller = nil
+            await self.refreshRequests()
+            await self.checkForBuild()
+        }
+    }
+
+    /// Something the reader is waiting on: a primer or a book being
+    /// written, a change request in the agent's hands.
+    var awaiting: Bool { !writing.isEmpty || !openRequests.isEmpty }
+
+    /// Whatever was being written at the last look and is done now gets
+    /// a word to the reader; whatever is being written now is remembered.
+    private func noticeWriting() {
+        let byID = Dictionary(subjects.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        for (id, title) in writing {
+            if let s = byID[id] {
+                guard !s.authoring else { continue }
+                if s.failed {
+                    notices.notify(id: id, title: "The primer could not be written", body: s.error ?? s.title)
+                } else {
+                    notices.notify(id: id, title: s.isPrimer ? "Your primer is ready" : "Your book is ready", body: s.title)
+                }
+            } else if let draft = subjects.first(where: { $0.book == id }) {
+                // A book draft stays on the shelf until its book arrives or
+                // its generation fails.
+                guard !draft.authoring else { continue }
+                if draft.failed {
+                    notices.notify(id: id, title: "The book could not be built", body: draft.error ?? title)
+                }
+            }
+            // Gone from the shelf altogether: discarded, or another device's
+            // doing; nothing to say.
+            writing[id] = nil
+        }
+        for s in subjects where s.authoring {
+            writing[s.book ?? s.id] = s.title
+        }
+    }
+
+    // MARK: - Away from the app
+
+    /// The system's name for a look at the shelf while the app is in the
+    /// background, so a notice can reach the reader in another app.
+    nonisolated static let backgroundCheckID = "dev.mjbraun.chiron.check"
+
+    /// Ask for a look at the shelf while the app is away, when there is
+    /// something to look for. The system decides when, if at all.
+    func scheduleBackgroundCheck() {
+        guard awaiting else { return }
+        let request = BGAppRefreshTaskRequest(identifier: Self.backgroundCheckID)
+        request.earliestBeginDate = Date().addingTimeInterval(60)
+        try? BGTaskScheduler.shared.submit(request)
+    }
+
+    /// The look itself: the shelf and the requests, then another look
+    /// asked for if there is still something to wait on.
+    func backgroundCheck() async {
+        await refresh()
+        await refreshRequests()
+        scheduleBackgroundCheck()
+    }
+
+    /// Back in front: what was waited on may be done.
+    func resume() async {
+        guard awaiting else { return }
+        await refresh()
+        await refreshRequests()
     }
 
     /// Ask the server for its latest build and offer it if it is newer
@@ -166,6 +264,7 @@ final class Library: ObservableObject {
             shelves = shelf.shelves ?? []
             activeSubjectID = shelf.activeID
             shelfError = nil
+            noticeWriting()
             // A shelf deleted elsewhere closes here.
             shelfPath.removeAll { id in !shelves.contains { $0.id == id } }
             saveShelfCache(shelf)
@@ -187,7 +286,7 @@ final class Library: ObservableObject {
                 guard let self else { return }
                 try? await Task.sleep(nanoseconds: UInt64(self.shelfPollInterval * 1_000_000_000))
                 self.shelfPoller = nil
-                if self.session == nil || self.awaitedPrimer != nil { await self.refresh() }
+                if self.session == nil || self.awaitedPrimer != nil || !self.writing.isEmpty { await self.refresh() }
             }
         }
     }
@@ -272,6 +371,7 @@ final class Library: ObservableObject {
             awaitedPrimer = built.book ?? built.subject
             planning = nil
             planError = nil
+            notices.prepare()
             session?.persist()
             session = nil
             await refresh()
@@ -399,6 +499,8 @@ final class Library: ObservableObject {
     /// whichever client, is the card marked "Open now".
     func launch() async {
         await refresh()
+        // A request left with the agent last time is watched again.
+        await refreshRequests()
     }
 
     func open(_ id: String) async {

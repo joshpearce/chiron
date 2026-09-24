@@ -410,9 +410,54 @@ final class Sync: ObservableObject, ChironService {
         return req
     }
 
-    private func perform<T: Decodable>(_ req: URLRequest) async throws -> T {
+    // The sprite sleeps when nobody is reading and wakes on the first
+    // request, which that request does not survive: the connection is
+    // refused, or the gate answers 502 or 503 while the server comes up.
+    // A request that never reached the server goes again, a few times, a
+    // moment apart. One the server answered, or that timed out, does not:
+    // the server may have taken it, and a capture sent twice is two drafts.
+
+    /// The pauses between tries; one more try than pauses.
+    static var retryPauses: [TimeInterval] = [1, 2, 4]
+
+    static func worthRetrying(_ error: Error) -> Bool {
+        if let e = error as? URLError {
+            switch e.code {
+            case .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed, .networkConnectionLost: return true
+            default: return false
+            }
+        }
+        if let s = error as? ServiceError, case .status(let code) = s { return gatewayDown(code) }
+        return false
+    }
+
+    /// The gate is up and its server is not, or the platform is still
+    /// bringing the sprite back.
+    static func gatewayDown(_ code: Int) -> Bool { code == 502 || code == 503 || code == 504 }
+
+    static func retrying<T>(pauses: [TimeInterval] = retryPauses, _ op: () async throws -> T) async throws -> T {
+        var pauses = pauses[...]
+        while true {
+            do {
+                return try await op()
+            } catch {
+                guard worthRetrying(error), let pause = pauses.popFirst() else { throw error }
+                try? await Task.sleep(nanoseconds: UInt64(pause * 1_000_000_000))
+            }
+        }
+    }
+
+    /// One try: the status and the bytes, with a gateway's failure thrown
+    /// so the retry sees it.
+    private func fetch(_ req: URLRequest) async throws -> (Int, Data) {
         let (data, resp) = try await URLSession.shared.data(for: req)
         let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        if Self.gatewayDown(code) { throw ServiceError.status(code) }
+        return (code, data)
+    }
+
+    private func perform<T: Decodable>(_ req: URLRequest) async throws -> T {
+        let (code, data) = try await Self.retrying { try await fetch(req) }
         guard code == 200 else {
             connected = false
             throw ServiceError.status(code)
@@ -437,8 +482,11 @@ final class Sync: ObservableObject, ChironService {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = body
         }
-        let (data, resp) = try await URLSession.shared.data(for: req)
-        return ((resp as? HTTPURLResponse)?.statusCode ?? 0, data)
+        do {
+            return try await Self.retrying { try await fetch(req) }
+        } catch ServiceError.status(let code) {
+            return (code, Data())
+        }
     }
 
     private func send<T: Decodable>(_ method: String, _ path: String, body: Data?, timeout: TimeInterval) async throws -> T {

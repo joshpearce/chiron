@@ -63,6 +63,14 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
 
 ## Server and sprite
 
+- **The first request to a sleeping sprite fails (2026-09-24).** The
+  platform wakes the sprite on the first connection and that connection
+  is refused, or the gate answers 502 while the server comes up; the
+  reader saw "unable to reach the server" and had to send the primer
+  twice. `Sync` now sends a request that never reached the server again,
+  a few times, a moment apart (connection refused, DNS, 502/503/504),
+  and never one that timed out or was answered: a capture sent twice is
+  two drafts.
 - **`sprite-env services create` keeps only the last `--env`
   (2026-09-02).** Two flags left the book server without its key and open.
   One flag, comma-separated.
