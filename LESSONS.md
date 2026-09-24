@@ -174,6 +174,24 @@ symptom, the cause, what to do. Add to it in the same commit as the fix.
 - **A VStack with `maxHeight: .infinity` centres its overflow
   (2026-09-05).** The shelf lost its header at the top once the cards
   outgrew the screen; a ScrollView is what a growing list needs.
+- **Nothing on the sprite keeps it awake for the dev agent
+  (2026-09-24).** A request sat in `make test` for three hours: the
+  sprite hibernates when no one is connected, and its processes freeze
+  with it. Tried and failed: a service on the sprite, a loop curling the
+  sprite's own public URL, and Truman curling `/ping` every 20 seconds
+  from outside. The only thing that kept it running was a live `sprite
+  exec` session printing a line every ten seconds. The frozen time still
+  counts on the wall clock, so `go test`'s ten-minute limit fired in
+  `httpapi` (621 s) and failed a request that had not touched Go. Until
+  the agent holds a session open itself, a request only progresses
+  while someone is connected.
+- **The agent's Swift is never compiled on the sprite (2026-09-24).**
+  The sprite has no Xcode, so `make test` there proves the Go side only.
+  Request 1 came back with a main-actor `static var` used as a default
+  argument (does not build) and new keys written into `Info.plist`,
+  which XcodeGen regenerates from `project.yml` - they vanished on the
+  next `xcodegen generate`. An app change from the agent is untested
+  until the Mac builds it; plist keys go in `project.yml`.
 
 ## Mac side
 
