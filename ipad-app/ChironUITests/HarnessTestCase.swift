@@ -191,6 +191,19 @@ class HarnessTestCase: XCTestCase {
             try post("server", ["url": Self.serverURL, "name": "dev"])
             try post("open", ["subject": subject])
         }
+        // A server with fresh state starts the book at its placement
+        // question and a calibration series; go through them to a chapter.
+        for _ in 0..<8 {
+            let screen = try state()["screen"] as? String ?? ""
+            switch screen {
+            case "placement": try post("place", ["level": 3])
+            case "series", "pretest", "checking": try post("answer", ["mode": "correct"])
+            case "results": try post("proceed")
+            default: break
+            }
+            if screen == "reading" { break }
+            Thread.sleep(forTimeInterval: 0.5)
+        }
         try waitUntil("the reader's palette", timeout: 25) { self.app.buttons["Pen"].exists }
         try waitUntil("the chapter to be on the page") { try self.eval("!!document.querySelector('#chapter h1')") == "1" }
         for m in try marks() {
