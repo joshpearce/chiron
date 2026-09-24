@@ -73,15 +73,15 @@
 		<string>fonts/SourceSans3-Semibold.ttf</string>
 		<string>fonts/SourceSans3-Bold.ttf</string>
 	</array>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>fetch</string>
-	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
 	<key>UIRequiresFullScreen</key>
 	<false/>
 </dict>

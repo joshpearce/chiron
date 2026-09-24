@@ -71,6 +71,10 @@ targets:
         NSLocalNetworkUsageDescription: "Chiron connects to the tutor server running on your Mac to grade answers and generate chapters."
         NSCameraUsageDescription: "Chiron reads the setup code shown on your other device, so you do not have to type the server's address and key."
         UIRequiresFullScreen: false
+        # The background refresh that looks for finished primers, books
+        # and changes while the reader is away.
+        BGTaskSchedulerPermittedIdentifiers: [dev.mjbraun.chiron.check]
+        UIBackgroundModes: [fetch]
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         # chiron://capture/<id>: the share extension's and intents' way in.

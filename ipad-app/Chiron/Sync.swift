@@ -418,7 +418,7 @@ final class Sync: ObservableObject, ChironService {
     // the server may have taken it, and a capture sent twice is two drafts.
 
     /// The pauses between tries; one more try than pauses.
-    static var retryPauses: [TimeInterval] = [1, 2, 4]
+    nonisolated static let retryPauses: [TimeInterval] = [1, 2, 4]
 
     static func worthRetrying(_ error: Error) -> Bool {
         if let e = error as? URLError {
