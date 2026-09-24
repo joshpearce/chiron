@@ -299,44 +299,6 @@ struct SubjectInfo: Codable, Identifiable {
     }
 }
 
-/// How the cards are ordered, in the library and on every shelf.
-enum ShelfOrder: String, CaseIterable, Identifiable {
-    /// What last changed or was last opened comes first.
-    case recent
-    /// By title.
-    case alphabetical
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .recent: return "Most recent first"
-        case .alphabetical: return "By title"
-        }
-    }
-
-    /// The rows in this order. Recency falls back to the title, so a
-    /// server that sends no stamps still lists by name.
-    func apply(_ rows: [SubjectInfo]) -> [SubjectInfo] {
-        func byTitle(_ a: SubjectInfo, _ b: SubjectInfo) -> Bool {
-            a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
-        }
-        switch self {
-        case .alphabetical:
-            return rows.sorted(by: byTitle)
-        case .recent:
-            return rows.sorted { a, b in
-                switch (a.updated, b.updated) {
-                case let (x?, y?) where x != y: return x > y
-                case (.some, .none): return true
-                case (.none, .some): return false
-                default: return byTitle(a, b)
-                }
-            }
-        }
-    }
-}
-
 struct PrimerSource: Codable, Equatable {
     let text: String?
     let url: String?

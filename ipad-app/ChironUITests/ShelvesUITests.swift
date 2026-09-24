@@ -1,7 +1,7 @@
 import XCTest
 
-/// A card dragged onto a shelf is filed there; dragged onto the library
-/// row on the shelf's screen, it comes back. Read back through the
+/// A row dragged onto a shelf in the sidebar is filed there; dragged onto
+/// the sidebar's All, it comes off the shelf. Read back through the
 /// harness, so the assertion is about where the server says it is.
 final class ShelvesUITests: HarnessTestCase {
     private var made: String?
@@ -36,17 +36,17 @@ final class ShelvesUITests: HarnessTestCase {
 
     func testDraggingACardOntoAShelfFilesItAndBack() throws {
         let id = try freshShelf(named: "Dragged", clearing: "Dragged")
-        let folder = app.buttons["Shelf: Dragged"].firstMatch
-        XCTAssertTrue(folder.waitForExistence(timeout: 10), "the shelf's folder card")
+        let folder = app.descendants(matching: .any)["Shelf: Dragged"].firstMatch
+        XCTAssertTrue(folder.waitForExistence(timeout: 10), "the shelf's row in the sidebar")
         let card = app.buttons["Where the Words Come From"].firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 5), "a book card in the library")
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "a book's row in the library")
         card.press(forDuration: 0.6, thenDragTo: folder, withVelocity: .slow, thenHoldForDuration: 0.8)
         try waitUntil("the book to land on the shelf") { (try self.shelfOf("data")) == id }
 
-        // Onto the shelf's screen, and back off it by the library row.
+        // The shelf's list, and back off it onto All.
         try post("shelf/open", ["id": id])
-        let library = app.descendants(matching: .any)["Back to the library"].firstMatch
-        XCTAssertTrue(library.waitForExistence(timeout: 10), "the library drop row")
+        let library = app.descendants(matching: .any)["library-all"].firstMatch
+        XCTAssertTrue(library.waitForExistence(timeout: 10), "the sidebar's All")
         let onShelf = app.buttons["Where the Words Come From"].firstMatch
         XCTAssertTrue(onShelf.waitForExistence(timeout: 5))
         onShelf.press(forDuration: 0.6, thenDragTo: library, withVelocity: .slow, thenHoldForDuration: 0.8)

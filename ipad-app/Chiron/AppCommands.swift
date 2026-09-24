@@ -101,14 +101,22 @@ enum AppCommands {
         case "shelf/open":
             guard let id = args["id"] as? String, library.shelf(id) != nil else { throw Failure.badArguments("shelf/open needs the id of a shelf") }
             library.closeBook()
-            library.shelfPath = [id]
+            library.scope = .shelf(id)
         case "shelf/close":
-            library.shelfPath = []
+            library.scope = .all
         case "shelf/order":
-            guard let raw = args["order"] as? String, let order = ShelfOrder(rawValue: raw) else {
-                throw Failure.badArguments("shelf/order needs order: recent | alphabetical")
+            guard let raw = args["order"] as? String, let order = LibrarySort(rawValue: raw) else {
+                throw Failure.badArguments("shelf/order needs order: recent | title | kind | unread")
             }
             library.order = order
+        case "library/show":
+            // What the sidebar picks: all, a kind (book, primer, feed,
+            // reading, pdf), or shelf:<id>.
+            guard let raw = args["scope"] as? String, let scope = LibraryScope(harness: raw) else {
+                throw Failure.badArguments("library/show needs scope: all, a kind, or shelf:<id>")
+            }
+            library.closeBook()
+            library.scope = scope
         case "import":
             guard let path = args["path"] as? String else { throw Failure.badArguments("import needs path") }
             await library.importPDF(at: URL(fileURLWithPath: path))
@@ -396,7 +404,8 @@ enum AppCommands {
             "capture_answer": library.captureAnswer ?? "",
             "shelf_rows": library.subjects.map { ["id": $0.id, "kind": $0.kind ?? "book", "status": $0.status ?? "", "scale": $0.scale ?? "", "progress": $0.progress ?? "", "shelf": $0.shelf ?? "", "unread": $0.unread ?? 0, "updated": $0.updatedAt ?? ""] },
             "shelves": library.shelves.map { ["id": $0.id, "name": $0.name, "subjects": $0.subjects] },
-            "open_shelf": library.shelfPath.last ?? "",
+            "open_shelf": { if case .shelf(let id) = library.scope { return id } else { return "" } }(),
+            "scope": library.scope?.harness ?? "",
             "order": library.order.rawValue,
             "shelf_error": library.shelfError ?? "",
         ]

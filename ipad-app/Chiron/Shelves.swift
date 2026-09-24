@@ -1,60 +1,123 @@
 import SwiftUI
 
-/// A shelf in the library: a folder card that opens the shelf, takes a
-/// dragged book, and carries the shelf's menu.
-struct ShelfFolderCard: View {
-    @EnvironmentObject var library: Library
-    let shelf: ShelfInfo
-    @State private var over = false
-    @State private var renaming = false
-    @State private var deleting = false
+/// What a thing in the library is, in the order the sidebar lists them.
+enum LibraryKind: String, CaseIterable, Hashable {
+    case book, primer, feed, reading, pdf
 
-    var body: some View {
-        NavigationLink(value: shelf.id) {
-            HStack(alignment: .center, spacing: 14) {
-                Image(systemName: over ? "folder.fill" : "folder")
-                    .font(.title2)
-                    .foregroundStyle(over ? Color.accentColor : .secondary)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(shelf.name).font(Typography.serif(22, weight: .semibold, relativeTo: .title3))
-                    Text(ShelfContentsView.countLine(shelf.subjects.count))
-                        .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Image(systemName: "chevron.right").foregroundStyle(.secondary)
-            }
-            .padding(18)
-            .frame(maxWidth: 480)
-            .background(over ? AnyShapeStyle(Color.accentColor.opacity(0.15)) : AnyShapeStyle(.fill.tertiary),
-                        in: .rect(cornerRadius: 22))
-            .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.accentColor, lineWidth: over ? 2 : 0))
+    var plural: String {
+        switch self {
+        case .book: return "Books"
+        case .primer: return "Primers"
+        case .feed: return "Feeds"
+        case .reading: return "Readings"
+        case .pdf: return "PDFs"
         }
-        .buttonStyle(.plain)
-        .hoverEffect()
-        .accessibilityLabel("Shelf: \(shelf.name)")
-        .accessibilityHint(ShelfContentsView.countLine(shelf.subjects.count))
-        .dropDestination(for: String.self) { ids, _ in
-            guard let id = ids.first else { return false }
-            Task { await library.move(id, to: shelf.id) }
-            return true
-        } isTargeted: { over = $0 }
-        .contextMenu { ShelfMenu(renaming: $renaming, deleting: $deleting) }
-        .modifier(ShelfPrompts(shelf: shelf, renaming: $renaming, deleting: $deleting))
+    }
+
+    var symbol: String {
+        switch self {
+        case .book: return "brain"
+        case .primer: return "doc.text"
+        case .feed: return "dot.radiowaves.up.forward"
+        case .reading: return "book"
+        case .pdf: return "doc.richtext"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .book: return Color(red: 0.21, green: 0.34, blue: 0.56)
+        case .primer: return Color(red: 0.25, green: 0.49, blue: 0.36)
+        case .feed: return Color(red: 0.77, green: 0.42, blue: 0.14)
+        case .reading: return Color(red: 0.48, green: 0.29, blue: 0.53)
+        case .pdf: return Color(red: 0.55, green: 0.29, blue: 0.27)
+        }
     }
 }
 
-/// The order of the cards, chosen once for the library and every shelf:
-/// a picker for a toolbar menu.
-struct ShelfOrderPicker: View {
-    @EnvironmentObject var library: Library
+/// What the library's list shows, picked in the sidebar.
+enum LibraryScope: Hashable {
+    case all
+    case kind(LibraryKind)
+    case shelf(String)
 
-    var body: some View {
-        Picker("Sort by", selection: $library.order) {
-            ForEach(ShelfOrder.allCases) { order in
-                Text(order.label).tag(order)
-            }
+    /// The harness's spelling: "all", a kind's name, or "shelf:<id>".
+    init?(harness raw: String) {
+        if raw == "all" { self = .all; return }
+        if raw.hasPrefix("shelf:") { self = .shelf(String(raw.dropFirst(6))); return }
+        guard let k = LibraryKind(rawValue: raw) else { return nil }
+        self = .kind(k)
+    }
+
+    var harness: String {
+        switch self {
+        case .all: return "all"
+        case .kind(let k): return k.rawValue
+        case .shelf(let id): return "shelf:\(id)"
         }
-        .pickerStyle(.inline)
+    }
+}
+
+/// The list's order, in every scope: the reader's choice, kept on the
+/// device.
+enum LibrarySort: String, CaseIterable {
+    case recent, title, kind, unread
+
+    var label: String {
+        switch self {
+        case .recent: return "Most recent first"
+        case .title: return "Title"
+        case .kind: return "Kind"
+        case .unread: return "Unread"
+        }
+    }
+
+    /// Recent puts what last changed or was opened first, and what the
+    /// server sent no stamp for after it, by title. Kind and unread keep
+    /// the server's order among rows that tie.
+    func apply(_ rows: [SubjectInfo]) -> [SubjectInfo] {
+        func byTitle(_ a: SubjectInfo, _ b: SubjectInfo) -> Bool {
+            a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
+        }
+        switch self {
+        case .title:
+            return rows.sorted(by: byTitle)
+        case .recent:
+            return rows.sorted { a, b in
+                switch (a.updated, b.updated) {
+                case let (x?, y?) where x != y: return x > y
+                case (.some, .none): return true
+                case (.none, .some): return false
+                default: return byTitle(a, b)
+                }
+            }
+        case .kind, .unread:
+            func key(_ s: SubjectInfo) -> Int {
+                self == .kind ? LibraryKind.allCases.firstIndex(of: s.libraryKind) ?? 0 : -(s.isFeed ? s.unread ?? 0 : 0)
+            }
+            return rows.enumerated().sorted { a, b in
+                key(a.element) != key(b.element) ? key(a.element) < key(b.element) : a.offset < b.offset
+            }.map(\.element)
+        }
+    }
+}
+
+extension SubjectInfo {
+    var libraryKind: LibraryKind {
+        if isPDF { return .pdf }
+        if isFeed { return .feed }
+        if isReading { return .reading }
+        if isPrimer && scale != "book" { return .primer }
+        return .book
+    }
+
+    /// Started and not finished, or still being written.
+    var underway: Bool {
+        if authoring || building { return true }
+        if isPDF { return (page ?? 0) > 0 }
+        if isFeed || isPrimer { return false }
+        guard let c = unitsCleared, let t = unitsTotal else { return false }
+        return c > 0 && c < t
     }
 }
 
@@ -109,87 +172,5 @@ struct ShelfPrompts: ViewModifier {
                      ? "The shelf is empty."
                      : "What is on it goes back to the library; nothing is lost.")
             }
-    }
-}
-
-/// One shelf's screen: its cards, a place to drag one back to the
-/// library, and the shelf's menu in the bar.
-struct ShelfContentsView: View {
-    @EnvironmentObject var library: Library
-    let shelfID: String
-    @State private var over = false
-    @State private var renaming = false
-    @State private var deleting = false
-
-    private var shelf: ShelfInfo? { library.shelf(shelfID) }
-    private var contents: [SubjectInfo] { library.subjects(on: shelfID) }
-
-    static func countLine(_ n: Int) -> String {
-        switch n {
-        case 0: return "Empty"
-        case 1: return "1 item"
-        default: return "\(n) items"
-        }
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                // The way out: a drop target that reads as the library.
-                HStack(spacing: 12) {
-                    Image(systemName: "books.vertical")
-                        .foregroundStyle(over ? Color.accentColor : .secondary)
-                    Text(over ? "Drop to move it back to the library" : "Drag a card here to move it back to the library")
-                        .font(Typography.sans(14, relativeTo: .caption))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .padding(16)
-                .frame(maxWidth: 480)
-                .background(over ? AnyShapeStyle(Color.accentColor.opacity(0.15)) : AnyShapeStyle(.fill.quaternary),
-                            in: .rect(cornerRadius: 22))
-                .overlay(RoundedRectangle(cornerRadius: 22)
-                    .strokeBorder(style: StrokeStyle(lineWidth: over ? 2 : 1, dash: over ? [] : [6, 4]))
-                    .foregroundStyle(over ? Color.accentColor : .secondary.opacity(0.4)))
-                .dropDestination(for: String.self) { ids, _ in
-                    guard let id = ids.first else { return false }
-                    Task { await library.move(id, to: nil) }
-                    return true
-                } isTargeted: { over = $0 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Back to the library")
-                .accessibilityHint("Drop a card here to take it off the shelf")
-
-                ForEach(contents) { s in
-                    ShelfCard(subject: s)
-                }
-                if contents.isEmpty {
-                    Text("Nothing on this shelf yet. Drag a card onto it from the library, or use Move to on a card.")
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 24)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 24)
-            .frame(maxWidth: .infinity)
-        }
-        .navigationTitle(shelf?.name ?? "Shelf")
-        .toolbarTitleDisplayMode(.inline)
-        .toolbar {
-            if shelf != nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        ShelfOrderPicker()
-                        Divider()
-                        ShelfMenu(renaming: $renaming, deleting: $deleting)
-                    } label: {
-                        Label("Shelf", systemImage: "ellipsis.circle")
-                    }
-                    .accessibilityLabel("Shelf menu")
-                }
-            }
-        }
-        .modifier(ShelfPrompts(shelf: shelf ?? ShelfInfo(id: shelfID, name: ""), renaming: $renaming, deleting: $deleting))
     }
 }

@@ -47,12 +47,12 @@ final class ShelvesTests: XCTestCase {
         XCTAssertEqual(fake.renames.map(\.name), ["Models"])
         XCTAssertEqual(library.shelves.first?.name, "Models")
 
-        library.shelfPath = ["s1"]
+        library.scope = .shelf("s1")
         shelves = []
         await library.deleteShelf("s1")
         XCTAssertEqual(fake.shelvesDeleted, ["s1"])
         XCTAssertTrue(library.shelves.isEmpty)
-        XCTAssertTrue(library.shelfPath.isEmpty, "a deleted shelf is no longer open")
+        XCTAssertEqual(library.scope, .all, "a deleted shelf is no longer open")
     }
 
     func testMovingFilesTheSubjectAndBack() async {
@@ -92,12 +92,12 @@ final class ShelvesTests: XCTestCase {
         XCTAssertEqual(library.unfiled.map(\.id), ["mango", "kiwi"], "an unstamped card comes after the stamped, by title")
         XCTAssertEqual(library.subjects(on: "s1").map(\.id), ["zebra", "apple"])
 
-        library.order = .alphabetical
+        library.order = .title
         XCTAssertEqual(library.unfiled.map(\.id), ["kiwi", "mango"])
         XCTAssertEqual(library.subjects(on: "s1").map(\.id), ["apple", "zebra"])
 
         let later = Library(storage: storage, service: fake, defaults: defaults)
-        XCTAssertEqual(later.order, .alphabetical, "the choice is kept")
+        XCTAssertEqual(later.order, .title, "the choice is kept")
     }
 
     func testAServerWithoutShelvesListsAPlainLibrary() throws {

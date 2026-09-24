@@ -11,7 +11,8 @@ import Network
 ///   GET  /state              {screen, subject, unit, items, wait, error, shelf}
 ///   POST /open   {subject}   open a book from the shelf
 ///   POST /shelf              close the book
-///   POST /shelf/order {order}  order the cards: recent | alphabetical (folders stay on top)
+///   POST /shelf/order {order}  order the list: recent | title | kind | unread
+///   POST /library/show {scope} what the sidebar picks: all, a kind, or shelf:<id>
 ///   POST /start              start exchange from the top
 ///   POST /place  {level}     answer the placement screener
 ///   POST /check              enter the check from the reader

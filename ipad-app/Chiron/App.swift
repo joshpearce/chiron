@@ -334,6 +334,9 @@ struct BuildBanner: View {
     }
 }
 
+/// The library: a sidebar of what the reader is in the middle of, the
+/// kinds of thing kept, and the shelves, beside a list of what is picked.
+/// On a narrow screen the sidebar stands alone and the list comes in over it.
 struct BookshelfView: View {
     @EnvironmentObject var library: Library
 
@@ -342,61 +345,21 @@ struct BookshelfView: View {
     @State private var newShelfName = ""
     @State private var readingLink = false
     @State private var link = ""
+    /// The sidebar shows from the start, in portrait too; it is how the
+    /// library is found and filed.
+    @State private var columns: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationStack(path: $library.shelfPath) {
-            shelf
-                .toolbarTitleDisplayMode(.inline)
+        NavigationSplitView(columnVisibility: $columns) {
+            LibrarySidebar(newShelf: startNewShelf)
+        } detail: {
+            LibraryList(scope: library.scope ?? .all)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         ConnectionBadge(compact: true)
                     }
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        Button {
-                            library.pendingCapture = Capture()
-                        } label: {
-                            Label("Capture", systemImage: "text.badge.plus")
-                        }
-                        .disabled(!library.sync.connected)
-                        .accessibilityHint("Paste something and ask about it; a primer appears in the library")
-                        Button {
-                            library.teaching = true
-                        } label: {
-                            Label("Teach me something else", systemImage: "sparkles")
-                        }
-                        .disabled(!library.sync.connected)
-                        Button {
-                            newShelfName = ""
-                            namingShelf = true
-                        } label: {
-                            Label("New shelf", systemImage: "folder.badge.plus")
-                        }
-                        .disabled(!library.sync.connected)
-                        Button {
-                            importingPDF = true
-                        } label: {
-                            Label("Import a PDF or EPUB", systemImage: "doc.badge.plus")
-                        }
-                        .disabled(!library.sync.connected)
-                        .accessibilityHint("A PDF from Files goes on the shelf")
-                        Button {
-                            link = UIPasteboard.general.url?.absoluteString ?? ""
-                            readingLink = true
-                        } label: {
-                            Label("Read a link or follow a blog", systemImage: "link.badge.plus")
-                        }
-                        .disabled(!library.sync.connected)
-                        .accessibilityHint("A page on the web is read here; a feed is followed as a card")
-                    }
-                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
-                    ToolbarItemGroup(placement: .topBarTrailing) {
-                        Menu {
-                            ShelfOrderPicker()
-                        } label: {
-                            Label("Sort the library", systemImage: "arrow.up.arrow.down")
-                        }
-                        .accessibilityLabel("Sort the library")
-                        .accessibilityHint("Most recent first, or by title; shelves stay on top")
+                        addMenu
                         Button {
                             Task { await library.refresh() }
                         } label: { Label("Refresh the library", systemImage: "arrow.clockwise") }
@@ -407,10 +370,8 @@ struct BookshelfView: View {
                         ShellButton()
                     }
                 }
-                .navigationDestination(for: String.self) { id in
-                    ShelfContentsView(shelfID: id)
-                }
         }
+        .navigationSplitViewStyle(.balanced)
         .task { await library.refresh() }
         // Every sheet carries the objects its view asks the environment
         // for. A sheet is its own presentation, and on the Mac its own
@@ -450,43 +411,44 @@ struct BookshelfView: View {
         }
     }
 
-    private var shelf: some View {
-        ScrollView {
-            VStack(spacing: 28) {
-                VStack(spacing: 10) {
-                    Image("Logo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 160)
-                        .accessibilityHidden(true)
-                    Text("Chiron").font(Typography.display(52))
-                    Text("Library")
-                        .font(Typography.serifItalic(20))
-                        .foregroundStyle(.secondary)
-                }
-                if let build = library.availableBuild, let url = library.installURL {
-                    BuildBanner(build: build, url: url)
-                }
-                VStack(spacing: 12) {
-                    ForEach(library.shelves) { shelf in
-                        ShelfFolderCard(shelf: shelf)
-                    }
-                    ForEach(library.unfiled) { s in
-                        ShelfCard(subject: s)
-                    }
-                    if library.subjects.isEmpty && !library.loadingShelf {
-                        Text(library.shelfError ?? "Nothing in the library yet.")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                if let err = library.shelfError, !library.subjects.isEmpty {
-                    Text(err).foregroundStyle(.red).font(.callout)
-                }
+    private func startNewShelf() {
+        newShelfName = ""
+        namingShelf = true
+    }
+
+    /// Everything that puts something new in the library, in one place.
+    private var addMenu: some View {
+        Menu {
+            Button {
+                library.pendingCapture = Capture()
+            } label: {
+                Label("Capture", systemImage: "text.badge.plus")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 24)
-            .frame(maxWidth: .infinity)
+            .accessibilityHint("Paste something and ask about it; a primer appears in the library")
+            Button {
+                library.teaching = true
+            } label: {
+                Label("Teach me something else", systemImage: "sparkles")
+            }
+            Button {
+                link = UIPasteboard.general.url?.absoluteString ?? ""
+                readingLink = true
+            } label: {
+                Label("Read a link or follow a blog", systemImage: "link.badge.plus")
+            }
+            .accessibilityHint("A page on the web is read here; a feed is followed")
+            Button {
+                importingPDF = true
+            } label: {
+                Label("Import a PDF or EPUB", systemImage: "doc.badge.plus")
+            }
+            Button(action: startNewShelf) {
+                Label("New shelf", systemImage: "folder.badge.plus")
+            }
+        } label: {
+            Label("Add to the library", systemImage: "plus")
         }
+        .disabled(!library.sync.connected)
     }
 }
 
@@ -874,114 +836,4 @@ struct ConnectionBadge: View {
 final class AgentBadgeState: ObservableObject {
     static let shared = AgentBadgeState()
     @Published var driven = false
-}
-
-
-/// One book or primer on the shelf. A book carries its progress; a primer
-/// its source and capture date, greyed with a spinner while the server is
-/// still writing it, red when that failed. The badge in the corner says
-/// which is which without reading.
-struct ShelfCard: View {
-    @EnvironmentObject var library: Library
-    let subject: SubjectInfo
-
-    private var openable: Bool { subject.drafting || (!subject.authoring && !subject.failed) }
-
-    /// The line under the title. The book last open says so; a blog says
-    /// so and still says how much of it is waiting.
-    private var openLine: String {
-        guard subject.id == library.activeSubjectID else { return subject.progressLine }
-        if subject.isFeed, let n = subject.unread, n > 0 { return "Open now · \(n) unread" }
-        return "Open now"
-    }
-
-    var body: some View {
-        Button {
-            Task {
-                if subject.drafting { await library.openDraft(subject.id) } else { await library.open(subject.id) }
-            }
-        } label: {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(subject.title).font(Typography.serif(22, weight: .semibold, relativeTo: .title3))
-                    if subject.authoring {
-                        HStack(spacing: 8) {
-                            ProgressView().controlSize(.small)
-                            Text(subject.building ? subject.progressLine : "Writing the primer · \(subject.sourceLine)")
-                        }
-                        .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.secondary)
-                    } else if subject.drafting && !subject.failed {
-                        Text(subject.progressLine)
-                            .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.secondary)
-                    } else if subject.failed {
-                        Text(subject.error ?? "The primer could not be written.")
-                            .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.red)
-                    } else {
-                        Text(openLine)
-                            .font(Typography.sans(14, relativeTo: .caption)).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                Image(systemName: "chevron.right").foregroundStyle(.secondary)
-            }
-            .padding(18)
-            .padding(.bottom, 10)
-            .frame(maxWidth: 480)
-            .background(.fill.tertiary, in: .rect(cornerRadius: 22))
-            .overlay(alignment: .bottomTrailing) {
-                // A draft wears a hammer beside what it will be: work in
-                // progress the reader can pick up again.
-                HStack(spacing: 4) {
-                    if subject.drafting || subject.building { Text("🔨").font(.footnote) }
-                    Image(systemName: subject.isPDF ? "doc.richtext"
-                          : subject.isFeed ? "dot.radiowaves.up.forward"
-                          : subject.isReading ? "book"
-                          : (subject.scale == "book" || !subject.isPrimer ? "brain" : "doc.text"))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(10)
-                .accessibilityLabel(subject.drafting || subject.building ? "Draft"
-                                    : subject.isPDF ? "PDF"
-                                    : subject.isFeed ? "Followed blog"
-                                    : subject.isReading ? "Imported book"
-                                    : (subject.isPrimer ? "Primer" : "Smart book"))
-            }
-            .opacity(openable ? 1 : 0.55)
-        }
-        .buttonStyle(.plain)
-        .hoverEffect()
-        .disabled(!openable)
-        .accessibilityLabel(subject.title)
-        .accessibilityHint(subject.authoring ? "Still being written" : (subject.id == library.activeSubjectID ? "Open now" : subject.progressLine))
-        // Filed by dragging onto a shelf, or by the menu for a hand that
-        // would rather not drag.
-        .draggable(subject.id)
-        .contextMenu {
-            Menu("Move to") {
-                Button {
-                    Task { await library.move(subject.id, to: nil) }
-                } label: {
-                    Label("Library", systemImage: "books.vertical")
-                }
-                .disabled(subject.shelf == nil)
-                ForEach(library.shelves) { shelf in
-                    Button {
-                        Task { await library.move(subject.id, to: shelf.id) }
-                    } label: {
-                        Label(shelf.name, systemImage: "folder")
-                    }
-                    .disabled(subject.shelf == shelf.id)
-                }
-            }
-            if subject.isFeed || subject.isReading || subject.isPrimer {
-                Button(role: .destructive) {
-                    Task { await library.forget(subject.id) }
-                } label: {
-                    Label(subject.isFeed ? "Unfollow" : "Take off the shelf", systemImage: "trash")
-                }
-                .disabled(subject.authoring || subject.building)
-            }
-        }
-    }
 }

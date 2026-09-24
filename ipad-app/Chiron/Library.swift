@@ -20,10 +20,12 @@ final class Library: ObservableObject {
     @Published var settingsShown = false
     /// The shelves of the library, and the one open (a path of one id).
     @Published var shelves: [ShelfInfo] = []
-    @Published var shelfPath: [String] = []
-    /// How the cards are ordered, in the library and on every shelf;
-    /// the reader's choice, kept on the device.
-    @Published var order: ShelfOrder {
+    /// What the library's list shows: everything, one kind, or one shelf.
+    /// Nil only on a narrow screen, where the sidebar stands alone.
+    @Published var scope: LibraryScope? = .all
+    /// How the list is ordered, in every scope; the reader's choice, kept
+    /// on the device.
+    @Published var order: LibrarySort {
         didSet { defaults.set(order.rawValue, forKey: "shelfOrder") }
     }
     private let defaults: UserDefaults
@@ -92,7 +94,7 @@ final class Library: ObservableObject {
         self.storage = storage ?? Library.defaultStorage()
         self.service = service ?? sync
         self.defaults = defaults
-        self.order = ShelfOrder(rawValue: defaults.string(forKey: "shelfOrder") ?? "") ?? .recent
+        self.order = LibrarySort(rawValue: defaults.string(forKey: "shelfOrder") ?? "") ?? .recent
         agent.attach(self)
         loadShelfCache()
     }
@@ -266,7 +268,7 @@ final class Library: ObservableObject {
             shelfError = nil
             noticeWriting()
             // A shelf deleted elsewhere closes here.
-            shelfPath.removeAll { id in !shelves.contains { $0.id == id } }
+            if case .shelf(let id) = scope, !shelves.contains(where: { $0.id == id }) { scope = .all }
             saveShelfCache(shelf)
             // The server is back: whatever was marked up while it was away goes up.
             await session?.pushAnnotations()
@@ -420,6 +422,26 @@ final class Library: ObservableObject {
     func subjects(on shelf: String) -> [SubjectInfo] { order.apply(subjects.filter { $0.shelf == shelf }) }
 
     func shelf(_ id: String) -> ShelfInfo? { shelves.first { $0.id == id } }
+
+    /// What the sidebar's pick holds, in the reader's order.
+    func listed(in scope: LibraryScope) -> [SubjectInfo] {
+        switch scope {
+        case .all: return order.apply(subjects)
+        case .kind(let k): return order.apply(subjects.filter { $0.libraryKind == k })
+        case .shelf(let id): return subjects(on: id)
+        }
+    }
+
+    /// Posts waiting across every followed blog.
+    var unreadTotal: Int { subjects.reduce(0) { $0 + ($1.isFeed ? $1.unread ?? 0 : 0) } }
+
+    /// What the reader is in the middle of: the one open, then whatever is
+    /// started and not finished, and a primer still being written. A feed
+    /// only while it is the one open; its unread count says the rest.
+    var continuing: [SubjectInfo] {
+        let open = subjects.filter { $0.id == activeSubjectID }
+        return open + subjects.filter { $0.id != activeSubjectID && $0.underway }
+    }
 
     func createShelf(named name: String) async {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
