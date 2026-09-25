@@ -7,6 +7,13 @@ import Security
 /// file keychain, which refuses the accessibility class and asks for a
 /// password when the app reads it back.
 enum Keychain {
+    /// This is also the app target's `keychain-access-groups` entitlement.
+    /// Naming it explicitly keeps Catalyst on the provisioned data-protection
+    /// access group instead of relying on the macOS file-keychain default.
+    static var accessGroup: String? {
+        Bundle.main.object(forInfoDictionaryKey: "ChironKeychainAccessGroup") as? String
+    }
+
     static func read(service: String, account: String) -> Data? {
         var query = base(service: service, account: account)
         query[kSecReturnData as String] = true
@@ -28,11 +35,15 @@ enum Keychain {
     }
 
     private static func base(service: String, account: String) -> [String: Any] {
-        [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecUseDataProtectionKeychain as String: true,
         ]
+        if let accessGroup, !accessGroup.isEmpty {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
+        return query
     }
 }

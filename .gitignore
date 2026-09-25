@@ -8,6 +8,7 @@ ipad-app/Chiron.xcodeproj/
 build-sim/
 build-mac/
 build-phone/
+signing/local.config
 server-go/chiron-server
 server-go/dist/
 bin/

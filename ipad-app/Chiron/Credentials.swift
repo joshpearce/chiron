@@ -11,7 +11,7 @@ import Foundation
 /// between a LAN server with no key and a public one with a key does not mean
 /// retyping - or worse, silently sending one server's key to another.
 enum Credentials {
-    private static let service = "com.mjbraun.chiron"
+    private static let service = Bundle.main.bundleIdentifier ?? "chiron"
     private static let legacyAccount = "server-token"
 
     static func token(for serverID: UUID) -> String? {

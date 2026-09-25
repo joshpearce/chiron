@@ -166,11 +166,23 @@ presents as the app hanging rather than as a server problem.
 ### Build the apps
 
 ```bash
-export CHIRON_TEAM_ID=XXXXXXXXXX      # your Apple developer team
-cd ipad-app && xcodegen generate
-../scripts/sim-run.sh                 # iPad Simulator
-../scripts/mac-run.sh                 # the same app on the Mac
+cp signing/local.config.example signing/local.config
+# Fill in your team, unique bundle ID, and matching App Group.
+bash scripts/xcodegen.sh              # generates ipad-app/Chiron.xcodeproj
+./scripts/sim-run.sh                  # iPad Simulator
+./scripts/mac-run.sh                  # the same app on the Mac
 ```
+
+`signing/local.config` is ignored. XcodeGen, the simulator scripts, the
+Catalyst build, the share extension, and the unattended build all read the
+same values through `scripts/signing-config.sh`. Signing remains automatic:
+do not put certificate names or provisioning profiles in the project. Xcode
+selects platform-appropriate assets for the configured team.
+
+After changing the team or bundle ID, regenerate the project before building.
+The app's Keychain access group is derived from that signing identity; an old
+installed build cannot retain a newly entered server key if its provisioning
+profile does not include Keychain Sharing.
 
 On first launch, open **Server** (the gear) and add the address the server is
 listening on. A second device takes the same settings from a QR code, or from a
@@ -291,7 +303,8 @@ The bundled third-party material keeps its own terms:
 - The centaur logo and app icon were generated for this project and are
   covered by the licence above.
 
-Nothing in the repo carries an account of its own: the Apple team comes from
-`CHIRON_TEAM_ID` at generate time, your server's address from the app's
+Nothing committed in the repo carries an account of its own: Apple team and
+identifier values come from ignored `signing/local.config` (or equivalent
+environment variables) at generation time, your server's address from the app's
 settings screen and `~/.config/chiron-runner/config`, and every 1Password
 reference from an environment variable.

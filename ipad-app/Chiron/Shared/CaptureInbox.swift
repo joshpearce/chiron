@@ -34,7 +34,7 @@ struct Capture: Codable, Identifiable, Equatable {
 /// entitlement (a build that lacks it) the app's own support directory
 /// stands in, which still serves the in-app and intent paths.
 enum CaptureInbox {
-    static let group = "group.dev.mjbraun.chiron"
+    static let group = Bundle.main.object(forInfoDictionaryKey: "ChironAppGroup") as? String ?? ""
     static let scheme = "chiron"
 
     static var directory: URL {

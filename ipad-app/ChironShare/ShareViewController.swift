@@ -58,7 +58,7 @@ final class ShareViewController: UIViewController {
         guard !capture.isEmpty, (try? CaptureInbox.write(capture)) != nil else {
             label.text = "Nothing Chiron can read was shared."
             try? await Task.sleep(nanoseconds: 1_200_000_000)
-            extensionContext?.cancelRequest(withError: NSError(domain: "dev.mjbraun.chiron.share", code: 1))
+            extensionContext?.cancelRequest(withError: NSError(domain: Bundle.main.bundleIdentifier ?? "chiron.share", code: 1))
             return
         }
         openApp(CaptureInbox.url(for: capture.id))

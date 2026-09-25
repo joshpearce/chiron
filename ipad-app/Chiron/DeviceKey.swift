@@ -6,7 +6,7 @@ import Foundation
 /// key per saved server, so revoking one on the sprite revokes only this
 /// device's access to that server.
 enum DeviceKey {
-    private static let service = "com.mjbraun.chiron.devicekey"
+    private static let service = (Bundle.main.bundleIdentifier ?? "chiron") + ".devicekey"
 
     /// The key for a server, created on first use.
     static func privateKey(for serverID: UUID) -> Curve25519.Signing.PrivateKey {

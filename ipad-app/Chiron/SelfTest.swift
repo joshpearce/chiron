@@ -4,14 +4,14 @@ import os
 /// Hands-free verification of the full exchange loop, for use from a script
 /// when nobody is present to tap through the UI. Launch with:
 ///
-///     xcrun simctl launch --console-pty <device> dev.mjbraun.chiron selftest
+///     xcrun simctl launch --console-pty <device> <configured bundle id> selftest
 ///
 /// Progress is written to stdout (which simctl relays) and to the system log
-/// (subsystem com.mjbraun.chiron). Every step drives the same code paths the
+/// (subsystem = the configured bundle id). Every step drives the same code paths the
 /// real UI drives - no shortcuts around the session.
 @MainActor
 enum SelfTest {
-    static let log = Logger(subsystem: "com.mjbraun.chiron", category: "chiron-selftest")
+    static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "chiron", category: "chiron-selftest")
 
     /// os.Logger output does not reach `idevicesyslog`, which reads the legacy
     /// syslog stream - so a run over USB looked like it had produced nothing at

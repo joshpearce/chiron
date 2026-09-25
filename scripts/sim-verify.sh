@@ -15,7 +15,8 @@ set -euo pipefail
 
 SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$SCRIPTS/.."
-BUNDLE=dev.mjbraun.chiron
+source "$SCRIPTS/signing-config.sh"
+BUNDLE="$CHIRON_BUNDLE_ID"
 SERVER="${CHIRON_SERVER:-http://localhost:8084}"
 SUBJECT="${SUBJECT:-ai}"
 LEVEL="${LEVEL:-2}"
@@ -27,6 +28,8 @@ THEMES="${THEMES:-light dark}"
 SIZES="${SIZES:-large accessibility-extra-large}"
 PORT=8087
 H="http://localhost:$PORT"
+
+[ -d "$ROOT/ipad-app/Chiron.xcodeproj" ] || bash "$SCRIPTS/xcodegen.sh"
 
 # The server must be fresh for the subject so the walk starts at placement.
 reset_subject() {

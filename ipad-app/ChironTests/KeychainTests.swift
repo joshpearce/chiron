@@ -5,7 +5,13 @@ import XCTest
 /// Mac included, where the file keychain would refuse the `ThisDeviceOnly`
 /// accessibility and prompt for a password besides.
 final class KeychainTests: XCTestCase {
-    private let service = "com.mjbraun.chiron.test"
+    private let service = (Bundle.main.bundleIdentifier ?? "chiron.tests") + ".keychain"
+
+    func testAccessGroupMatchesTheSignedApplicationIdentifier() {
+        let bundleID = Bundle.main.bundleIdentifier ?? ""
+        let group = try? XCTUnwrap(Keychain.accessGroup)
+        XCTAssertTrue(group?.hasSuffix(".\(bundleID)") == true, "Keychain access group must be the team prefix plus the app bundle id")
+    }
 
     func testASecretRoundTripsAndForgetsCleanly() {
         let account = UUID().uuidString

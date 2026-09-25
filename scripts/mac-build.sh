@@ -31,6 +31,8 @@ CONF="$HOME/.config/chiron-runner/config"
 conf() { [ -f "$CONF" ] && sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$CONF" | head -1 | sed "s|^~|$HOME|" || true; }
 TEAM=$(conf team_id); TEAM=${TEAM:-${CHIRON_TEAM_ID:-}}
 [ -n "$TEAM" ] || { echo "set team_id in ~/.config/chiron-runner/config (or CHIRON_TEAM_ID)" >&2; exit 1; }
+export CHIRON_TEAM_ID="$TEAM"
+source "$ROOT/scripts/signing-config.sh"
 BUILDS_URL=$(conf builds_url); BUILDS_URL=${BUILDS_URL:-${CHIRON_BUILDS_URL:-}}
 [ -n "$BUILDS_URL" ] || { echo "set builds_url in ~/.config/chiron-runner/config (or CHIRON_BUILDS_URL)" >&2; exit 1; }
 AUTH=()
@@ -67,7 +69,7 @@ PY
 
 cd ipad-app
 step "xcodegen"
-xcodegen generate -q >>"$LOG" 2>&1 || fail "xcodegen"
+bash "$ROOT/scripts/xcodegen.sh" -q >>"$LOG" 2>&1 || fail "xcodegen"
 
 step "unit tests in the Simulator"
 if ! ../scripts/sim-run.sh fast ChironTests >>"$LOG" 2>&1; then
@@ -125,7 +127,7 @@ cat > "$OUT/manifest.plist" <<PLIST
       <key>url</key><string>$BUILDS_URL/$TOKEN/Chiron.ipa</string>
     </dict></array>
     <key>metadata</key><dict>
-      <key>bundle-identifier</key><string>dev.mjbraun.chiron</string>
+      <key>bundle-identifier</key><string>$CHIRON_BUNDLE_ID</string>
       <key>bundle-version</key><string>$SHORT</string>
       <key>kind</key><string>software</string>
       <key>title</key><string>Chiron $SHORT ($COUNT)</string>

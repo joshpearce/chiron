@@ -35,18 +35,18 @@ sudo pmset -c sleep 0 disksleep 0 displaysleep 5
 sudo pmset -a disablesleep 1
 # Belt and braces: a user agent that holds the machine awake while on power.
 mkdir -p ~/Library/LaunchAgents
-cat > ~/Library/LaunchAgents/dev.mjbraun.chiron.awake.plist <<'PLIST'
+cat > ~/Library/LaunchAgents/chiron.runner.awake.plist <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Label</key><string>dev.mjbraun.chiron.awake</string>
+  <key>Label</key><string>chiron.runner.awake</string>
   <key>ProgramArguments</key><array><string>/usr/bin/caffeinate</string><string>-s</string></array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
 </dict></plist>
 PLIST
-launchctl unload ~/Library/LaunchAgents/dev.mjbraun.chiron.awake.plist 2>/dev/null || true
-launchctl load ~/Library/LaunchAgents/dev.mjbraun.chiron.awake.plist
+launchctl unload ~/Library/LaunchAgents/chiron.runner.awake.plist 2>/dev/null || true
+launchctl load ~/Library/LaunchAgents/chiron.runner.awake.plist
 
 echo "==> the runner and the sprite's key"
 mkdir -p ~/bin ~/builds ~/src ~/.ssh
@@ -96,12 +96,26 @@ ui_tests = 0
 CONF
 fi
 
+# The checkout is filled by a later push, but this ignored file survives that
+# update and supplies XcodeGen's bundle/App Group identifiers. Fill placeholders
+# before asking the runner to build, or preseed the three CHIRON_* variables.
+mkdir -p ~/src/chiron/signing
+if [ ! -f ~/src/chiron/signing/local.config ]; then
+  cat > ~/src/chiron/signing/local.config <<CONF
+CHIRON_TEAM_ID=${CHIRON_TEAM_ID:-<your Apple team id>}
+CHIRON_BUNDLE_ID=${CHIRON_BUNDLE_ID:-com.example.chiron}
+CHIRON_APP_GROUP=${CHIRON_APP_GROUP:-group.com.example.chiron}
+CONF
+fi
+
 cat <<EOT
 
 Done. Still for a person:
-  1. Install Tailscale (App Store) and sign in to the personal tailnet.
-  2. Fill asc_key_id, asc_issuer_id and asc_key_path in
+  1. Fill ~/src/chiron/signing/local.config with the Apple team, bundle ID,
+     and App Group used for this checkout.
+  2. Install Tailscale (App Store) and sign in to the personal tailnet.
+  3. Fill asc_key_id, asc_issuer_id and asc_key_path in
      ~/.config/chiron-runner/config, with the .p8 in ~/.private_keys.
-  3. Open Xcode once, accept the licence, let it finish installing.
+  4. Open Xcode once, accept the licence, let it finish installing.
 Then from the sprite: git push macbook main; ssh macbook build main.
 EOT

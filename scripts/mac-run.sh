@@ -15,10 +15,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$ROOT/scripts/signing-config.sh"
 cd "$ROOT/ipad-app"
-# The Xcode project is generated, not kept in the repo: the team id
-# comes from the environment at generate time.
-[ -d Chiron.xcodeproj ] || xcodegen generate
+# The generated project receives its team and identifiers from the validated
+# ignored local configuration.
+[ -d Chiron.xcodeproj ] || bash "$ROOT/scripts/xcodegen.sh"
 
 DEST='platform=macOS,variant=Mac Catalyst'
 APP="$PWD/build-mac/Build/Products/Debug-maccatalyst/Chiron.app"

@@ -1,6 +1,6 @@
 name: Chiron
 options:
-  bundleIdPrefix: com.mjbraun
+  bundleIdPrefix: ${CHIRON_BUNDLE_ID}
   deploymentTarget:
     iOS: "26.0"          # the reading iPad runs current iPadOS with a Pencil Pro
 packages:
@@ -23,8 +23,10 @@ targets:
     entitlements:
       path: Chiron/Chiron.entitlements
       properties:
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)
         com.apple.security.application-groups:
-          - group.dev.mjbraun.chiron
+          - $(CHIRON_APP_GROUP)
     sources:
       # KaTeX must keep its directory structure: chapter.html and MathText.swift
       # reference "katex/katex.min.css" and "katex/contrib/auto-render.min.js".
@@ -47,25 +49,22 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait"
         CODE_SIGN_STYLE: Automatic
-        # Fly.io, Inc - a paid team, so provisioning profiles last a year
-        # rather than the seven days a personal team gets. The free-team profile
-        # expiring is not a nuisance but a failure: when it lapses the app stops
-        # launching at all, including the bundled offline book.
+        # Supplied by the ignored signing/local.config via scripts/xcodegen.sh.
+        # Xcode owns certificate/profile selection for this team and platform.
         DEVELOPMENT_TEAM: ${CHIRON_TEAM_ID}
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        # com.mjbraun.chiron is registered to the personal team and an App ID
-        # can only belong to one team, so moving to Fly.io needs a new one.
-        # Deliberately not com.fly.* - this is Matt's project living on the
-        # company account, not a Fly product.
-        PRODUCT_BUNDLE_IDENTIFIER: dev.mjbraun.chiron
+        PRODUCT_BUNDLE_IDENTIFIER: ${CHIRON_BUNDLE_ID}
+        CHIRON_APP_GROUP: ${CHIRON_APP_GROUP}
         # The Mac loads an extension only when its version matches the app's.
         CURRENT_PROJECT_VERSION: 1
         MARKETING_VERSION: 1.0
     info:
       path: Chiron/Info.plist
       properties:
+        ChironKeychainAccessGroup: $(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)
+        ChironAppGroup: $(CHIRON_APP_GROUP)
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: "Chiron connects to the tutor server running on your Mac to grade answers and generate chapters."
@@ -75,7 +74,7 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         # chiron://capture/<id>: the share extension's and intents' way in.
         CFBundleURLTypes:
-          - CFBundleURLName: dev.mjbraun.chiron
+          - CFBundleURLName: $(PRODUCT_BUNDLE_IDENTIFIER)
             CFBundleURLSchemes: [chiron]
         # "Send to Chiron" in every Mac app's Services menu (MacServices.swift).
         NSServices:
@@ -103,9 +102,10 @@ targets:
       - path: Chiron/Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.mjbraun.chiron.share
+        PRODUCT_BUNDLE_IDENTIFIER: ${CHIRON_BUNDLE_ID}.share
         DEVELOPMENT_TEAM: ${CHIRON_TEAM_ID}
         CODE_SIGN_STYLE: Automatic
+        CHIRON_APP_GROUP: ${CHIRON_APP_GROUP}
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Chiron
         TARGETED_DEVICE_FAMILY: "1,2"
@@ -116,6 +116,7 @@ targets:
     info:
       path: ChironShare/Info.plist
       properties:
+        ChironAppGroup: $(CHIRON_APP_GROUP)
         # The Simulator refuses an extension whose plist has no version.
         CFBundleVersion: "1"
         CFBundleShortVersionString: "1.0"
@@ -133,7 +134,7 @@ targets:
       path: ChironShare/ChironShare.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.dev.mjbraun.chiron
+          - $(CHIRON_APP_GROUP)
   # Tap-level checks against the running app, read back through the harness.
   ChironUITests:
     type: bundle.ui-testing
@@ -147,6 +148,8 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         SUPPORTS_MACCATALYST: YES
         DEVELOPMENT_TEAM: ${CHIRON_TEAM_ID}       # the Mac signs test bundles too
+        CODE_SIGN_STYLE: Automatic
+        PRODUCT_BUNDLE_IDENTIFIER: ${CHIRON_BUNDLE_ID}.uitests
         TEST_TARGET_NAME: Chiron
   ChironTests:
     type: bundle.unit-test
@@ -164,6 +167,8 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         SUPPORTS_MACCATALYST: YES
         DEVELOPMENT_TEAM: ${CHIRON_TEAM_ID}       # the Mac signs test bundles too
+        CODE_SIGN_STYLE: Automatic
+        PRODUCT_BUNDLE_IDENTIFIER: ${CHIRON_BUNDLE_ID}.tests
 schemes:
   Chiron:
     build:

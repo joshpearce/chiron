@@ -1,0 +1,15 @@
+# Local Apple signing inputs for Chiron. Copy this file to local.config;
+# local.config is ignored and must not be committed.
+#
+# Automatic signing intentionally does not pin an Apple Development identity
+# or provisioning profile. Xcode selects those for this team/account and the
+# current platform. In particular, do not copy macOS profiles into this iOS
+# project.
+
+CHIRON_TEAM_ID=XXXXXXXXXX
+CHIRON_BUNDLE_ID=com.example.chiron
+CHIRON_APP_GROUP=group.com.example.chiron
+
+# Optional operator notes only; these are not passed to Xcode.
+CHIRON_APPLE_ACCOUNT_NOTE=developer@example.com
+CHIRON_DEVELOPMENT_IDENTITY_NOTE='Apple Development: Example (XXXXXXXXXX)'
