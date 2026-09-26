@@ -32,12 +32,6 @@ const transcribePrompt = "Transcribe the handwriting in this image exactly, " +
 // demand next to the text model.
 // The tag parameter is for logging only.
 func Transcribe(baseURL, model, tag string, pngData []byte) (string, error) {
-	return TranscribeWithKey(baseURL, model, tag, "", pngData)
-}
-
-// TranscribeWithKey is Transcribe with bearer authentication for hosted
-// OpenAI-compatible vision endpoints such as DeepInfra.
-func TranscribeWithKey(baseURL, model, tag, apiKey string, pngData []byte) (string, error) {
 	_ = tag
 	prompt := transcribePrompt
 	body, err := json.Marshal(map[string]any{
@@ -58,19 +52,9 @@ func TranscribeWithKey(baseURL, model, tag, apiKey string, pngData []byte) (stri
 	if err != nil {
 		return "", err
 	}
-	// Hosted multimodal models can cold-start; keep this aligned with the
-	// multi-minute text path rather than letting an ingress-sized timeout win.
-	client := &http.Client{Timeout: 10 * time.Minute}
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost,
-		baseURL+"/chat/completions", bytes.NewReader(body))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-	}
-	resp, err := client.Do(req)
+	client := &http.Client{Timeout: 120 * time.Second}
+	resp, err := client.Post(baseURL+"/chat/completions", "application/json",
+		bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}

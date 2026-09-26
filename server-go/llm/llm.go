@@ -64,11 +64,6 @@ type Config struct {
 	Temperature float64        `yaml:"temperature"`
 	TimeoutS    int            `yaml:"timeout_s"`
 	MaxTokens   map[string]int `yaml:"max_tokens"`
-	// APIKeyFile is preferred for hosted OpenAI-compatible services so a
-	// credential can be mounted as a secret instead of copied into YAML or an
-	// environment variable. APIKey is populated at boot and never serialized.
-	APIKeyFile string `yaml:"api_key_file"`
-	APIKey     string `yaml:"-"`
 }
 
 // OpenAIChain is an ordered list of OpenAI-compatible endpoints; the first
@@ -113,12 +108,7 @@ func (c *OpenAIChain) healthy() *Upstream {
 	probe := &http.Client{Timeout: healthTimeout}
 	for i := range c.upstreams {
 		up := c.upstreams[i]
-		req, err := http.NewRequest(http.MethodGet, up.BaseURL+"/models", nil)
-		if err != nil {
-			continue
-		}
-		c.authorize(req)
-		resp, err := probe.Do(req)
+		resp, err := probe.Get(up.BaseURL + "/models")
 		if err != nil {
 			continue
 		}
@@ -172,20 +162,14 @@ func (c *OpenAIChain) Structured(role, system, user string, schema map[string]an
 		"response_format": map[string]any{
 			"type": "json_schema",
 			"json_schema": map[string]any{
-				"name": schemaName, "strict": true, "schema": schema,
+				"name": schemaName, "strict": "true", "schema": schema,
 			},
 		},
 	})
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest(http.MethodPost, up.BaseURL+"/chat/completions", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	c.authorize(req)
-	resp, err := c.client.Do(req)
+	resp, err := c.client.Post(up.BaseURL+"/chat/completions", "application/json", bytes.NewReader(body))
 	if err != nil {
 		c.forgetHealth() // force a re-probe on the next call
 		return Errorf("%s: %v", up.Name, err)
@@ -224,12 +208,6 @@ func (c *OpenAIChain) Structured(role, system, user string, schema map[string]an
 		}
 	}
 	return Errorf("%s: unparseable structured output", up.Name)
-}
-
-func (c *OpenAIChain) authorize(req *http.Request) {
-	if c.cfg.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.cfg.APIKey)
-	}
 }
 
 // unmarshalLoose accepts either a bare JSON object or one wrapped in prose or
