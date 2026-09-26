@@ -2,7 +2,7 @@ name: Publish OCI image
 
 on:
   push:
-    branches: [main]
+    branches: [personal]
   workflow_dispatch:
 
 permissions:
@@ -38,7 +38,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/joshpearce/chiron:sha-${{ github.sha }}
-            ghcr.io/joshpearce/chiron:main
+            ghcr.io/joshpearce/chiron:personal
           labels: |
             org.opencontainers.image.source=https://github.com/joshpearce/chiron
             org.opencontainers.image.revision=${{ github.sha }}
