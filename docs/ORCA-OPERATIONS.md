@@ -121,15 +121,13 @@ the lock file (the kernel lock, not the file's presence, is authoritative).
 
 ## Personal-branch migration assessment
 
-Keep the runtime behavior from `4287d87`: the single-writer lease, explicit
-storage roots, secret-file support, long HTTP request/shutdown behavior, and
-public-only fetching. Keep Apple signing local to the Mac; it is independent of
-Linux deployment. Drop its Dockerfile, `.dockerignore`, NAS configuration,
-NAS operations text, and DeepInfra API-key/vision changes; the target uses the
-already-supported Claude subscription backend. Drop `3d4a2c3` and `017b735`
-entirely: they only publish NAS OCI images. `3dc750a` is an Apple UI/Xcode
-compatibility change, not an Incus prerequisite, and should be evaluated or
-cherry-picked separately against the current Apple tree rather than coupled to
-this server migration. Likewise, `883de80` is a useful Mac ownership cleanup
-but not a server-deployment prerequisite; do not mix it into the homelab
-rollout.
+The runtime behavior introduced by `4287d87` remains: the single-writer lease,
+explicit storage roots, secret-file support, long HTTP request/shutdown
+behavior, and public-only fetching. Its Dockerfile, `.dockerignore`, NAS
+configuration, NAS operations text, and DeepInfra API-key/vision changes are
+removed from the current tree; the target uses the already-supported Claude
+subscription backend. The history of image-publishing commits `3d4a2c3` and
+`017b735` is intentionally preserved, but their workflow and deployable
+artifacts are removed by the Incus migration commits. Apple changes `883de80`
+and `3dc750a` remain owned and exercised by the Mac/Xcode side; neither makes
+the Linux guest responsible for building or signing Apple software.
