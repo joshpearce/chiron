@@ -94,11 +94,14 @@ type Config struct {
 	// moment a learner is most exposed to a regression.
 	BatchGrading bool `yaml:"batch_grading"`
 
-	Provider       string         `yaml:"provider"`
-	AnthropicModel string         `yaml:"anthropic_model"`
-	ClaudeCLIModel string         `yaml:"claude_cli_model"`
-	Upstreams      []llm.Upstream `yaml:"upstreams"`
-	LLM            llm.Config     `yaml:"llm"`
+	Provider       string `yaml:"provider"`
+	AnthropicModel string `yaml:"anthropic_model"`
+	ClaudeCLIModel string `yaml:"claude_cli_model"`
+	// ClaudeConfigDir holds the Claude CLI's login and settings. Empty keeps
+	// the historical config-relative directory.
+	ClaudeConfigDir string         `yaml:"claude_config_dir"`
+	Upstreams       []llm.Upstream `yaml:"upstreams"`
+	LLM             llm.Config     `yaml:"llm"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -191,7 +194,7 @@ type Server struct {
 	chain      llm.Chain
 	token      string
 	// writerLock is held for the process lifetime. It prevents two replicas
-	// from mutating the same NAS-backed data root.
+	// from mutating the same persistent data root.
 	writerLock *os.File
 	// authorizedKeys is sshd's file on the sprite; empty means device keys
 	// cannot be enrolled here.
@@ -255,15 +258,6 @@ func New(cfg *Config, root string) (*Server, error) {
 			token = strings.TrimSpace(cfg.AuthToken)
 		}
 	}
-	if key := strings.TrimSpace(os.Getenv("CHIRON_LLM_API_KEY")); key != "" {
-		cfg.LLM.APIKey = key
-	} else if file := firstNonEmpty(os.Getenv("CHIRON_LLM_API_KEY_FILE"), cfg.LLM.APIKeyFile); file != "" {
-		key, err := readSecret(resolve(root, file))
-		if err != nil {
-			return nil, fmt.Errorf("LLM API key file: %w", err)
-		}
-		cfg.LLM.APIKey = key
-	}
 	lock, err := acquireWriterLock(filepath.Join(dataRoot(cfg, root), ".chiron-writer.lock"))
 	if err != nil {
 		return nil, err
@@ -286,7 +280,7 @@ func New(cfg *Config, root string) (*Server, error) {
 		chain: llm.New(llm.FactoryConfig{
 			Provider: cfg.Provider, AnthropicModel: cfg.AnthropicModel,
 			ClaudeCLIModel: cfg.ClaudeCLIModel, Upstreams: cfg.Upstreams, LLM: cfg.LLM,
-			CLIConfigDir: filepath.Join(root, "claude"),
+			CLIConfigDir: claudeConfigRoot(cfg, root),
 		}),
 	}
 	s.startGenerate = func(slug, title, brief string, named []string, planOnly bool) {
@@ -359,17 +353,15 @@ func readSecret(path string) (string, error) {
 	return secret, nil
 }
 
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if value = strings.TrimSpace(value); value != "" {
-			return value
-		}
-	}
-	return ""
-}
-
 func (s *Server) dataRoot() string {
 	return dataRoot(s.cfg, s.root)
+}
+
+func claudeConfigRoot(cfg *Config, root string) string {
+	if cfg.ClaudeConfigDir != "" {
+		return resolve(root, cfg.ClaudeConfigDir)
+	}
+	return filepath.Join(root, "claude")
 }
 
 func dataRoot(cfg *Config, root string) string {

@@ -237,9 +237,9 @@ cd server && .venv/bin/python test_sim_learners.py  # simulated learners
 CHIRON_TEST_BASE=http://host:8080 .venv/bin/python test_sim_learners.py
 ```
 
-For a single-node NAS deployment backed by DeepInfra, including immutable OCI
-builds, durable/cache/scratch mounts, file secrets, health checks, backup and
-restore, see [docs/NAS-OPERATIONS.md](docs/NAS-OPERATIONS.md).
+For the persistent Incus system container on `orca`, including the exact
+filesystem, service, Claude subscription login, health-check, and backup
+contract, see [docs/ORCA-OPERATIONS.md](docs/ORCA-OPERATIONS.md).
 
 The simulated learners are the interesting ones: a strong learner who should
 clear gates and unlock extensions, a weak learner who should be held with the

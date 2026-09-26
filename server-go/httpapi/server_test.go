@@ -105,28 +105,29 @@ func TestNoTokenLeavesTheServerOpen(t *testing.T) {
 }
 
 func TestFileSecretsAndExplicitPersistentRoots(t *testing.T) {
+	t.Setenv("CHIRON_PROVIDER", "")
 	root := t.TempDir()
 	data := filepath.Join(root, "persistent")
+	claude := filepath.Join(root, "claude-state")
 	auth := filepath.Join(root, "auth")
-	llmKey := filepath.Join(root, "llm")
 	if err := os.WriteFile(auth, []byte(" bearer-key\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(llmKey, []byte(" provider-key\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	cfg := &Config{
 		DataDir: data, GeneratedCorporaDir: filepath.Join(data, "corpora"),
+		Provider: "claude-cli", ClaudeConfigDir: claude,
 		AuthTokenFile: auth, PrimersDir: "", ReadingsDir: "", RequestsDir: "", BuildsDir: "",
-		LLM: llm.Config{APIKeyFile: llmKey},
 	}
 	s, err := New(cfg, root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	if s.token != "bearer-key" || cfg.LLM.APIKey != "provider-key" {
-		t.Fatalf("file secrets were not loaded")
+	if s.token != "bearer-key" {
+		t.Fatalf("file auth token was not loaded")
+	}
+	if got := s.chain.(*llm.ClaudeCLI).ConfigDir; got != claude {
+		t.Fatalf("Claude config dir = %q, want %q", got, claude)
 	}
 	for got, want := range map[string]string{
 		s.readingsRoot():         filepath.Join(data, "readings"),

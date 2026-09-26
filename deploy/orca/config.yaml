@@ -1,0 +1,34 @@
+# Persistent Incus system-container layout. The release tree is immutable;
+# state, generated content, deployable Apple builds, caches, and scratch do not
+# overlap.
+data_dir: /var/lib/chiron/state
+generated_corpora_dir: /var/lib/chiron/generated
+cache_dir: /var/cache/chiron
+temp_dir: /var/tmp/chiron
+builds_dir: /var/lib/chiron/deployable/apple
+requests_dir: /var/lib/chiron/state/requests
+readings_dir: /var/lib/chiron/state/readings
+primers_dir: /var/lib/chiron/state/primers
+claude_config_dir: /var/lib/chiron/claude
+fonts_dir: /opt/chiron/current/assets/fonts
+
+subjects:
+  - id: ai
+    title: How AI Works
+    corpus_dir: /opt/chiron/current/corpus
+    state_dir: /var/lib/chiron/state/subjects/ai
+  - id: data
+    title: Where the Words Come From
+    corpus_dir: /opt/chiron/current/corpus-v2
+    state_dir: /var/lib/chiron/state/subjects/data
+
+provider: claude-cli
+batch_grading: true
+session:
+  mastery_gate: 0.80
+  extension_trigger: 0.90
+  check_items: 9
+  callback_fraction: 0.4
+  chunk_minutes: 22
+  break_minutes: 5
+  long_break_every_chunks: 4
