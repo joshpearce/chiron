@@ -21,6 +21,18 @@ final class ShelvesUITests: HarnessTestCase {
         try XCTUnwrap(try state()["shelves"] as? [[String: Any]])
     }
 
+    /// Connection lives on Sync, nested under Library. The shelf must observe
+    /// that object directly or its initial offline chrome never changes.
+    func testAConnectedServerUpdatesTheBadgeAndEnablesCreation() throws {
+        _ = app
+        try waitUntil("the health probe to connect") {
+            (try? self.state()["connected"] as? Bool) == true
+        }
+        XCTAssertTrue(app.buttons["Capture"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Capture"].firstMatch.isEnabled)
+        XCTAssertTrue(app.descendants(matching: .any)["Server connected"].firstMatch.exists)
+    }
+
     /// The shelf screen, with any shelf an earlier run left behind removed.
     private func freshShelf(named name: String, clearing prefix: String) throws -> String {
         _ = app

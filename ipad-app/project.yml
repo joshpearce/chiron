@@ -12,6 +12,11 @@ packages:
   Citadel:
     url: https://github.com/orlandos-nl/Citadel.git
     from: 0.12.1
+  # 1.7.0 emits Swift 6.4 borrowing runtime calls that are unavailable on
+  # macOS 26 when the app is built with Xcode 27.
+  Collections:
+    url: https://github.com/apple/swift-collections.git
+    exactVersion: 1.6.0
 targets:
   Chiron:
     type: application

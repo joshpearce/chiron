@@ -72,7 +72,7 @@ struct ContentView: View {
                 DocumentReaderView(doc: doc)
                     .id(doc.id)
             } else {
-                BookshelfView()
+                BookshelfView(sync: library.sync)
             }
         }
         // Fill the screen so the top-right chrome pins to the display corner.
@@ -222,7 +222,7 @@ struct BookView: View {
                     .accessibilityLabel("Bookshelf")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    ConnectionBadge(compact: true)
+                    ConnectionBadge(sync: library.sync, compact: true)
                 }
                 ToolbarSpacer(.fixed, placement: .topBarTrailing)
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -326,6 +326,7 @@ struct BuildBanner: View {
 
 struct BookshelfView: View {
     @EnvironmentObject var library: Library
+    @ObservedObject var sync: Sync
 
     @State private var namingShelf = false
     @State private var importingPDF = false
@@ -339,7 +340,7 @@ struct BookshelfView: View {
                 .toolbarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        ConnectionBadge(compact: true)
+                        ConnectionBadge(sync: sync, compact: true)
                     }
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         Button {
@@ -347,27 +348,27 @@ struct BookshelfView: View {
                         } label: {
                             Label("Capture", systemImage: "text.badge.plus")
                         }
-                        .disabled(!library.sync.connected)
+                        .disabled(!sync.connected)
                         .accessibilityHint("Paste something and ask about it; a primer appears in the library")
                         Button {
                             library.teaching = true
                         } label: {
                             Label("Teach me something else", systemImage: "sparkles")
                         }
-                        .disabled(!library.sync.connected)
+                        .disabled(!sync.connected)
                         Button {
                             newShelfName = ""
                             namingShelf = true
                         } label: {
                             Label("New shelf", systemImage: "folder.badge.plus")
                         }
-                        .disabled(!library.sync.connected)
+                        .disabled(!sync.connected)
                         Button {
                             importingPDF = true
                         } label: {
                             Label("Import a PDF or EPUB", systemImage: "doc.badge.plus")
                         }
-                        .disabled(!library.sync.connected)
+                        .disabled(!sync.connected)
                         .accessibilityHint("A PDF from Files goes on the shelf")
                         Button {
                             link = UIPasteboard.general.url?.absoluteString ?? ""
@@ -375,7 +376,7 @@ struct BookshelfView: View {
                         } label: {
                             Label("Read a link or follow a blog", systemImage: "link.badge.plus")
                         }
-                        .disabled(!library.sync.connected)
+                        .disabled(!sync.connected)
                         .accessibilityHint("A page on the web is read here; a feed is followed as a card")
                     }
                     ToolbarSpacer(.fixed, placement: .topBarTrailing)
@@ -546,7 +547,7 @@ struct ConnectionSettings: View {
 
                 AgentSection(agent: library.agent)
 
-                Section { ConnectionBadge() }
+                Section { ConnectionBadge(sync: library.sync) }
             }
             .navigationTitle("Connection")
             .toolbar {
@@ -815,12 +816,12 @@ struct ServerEditor: View {
 /// Whether the server is reachable, and whether the sprite's agent has the
 /// app. In a toolbar it is the symbols alone; on a page, the words too.
 struct ConnectionBadge: View {
-    @EnvironmentObject var library: Library
+    @ObservedObject var sync: Sync
     @ObservedObject private var agentState = AgentBadgeState.shared
     var compact = false
 
     var body: some View {
-        let connected = library.sync.connected
+        let connected = sync.connected
         Group {
             if compact {
                 labels(connected).labelStyle(.iconOnly).font(.body)
@@ -830,7 +831,7 @@ struct ConnectionBadge: View {
         }
         .task {
             while !Task.isCancelled {
-                await library.sync.probe()
+                await sync.probe()
                 try? await Task.sleep(nanoseconds: 15_000_000_000)
             }
         }
